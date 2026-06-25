@@ -1,21 +1,64 @@
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle, MySql2Database } from "drizzle-orm/mysql2";
+import { createPool, Pool } from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: ReturnType<typeof drizzle> | null = null;
+type DrizzleDb = MySql2Database<Record<string, never>>;
+let _db: DrizzleDb | null = null;
+let _pool: Pool | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+/**
+ * Returns a Drizzle instance backed by a mysql2 connection pool.
+ * The pool automatically handles reconnection on ECONNRESET/ECONNREFUSED.
+ * Retries up to 3 times with exponential backoff on failure.
+ */
+export async function getDb(): Promise<DrizzleDb | null> {
+  if (_db) return _db;
+  if (!process.env.DATABASE_URL) return null;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _pool = createPool({
+        uri: process.env.DATABASE_URL,
+        connectionLimit: 10,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000,
+        waitForConnections: true,
+        queueLimit: 0,
+      });
+
+      // Test the connection
+      await _pool.query("SELECT 1");
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      _db = drizzle(_pool as any) as unknown as DrizzleDb;
+      console.log(`[Database] Pool connected successfully (attempt ${attempt})`);
+      return _db;
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.error(`[Database] Failed to connect pool (attempt ${attempt}/3):`, error);
+      _pool = null;
       _db = null;
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1000 * attempt)); // 1s, 2s backoff
+      }
     }
   }
-  return _db;
+  console.error("[Database] All connection attempts failed");
+  return null;
+}
+
+/**
+ * Reset the DB connection (called on fatal errors so the next request reconnects).
+ * With a pool, we just destroy and recreate it.
+ */
+export function resetDb() {
+  if (_pool) {
+    _pool.end().catch(() => {}); // gracefully close existing connections
+  }
+  _pool = null;
+  _db = null;
+  console.log("[Database] Pool reset, will reconnect on next request");
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -52,10 +95,18 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
     }
+    // List of emails that should always get admin role
+    const ADMIN_EMAILS = [
+      'hilitcaspi@gmail.com',
+      'shaharnat08@gmail.com',
+      'drorbaraksm@gmail.com',
+      'guy@justdigital.co.il',
+    ];
+
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
+    } else if (user.openId === ENV.ownerOpenId || (user.email && ADMIN_EMAILS.includes(user.email))) {
       values.role = 'admin';
       updateSet.role = 'admin';
     }
