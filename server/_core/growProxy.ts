@@ -13,21 +13,27 @@
  *   /api/grow-proxy/prod/<path>  → https://api.meshulam.co.il/<path>
  *   /api/grow-proxy/<path>       → https://secure.meshulam.co.il/<path>
  *
- * Notes:
- * - The runtime config (params.json) calls https://secure.meshulam.co.il directly
- *   in PRODUCTION; the patched SDK rewrites that host to this proxy as well.
- * - We forward method, query string, headers (minus hop-by-hop / host), and the
- *   raw body. We must register this BEFORE express.json so the raw body is intact.
+ * IMPORTANT — body handling:
+ * This route is registered AFTER express.json()/express.urlencoded(), so the
+ * request stream has already been consumed. We therefore MUST rebuild the
+ * upstream body from the already-parsed `req.body` (never re-read the raw
+ * stream — `req.on("end")` would never fire again and the request would hang
+ * forever). We also wrap every upstream call in a hard AbortController timeout
+ * with a fast Cloudflare Worker fallback so a slow/blocked Meshulam edge can
+ * never freeze the wallet.
  */
 import type { Express, Request, Response } from "express";
 
 const PROXY_BASE = "/api/grow-proxy";
 
-// Fallback: the original Cloudflare Worker, used only if Meshulam blocks our
-// server egress IP via Incapsula (HTTP 403 + Incapsula HTML). Cloudflare's
-// network is not IP-blocked by Meshulam, so it keeps payments working even if
-// the Manus production egress IP is ever blacklisted.
+// Fallback: the original Cloudflare Worker, used if Meshulam blocks our server
+// egress IP via Incapsula (HTTP 403 + Incapsula HTML) or if the direct call
+// times out. Cloudflare's network is not IP-blocked by Meshulam.
 const CF_WORKER_BASE = "https://grow-proxy.hilitcaspi.workers.dev";
+
+// Hard timeouts so a request can never hang indefinitely.
+const PRIMARY_TIMEOUT_MS = 8000;
+const FALLBACK_TIMEOUT_MS = 12000;
 
 function looksBlocked(status: number, body: Buffer): boolean {
   if (status !== 403 && status !== 503) return false;
@@ -69,67 +75,120 @@ function resolveUpstream(pathAfterBase: string): string {
   return `https://secure.meshulam.co.il${pathAfterBase}`;
 }
 
+/**
+ * Rebuild the upstream request body + content-type from express's already-parsed
+ * `req.body`. Returns `undefined` body for GET/HEAD or empty payloads.
+ */
+function buildBody(req: Request): { body?: string; contentType?: string } {
+  const method = req.method.toUpperCase();
+  if (method === "GET" || method === "HEAD") return {};
+
+  const raw = (req as any).body;
+  if (raw == null || (typeof raw === "object" && Object.keys(raw).length === 0)) {
+    return {};
+  }
+
+  const ct = (req.headers["content-type"] || "").toString().toLowerCase();
+
+  // JSON body
+  if (ct.includes("application/json")) {
+    return { body: JSON.stringify(raw), contentType: "application/json" };
+  }
+
+  // urlencoded body (the Grow SDK uses this for createPaymentProcess etc.)
+  if (ct.includes("application/x-www-form-urlencoded") || typeof raw === "object") {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(raw)) {
+      if (Array.isArray(v)) v.forEach((item) => params.append(k, String(item)));
+      else params.append(k, String(v));
+    }
+    return {
+      body: params.toString(),
+      contentType: "application/x-www-form-urlencoded",
+    };
+  }
+
+  // Fallback: stringify whatever we have
+  return { body: String(raw), contentType: ct || undefined };
+}
+
+type FetchResponse = Awaited<ReturnType<typeof fetch>>;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<FetchResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function registerGrowProxy(app: Express): void {
   const handler = async (req: Request, res: Response) => {
     try {
-      // Everything after PROXY_BASE, preserving the original query string.
       const fullPath = req.originalUrl; // e.g. /api/grow-proxy/prod/api/...?x=1
       const afterBase = fullPath.slice(PROXY_BASE.length) || "/";
       const upstreamUrl = resolveUpstream(afterBase);
 
-      // Build forwarded headers.
+      // Build forwarded headers from express-parsed request.
       const headers: Record<string, string> = { ...SPOOF_HEADERS };
       for (const [key, value] of Object.entries(req.headers)) {
         const lower = key.toLowerCase();
         if (HOP_BY_HOP.has(lower)) continue;
+        if (lower === "content-type") continue; // set from rebuilt body below
         if (typeof value === "string") headers[key] = value;
         else if (Array.isArray(value)) headers[key] = value.join(", ");
       }
 
       const method = req.method.toUpperCase();
-      const hasBody = method !== "GET" && method !== "HEAD";
+      const { body, contentType } = buildBody(req);
+      if (contentType) headers["Content-Type"] = contentType;
 
-      // Collect the raw request body (this route runs before express.json).
-      let body: Buffer | undefined;
-      if (hasBody) {
-        body = await new Promise<Buffer>((resolve, reject) => {
-          const chunks: Buffer[] = [];
-          req.on("data", (c) => chunks.push(Buffer.from(c)));
-          req.on("end", () => resolve(Buffer.concat(chunks)));
-          req.on("error", reject);
-        });
+      const init: RequestInit = { method, headers };
+      if (body !== undefined) init.body = body;
+
+      // Primary attempt: direct from this server to Meshulam (hard timeout).
+      let upstream: FetchResponse | null = null;
+      let buf: Buffer | null = null;
+      let status = 0;
+      let contentTypeOut: string | null = null;
+      let primaryFailed = false;
+
+      try {
+        upstream = await fetchWithTimeout(upstreamUrl, init, PRIMARY_TIMEOUT_MS);
+        buf = Buffer.from(await upstream.arrayBuffer());
+        status = upstream.status;
+        contentTypeOut = upstream.headers.get("content-type");
+      } catch (e: any) {
+        primaryFailed = true;
+        console.warn(
+          "[GrowProxy] Direct Meshulam call failed/timed out:",
+          e?.name || e?.message || e,
+        );
       }
 
-      const bodyInit =
-        hasBody && body && body.length > 0 ? new Uint8Array(body) : undefined;
-
-      const doFetch = (url: string) =>
-        fetch(url, { method, headers, body: bodyInit });
-
-      // Primary attempt: direct from this server to Meshulam.
-      let upstream = await doFetch(upstreamUrl);
-      let buf = Buffer.from(await upstream.arrayBuffer());
-      let status = upstream.status;
-      let contentType = upstream.headers.get("content-type");
-
-      // Fallback: if Meshulam blocks our egress IP (Incapsula), retry via the
-      // Cloudflare Worker, whose network is not IP-blocked.
-      if (looksBlocked(status, buf)) {
+      // Fallback: if direct attempt timed out, errored, or was Incapsula-blocked,
+      // retry via the Cloudflare Worker (different egress network).
+      if (primaryFailed || (buf && looksBlocked(status, buf))) {
         try {
           const fbUrl = `${CF_WORKER_BASE}${afterBase}`;
-          const fb = await doFetch(fbUrl);
+          const fb = await fetchWithTimeout(fbUrl, init, FALLBACK_TIMEOUT_MS);
           const fbBuf = Buffer.from(await fb.arrayBuffer());
           if (!looksBlocked(fb.status, fbBuf)) {
-            upstream = fb;
             buf = fbBuf;
             status = fb.status;
-            contentType = fb.headers.get("content-type");
+            contentTypeOut = fb.headers.get("content-type");
             console.log("[GrowProxy] Served via Cloudflare Worker fallback");
           }
         } catch (fbErr: any) {
           console.warn(
             "[GrowProxy] Worker fallback failed:",
-            fbErr?.message || fbErr,
+            fbErr?.name || fbErr?.message || fbErr,
           );
         }
       }
@@ -146,11 +205,21 @@ export function registerGrowProxy(app: Express): void {
         "GET, POST, PUT, DELETE, OPTIONS",
       );
 
-      if (contentType) res.setHeader("Content-Type", contentType);
+      if (buf == null) {
+        // Both attempts failed — return a fast error instead of hanging.
+        res
+          .status(502)
+          .json({ status: false, err: { message: "grow upstream unavailable" } });
+        return;
+      }
+
+      if (contentTypeOut) res.setHeader("Content-Type", contentTypeOut);
       res.status(status).send(buf);
     } catch (err: any) {
       console.error("[GrowProxy] Proxy error:", err?.message || err);
-      res.status(502).json({ status: false, err: { message: "grow proxy error" } });
+      res
+        .status(502)
+        .json({ status: false, err: { message: "grow proxy error" } });
     }
   };
 

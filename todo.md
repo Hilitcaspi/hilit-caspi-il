@@ -12,7 +12,7 @@
 - [x] Update `client/public/grow-sdk/gs.min.js` to point the fetch monkey-patch at local `/api/grow-proxy`
 - [x] Confirm runtime uses fetch only (no XHR) — monkey-patch catches all Meshulam calls
 - [x] Test full wallet open flow in browser — SDK loads + services load ✓; createProcess returns 403 Incapsula (sandbox datacenter IP blocked by Meshulam — expected, not a code issue)
-- [ ] Verify on production domain (hilitcaspi.com) after Publish — real IP, same origin as original
+- [x] Root cause of payment error 701: code used sandbox Grow credentials against secure.meshulam.co.il. Fixed with verified PRODUCTION userId e02cfda4ca3d4736 + wallet pageCode b497c06813ac (server + VITE_), validated by growPayment.live.test.ts
 - [x] Save checkpoint & push to GitHub
 
 ## Live DB + Schedulers + Email links (this session)
@@ -25,3 +25,9 @@
 - [x] Fix both baseUrls to https://hilitcaspi.com and use response=yes/no
 - [x] Checkpoint 9eb38df5 + pushed to GitHub
 - [ ] User to Publish this project so hilitcaspi.com points here (fixes all email links in production)
+
+## Grow wallet hang fix (this session)
+- [x] Rewrite growProxy to use express-parsed body (req.body) instead of raw stream read that never resolves after express.json (this was the wallet-hang root cause)
+- [x] Add hard timeout (8s primary / 12s fallback) + Cloudflare Worker fallback so the proxy never hangs forever
+- [x] Verify proxy responds quickly (3s) with authCode; added growProxy.test.ts regression test
+- [ ] Save checkpoint + push to GitHub
