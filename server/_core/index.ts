@@ -670,9 +670,18 @@ async function startServer() {
     console.log(`Server running on http://localhost:${port}/`);
   });
 
+  // ─── Scheduler master switch ──────────────────────────────────────────────
+  // This project shares the LIVE database with the original project. To avoid
+  // duplicate emails / WhatsApp / matches being sent by two running instances,
+  // all background schedulers are DISABLED here unless SCHEDULERS_ENABLED="true".
+  const SCHEDULERS_ENABLED = process.env.SCHEDULERS_ENABLED === "true";
+  if (!SCHEDULERS_ENABLED) {
+    console.log("[Scheduler] All background schedulers are DISABLED (SCHEDULERS_ENABLED != 'true'). This instance will not send automated emails/WhatsApp or run matching.");
+  }
+
   // Email automation scheduler - runs every 5 minutes
   const EMAIL_SCHEDULER_INTERVAL = 5 * 60 * 1000; // 5 minutes
-  setInterval(async () => {
+  if (SCHEDULERS_ENABLED) setInterval(async () => {
     try {
       const count = await processPendingEmails();
       if (count > 0) {
@@ -712,14 +721,14 @@ async function startServer() {
       }
     }
   }, EMAIL_SCHEDULER_INTERVAL);
-  console.log("[Scheduler] Email + meeting reminder scheduler started (every 5 min)");
+  if (SCHEDULERS_ENABLED) console.log("[Scheduler] Email + meeting reminder scheduler started (every 5 min)");
 
   // Tri-daily matchmaking scheduler - runs every 3 days at 09:00 Israel time
   // Check every hour if it's time to run
   const MATCH_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
   const MATCH_RUN_INTERVAL_DAYS = 3;
   let lastMatchRunDate = "";
-  setInterval(async () => {
+  if (SCHEDULERS_ENABLED) setInterval(async () => {
     try {
       const now = new Date();
       // Israel timezone (UTC+3)
@@ -744,7 +753,7 @@ async function startServer() {
       console.error("[MatchScheduler] Error:", err);
     }
   }, MATCH_CHECK_INTERVAL);
-  console.log("[MatchScheduler] Tri-daily matching scheduler started (runs every 3 days at 09:00 IL, full algorithm)");
+  if (SCHEDULERS_ENABLED) console.log("[MatchScheduler] Tri-daily matching scheduler started (runs every 3 days at 09:00 IL, full algorithm)");
 
   // ─── Meta Lead Ads Polling (every 1 minute) ───────────────────────────────
   // Pulls new leads directly from Meta Graph API - does NOT rely on webhook
@@ -830,9 +839,11 @@ async function startServer() {
   }
 
   // Run immediately on startup to catch any missed leads
-  pollMetaLeads();
-  setInterval(pollMetaLeads, META_POLL_INTERVAL);
-  console.log("[MetaPoller] Meta Lead Ads polling started (every 1 minute)");
+  if (SCHEDULERS_ENABLED) {
+    pollMetaLeads();
+    setInterval(pollMetaLeads, META_POLL_INTERVAL);
+    console.log("[MetaPoller] Meta Lead Ads polling started (every 1 minute)");
+  }
 }
 
 startServer().catch(console.error);

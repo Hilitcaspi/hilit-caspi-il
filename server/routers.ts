@@ -2850,7 +2850,7 @@ export const appRouter = router({
           createdAt: now,
         });
 
-        const baseUrl = "https://hilitcaspi.manus.space";
+        const baseUrl = "https://hilitcaspi.com";
         const path = input.product === "guide_149" ? "/guide/view" : "/course/view";
         return { token, link: `${baseUrl}${path}?token=${token}` };
       }),
@@ -4437,9 +4437,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const opponentId = isA ? match.singleBId : match.singleAId;
         const [opponent] = await db.select().from(singles).where(eq(singles.id, opponentId)).limit(1);
         const token = isA ? match.approvalTokenA : match.approvalTokenB;
-        const baseUrl = process.env.VITE_OAUTH_PORTAL_URL || '';
-        const approveUrl = token ? `${baseUrl}/match/respond?token=${token}&answer=yes` : '';
-        const declineUrl = token ? `${baseUrl}/match/respond?token=${token}&answer=no` : '';
+        const baseUrl = "https://hilitcaspi.com";
+        const approveUrl = token ? `${baseUrl}/match/respond?token=${token}&response=yes` : '';
+        const declineUrl = token ? `${baseUrl}/match/respond?token=${token}&response=no` : '';
         const opponentName = opponent ? `${opponent.firstName} ${opponent.lastName || ''}`.trim() : 'מישהו מיוחד';
         const opponentAge = opponent?.age ?? null;
         const opponentCity = opponent?.city ?? null;

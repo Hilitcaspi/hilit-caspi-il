@@ -13,14 +13,24 @@ let _pool: Pool | null = null;
  * The pool automatically handles reconnection on ECONNRESET/ECONNREFUSED.
  * Retries up to 3 times with exponential backoff on failure.
  */
+/**
+ * Connection string. Prefer the original live database (LEGACY_DATABASE_URL)
+ * so this project operates on the real production data; fall back to the
+ * Manus-managed DATABASE_URL when the legacy URL is not set.
+ */
+function getDbUrl(): string {
+  return process.env.LEGACY_DATABASE_URL || process.env.DATABASE_URL || "";
+}
+
 export async function getDb(): Promise<DrizzleDb | null> {
   if (_db) return _db;
-  if (!process.env.DATABASE_URL) return null;
+  const dbUrl = getDbUrl();
+  if (!dbUrl) return null;
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       _pool = createPool({
-        uri: process.env.DATABASE_URL,
+        uri: dbUrl,
         connectionLimit: 10,
         enableKeepAlive: true,
         keepAliveInitialDelay: 10000,
