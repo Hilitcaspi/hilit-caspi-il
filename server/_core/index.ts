@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { registerGrowProxy } from "./growProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -71,6 +72,11 @@ async function startServer() {
   });
   app.use("/api/trpc/leads.", formLimiter);
   app.use("/api/trpc/matchmaking.", formLimiter);
+
+  // Local Grow payment proxy — forwards browser SDK requests to Meshulam server-side
+  // (replaces the external Cloudflare Worker grow-proxy.hilitcaspi.workers.dev).
+  // MUST be registered BEFORE express.json/global limiters so raw bodies pass through untouched.
+  registerGrowProxy(app);
 
   // OAuth callback under /api/oauth/callback
   registerStorageProxy(app);
