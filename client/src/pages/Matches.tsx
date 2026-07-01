@@ -41,10 +41,14 @@ export default function Matches() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const singleId = parseInt(params.get("id") || "0");
+  // [SECURITY] A valid questionnaireToken is required to view matches. This
+  // prevents IDOR: changing the numeric id in the URL no longer exposes anyone
+  // else's matches. The backend verifies the token belongs to this singleId.
+  const token = params.get("token") || "";
 
   const { data: matches, isLoading, error } = trpc.singles.getMatches.useQuery(
-    { singleId },
-    { enabled: singleId > 0 }
+    { singleId, token },
+    { enabled: singleId > 0 && token.length > 0 }
   );
 
   if (!singleId) {

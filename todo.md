@@ -42,4 +42,10 @@
 ## Favicon + release-match button (this session)
 - [x] Restore favicon to Hilit's photo (created favicon.ico + favicon-32.png + favicon-180.png in client/public, wired index.html with cache-bust)
 - [x] Add "שחרר התאמה" button in the "יש התאמה" match cards (status matched), wired to existing releaseFromMatch mutation
-- [ ] Verify, checkpoint, push to GitHub
+- [x] Verify, checkpoint (97148a01), push to GitHub
+
+## Security: IDOR fixes (this session)
+- [x] Remove/lock singles.getById (removed; was public, returned full PII by numeric id, unused in client)
+- [x] Add questionnaireToken verification to singles.getMatches; update Matches.tsx to pass token
+- [x] Type-check passed; verified no remaining getById refs
+- [ ] Checkpoint + push to GitHub

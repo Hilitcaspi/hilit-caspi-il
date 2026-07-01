@@ -1428,10 +1428,21 @@ export const appRouter = router({
       }),
 
     getMatches: publicProcedure
-      .input(z.object({ singleId: z.number() }))
+      .input(z.object({ singleId: z.number(), token: z.string().min(10) }))
       .query(async ({ input }) => {
         const db = await getDb();
         if (!db) return [];
+
+        // [SECURITY] Verify ownership: the caller must present the single's own
+        // questionnaireToken that matches the requested singleId. This prevents
+        // IDOR enumeration by simply changing the numeric id in the URL.
+        const [owner] = await db.select({ id: singles.id, token: singles.questionnaireToken })
+          .from(singles)
+          .where(eq(singles.id, input.singleId))
+          .limit(1);
+        if (!owner || !owner.token || owner.token !== input.token) {
+          return [];
+        }
 
         const myMatches = await db
           .select()
@@ -1462,14 +1473,11 @@ export const appRouter = router({
         return matchedProfiles.filter(Boolean);
       }),
 
-    getById: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return null;
-        const [profile] = await db.select().from(singles).where(eq(singles.id, input.id));
-        return profile || null;
-      }),
+    // [SECURITY] singles.getById was removed. It was a public endpoint returning a
+    // full profile (incl. phone/email/questionnaireToken) by sequential numeric id,
+    // enabling IDOR enumeration of the whole database. It was unused by the client.
+    // If an admin-only lookup is needed in the future, reintroduce it guarded by a
+    // role check (protectedProcedure + ctx.user.role === "admin").
 
     /**
      * Register a basic profile after payment (before the 15-question scientific questionnaire).
