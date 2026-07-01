@@ -1327,6 +1327,23 @@ export default function CRMMatchmaking() {
                         </div>
                       )}
 
+                      {/* Release both from an active (matched) match */}
+                      {match.status === "matched" && (
+                        <div className="flex gap-2 mb-3">
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`לשחרר את ${match.singleAName} ו-${match.singleBName} מההתאמה? שניהם יחזרו למאגר לקבלת התאמות חדשות.`)) {
+                                releaseFromMatch.mutate({ matchId: match.id });
+                              }
+                            }}
+                            disabled={releaseFromMatch.isPending}
+                            className="flex items-center gap-1 bg-red-100 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                          >
+                            🔓 שחרר התאמה
+                          </button>
+                        </div>
+                      )}
+
                       {/* Follow-up actions for matched 14+ days */}
                       {match.status === "matched" && match.matchedAt && match.matchedAt < now14daysAgo && (
                         <div className="bg-purple-50 rounded-xl p-3 space-y-3">
