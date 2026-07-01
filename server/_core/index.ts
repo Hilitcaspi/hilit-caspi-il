@@ -21,6 +21,10 @@ import { handleGrowWebhook } from "../growWebhook";
 import rateLimit from "express-rate-limit";
 import multer from "multer";
 import { storagePut } from "../storage";
+import { sendErrorAlert, installProcessErrorAlerts } from "./errorAlert";
+
+// Install process-level error alerts (uncaughtException / unhandledRejection).
+installProcessErrorAlerts();
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -130,6 +134,7 @@ async function startServer() {
         res.json({ url });
       } catch (err: any) {
         console.error("[UploadPhoto]", err);
+        void sendErrorAlert({ source: "express:upload-photo", error: err, context: { route: req.path } });
         res.status(500).json({ error: "Upload failed" });
       }
     });
@@ -305,6 +310,7 @@ async function startServer() {
       res.send(Buffer.from(buffer));
     } catch (err) {
       console.error("[GuideDownload] Error:", err);
+      void sendErrorAlert({ source: "express:guide-download", error: err, context: { route: req.path } });
       res.status(500).send("Error fetching guide");
     }
   });
@@ -548,6 +554,7 @@ async function startServer() {
       res.json({ success: true, totalFound, newlyInserted: inserted, timestamp: new Date().toISOString() });
     } catch (err) {
       console.error('[Daily Matching] Error:', err);
+      void sendErrorAlert({ source: "express:daily-matching", error: err, context: { route: req.path } });
       res.status(500).json({ error: String(err) });
     }
   });
@@ -611,6 +618,7 @@ async function startServer() {
       res.json({ ok: true, updated, total: singlesWithBirthDate.length });
     } catch (err) {
       console.error('[UpdateAges] Error:', err);
+      void sendErrorAlert({ source: "express:update-ages", error: err, context: { route: req.path } });
       res.status(500).json({ error: String(err) });
     }
   });
@@ -621,11 +629,22 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
-      onError: async ({ error }) => {
+      onError: async ({ error, path, type }) => {
         const errMsg = String(error?.cause ?? error);
         if (errMsg.includes('ECONNRESET') || errMsg.includes('ETIMEDOUT') || errMsg.includes('ECONNREFUSED')) {
           const { resetDb } = await import('../db');
           resetDb();
+        }
+        // Email an alert on real server errors. Skip expected client-side errors
+        // (bad input, unauthorized, forbidden, not-found) to avoid inbox noise.
+        const code = error?.code;
+        const clientErrorCodes = ['BAD_REQUEST', 'UNAUTHORIZED', 'FORBIDDEN', 'NOT_FOUND', 'TIMEOUT', 'CONFLICT', 'PARSE_ERROR', 'METHOD_NOT_SUPPORTED', 'TOO_MANY_REQUESTS'];
+        if (!code || !clientErrorCodes.includes(code)) {
+          void sendErrorAlert({
+            source: 'tRPC',
+            error,
+            context: { path: path ?? '(unknown)', type: type ?? '(unknown)', code: code ?? '(none)' },
+          });
         }
       },
     })
@@ -650,6 +669,21 @@ async function startServer() {
       return res.redirect(301, "/en" + path);
     }
     next();
+  });
+
+  // ─── Express error-handling middleware ────────────────────────────────────
+  // Catches errors thrown from REST routes (non-tRPC). Placed before static
+  // serving. Emails an alert then returns a 500. Must keep the 4-arg signature
+  // so Express treats it as an error handler.
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('[Express error]', req.method, req.path, err);
+    void sendErrorAlert({
+      source: 'express',
+      error: err,
+      context: { method: req.method, route: req.path },
+    });
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: 'Internal Server Error' });
   });
 
   // development mode uses Vite, production mode uses static files

@@ -48,4 +48,13 @@
 - [x] Remove/lock singles.getById (removed; was public, returned full PII by numeric id, unused in client)
 - [x] Add questionnaireToken verification to singles.getMatches; update Matches.tsx to pass token
 - [x] Type-check passed; verified no remaining getById refs
-- [ ] Checkpoint + push to GitHub
+- [x] Checkpoint (044a7a1e) + push to GitHub
+
+## Server-error email alerts (this session)
+- [x] Create server/_core/errorAlert.ts: sendErrorAlert() via Brevo to hilit@hilitcaspi.com, with dedupe/throttle
+- [x] Wire tRPC onError (server/_core/index.ts) to sendErrorAlert (skips expected client errors)
+- [x] Add Express error-handling middleware
+- [x] Add process-level uncaughtException / unhandledRejection handlers
+- [x] Wire sendErrorAlert into meaningful REST catch blocks (upload-photo, guide-download, daily-matching, update-ages)
+- [x] Add vitest (4 tests pass) for throttling/dedupe/never-throws; tsc clean
+- [ ] Checkpoint; push to GitHub
