@@ -279,6 +279,7 @@ export default function CRMMatchmaking() {
     phone?: string | null; email?: string | null;
     photoUrl?: string | null; seekingGender?: string | null;
     maritalStatus?: string | null; hasChildren?: boolean | null; numberOfChildren?: number | null;
+    hasKids?: boolean | null; numKids?: number | null; wantsKids?: string | null;
     wantsChildren?: string | null; about?: string | null; aboutMe?: string | null; partnerDescription?: string | null;
     height?: number | null; religiosity?: string | null; education?: string | null;
   }>;
@@ -665,8 +666,16 @@ export default function CRMMatchmaking() {
                         {single.education && <div><span className="font-semibold text-[#191265]">השכלה:</span> {EDUCATION_LABELS[single.education] || single.education}</div>}
                         {single.religiosity && <div><span className="font-semibold text-[#191265]">דת:</span> {RELIGIOSITY_LABELS[single.religiosity] || single.religiosity}</div>}
                         {single.maritalStatus && <div><span className="font-semibold text-[#191265]">מצב משפחתי:</span> {MARITAL_LABELS[single.maritalStatus] || single.maritalStatus}</div>}
-                        {single.hasChildren != null && <div><span className="font-semibold text-[#191265]">ילדים:</span> {single.hasChildren ? `כן (${single.numberOfChildren || ""})` : "אין"}</div>}
-                        {single.wantsChildren && <div><span className="font-semibold text-[#191265]">רוצה ילדים:</span> {single.wantsChildren}</div>}
+                        {(() => {
+                          const hasKids = single.hasKids ?? single.hasChildren;
+                          const numKids = single.numKids ?? single.numberOfChildren;
+                          return <div><span className="font-semibold text-[#191265]">ילדים:</span> {hasKids ? `יש${numKids ? ` (${numKids})` : ""}` : "אין"}</div>;
+                        })()}
+                        {(() => {
+                          const wants = single.wantsKids ?? single.wantsChildren;
+                          const WANTS: Record<string, string> = { yes: "רוצה ילדים", no: "לא רוצה ילדים", open: "פתוח/ה לנושא", maybe: "אולי" };
+                          return <div><span className="font-semibold text-[#191265]">רוצה ילדים:</span> {wants ? (WANTS[wants] || wants) : "לא צוין"}</div>;
+                        })()}
                         {single.seekingGender && <div><span className="font-semibold text-[#191265]">מחפש/ת:</span> {single.seekingGender === 'male' ? 'גבר' : single.seekingGender === 'female' ? 'אישה' : 'לא משנה'}</div>}
                         {single.dnaType && <div><span className="font-semibold text-[#191265]">DNA:</span> {DNA_LABELS[single.dnaType] || single.dnaType}</div>}
                       </div>

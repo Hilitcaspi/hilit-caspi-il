@@ -30,4 +30,11 @@
 - [x] Rewrite growProxy to use express-parsed body (req.body) instead of raw stream read that never resolves after express.json (this was the wallet-hang root cause)
 - [x] Add hard timeout (8s primary / 12s fallback) + Cloudflare Worker fallback so the proxy never hangs forever
 - [x] Verify proxy responds quickly (3s) with authCode; added growProxy.test.ts regression test
-- [ ] Save checkpoint + push to GitHub
+- [x] Save checkpoint (ae80665f) + push to GitHub
+- [ ] User to Publish so the proxy fix reaches production, then verify wallet opens on hilitcaspi.com
+
+## Children display on profile + match email (this session)
+- [x] Profile card (CRMMatchmaking): two separate rows — "יש ילדים וכמה" and "רוצה ילדים" — reading real questionnaire fields (hasKids/numKids/wantsKids) for ALL singles
+- [x] Match proposal email (emailTemplates.buildMatchProposalEmail): include children info (has kids + count) for the proposed person
+- [x] Confirm the router passes hasKids/numKids/wantsKids into the email builder (fixed 3rd call site at 3538/3558 which was missing them + gender)
+- [ ] Show user a preview of both cases before finalizing
