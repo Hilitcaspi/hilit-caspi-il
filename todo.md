@@ -57,4 +57,10 @@
 - [x] Add process-level uncaughtException / unhandledRejection handlers
 - [x] Wire sendErrorAlert into meaningful REST catch blocks (upload-photo, guide-download, daily-matching, update-ages)
 - [x] Add vitest (4 tests pass) for throttling/dedupe/never-throws; tsc clean
-- [ ] Checkpoint; push to GitHub
+- [x] Checkpoint (261dede4); push to GitHub
+
+## Hidden UTM fields on thank-you page events (this session)
+- [x] Enrich Meta Pixel events (all: trackPurchase, trackLead, trackViewContent, trackCompleteRegistration, trackInitiateCheckout) with hidden utm_source/utm_medium/utm_campaign from captured UTM
+- [x] Enrich GA/GTM events (every dataLayer push, incl. gaPurchase/gaGenerateLead) with the same three hidden UTM fields
+- [x] Verify all product thank-you pages (course, database, coaching, digital guide, session) + lead pages fire enriched events via shared helpers
+- [x] Type-check (tsc --noEmit clean), checkpoint, push to GitHub

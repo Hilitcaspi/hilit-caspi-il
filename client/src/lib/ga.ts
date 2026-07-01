@@ -13,10 +13,34 @@ declare global {
   }
 }
 
+/**
+ * Hidden UTM fields attached to EVERY GA/GTM dataLayer event.
+ * NEVER rendered in the UI — read from the URL / stored campaign data and
+ * pushed only inside the event payload so GA4 can attribute leads and
+ * purchases to their traffic source (utm_source / utm_medium / utm_campaign).
+ */
+function hiddenUtmFields(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const p = new URLSearchParams(window.location.search);
+  const get = (key: string) =>
+    p.get(key) ??
+    sessionStorage.getItem(key) ??
+    localStorage.getItem(key) ??
+    undefined;
+  const out: Record<string, string> = {};
+  const s = get("utm_source");
+  const m = get("utm_medium");
+  const c = get("utm_campaign");
+  if (s) out.utm_source = s;
+  if (m) out.utm_medium = m;
+  if (c) out.utm_campaign = c;
+  return out;
+}
+
 function push(event: Record<string, unknown>) {
   if (typeof window === "undefined") return;
   window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push(event);
+  window.dataLayer.push({ ...event, ...hiddenUtmFields() });
 }
 
 // ─── Products catalogue ────────────────────────────────────────────────────────
