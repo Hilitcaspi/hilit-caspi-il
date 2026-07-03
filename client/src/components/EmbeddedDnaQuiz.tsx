@@ -3,7 +3,7 @@
  * Skips the lead capture phase (user is already registered via course token)
  * Calls onComplete(dnaType, gender) when done
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 
@@ -11,7 +11,7 @@ type DnaType = "leader" | "romantic" | "free_spirit" | "anchor";
 type Gender = "female" | "male";
 
 interface Props {
-  onComplete: (dnaType: DnaType, gender: Gender) => void;
+  onComplete: (dnaType: DnaType, gender: Gender, sessionId?: string) => void;
   initialDnaType?: DnaType | null;
   initialGender?: Gender;
 }
@@ -156,6 +156,9 @@ export default function EmbeddedDnaQuiz({ onComplete, initialDnaType, initialGen
   const [tiebreakerQuestion, setTiebreakerQuestion] = useState<typeof TIEBREAKER_QUESTIONS[0] | null>(null);
   const [tiebreakerAnswer, setTiebreakerAnswer] = useState<DnaType | null>(null);
 
+  // Track the sessionId generated for this quiz attempt via ref (avoids stale closure in onSuccess)
+  const quizSessionIdRef = useRef<string>("");
+
   const submitMutation = trpc.dnaQuiz.submit.useMutation({
     onSuccess: (data) => {
       const type = data.dnaType as DnaType;
@@ -163,7 +166,7 @@ export default function EmbeddedDnaQuiz({ onComplete, initialDnaType, initialGen
       setScores(data.scores as Record<DnaType, number>);
       // Call onComplete immediately - skip the result display phase
       // so the parent (Register.tsx) can navigate to the next step
-      onComplete(type, gender);
+      onComplete(type, gender, quizSessionIdRef.current);
     },
   });
   // Read UTM params from sessionStorage (set by DnaQuiz.tsx or any landing page)
@@ -213,6 +216,7 @@ export default function EmbeddedDnaQuiz({ onComplete, initialDnaType, initialGen
       }
       // Submit directly without capture (user already registered)
       const sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+      quizSessionIdRef.current = sessionId;
       submitMutation.mutate({
         sessionId,
         gender,
@@ -226,6 +230,7 @@ export default function EmbeddedDnaQuiz({ onComplete, initialDnaType, initialGen
   const handleTiebreaker = (chosen: DnaType) => {
     setTiebreakerAnswer(chosen);
     const sessionId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    quizSessionIdRef.current = sessionId;
     submitMutation.mutate({
       sessionId,
       gender,

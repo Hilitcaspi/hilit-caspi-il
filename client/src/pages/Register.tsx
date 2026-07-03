@@ -1200,9 +1200,10 @@ export default function Register() {
             <motion.div key="dna_select" {...slideIn}>
               <EmbeddedDnaQuiz
                 initialGender={gender}
-                onComplete={(dnaType, quizGender) => {
+                onComplete={(dnaType, quizGender, quizSessionId) => {
                   setDnaFromQuiz(dnaType);
                   setGender(quizGender as "female" | "male");
+                  if (quizSessionId) setSessionId(quizSessionId);
                   trackInitiateCheckout({ value: 249, currency: "ILS", content_name: "מאגר רווקים" });
                   setStep("payment");
                 }}

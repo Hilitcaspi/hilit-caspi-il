@@ -64,3 +64,12 @@
 - [x] Enrich GA/GTM events (every dataLayer push, incl. gaPurchase/gaGenerateLead) with the same three hidden UTM fields
 - [x] Verify all product thank-you pages (course, database, coaching, digital guide, session) + lead pages fire enriched events via shared helpers
 - [x] Type-check (tsc --noEmit clean), checkpoint, push to GitHub
+
+## DNA auto-linkage systemic fix (this session)
+- [x] Systemic DNA auto-linkage: at registration time, if dnaType is missing, look up dna_quiz_results by phone/email to auto-fill
+- [x] Reverse linkage: when DNA quiz is completed and singleId is set (markConverted), update singles.dnaType if null
+- [x] Vitest tests for DNA auto-linkage logic
+- [x] Fix EmbeddedDnaQuiz to pass sessionId back to Register.tsx (was lost before)
+- [x] Add DNA auto-link to skeleton update branch in registerBasicProfile
+- [x] Use useRef instead of useState for sessionId propagation (avoids stale closure race)
+- [x] One-time backfill: 76 existing singles updated with DNA type from CRM lead → dna_quiz_results

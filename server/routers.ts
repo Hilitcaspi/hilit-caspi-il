@@ -40,6 +40,93 @@ const DNA_HEBREW_LABELS: Record<string, string> = {
 
 type SingleRow = typeof singles.$inferSelect;
 
+/**
+ * Auto-link DNA quiz result to a single's profile.
+ * Strategy: look up CRM lead by email/phone → get quizSessionId → find dna_quiz_results row.
+ * If found and single has no dnaType, update singles.dnaType and link dna_quiz_results.singleId.
+ * Returns the resolved dnaType or null if no match found.
+ */
+async function autoLinkDnaType(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  singleId: number,
+  email: string,
+  phone?: string,
+  existingDnaType?: string | null
+): Promise<string | null> {
+  // If already has a dnaType, just ensure dna_quiz_results is linked
+  if (existingDnaType) {
+    // Still try to link the dna_quiz_results row if not already linked
+    const [alreadyLinked] = await db.select({ id: dnaQuizResults.id })
+      .from(dnaQuizResults).where(eq(dnaQuizResults.singleId, singleId)).limit(1);
+    if (!alreadyLinked) {
+      // Try to find via CRM lead
+      const [crmLead] = await db.select({ quizSessionId: crmLeads.quizSessionId })
+        .from(crmLeads)
+        .where(
+          and(
+            or(
+              sql`LOWER(${crmLeads.email}) = ${email.toLowerCase()}`,
+              phone && phone.length >= 9 ? eq(crmLeads.phone, phone) : sql`0=1`
+            ),
+            isNotNull(crmLeads.quizSessionId)
+          )
+        )
+        .orderBy(desc(crmLeads.createdAt))
+        .limit(1);
+      if (crmLead?.quizSessionId) {
+        await db.update(dnaQuizResults)
+          .set({ singleId, convertedToRegistration: true })
+          .where(and(
+            eq(dnaQuizResults.sessionId, crmLead.quizSessionId),
+            isNull(dnaQuizResults.singleId)
+          ));
+      }
+    }
+    return existingDnaType;
+  }
+
+  // No dnaType — try to find one via CRM lead → dna_quiz_results
+  const crmLeadRows = await db.select({ quizSessionId: crmLeads.quizSessionId, dnaType: crmLeads.dnaType })
+    .from(crmLeads)
+    .where(
+      and(
+        or(
+          sql`LOWER(${crmLeads.email}) = ${email.toLowerCase()}`,
+          phone && phone.length >= 9 ? eq(crmLeads.phone, phone) : sql`0=1`
+        ),
+        isNotNull(crmLeads.quizSessionId)
+      )
+    )
+    .orderBy(desc(crmLeads.createdAt))
+    .limit(1);
+
+  const crmLead = crmLeadRows[0];
+  if (!crmLead?.quizSessionId) return null;
+
+  // Look up the actual quiz result
+  const [quizResult] = await db.select({ dnaType: dnaQuizResults.dnaType, id: dnaQuizResults.id })
+    .from(dnaQuizResults)
+    .where(eq(dnaQuizResults.sessionId, crmLead.quizSessionId))
+    .limit(1);
+
+  if (!quizResult) return null;
+
+  // Found! Update the single's dnaType and link the quiz result
+  await db.update(singles)
+    .set({ dnaType: quizResult.dnaType, updatedAt: Date.now() })
+    .where(eq(singles.id, singleId));
+
+  await db.update(dnaQuizResults)
+    .set({ singleId, convertedToRegistration: true })
+    .where(and(
+      eq(dnaQuizResults.sessionId, crmLead.quizSessionId),
+      isNull(dnaQuizResults.singleId)
+    ));
+
+  console.log(`[AutoLinkDNA] Linked dnaType=${quizResult.dnaType} to single id=${singleId} via CRM quizSession=${crmLead.quizSessionId}`);
+  return quizResult.dnaType;
+}
+
 // ─── Matching algorithm ───────────────────────────────────────────────────────
 // Legacy ScoreBreakdown kept for backward compatibility with generateMatchesForSingle
 interface ScoreBreakdown {
@@ -1247,6 +1334,25 @@ export const appRouter = router({
           .update(dnaQuizResults)
           .set({ convertedToRegistration: true, singleId: input.singleId })
           .where(eq(dnaQuizResults.sessionId, input.sessionId));
+
+        // Reverse linkage: if the single has no dnaType, fill it from the quiz result
+        const [quizRow] = await db.select({ dnaType: dnaQuizResults.dnaType })
+          .from(dnaQuizResults)
+          .where(eq(dnaQuizResults.sessionId, input.sessionId))
+          .limit(1);
+        if (quizRow?.dnaType) {
+          const [single] = await db.select({ dnaType: singles.dnaType })
+            .from(singles)
+            .where(eq(singles.id, input.singleId))
+            .limit(1);
+          if (single && !single.dnaType) {
+            await db.update(singles)
+              .set({ dnaType: quizRow.dnaType, updatedAt: Date.now() })
+              .where(eq(singles.id, input.singleId));
+            console.log(`[markConverted] Reverse-linked dnaType=${quizRow.dnaType} to single id=${input.singleId}`);
+          }
+        }
+
         return { success: true };
       }),
   }),
@@ -1360,6 +1466,15 @@ export const appRouter = router({
             .update(dnaQuizResults)
             .set({ convertedToRegistration: true, singleId: newSingleId })
             .where(eq(dnaQuizResults.sessionId, input.dnaSessionId));
+        }
+
+        // Auto-link DNA type if not provided (user may have taken quiz separately)
+        if (!input.dnaType && !input.dnaSessionId) {
+          const linkedDna = await autoLinkDnaType(db, newSingleId, input.email, input.phone);
+          if (linkedDna) {
+            // Update the dnaType in the notification below
+            (input as any).dnaType = linkedDna;
+          }
         }
 
         // Update CRM lead status to client_database
@@ -1640,6 +1755,14 @@ export const appRouter = router({
                 .where(eq(dnaQuizResults.sessionId, input.dnaSessionId))
                 .catch(err => console.error("[RegisterBasic] dnaQuizResults skeleton update failed:", err));
             }
+            // Auto-link DNA type for skeleton records when dnaType/dnaSessionId are missing
+            if (!input.dnaType && !input.dnaSessionId) {
+              autoLinkDnaType(db, existingProfile.id, normalizedEmail, normalizedPhone)
+                .then(linkedDna => {
+                  if (linkedDna) console.log(`[RegisterBasic/Skeleton] Auto-linked dnaType=${linkedDna} for single id=${existingProfile.id}`);
+                })
+                .catch(err => console.error("[RegisterBasic/Skeleton] autoLinkDnaType failed:", err));
+            }
             return { singleId: existingProfile.id, questionnaireToken: existingProfile.questionnaireToken || "", success: true, alreadyExists: false };
           }
 
@@ -1740,6 +1863,15 @@ export const appRouter = router({
             .set({ convertedToRegistration: true, singleId: newSingleId })
             .where(eq(dnaQuizResults.sessionId, input.dnaSessionId))
             .catch(err => console.error("[RegisterBasic] dnaQuizResults update failed:", err));
+        }
+
+        // Auto-link DNA type if not provided (user may have taken quiz separately)
+        if (!input.dnaType && !input.dnaSessionId) {
+          autoLinkDnaType(db, newSingleId, normalizedEmail, normalizedPhone)
+            .then(linkedDna => {
+              if (linkedDna) console.log(`[RegisterBasic] Auto-linked dnaType=${linkedDna} for single id=${newSingleId}`);
+            })
+            .catch(err => console.error("[RegisterBasic] autoLinkDnaType failed:", err));
         }
 
         // Create or update CRM lead (non-blocking)
@@ -1968,6 +2100,12 @@ export const appRouter = router({
         const finalAge = (input.age && input.age > 0) ? input.age : profile.age;
         const finalGender = input.gender || profile.gender;
         const finalCity = input.city || profile.city;
+
+        // Auto-link DNA type if still missing at questionnaire completion time
+        if (!profile.dnaType) {
+          await autoLinkDnaType(db, profile.id, profile.email!, profile.phone ?? undefined)
+            .catch(err => console.error("[completeQuestionnaire] autoLinkDnaType failed:", err));
+        }
 
         // Generate matches and notify owner in background (fire-and-forget)
         // This avoids LLM timeout blocking the user's response
