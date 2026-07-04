@@ -322,7 +322,7 @@ export default function CRMMatchmaking() {
   // Set of single IDs currently in an active (proposed) match
   const activeMatchSingleIds = new Set<number>(
     typedMatches
-      .filter(m => m.status === "proposed")
+      .filter(m => m.status === "proposed" && m.proposedAt && (Date.now() - (m.proposedAt as number)) < 48 * 60 * 60 * 1000)
       .flatMap(m => [m.singleAId, m.singleBId])
   );
   // Map: singleId -> active match details (partner name, days, matchId, proposedAt)
@@ -389,7 +389,7 @@ export default function CRMMatchmaking() {
   };
 
   const matchSubCounts = {
-    pending:  typedMatches.filter(m => m.status === "pending").length,
+    pending:  typedMatches.filter(m => m.status === "pending" && !isMatchBlocked(m)).length,
     proposed: typedMatches.filter(m => isEverSent(m)).length,
     matched:  typedMatches.filter(m => m.status === "matched").length,
     rejected: typedMatches.filter(m => isNoMatch(m)).length,
@@ -407,8 +407,14 @@ export default function CRMMatchmaking() {
     );
   };
 
+  // Hide pending matches where either person is already in an active proposal (within 48h)
+  const isMatchBlocked = (m: any) => {
+    if (m.status !== "pending") return false;
+    return activeMatchSingleIds.has(m.singleAId) || activeMatchSingleIds.has(m.singleBId);
+  };
+
   const filteredMatchesBySubTab = {
-    pending:  typedMatches.filter(m => m.status === "pending").filter(filterMatchByName),
+    pending:  typedMatches.filter(m => m.status === "pending" && !isMatchBlocked(m)).filter(filterMatchByName),
     proposed: typedMatches.filter(m => isEverSent(m)).filter(filterMatchByName),
     matched:  typedMatches.filter(m => m.status === "matched").filter(filterMatchByName),
     rejected: typedMatches.filter(m => isNoMatch(m)).filter(filterMatchByName),
@@ -970,8 +976,7 @@ export default function CRMMatchmaking() {
             {filteredMatchesBySubTab[matchSubTab].map(match => {
               const cfg = MATCH_STATUS_CONFIG[match.status] || MATCH_STATUS_CONFIG.pending;
               const isExpanded = expandedMatch === match.id;
-              // Check if this pending match is blocked (one/both persons in active proposal)
-              const blockedInfo = match.status === "pending" ? getMatchBlockedInfo(match) : null;
+
 
               // Per-person status helper
               const getPersonStatus = (isA: boolean) => {
@@ -1018,7 +1023,7 @@ export default function CRMMatchmaking() {
               ];
 
               return (
-                <div key={match.id} className={`rounded-xl shadow-sm border overflow-hidden ${blockedInfo ? 'bg-red-50/40 border-red-200' : 'bg-white border-gray-100'}`}>
+                <div key={match.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   {/* Header */}
                   <div
                     className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -1033,9 +1038,7 @@ export default function CRMMatchmaking() {
                         )}
                         <Badge className={`text-xs ${cfg.color}`}>{cfg.icon} {cfg.label}</Badge>
                         <span className="text-sm font-semibold text-[#191265]">
-                          {blockedInfo?.aBlocked && <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1 align-middle" title="בהתאמה פעילה" />}
-                          {match.singleAName} + {blockedInfo?.bBlocked && <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1 align-middle" title="בהתאמה פעילה" />}
-                          {match.singleBName}
+                          {match.singleAName} + {match.singleBName}
                         </span>
                       </div>
                       {/* Per-side status row — visible without expanding */}
@@ -1053,14 +1056,7 @@ export default function CRMMatchmaking() {
                           )}
                         </div>
                       )}
-                      {/* Blocked status row for pending matches */}
-                      {match.status === "pending" && blockedInfo && (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">
-                            ⏳ בהתאמה פעילה (עוד {blockedInfo.maxHoursLeft} שעות)
-                          </span>
-                        </div>
-                      )}
+
                     </div>
                     <div className="flex items-center gap-2">
                       {/* Quick send button visible in collapsed state for pending matches */}
@@ -1068,19 +1064,14 @@ export default function CRMMatchmaking() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (blockedInfo) return;
                             if (window.confirm(`לשלוח התאמה בין ${match.singleAName} ל-${match.singleBName}?`)) {
                               approveMatch.mutate({ matchId: match.id, hilitsNote: undefined });
                             }
                           }}
-                          disabled={approveMatch.isPending || !!blockedInfo}
-                          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1 flex-shrink-0 ${blockedInfo ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#ffe27c] text-[#191265] hover:bg-[#ffd84a]'}`}
+                          disabled={approveMatch.isPending}
+                          className="bg-[#ffe27c] text-[#191265] text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#ffd84a] transition-colors disabled:opacity-50 flex items-center gap-1 flex-shrink-0"
                         >
-                          {blockedInfo ? (
-                            <><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-0.5" />חסום ({blockedInfo.maxHoursLeft}ש׳)</>
-                          ) : (
-                            <><Send size={12} />שלח התאמה</>
-                          )}
+                          <Send size={12} />שלח התאמה
                         </button>
                       )}
                       <span className="text-xs text-[#727272]">
@@ -1284,26 +1275,16 @@ export default function CRMMatchmaking() {
                       {/* Action buttons for pending matches */}
                       {match.status === "pending" && (
                         <div className="flex flex-col gap-2">
-                          {blockedInfo && (
-                            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
-                              <span className="font-bold">🔴 לא ניתן לשלוח כרגע</span>
-                              {blockedInfo.aBlocked && (
-                                <span className="block mt-1">{match.singleAName?.split(' ')[0]} בהתאמה פעילה עם {activeMatchBySingleId.get(match.singleAId)?.opponentName} (עוד {blockedInfo.blockedPersons[0]?.hoursLeft || 0} שעות)</span>
-                              )}
-                              {blockedInfo.bBlocked && (
-                                <span className="block mt-1">{match.singleBName?.split(' ')[0]} בהתאמה פעילה עם {activeMatchBySingleId.get(match.singleBId)?.opponentName} (עוד {blockedInfo.blockedPersons[blockedInfo.aBlocked ? 1 : 0]?.hoursLeft || 0} שעות)</span>
-                              )}
-                            </div>
-                          )}
+
                           <div className="flex gap-2">
                             <Button
                               size="sm"
                               onClick={() => approveMatch.mutate({ matchId: match.id, hilitsNote: hilitsNotes[match.id] || undefined })}
-                              disabled={approveMatch.isPending || !!blockedInfo}
-                              className={`flex-1 font-bold border-0 py-3 ${blockedInfo ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#ffe27c] text-[#191265] hover:bg-[#ffd84a]'}`}
+                              disabled={approveMatch.isPending}
+                              className="flex-1 font-bold border-0 py-3 bg-[#ffe27c] text-[#191265] hover:bg-[#ffd84a]"
                             >
                               <Send size={14} className="ml-1" />
-                              {blockedInfo ? 'חסום — בהתאמה פעילה' : 'שלח הצעה לשני הצדדים'}
+                              שלח הצעה לשני הצדדים
                             </Button>
                             <Button
                               size="sm"

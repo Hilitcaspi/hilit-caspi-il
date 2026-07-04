@@ -178,3 +178,6 @@
 ## Add Details to "No Match" Tab (July 4)
 - [x] Add wantsKids, hasKids, maritalStatus, height, education fields to singles in "ללא התאמה" tab
 - [x] Add same fields to recommended matches section below each single
+
+## Hide Blocked Matches Instead of Red Indicator (July 4)
+- [x] Instead of showing blocked matches with red dot/disabled button, completely HIDE pending matches where either person is in an active proposal (for 48h or until resolved)
