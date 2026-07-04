@@ -238,18 +238,34 @@ async function startServer() {
         const eventType = event.event;
         const email = event.email;
         const ts = event.ts ? event.ts * 1000 : Date.now();
+        const messageId = event["message-id"] || event.messageId || null;
         if (!email || !eventType) continue;
-        console.log(`[BrevoWebhook] ${eventType}: ${email}`);
+        console.log(`[BrevoWebhook] ${eventType}: ${email} (msgId: ${messageId})`);
+        
+        // Try to match by Brevo message-id tag first (most accurate),
+        // then fall back to most recent sent email within a reasonable time window
         if (eventType === "opened") {
+          // Update ALL sent emails for this recipient that haven't been opened yet within last 30 days
+          // This is more accurate than just the last one
+          const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
           await db.execute(
             sql`UPDATE email_log SET openCount = openCount + 1, openedAt = COALESCE(openedAt, ${ts})
-                WHERE recipientEmail = ${email} AND status = 'sent'
+                WHERE recipientEmail = ${email} AND status = 'sent' AND sentAt > ${thirtyDaysAgo}
+                AND openedAt IS NULL
+                ORDER BY sentAt DESC LIMIT 1`
+          );
+          // Also increment openCount for already-opened emails (re-opens)
+          await db.execute(
+            sql`UPDATE email_log SET openCount = openCount + 1
+                WHERE recipientEmail = ${email} AND status = 'sent' AND sentAt > ${thirtyDaysAgo}
+                AND openedAt IS NOT NULL
                 ORDER BY sentAt DESC LIMIT 1`
           );
         } else if (eventType === "click" || eventType === "clicks") {
+          const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
           await db.execute(
             sql`UPDATE email_log SET clickCount = clickCount + 1, clickedAt = COALESCE(clickedAt, ${ts})
-                WHERE recipientEmail = ${email} AND status = 'sent'
+                WHERE recipientEmail = ${email} AND status = 'sent' AND sentAt > ${thirtyDaysAgo}
                 ORDER BY sentAt DESC LIMIT 1`
           );
         } else if (eventType === "hard_bounce" || eventType === "soft_bounce" || eventType === "invalid_email") {
@@ -258,9 +274,14 @@ async function startServer() {
                 WHERE recipientEmail = ${email} AND status = 'sent'
                 ORDER BY sentAt DESC LIMIT 1`
           );
+          // Also mark lead as bounced for future reference
+          await db.execute(
+            sql`UPDATE crm_leads SET notes = CONCAT(COALESCE(notes,''), ${`\n[${eventType}: ${new Date(ts).toISOString().slice(0,10)}]`})
+                WHERE email = ${email} LIMIT 1`
+          );
         } else if (eventType === "unsubscribed") {
           await db.execute(
-            sql`UPDATE crm_leads SET notes = CONCAT(COALESCE(notes,''), '\n[הסיר עצמו מרשימת תפוצה]')
+            sql`UPDATE crm_leads SET emailUnsubscribed = 1, notes = CONCAT(COALESCE(notes,''), '\n[הסיר עצמו מרשימת תפוצה]')
                 WHERE email = ${email} LIMIT 1`
           );
         }

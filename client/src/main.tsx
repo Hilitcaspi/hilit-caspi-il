@@ -8,6 +8,10 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
+import { initBehaviorTracker } from "@/lib/behaviorTracker";
+
+// Initialize behavior tracking (Hotjar-style)
+initBehaviorTracker();
 
 const queryClient = new QueryClient();
 

@@ -1,5 +1,6 @@
 import { useEffect, lazy, Suspense } from "react";
 import { trackPageView } from "@/lib/track";
+import { initBehaviorTracker, resetBehaviorTracker } from "@/lib/behaviorTracker";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
@@ -141,6 +142,7 @@ function ScrollToTop() {
     }
     // Track page view on every route change
     trackPageView(location);
+    resetBehaviorTracker(location);
   }, [location]);
   return null;
 }

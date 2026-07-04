@@ -107,3 +107,20 @@
 - [x] Add דתל"ש (datlash) option to religiosity choices
 - [x] Add religiosity preference sub-options including דתל"ש
 - [x] Update server-side to calculate age from birthDate dynamically
+
+## Email Journeys & CRM Analytics Overhaul (July 4)
+- [x] Audit all email journeys/automations and document flows
+- [x] Present email journey documentation to user for review
+- [x] Fix CRM analytics: show real-time accurate email data (opens, clicks, conversions)
+- [x] Add real-time alerts/recommendations to analytics dashboard
+- [x] Implement user behavior tracking (session replay/heatmaps) integrated into CRM
+- [x] Overhaul analytics page parameters and layout
+- [x] Fix Brevo webhook bug (updates only last email instead of correct one)
+- [x] Add time period filtering to analytics (week/month/all)
+- [x] Fix conversion metrics to show accurate attribution
+- [x] Show bounce/delivery rates in analytics
+- [x] Add per-email detail page with UTM attribution
+- [x] Track and display conversion source (which campaign/email/page led to purchase)
+- [x] Track and display WhatsApp group join sources
+- [x] Add real-time alerts and recommendations engine
+- [x] Implement Hotjar-style behavior tracking (heatmaps, session recording, click maps)

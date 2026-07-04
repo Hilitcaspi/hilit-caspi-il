@@ -38,6 +38,27 @@ const DNA_HEBREW_LABELS: Record<string, string> = {
   free_spirit: "רוח חופשית",
 };
 
+// Journey labels for server-side alerts
+const JOURNEY_LABELS_SERVER: Record<string, string> = {
+  women_first_step_v2: "מסע DNA - נשים",
+  men_first_step_v2: "מסע DNA - גברים",
+  free_guide_nurture: "מדריך חינמי",
+  sales_call_lead: "שיחת היכרות",
+  meta_lead_dna: "Meta ליד DNA",
+  women_matchmaking_welcome: "ברוך הבא למאגר - נשים",
+  men_matchmaking_welcome: "ברוך הבא למאגר - גברים",
+  women_guide: "מדריך - נשים",
+  men_guide: "מדריך - גברים",
+  women_course: "קורס - נשים",
+  men_course: "קורס - גברים",
+  women_transformation: "טרנספורמציה - נשים",
+  men_transformation: "טרנספורמציה - גברים",
+  abandoned_guide: "נטישת עגלה - מדריך",
+  abandoned_database: "נטישת עגלה - מאגר",
+  abandoned_course: "נטישת עגלה - קורס",
+  abandoned_coaching: "נטישת עגלה - ליווי",
+};
+
 type SingleRow = typeof singles.$inferSelect;
 
 /**
@@ -5164,6 +5185,459 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           .orderBy(desc(sql`COUNT(*)`))
           .limit(20);
         return { events, byType, total: events.length, emailStats, utmStats };
+      }),
+
+    // ── Sales by Channel (purchases with UTM attribution) ───────────────
+    salesByChannel: protectedProcedure
+      .input(z.object({
+        period: z.enum(["week", "month", "quarter", "all"]).default("all"),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const period = input?.period ?? "all";
+        let since = 0;
+        if (period === "week") since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        else if (period === "month") since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        else if (period === "quarter") since = Date.now() - 90 * 24 * 60 * 60 * 1000;
+
+        const salesResult = await db.execute(sql`
+          SELECT 
+            COALESCE(cl.product, wi.product, 'unknown') as product,
+            cl.utmSource,
+            cl.utmMedium,
+            cl.utmCampaign,
+            COUNT(*) as count
+          FROM crm_leads cl
+          LEFT JOIN webhook_idempotency wi ON wi.email = cl.email
+          WHERE cl.paymentRef IS NOT NULL
+            AND (${since} = 0 OR cl.createdAt > ${since})
+          GROUP BY product, cl.utmSource, cl.utmMedium, cl.utmCampaign
+          ORDER BY count DESC
+        `);
+        const rows = (salesResult as any)[0] as any[];
+        return rows.map(r => ({
+          product: r.product ?? 'unknown',
+          utmSource: r.utmSource ?? null,
+          utmMedium: r.utmMedium ?? null,
+          utmCampaign: r.utmCampaign ?? null,
+          count: Number(r.count),
+        }));
+      }),
+
+    // ── Email Detail - per-email stats with recipients ───────────────
+    emailDetail: protectedProcedure
+      .input(z.object({
+        journeyKey: z.string(),
+        emailIndex: z.number(),
+        period: z.enum(["week", "month", "quarter", "all"]).default("all"),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        let since = 0;
+        if (input.period === "week") since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        else if (input.period === "month") since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        else if (input.period === "quarter") since = Date.now() - 90 * 24 * 60 * 60 * 1000;
+
+        const emails = await db.select()
+          .from(emailLog)
+          .where(and(
+            eq(emailLog.journeyKey, input.journeyKey),
+            eq(emailLog.emailIndex, input.emailIndex),
+            since > 0 ? sql`${emailLog.createdAt} > ${since}` : undefined,
+          ))
+          .orderBy(desc(emailLog.sentAt));
+
+        // Get subject from first email
+        const subject = emails[0]?.subject ?? '';
+
+        // Aggregate stats
+        const total = emails.length;
+        const sent = emails.filter(e => e.status === 'sent').length;
+        const pending = emails.filter(e => e.status === 'pending').length;
+        const failed = emails.filter(e => e.status === 'failed').length;
+        const opened = emails.filter(e => e.openedAt).length;
+        const clicked = emails.filter(e => e.clickedAt).length;
+        const totalOpens = emails.reduce((s, e) => s + (e.openCount ?? 0), 0);
+        const totalClicks = emails.reduce((s, e) => s + (e.clickCount ?? 0), 0);
+
+        // Get UTM data for recipients who converted
+        const recipientEmails = emails.map(e => e.recipientEmail);
+        let conversions: any[] = [];
+        if (recipientEmails.length > 0) {
+          const convResult = await db.execute(sql`
+            SELECT cl.email, cl.utmSource, cl.utmCampaign, cl.product, cl.paymentRef,
+                   s.id as singleId
+            FROM crm_leads cl
+            LEFT JOIN singles s ON s.email = cl.email
+            WHERE cl.email IN (${sql.join(recipientEmails.slice(0, 500).map(e => sql`${e}`), sql`, `)})
+              AND (cl.paymentRef IS NOT NULL OR s.id IS NOT NULL)
+          `) as any;
+          conversions = Array.isArray(convResult[0]) ? convResult[0] : convResult;
+        }
+
+        // Recipients list (last 50)
+        const recipients = emails.slice(0, 50).map(e => ({
+          email: e.recipientEmail,
+          name: e.recipientName,
+          status: e.status,
+          sentAt: e.sentAt,
+          openCount: e.openCount,
+          clickCount: e.clickCount,
+          openedAt: e.openedAt,
+          clickedAt: e.clickedAt,
+        }));
+
+        return {
+          journeyKey: input.journeyKey,
+          emailIndex: input.emailIndex,
+          subject,
+          stats: { total, sent, pending, failed, opened, clicked, totalOpens, totalClicks },
+          openRate: sent > 0 ? Math.round((opened / sent) * 100) : 0,
+          clickRate: sent > 0 ? Math.round((clicked / sent) * 100) : 0,
+          conversions,
+          recipients,
+        };
+      }),
+
+    // ── WhatsApp Group Stats ──────────────────────────────────────────
+    waGroupStats: protectedProcedure
+      .input(z.object({
+        period: z.enum(["week", "month", "quarter", "all"]).default("month"),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const period = input?.period ?? "month";
+        let since = 0;
+        if (period === "week") since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        else if (period === "month") since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        else if (period === "quarter") since = Date.now() - 90 * 24 * 60 * 60 * 1000;
+
+        // By source
+        const sourceResult = await db.execute(sql`
+          SELECT source, COUNT(*) as count
+          FROM wa_clicks
+          WHERE ${since} = 0 OR createdAt > ${since}
+          GROUP BY source
+          ORDER BY count DESC
+        `) as any;
+        const sourceRows = Array.isArray(sourceResult[0]) ? sourceResult[0] : sourceResult;
+
+        // Daily trend
+        const dailyResult = await db.execute(sql`
+          SELECT FROM_UNIXTIME(createdAt/1000, '%Y-%m-%d') as day, source, COUNT(*) as count
+          FROM wa_clicks
+          WHERE ${since} = 0 OR createdAt > ${since}
+          GROUP BY day, source
+          ORDER BY day ASC
+        `) as any;
+        const dailyRows = Array.isArray(dailyResult[0]) ? dailyResult[0] : dailyResult;
+
+        // Total
+        const totalResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM wa_clicks
+          WHERE ${since} = 0 OR createdAt > ${since}
+        `) as any;
+        const totalArr = Array.isArray(totalResult[0]) ? totalResult[0] : totalResult;
+        const totalRow = totalArr[0];
+
+        return {
+          total: Number(totalRow?.total ?? 0),
+          bySource: (sourceRows as any[]).map((r: any) => ({ source: r.source, count: Number(r.count) })),
+          daily: (dailyRows as any[]).map((r: any) => ({ day: r.day, source: r.source, count: Number(r.count) })),
+        };
+      }),
+
+    // ── Journey Funnel with time filter ──────────────────────────────
+    journeyFunnelFiltered: protectedProcedure
+      .input(z.object({
+        period: z.enum(["week", "month", "quarter", "all"]).default("all"),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const period = input?.period ?? "all";
+        let since = 0;
+        if (period === "week") since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        else if (period === "month") since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        else if (period === "quarter") since = Date.now() - 90 * 24 * 60 * 60 * 1000;
+
+        const journeyResult = await db.execute(sql`
+          SELECT 
+            el.journeyKey,
+            COUNT(DISTINCT el.leadId) as totalLeads,
+            SUM(CASE WHEN el.status='sent' THEN 1 ELSE 0 END) as totalSent,
+            SUM(CASE WHEN el.status='pending' THEN 1 ELSE 0 END) as totalPending,
+            SUM(CASE WHEN el.status='failed' THEN 1 ELSE 0 END) as totalFailed,
+            SUM(CASE WHEN el.openCount > 0 THEN 1 ELSE 0 END) as uniqueOpens,
+            SUM(CASE WHEN el.clickCount > 0 THEN 1 ELSE 0 END) as uniqueClicks,
+            SUM(el.openCount) as totalOpenCount,
+            SUM(el.clickCount) as totalClickCount,
+            COUNT(DISTINCT CASE WHEN s.id IS NOT NULL THEN el.leadId END) as convertedToMatchmaking,
+            COUNT(DISTINCT CASE WHEN cl.paymentRef IS NOT NULL THEN el.leadId END) as convertedToPurchase
+          FROM email_log el
+          LEFT JOIN crm_leads cl ON cl.id = el.leadId
+          LEFT JOIN singles s ON s.email = cl.email
+          WHERE ${since} = 0 OR el.createdAt > ${since}
+          GROUP BY el.journeyKey
+          ORDER BY totalLeads DESC
+        `) as any;
+        const journeyRows = Array.isArray(journeyResult[0]) ? journeyResult[0] : journeyResult;
+
+        const emailIndexResult = await db.execute(sql`
+          SELECT 
+            journeyKey,
+            emailIndex,
+            subject,
+            COUNT(*) as total,
+            SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) as sent,
+            SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as failed,
+            SUM(CASE WHEN openCount > 0 THEN 1 ELSE 0 END) as opened,
+            SUM(CASE WHEN clickCount > 0 THEN 1 ELSE 0 END) as clicked,
+            SUM(openCount) as totalOpens,
+            SUM(clickCount) as totalClicks
+          FROM email_log
+          WHERE ${since} = 0 OR createdAt > ${since}
+          GROUP BY journeyKey, emailIndex, subject
+          ORDER BY journeyKey, emailIndex
+        `) as any;
+        const emailIndexRows = Array.isArray(emailIndexResult[0]) ? emailIndexResult[0] : emailIndexResult;
+
+        return {
+          journeys: journeyRows as any[],
+          emailIndex: emailIndexRows as any[],
+        };
+      }),
+
+    // ── Smart Alerts & Recommendations ──────────────────────────────
+    alerts: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const alerts: { type: 'error' | 'warning' | 'success' | 'info'; title: string; message: string; action?: string }[] = [];
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+      // 1. Check for failed emails in last 7 days
+      const [[failedRow]] = await db.execute(sql`
+        SELECT COUNT(*) as cnt FROM email_log WHERE status='failed' AND createdAt > ${sevenDaysAgo}
+      `) as any;
+      const failedCount = Number(failedRow?.cnt ?? 0);
+      if (failedCount > 0) {
+        alerts.push({
+          type: 'error',
+          title: `${failedCount} מיילים נכשלו בשבוע האחרון`,
+          message: 'בדוק את סיבת הכשלון - ייתכן שיש כתובות שגויות או בעיות bounce',
+          action: 'עבור לטאב מסעות לפרטים',
+        });
+      }
+
+      // 2. Check for leads without journey
+      const [[noJourneyRow]] = await db.execute(sql`
+        SELECT COUNT(*) as cnt FROM crm_leads
+        WHERE id NOT IN (SELECT DISTINCT leadId FROM email_log WHERE leadId IS NOT NULL)
+          AND createdAt > ${sevenDaysAgo}
+      `) as any;
+      const noJourneyCount = Number(noJourneyRow?.cnt ?? 0);
+      if (noJourneyCount > 0) {
+        alerts.push({
+          type: 'warning',
+          title: `${noJourneyCount} לידים חדשים ללא מסע מיילים`,
+          message: 'לידים שנכנסו בשבוע האחרון ולא נכנסו לאף מסע אוטומטי. בדוק אם חסר להם מגדר או מייל.',
+          action: 'עבור לטאב ללא מסע',
+        });
+      }
+
+      // 3. Check low open rates
+      const [lowOpenRows] = await db.execute(sql`
+        SELECT journeyKey, emailIndex,
+          SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) as sent,
+          SUM(CASE WHEN openCount > 0 THEN 1 ELSE 0 END) as opened
+        FROM email_log
+        WHERE createdAt > ${sevenDaysAgo} AND status = 'sent'
+        GROUP BY journeyKey, emailIndex
+        HAVING sent >= 5 AND (opened / sent) < 0.15
+      `) as any;
+      for (const row of (lowOpenRows as any[])) {
+        const openRate = Math.round((Number(row.opened) / Number(row.sent)) * 100);
+        const jLabel = (JOURNEY_LABELS_SERVER as any)[row.journeyKey] ?? row.journeyKey;
+        alerts.push({
+          type: 'warning',
+          title: `שיעור פתיחה נמוך: ${openRate}%`,
+          message: `מייל ${row.emailIndex} במסע "${jLabel}" - שקול לשנות את כותרת הנושא או התוכן`,
+        });
+      }
+
+      // 4. Check high bounce rate
+      const [[bounceRow]] = await db.execute(sql`
+        SELECT 
+          SUM(CASE WHEN status='failed' AND errorMessage IN ('hard_bounce','soft_bounce','invalid_email') THEN 1 ELSE 0 END) as bounced,
+          SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) as sent
+        FROM email_log WHERE createdAt > ${sevenDaysAgo}
+      `) as any;
+      const bounced = Number(bounceRow?.bounced ?? 0);
+      const sentRecent = Number(bounceRow?.sent ?? 0);
+      if (sentRecent > 10 && bounced / sentRecent > 0.05) {
+        alerts.push({
+          type: 'error',
+          title: `שיעור bounce גבוה: ${Math.round(bounced/sentRecent*100)}%`,
+          message: `${bounced} מיילים חזרו (מתוך ${sentRecent} שנשלחו). בדוק את איכות רשימת התפוצה.`,
+        });
+      }
+
+      // 5. Good news - high performing emails
+      const [highPerformRows] = await db.execute(sql`
+        SELECT journeyKey, emailIndex,
+          SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) as sent,
+          SUM(CASE WHEN clickCount > 0 THEN 1 ELSE 0 END) as clicked
+        FROM email_log
+        WHERE createdAt > ${sevenDaysAgo} AND status = 'sent'
+        GROUP BY journeyKey, emailIndex
+        HAVING sent >= 5 AND (clicked / sent) > 0.10
+      `) as any;
+      for (const row of (highPerformRows as any[])) {
+        const clickRate = Math.round((Number(row.clicked) / Number(row.sent)) * 100);
+        const jLabel = (JOURNEY_LABELS_SERVER as any)[row.journeyKey] ?? row.journeyKey;
+        alerts.push({
+          type: 'success',
+          title: `מייל עם קליקים גבוהים: ${clickRate}%`,
+          message: `מייל ${row.emailIndex} במסע "${jLabel}" משיג ביצועים מעולים - שמור על הנוסחה הזו!`,
+        });
+      }
+
+      // 6. Unsubscribes in last 7 days
+      const [[unsubRow]] = await db.execute(sql`
+        SELECT COUNT(*) as cnt FROM crm_leads
+        WHERE emailUnsubscribed = 1 AND emailUnsubscribedAt > ${sevenDaysAgo}
+      `) as any;
+      const unsubCount = Number(unsubRow?.cnt ?? 0);
+      if (unsubCount > 0) {
+        alerts.push({
+          type: 'info',
+          title: `${unsubCount} אנשים הסירו עצמם השבוע`,
+          message: 'בדוק אם יש מגמה - אם הרבה מסירים אחרי מייל מסוים, שקול לשנות את התוכן.',
+        });
+      }
+
+      // 7. Pending emails stuck (scheduled > 1 hour ago but not sent)
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      const [[stuckRow]] = await db.execute(sql`
+        SELECT COUNT(*) as cnt FROM email_log
+        WHERE status = 'pending' AND scheduledAt < ${oneHourAgo}
+      `) as any;
+      const stuckCount = Number(stuckRow?.cnt ?? 0);
+      if (stuckCount > 0) {
+        alerts.push({
+          type: 'error',
+          title: `${stuckCount} מיילים תקועים`,
+          message: 'מיילים שהיו אמורים להישלח אבל לא נשלחו. ייתכן שיש תקלה בשרת Brevo.',
+          action: 'בדוק את חיבור Brevo',
+        });
+      }
+
+      return alerts;
+    }),
+
+    // ── Behavior Tracking Stats (Hotjar-style) ───────────────────────
+    behaviorStats: protectedProcedure
+      .input(z.object({
+        period: z.enum(["week", "month", "quarter", "all"]).default("month"),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const period = input?.period ?? "month";
+        let since = 0;
+        if (period === "week") since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        else if (period === "month") since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        else if (period === "quarter") since = Date.now() - 90 * 24 * 60 * 60 * 1000;
+
+        // Page views by page
+        const pvResult = await db.execute(sql`
+          SELECT page, COUNT(*) as views
+          FROM analytics_events
+          WHERE eventType = 'page_view'
+            AND (${since} = 0 OR createdAt > ${since})
+          GROUP BY page
+          ORDER BY views DESC
+          LIMIT 20
+        `) as any;
+        const pageViewRows = Array.isArray(pvResult[0]) ? pvResult[0] : pvResult;
+
+        // Button clicks by page + metadata
+        const bcResult = await db.execute(sql`
+          SELECT page, metadata, COUNT(*) as clicks
+          FROM analytics_events
+          WHERE eventType = 'button_click'
+            AND (${since} = 0 OR createdAt > ${since})
+          GROUP BY page, metadata
+          ORDER BY clicks DESC
+          LIMIT 30
+        `) as any;
+        const buttonClickRows = Array.isArray(bcResult[0]) ? bcResult[0] : bcResult;
+
+        // Scroll depth distribution
+        const sdResult = await db.execute(sql`
+          SELECT page, metadata, COUNT(*) as cnt
+          FROM analytics_events
+          WHERE eventType = 'scroll_depth'
+            AND (${since} = 0 OR createdAt > ${since})
+          GROUP BY page, metadata
+          ORDER BY page, metadata
+        `) as any;
+        const scrollRows = Array.isArray(sdResult[0]) ? sdResult[0] : sdResult;
+
+        // Form starts vs submits (conversion)
+        const fResult = await db.execute(sql`
+          SELECT page, eventType, COUNT(*) as cnt
+          FROM analytics_events
+          WHERE eventType IN ('form_start', 'form_submit')
+            AND (${since} = 0 OR createdAt > ${since})
+          GROUP BY page, eventType
+          ORDER BY page
+        `) as any;
+        const formRows = Array.isArray(fResult[0]) ? fResult[0] : fResult;
+
+        // CTA clicks
+        const ctaResult = await db.execute(sql`
+          SELECT page, eventType, COUNT(*) as cnt
+          FROM analytics_events
+          WHERE eventType IN ('database_cta', 'course_cta', 'coaching_cta', 'free_guide_cta', 'product_click', 'intro_meeting_click')
+            AND (${since} = 0 OR createdAt > ${since})
+          GROUP BY page, eventType
+          ORDER BY cnt DESC
+          LIMIT 30
+        `) as any;
+        const ctaRows = Array.isArray(ctaResult[0]) ? ctaResult[0] : ctaResult;
+
+        // Section views (which sections people see)
+        const svResult = await db.execute(sql`
+          SELECT page, metadata, COUNT(*) as views
+          FROM analytics_events
+          WHERE eventType = 'section_view'
+            AND (${since} = 0 OR createdAt > ${since})
+          GROUP BY page, metadata
+          ORDER BY views DESC
+          LIMIT 30
+        `) as any;
+        const sectionRows = Array.isArray(svResult[0]) ? svResult[0] : svResult;
+
+        return {
+          pageViews: (pageViewRows as any[]).map((r: any) => ({ page: r.page, views: Number(r.views) })),
+          buttonClicks: (buttonClickRows as any[]).map((r: any) => ({ page: r.page, metadata: r.metadata, clicks: Number(r.clicks) })),
+          scrollDepth: (scrollRows as any[]).map((r: any) => ({ page: r.page, metadata: r.metadata, count: Number(r.cnt) })),
+          formConversion: (formRows as any[]).map((r: any) => ({ page: r.page, eventType: r.eventType, count: Number(r.cnt) })),
+          ctaClicks: (ctaRows as any[]).map((r: any) => ({ page: r.page, eventType: r.eventType, count: Number(r.cnt) })),
+          sectionViews: (sectionRows as any[]).map((r: any) => ({ page: r.page, metadata: r.metadata, views: Number(r.views) })),
+        };
       }),
   }),
   // ── Profile Update Requests ─────────────────────────────────────────────
