@@ -1,7 +1,7 @@
 /**
  * SingleSessionSales - דף מכירה לפגישה אישית חד-פעמית
  * מחיר: ₪500 (ניתן לקיזוז מחבילת ליווי מלאה)
- * כולל: כניסה אוטומטית למאגר הרווקים
+ * פגישת היכרות אישית
  * מיקום: קליניקה ברמת השרון / קליניקה בתל אביב / זום
  * Route: /single-session
  */
@@ -38,7 +38,6 @@ function AnimatedSection({ children, className = "" }: { children: React.ReactNo
 const WHAT_HAPPENS = [
   { icon: "🧬", title: "מיפוי אישי", desc: "נבין יחד מה עוצר אותך, מה הדפוסים שחוזרים, ומה את/ה מחפש/ת בזוגיות." },
   { icon: "🗺️", title: "תמונה ברורה", desc: "תצא/י מהפגישה עם הבנה מדויקת של הצעד הבא שלך, לא עוד ניחושים." },
-  { icon: "🏆", title: "כניסה למאגר", desc: "מיד לאחר הפגישה תקבל/י גישה מלאה למאגר הרווקים הבלעדי." },
   { icon: "💰", title: "ניתן לקיזוז", desc: "אם תחליט/י להמשיך לתהליך ליווי מלא, ₪500 יקוזזו מהמחיר הכולל." },
 ];
 
@@ -127,14 +126,6 @@ export default function SingleSessionSales() {
               </p>
             </div>
 
-            {/* Database bonus */}
-            <div className="bg-[#ffe27c] rounded-2xl p-5 mb-6">
-              <div className="flex items-center gap-3 mb-1">
-                <span className="text-2xl">🏆</span>
-                <p className="text-[#191265] font-black text-base">כולל: כניסה למאגר הרווקים (שווי ₪499)</p>
-              </div>
-              <p className="text-[#191265]/70 text-sm pr-9">לאחר הפגישה תקבל/י גישה מלאה למאגר הרווקים הבלעדי, ללא תשלום נוסף (שווי ₪499)</p>
-            </div>
 
             <div id="session-wallet-hero" className="mt-2">
               <GrowWallet

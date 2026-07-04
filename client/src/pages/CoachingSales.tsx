@@ -223,6 +223,7 @@ export default function CoachingSales() {
                   termsPath="/terms/coaching"
                   onSuccess={() => { window.location.href = "/thank-you/coaching"; }}
                 />
+                <p className="text-[#191265]/60 text-xs text-center mt-3">מיד לאחר התשלום ניצור קשר בתוך 1-2 ימי עסקים לקביעת תאריך הפגישה</p>
               </motion.div>
 
               {/* Package 2: המסע */}
@@ -267,19 +268,27 @@ export default function CoachingSales() {
                   termsPath="/terms/coaching"
                   onSuccess={() => { window.location.href = "/thank-you/coaching"; }}
                 />
+                <p className="text-white/50 text-xs text-center mt-3">מיד לאחר התשלום ניצור קשר בתוך 1-2 ימי עסקים לקביעת תאריך הפגישה</p>
               </motion.div>
 
             </div>
 
-            {/* Comparison note */}
+            {/* Clinic locations */}
             <motion.div variants={fadeUp} className="mt-8 bg-[#f0eadc] rounded-2xl p-5 text-center">
-              <p className="text-[#191265]/70 text-sm">
-                לא בטוחים איזה תהליך מתאים לכם?{" "}
-                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-[#191265] font-bold underline hover:text-[#1800ad]">
-                  שלחו וואטסאפ
-                </a>{" "}
-                ונעזור לכם לבחור.
-              </p>
+              <p className="text-[#191265]/80 text-sm font-semibold mb-1">📍 הפגישות מתקיימות ב:</p>
+              <p className="text-[#191265]/70 text-sm">תל אביב | רמת השרון | זום</p>
+            </motion.div>
+
+            {/* Not sure yet? */}
+            <motion.div variants={fadeUp} className="mt-4 bg-white border-2 border-[#191265]/15 rounded-2xl p-6 text-center">
+              <p className="text-[#191265] font-bold text-base mb-2">עדיין לא בטוחים?</p>
+              <p className="text-[#727272] text-sm mb-4">אפשר להתחיל בפגישת היכרות אחת ולהבין אם זה מתאים לכם</p>
+              <a
+                href="/single-session"
+                className="inline-flex items-center gap-2 bg-[#191265] text-white font-bold px-6 py-3 rounded-full hover:bg-[#1800ad] transition-colors text-sm"
+              >
+                ❤ קבעו פגישת היכרות
+              </a>
             </motion.div>
           </div>
         </AnimatedSection>
