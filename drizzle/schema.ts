@@ -64,8 +64,9 @@ export const singles = mysqlTable("singles", {
   // Profile details
   height: int("height"), // cm
   education: mysqlEnum("education", ["high_school", "vocational", "technician", "student", "bachelor", "master", "phd", "other"]),
-  religiosity: mysqlEnum("religiosity", ["secular", "traditional", "religious", "orthodox"]),
+  religiosity: mysqlEnum("religiosity", ["secular", "traditional", "religious", "orthodox", "datlash"]),
   religiosityOrigin: mysqlEnum("religiosityOrigin", ["cultural", "halachic"]), // For traditional: cultural/family tradition or halachic observance?
+  shomerShabbat: boolean("shomerShabbat"), // For religious/traditional: do they observe Shabbat?
   occupation: varchar("occupation", { length: 150 }),
   about: text("about"),
   interests: text("interests"), // comma-separated

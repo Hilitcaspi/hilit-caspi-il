@@ -98,3 +98,12 @@
 - [x] CoachingSales: Add clinic locations (תל אביב, רמת השרון, זום)
 - [x] SingleSessionSales: Remove free database entry mention
 - [x] Verify coupons work correctly (BRAIN99=99₪ guide, LOVE10=10% any, HC500=500₪ off coaching)
+
+## Questionnaire Improvements (July 4)
+- [x] Replace age number input with birthDate date picker only, auto-calculate age from birthDate
+- [x] Ensure age is always dynamically calculated from birthDate (not stored as static number)
+- [x] Show calculated age to user in questionnaire for confirmation
+- [x] Add religiosity sub-question: if דתי/מסורתי/דתל"ש → ask if שומר/ת שבת
+- [x] Add דתל"ש (datlash) option to religiosity choices
+- [x] Add religiosity preference sub-options including דתל"ש
+- [x] Update server-side to calculate age from birthDate dynamically

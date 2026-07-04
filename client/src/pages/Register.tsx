@@ -193,14 +193,25 @@ export default function Register() {
   const [gender, setGender] = useState<"female" | "male">(genderFromQuiz || "female");
   // seekingGender: who they are looking for (supports same-sex)
   const [seekingGender, setSeekingGender] = useState<"female" | "male" | "any">(genderFromQuiz === "female" ? "male" : genderFromQuiz === "male" ? "female" : "male");
-  const [age, setAge] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  // Age is always derived from birthDate - single source of truth
+  const calculatedAge = birthDate ? (() => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let a = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
+    return a;
+  })() : null;
+  const age = calculatedAge !== null ? String(calculatedAge) : "";
   const [phone, setPhone] = useState(phoneFromDna);
   const [email, setEmail] = useState(emailFromDna);
   const [city, setCity] = useState("");
   const [height, setHeight] = useState("");
   const [education, setEducation] = useState("");
   const [religiosity, setReligiosity] = useState("");
+  const [shomerShabbat, setShomerShabbat] = useState<boolean | null>(null);
+  const [religiosityOrigin, setReligiosityOrigin] = useState("");
   const [occupation, setOccupation] = useState("");
   const [maritalStatus, setMaritalStatus] = useState("");
   const [hasKids, setHasKids] = useState(false);
@@ -341,7 +352,7 @@ export default function Register() {
         registerBasicMutation.mutate({
         firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email: freeTokenEmail,
         city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
-        religiosity: (religiosity as any) || undefined, occupation: occupation || undefined,
+        religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
         maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
         wantsKids: (wantsKids as any) || undefined, about: about || undefined,
         partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
@@ -389,7 +400,7 @@ export default function Register() {
       registerBasicMutation.mutate({
         firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email: freeTokenEmail,
         city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
-        religiosity: (religiosity as any) || undefined, occupation: occupation || undefined,
+        religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
         maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
         wantsKids: (wantsKids as any) || undefined, about: about || undefined,
         partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
@@ -457,7 +468,7 @@ export default function Register() {
       const data = await registerBasicMutation.mutateAsync({
         firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email: emailToUse,
         city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
-        religiosity: (religiosity as any) || undefined, occupation: occupation || undefined,
+        religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
         maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
         wantsKids: (wantsKids as any) || undefined, about: about || undefined,
         partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
@@ -514,7 +525,7 @@ export default function Register() {
   const buildRegisterPayload = () => ({
     firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email,
     city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
-    religiosity: (religiosity as any) || undefined, occupation: occupation || undefined,
+    religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
     maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
     wantsKids: (wantsKids as any) || undefined, about: about || undefined,
     partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
@@ -764,22 +775,18 @@ export default function Register() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-[#191265] mb-1">גיל *</label>
-                        <input type="number" value={age} onChange={e => setAge(e.target.value)} required min={18} max={80}
-                          placeholder="גיל"
+                        <label className="block text-sm font-medium text-[#191265] mb-1">תאריך לידה *</label>
+                        <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} required
+                          max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                          min={new Date(new Date().setFullYear(new Date().getFullYear() - 80)).toISOString().split('T')[0]}
                           className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] focus:outline-none focus:border-[#191265] text-right" />
+                        {age && <p className="text-xs text-[#191265] mt-1 font-medium">גיל: {age}</p>}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-[#191265] mb-1">גובה (ס"מ)</label>
                         <input type="number" value={height} onChange={e => setHeight(e.target.value)} min={140} max={220}
                           className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] focus:outline-none focus:border-[#191265] text-right" />
                       </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#191265] mb-1">תאריך לידה</label>
-                      <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] focus:outline-none focus:border-[#191265] text-right" />
-                      <p className="text-xs text-[#727272] mt-1">לצורך התאמה אסטרולוגית</p>
-                    </div>
                     </div>
 
                     <div>
@@ -848,14 +855,51 @@ export default function Register() {
                           { v: "traditional", l: "מסורתי/ת" },
                           { v: "religious", l: "דתי/ה" },
                           { v: "orthodox", l: "חרדי/ת" },
+                          { v: "datlash", l: "דתל\"ש" },
                         ].map(({ v, l }) => (
-                          <button key={v} type="button" onClick={() => setReligiosity(v)}
+                          <button key={v} type="button" onClick={() => { setReligiosity(v); if (v === "secular") { setShomerShabbat(null); setReligiosityOrigin(""); } }}
                             className={`py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${religiosity === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
                             {l}
                           </button>
                         ))}
                       </div>
                     </div>
+
+                    {/* Sub-questions for religious/traditional/datlash */}
+                    {(religiosity === "religious" || religiosity === "traditional" || religiosity === "datlash") && (
+                      <div className="space-y-4 p-4 bg-[#f8f7ff] rounded-xl border border-[#e9e8e8]">
+                        <div>
+                          <label className="block text-sm font-medium text-[#191265] mb-2">האם שומר/ת שבת?</label>
+                          <div className="flex gap-2">
+                            {[
+                              { v: true, l: "כן" },
+                              { v: false, l: "לא" },
+                            ].map(({ v, l }) => (
+                              <button key={String(v)} type="button" onClick={() => setShomerShabbat(v)}
+                                className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${shomerShabbat === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                                {l}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {religiosity === "traditional" && (
+                          <div>
+                            <label className="block text-sm font-medium text-[#191265] mb-2">סוג המסורתיות</label>
+                            <div className="flex gap-2">
+                              {[
+                                { v: "cultural", l: "תרבותית/משפחתית" },
+                                { v: "halachic", l: "הלכתית" },
+                              ].map(({ v, l }) => (
+                                <button key={v} type="button" onClick={() => setReligiosityOrigin(v)}
+                                  className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${religiosityOrigin === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                                  {l}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-sm font-medium text-[#191265] mb-2">מצב משפחתי</label>
@@ -958,6 +1002,7 @@ export default function Register() {
                           { v: "traditional", l: "מסורתי/ת" },
                           { v: "religious", l: "דתי/ה" },
                           { v: "orthodox", l: "חרדי/ת" },
+                          { v: "datlash", l: "דתל\"ש" },
                         ].map(({ v, l }) => (
                           <button key={v} type="button" onClick={() => toggleReligiosityPref(v)}
                             className={`py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${religiosityPref.includes(v) ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
@@ -1420,7 +1465,7 @@ export default function Register() {
                       firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone,
                       email: freeTokenVerified ? freeTokenEmail : email,
                       city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
-                      religiosity: (religiosity as any) || undefined, occupation: occupation || undefined,
+                      religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
                       maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
                       wantsKids: (wantsKids as any) || undefined, about: about || undefined,
                       partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
