@@ -170,3 +170,11 @@
 - [x] Show "⏳ בהתאמה פעילה (עוד X שעות)" text on blocked match cards
 - [x] Blocking applies to BOTH people in the sent match (both directions)
 - [x] Blocking auto-expires after 48 hours or when the active match is resolved (declined/expired/matched)
+
+## Add Details to "No Match" Tab (July 4)
+- [ ] Add wantsKids, hasKids, maritalStatus, height, education fields to singles without matches in "ללא התאמה" tab
+- [ ] Add same fields to recommended matches section below each single
+
+## Add Details to "No Match" Tab (July 4)
+- [x] Add wantsKids, hasKids, maritalStatus, height, education fields to singles in "ללא התאמה" tab
+- [x] Add same fields to recommended matches section below each single

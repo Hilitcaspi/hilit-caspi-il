@@ -1520,8 +1520,15 @@ export default function CRMMatchmaking() {
                         </div>
                         <p className="text-xs text-[#727272]">
                           {s.gender === 'female' ? 'אישה' : 'גבר'} · {displayAge(s.age)} · {s.city || 'לא ידוע'}
+                          {s.height ? ` · ${s.height} ס"מ` : ''}
                           {s.dnaType && ` · ${DNA_LABELS[s.dnaType] || s.dnaType}`}
                           {s.religiosity && ` · ${RELIGIOSITY_LABELS[s.religiosity] || s.religiosity}`}
+                        </p>
+                        <p className="text-xs text-[#727272]">
+                          {s.maritalStatus && `${MARITAL_LABELS[s.maritalStatus] || s.maritalStatus}`}
+                          {s.education && ` · ${EDUCATION_LABELS[s.education] || s.education}`}
+                          {s.hasKids != null && ` · ${s.hasKids ? `יש ילדים${s.numKids ? ` (${s.numKids})` : ''}` : 'אין ילדים'}`}
+                          {s.wantsKids && ` · ${s.wantsKids === 'yes' ? 'רוצה ילדים' : s.wantsKids === 'no' ? 'לא רוצה ילדים' : 'פתוח לנושא'}`}
                         </p>
                         {s.phone && (
                           <a href={`https://wa.me/${s.phone.replace(/[^0-9]/g, '').replace(/^0/, '972')}`}
@@ -1554,7 +1561,15 @@ export default function CRMMatchmaking() {
                                 </div>
                               )}
                               <p className="text-xs font-bold text-[#191265] truncate">{sug.name}</p>
-                              <p className="text-[10px] text-[#727272]">{displayAge(sug.age)} · {sug.city || ''}</p>
+                              <p className="text-[10px] text-[#727272]">{displayAge(sug.age)} · {sug.city || ''}{sug.height ? ` · ${sug.height}` : ''}</p>
+                              <p className="text-[9px] text-[#727272]">
+                                {sug.maritalStatus && `${MARITAL_LABELS[sug.maritalStatus] || sug.maritalStatus}`}
+                                {sug.education && ` · ${EDUCATION_LABELS[sug.education] || sug.education}`}
+                              </p>
+                              <p className="text-[9px] text-[#727272]">
+                                {sug.hasKids != null && `${sug.hasKids ? `ילדים${sug.numKids ? ` (${sug.numKids})` : ''}` : 'אין ילדים'}`}
+                                {sug.wantsKids && ` · ${sug.wantsKids === 'yes' ? 'רוצה' : sug.wantsKids === 'no' ? 'לא רוצה' : 'פתוח'} ילדים`}
+                              </p>
                               <div className="text-[10px] font-black text-[#1800ad] mt-0.5">{sug.score}%</div>
                               {sug.hasActiveProposal && (
                                 <div className="text-[9px] bg-orange-100 text-orange-700 font-bold rounded px-1 py-0.5 mt-0.5">⏳ בהתאמה פעילה</div>
