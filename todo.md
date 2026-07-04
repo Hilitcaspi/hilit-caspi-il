@@ -129,3 +129,9 @@
 - [x] Build cart abandonment trigger: detect purchase intent click → wait 1hr → check if paid → start abandoned journey
 - [x] Hide unused journeys from analytics display (kept in code for future reactivation)
 - [x] Test abandonment flow end-to-end (TS clean, all 41 tests pass)
+
+## Paid Users Visibility Fix (July 4)
+- [x] Change logic: isPaid=true → isActive=true immediately (show in database even without full profile)
+- [x] Add "incomplete profile" indicator for admin view (already exists: getMissingData procedure)
+- [x] Fix existing 35 paid-but-inactive users to be active (UPDATE executed, 35 rows fixed)
+- [x] Fix Grow webhook to set isActive=true on payment (both new-record and existing-record branches)

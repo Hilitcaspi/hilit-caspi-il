@@ -2135,7 +2135,7 @@ function MissingDataTab() {
                 <Badge className={`text-xs ${row.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                   {row.isActive ? "פעיל" : "לא פעיל"}
                 </Badge>
-                {row.questionnaireCompletedAt && <Badge className="text-xs bg-blue-100 text-blue-700">✓ שאלון</Badge>}
+                {row.questionnaireCompletedAt ? <Badge className="text-xs bg-blue-100 text-blue-700">✓ שאלון</Badge> : <Badge className="text-xs bg-orange-100 text-orange-700">⏳ לא מילא שאלון</Badge>}
               </div>
               {/* Missing fields badges */}
               {row.missingFields && row.missingFields.length > 0 && (

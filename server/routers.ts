@@ -1878,7 +1878,7 @@ export const appRouter = router({
           consentMatchmaking: input.consentMatchmaking ?? false,
           consentDataSharing: input.consentDataSharing ?? false,
           consentEmailMarketing: input.consentEmailMarketing ?? false,
-          isActive: false, // not active until questionnaire is completed
+          isActive: input.freeToken ? true : false, // active immediately if paid (free token); otherwise wait for payment
           isSeed: false,
           isPaid: input.freeToken ? true : false, // free token = paid; DNA form = wait for Grow webhook
           createdAt: now,

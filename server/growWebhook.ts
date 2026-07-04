@@ -278,15 +278,11 @@ async function handleDatabase(email: string, name: string, phone: string, transa
     .then(r => r[0] ?? null);
 
   if (singleRecord) {
-    // Existing record found (created by registerBasicProfile with isPaid=false), mark as paid now
-    // Also set isActive=true if questionnaire was already completed (race condition: user filled questionnaire before payment confirmed)
-    const [existingFull] = await db.select({ questionnaireCompletedAt: singles.questionnaireCompletedAt })
-      .from(singles).where(eq(singles.id, singleRecord.id)).limit(1);
-    const alreadyCompleted = !!existingFull?.questionnaireCompletedAt;
+    // Existing record found (created by registerBasicProfile with isPaid=false), mark as paid + active now
     await db.update(singles)
-      .set({ isPaid: true, paymentRef: transactionId || null, subscriptionStartedAt: now, ...(alreadyCompleted ? { isActive: true } : {}), updatedAt: now })
+      .set({ isPaid: true, isActive: true, paymentRef: transactionId || null, subscriptionStartedAt: now, updatedAt: now })
       .where(eq(singles.id, singleRecord.id));
-    console.log(`[GrowWebhook] Marked existing single id=${singleRecord.id} as isPaid=true (tx=${transactionId})${alreadyCompleted ? ' + isActive=true (questionnaire was already done)' : ''} for ${email}`);
+    console.log(`[GrowWebhook] Marked existing single id=${singleRecord.id} as isPaid=true + isActive=true (tx=${transactionId}) for ${email}`);
   } else {
     // Create singles record with personal questionnaire token
     const token = crypto.randomBytes(32).toString("hex");
@@ -302,7 +298,7 @@ async function handleDatabase(email: string, name: string, phone: string, transa
       isPaid: true,
       paymentRef: transactionId || null,
       subscriptionStartedAt: now,
-      isActive: false, // becomes active after questionnaire completion
+      isActive: true, // show in database immediately after payment (profile may be incomplete)
       createdAt: now,
       updatedAt: now,
     });
