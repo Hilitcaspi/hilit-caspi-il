@@ -9,7 +9,7 @@ import { registerGrowProxy } from "./growProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { processPendingEmails, processMeetingReminders, processMatchFollowUps, retryUnsentMatchEmails, processMatchedPairFollowUps } from "../automation";
+import { processPendingEmails, processMeetingReminders, processMatchFollowUps, retryUnsentMatchEmails, processMatchedPairFollowUps, processCartAbandonment } from "../automation";
 import { notifyOwner } from "./notification";
 import { notifyOwnerWhatsApp, sendLeadWelcomeWhatsApp } from "../joni";
 import { runWeeklyMatching, expireStaleMatches } from "../matchingScheduler";
@@ -761,6 +761,11 @@ async function startServer() {
       const matchedFollowUps = await processMatchedPairFollowUps();
       if (matchedFollowUps > 0) {
         console.log(`[MatchedFollowUp] Sent ${matchedFollowUps} post-match lifecycle emails`);
+      }
+      // Check for cart abandonment (people who started payment but didn't finish)
+      const abandoned = await processCartAbandonment();
+      if (abandoned > 0) {
+        console.log(`[CartAbandonment] Triggered ${abandoned} abandonment journeys`);
       }
       // Expire matches that haven't been responded to within 48 hours
       const expired = await expireStaleMatches();

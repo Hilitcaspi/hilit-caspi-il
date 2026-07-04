@@ -12,7 +12,7 @@
 
 import { getDb, resetDb } from "./db";
 import { emailLog, crmLeads, productAccessTokens, matches, singles } from "../drizzle/schema";
-import { and, eq, lt, isNull, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, lt, gt, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { sendEmail, addContactToList } from "./brevo";
 import { sendWhatsApp } from "./joni";
 import { EMAIL_SEQUENCES, renderTemplate, DNA_PROFILES, type JourneyKey, buildMatchFollowUpEmail } from "./emailTemplates";
@@ -938,4 +938,120 @@ export async function processMatchedPairFollowUps(): Promise<number> {
 
   console.log(`[MatchedFollowUp] Processed ${matchedPairs.length} matched pairs, sent ${sent} emails`);
   return sent;
+}
+
+
+/**
+ * Cart Abandonment Detection
+ * 
+ * Checks payment_leads table for people who initiated a purchase (filled in the form)
+ * but never completed payment (no paymentRef in crmLeads or singles table).
+ * 
+ * Logic:
+ * 1. Find payment_leads created 1-2 hours ago (gives time to complete payment)
+ * 2. Check if they have a paymentRef in crmLeads or singles (meaning they paid)
+ * 3. If not paid → start the appropriate abandoned_* journey
+ * 4. Only trigger once per email+product (startJourney has idempotency guard)
+ */
+export async function processCartAbandonment(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const now = Date.now();
+  const oneHourAgo = now - 60 * 60 * 1000;       // 1 hour ago
+  const twoHoursAgo = now - 2 * 60 * 60 * 1000;  // 2 hours ago (window: 1-2h old leads)
+
+  // Find payment_leads created between 1-2 hours ago
+  const { paymentLeads, singles } = await import("../drizzle/schema");
+  
+  const recentLeads = await db
+    .select()
+    .from(paymentLeads)
+    .where(
+      and(
+        lt(paymentLeads.createdAt, oneHourAgo),
+        gt(paymentLeads.createdAt, twoHoursAgo)
+      )
+    )
+    .limit(50);
+
+  if (recentLeads.length === 0) return 0;
+
+  let triggered = 0;
+
+  for (const lead of recentLeads) {
+    // Check if this person already paid (has paymentRef in crmLeads)
+    const [crmLead] = await db
+      .select({ paymentRef: crmLeads.paymentRef, status: crmLeads.status })
+      .from(crmLeads)
+      .where(eq(crmLeads.email, lead.email))
+      .limit(1);
+
+    // If they have a paymentRef or are already a client, skip
+    if (crmLead?.paymentRef) continue;
+    if (crmLead?.status && ["client_database", "client_guide", "client_course", "client_coaching"].includes(crmLead.status)) continue;
+
+    // For database product, also check if they're in the singles table with isPaid=true
+    if (lead.product === "database") {
+      const [single] = await db
+        .select({ isPaid: singles.isPaid })
+        .from(singles)
+        .where(eq(singles.email, lead.email))
+        .limit(1);
+      if (single?.isPaid) continue;
+    }
+
+    // For coaching/coaching_mas, also check leads table for paid_coaching/paid_coaching_mas source
+    // (coaching webhook doesn't always update crmLeads)
+    if (lead.product === "coaching" || lead.product === "coaching_mas" || lead.product === "session") {
+      const { leads: leadsTable } = await import("../drizzle/schema");
+      const [paidCoaching] = await db
+        .select({ id: leadsTable.id })
+        .from(leadsTable)
+        .where(and(
+          eq(leadsTable.email, lead.email),
+          or(
+            eq(leadsTable.source, "paid_coaching"),
+            eq(leadsTable.source, "paid_coaching_mas")
+          )
+        ))
+        .limit(1);
+      if (paidCoaching) continue;
+    }
+
+    // Map product to abandoned journey key
+    const productToJourney: Record<string, JourneyKey> = {
+      database: "abandoned_database",
+      guide: "abandoned_guide",
+      course: "abandoned_course",
+      coaching: "abandoned_coaching",
+      coaching_mas: "abandoned_coaching",
+      session: "abandoned_coaching",
+    };
+
+    const journeyKey = productToJourney[lead.product];
+    if (!journeyKey) continue;
+
+    // Start the abandoned cart journey (idempotency guard inside prevents duplicates)
+    const firstName = lead.name.split(" ")[0];
+    const lastName = lead.name.split(" ").slice(1).join(" ") || "";
+
+    try {
+      await startJourney({
+        email: lead.email,
+        firstName,
+        lastName,
+        phone: lead.phone,
+        gender: "female", // Default to female (majority of audience)
+        journeyKey,
+        leadId: crmLead ? undefined : undefined,
+      });
+      triggered++;
+      console.log(`[CartAbandonment] Started ${journeyKey} for ${lead.email} (product: ${lead.product})`);
+    } catch (err) {
+      console.error(`[CartAbandonment] Failed to start journey for ${lead.email}:`, err);
+    }
+  }
+
+  return triggered;
 }

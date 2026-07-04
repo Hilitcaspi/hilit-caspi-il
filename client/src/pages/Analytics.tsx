@@ -235,7 +235,11 @@ export default function Analytics() {
             ) : journeys.length === 0 ? (
               <div className="text-center py-10 text-[#727272]">אין נתונים לתקופה זו</div>
             ) : (
-              journeys.map((j: any) => {
+              journeys.filter((j: any) => {
+                // Hide dormant journeys with 0 activity
+                const hasActivity = Number(j.totalSent) > 0 || Number(j.totalLeads) > 0;
+                return hasActivity;
+              }).map((j: any) => {
                 const meta = JOURNEY_LABELS[j.journeyKey] ?? { label: j.journeyKey, icon: "📧", color: "#191265" };
                 const sent = Number(j.totalSent);
                 const pending = Number(j.totalPending);

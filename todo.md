@@ -124,3 +124,8 @@
 - [x] Track and display WhatsApp group join sources
 - [x] Add real-time alerts and recommendations engine
 - [x] Implement Hotjar-style behavior tracking (heatmaps, session recording, click maps)
+
+## Cart Abandonment & Journey Cleanup (July 4)
+- [x] Build cart abandonment trigger: detect purchase intent click → wait 1hr → check if paid → start abandoned journey
+- [x] Hide unused journeys from analytics display (kept in code for future reactivation)
+- [x] Test abandonment flow end-to-end (TS clean, all 41 tests pass)

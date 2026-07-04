@@ -169,6 +169,7 @@ export default function GrowWallet({
   const [couponLoading, setCouponLoading] = useState(false);
 
   const validateCouponMutation = trpc.coupons.validate.useMutation();
+  const saveLeadMutation = trpc.coupons.saveLead.useMutation();
   const createProcessMutation = trpc.payment.createProcess.useMutation();
 
   // Capture UTM params from URL on mount and persist to sessionStorage
@@ -338,6 +339,11 @@ export default function GrowWallet({
       } catch {
         // Ignore cookie read errors
       }
+
+      // Save lead for cart abandonment tracking (non-blocking)
+      try {
+        await saveLeadMutation.mutateAsync({ name: fullName, email: userEmail, phone: userPhone || "", product });
+      } catch { /* non-blocking */ }
 
       const result = await createProcessMutation.mutateAsync({
         product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session",
