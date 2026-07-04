@@ -4029,7 +4029,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!db) return [];
 
       const rawMatches = await db.select().from(matches)
-        .orderBy(desc(matches.score), desc(matches.createdAt)); // highest score first
+        .orderBy(desc(matches.createdAt), desc(matches.score)); // newest first, then by score
 
       // Deduplicate: for each pair (A,B) keep only the row with the highest score.
       // A pair can appear as (A,B) or (B,A) so normalise the key.
@@ -4037,13 +4037,20 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       for (const m of rawMatches) {
         const key = [Math.min(m.singleAId, m.singleBId), Math.max(m.singleAId, m.singleBId)].join('-');
         const existing = bestPerPair.get(key);
-        if (!existing || (m.score ?? 0) > (existing.score ?? 0)) {
+        // Keep the newest match per pair (most recent createdAt)
+        const mTime = m.createdAt instanceof Date ? m.createdAt.getTime() : Number(m.createdAt) || 0;
+        const existingTime = existing ? (existing.createdAt instanceof Date ? existing.createdAt.getTime() : Number(existing.createdAt) || 0) : 0;
+        if (!existing || mTime > existingTime) {
           bestPerPair.set(key, m);
         }
       }
-      // Re-sort by score desc after dedup
+      // Re-sort by date desc (newest first) after dedup
       const allMatches = Array.from(bestPerPair.values())
-        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        .sort((a, b) => {
+          const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt) || 0;
+          const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt) || 0;
+          return bTime - aTime;
+        });
 
       // Enrich with single names
       const singleIds = Array.from(new Set(allMatches.flatMap(m => [m.singleAId, m.singleBId])));

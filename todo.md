@@ -153,3 +153,9 @@
 - [x] Change coaching "8 פגישות" to "8-12 פגישות"
 - [x] "מוכנה לשנות את הסיפור שלך" section: replaced with /single-session link
 - [x] Behavior tracking: confirmed working - behaviorTracker.ts tracks section_view, scroll_depth, button_click, product_click events
+
+## CRM Matchmaking Bugs (July 4)
+- [x] Fix: Algorithm IS running daily (718 new pending since June 24). Matches show in 'ממתין לשליחה' tab
+- [x] Fix: "נשלחו הצעות" tab now shows ALL matches ever sent (proposedAt != null) - was only showing status=proposed (1 active)
+- [x] Fix: "יש התאמה" tab now shows ALL 43 matched pairs (removed 14-day split that hid older matches)
+- [x] Sort pending matches by date (newest first) instead of by score

@@ -352,21 +352,22 @@ export default function CRMMatchmaking() {
 
   // Match sub-tab counts
   const now14daysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
-  // "proposed" tab = ALL sent matches (status=proposed, regardless of approvals)
+  // "proposed" tab = ALL matches that were ever sent (proposedAt is set, not pending)
   // "no_match" tab = rejected OR expired only
   const isNoMatch = (m: any) => {
     if (m.status === "rejected") return true;
     if (m.status === "expired") return true;
     return false;
   };
-  const isWaitingProposed = (m: any) => {
-    return m.status === "proposed";
+  // Show ALL matches that were ever sent to singles (have proposedAt), excluding pending
+  const isEverSent = (m: any) => {
+    return m.proposedAt != null && m.status !== "pending";
   };
 
   const matchSubCounts = {
     pending:  typedMatches.filter(m => m.status === "pending").length,
-    proposed: typedMatches.filter(m => isWaitingProposed(m)).length,
-    matched:  typedMatches.filter(m => m.status === "matched" && !(m.matchedAt && m.matchedAt < now14daysAgo)).length,
+    proposed: typedMatches.filter(m => isEverSent(m)).length,
+    matched:  typedMatches.filter(m => m.status === "matched").length,
     rejected: typedMatches.filter(m => isNoMatch(m)).length,
     expired:  0, // merged into rejected
     followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo).length,
@@ -384,8 +385,8 @@ export default function CRMMatchmaking() {
 
   const filteredMatchesBySubTab = {
     pending:  typedMatches.filter(m => m.status === "pending").filter(filterMatchByName),
-    proposed: typedMatches.filter(m => isWaitingProposed(m)).filter(filterMatchByName),
-    matched:  typedMatches.filter(m => m.status === "matched" && !(m.matchedAt && m.matchedAt < now14daysAgo)).filter(filterMatchByName),
+    proposed: typedMatches.filter(m => isEverSent(m)).filter(filterMatchByName),
+    matched:  typedMatches.filter(m => m.status === "matched").filter(filterMatchByName),
     rejected: typedMatches.filter(m => isNoMatch(m)).filter(filterMatchByName),
     expired:  [],
     followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo).filter(filterMatchByName),
@@ -873,7 +874,7 @@ export default function CRMMatchmaking() {
             <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm overflow-x-auto">
               {([
                 { id: "pending"  as const, label: "ממתין לשליחה",    icon: "⏳", count: matchSubCounts.pending },
-                { id: "proposed" as const, label: "נשלחה הצעה",      icon: "📨", count: matchSubCounts.proposed },
+                { id: "proposed" as const, label: "נשלחו הצעות",      icon: "📨", count: matchSubCounts.proposed },
                 { id: "matched"  as const, label: "יש התאמה",        icon: "💛", count: matchSubCounts.matched },
                 { id: "rejected" as const, label: "אין התאמה",       icon: "❌", count: matchSubCounts.rejected },
                 { id: "followup" as const, label: "מעקב אחרי התאמה", icon: "🔔", count: matchSubCounts.followup },
@@ -905,7 +906,7 @@ export default function CRMMatchmaking() {
             )}
             {matchSubTab === "proposed" && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
-                📨 <strong>נשלחה הצעה</strong> — כל ההצעות שנשלחו לרווקים וממתינות לתשובה. ניתן לראות מי אישר ומי טרם ענה.
+                📨 <strong>נשלחו הצעות</strong> — כל ההצעות שנשלחו אי פעם לרווקים. ניתן לראות את הסטטוס של כל הצעה — ממתינה, אושרה, נדחתה או פגה.
               </div>
             )}
             {matchSubTab === "matched" && (
