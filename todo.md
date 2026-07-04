@@ -160,3 +160,13 @@
 - [x] Fix: "יש התאמה" tab now shows ALL 43 matched pairs (removed 14-day split that hid older matches)
 - [x] Sort pending matches by date (newest first) instead of by score
 - [x] Bug: Match proposal emails show broken photo - photoUrl was relative (/manus-storage/...) instead of absolute (https://hilitcaspi.com/manus-storage/...). Fixed all 6 occurrences.
+
+## Resend Match Emails (July 4)
+- [ ] Resend Yuval-Dana match with correct photo URLs (was sent before photo URL fix)
+
+## Active Match Blocking Indicator (July 4)
+- [x] When a match is sent (proposed), mark all other pending matches for that person as "blocked" with red dot
+- [x] Disable "שלח התאמה" button on blocked matches (greyed out, not clickable)
+- [x] Show "⏳ בהתאמה פעילה (עוד X שעות)" text on blocked match cards
+- [x] Blocking applies to BOTH people in the sent match (both directions)
+- [x] Blocking auto-expires after 48 hours or when the active match is resolved (declined/expired/matched)
