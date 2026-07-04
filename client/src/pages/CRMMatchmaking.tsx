@@ -388,6 +388,12 @@ export default function CRMMatchmaking() {
     return m.proposedAt != null && m.status !== "pending";
   };
 
+  // Hide pending matches where either person is already in an active proposal (within 48h)
+  const isMatchBlocked = (m: any) => {
+    if (m.status !== "pending") return false;
+    return activeMatchSingleIds.has(m.singleAId) || activeMatchSingleIds.has(m.singleBId);
+  };
+
   const matchSubCounts = {
     pending:  typedMatches.filter(m => m.status === "pending" && !isMatchBlocked(m)).length,
     proposed: typedMatches.filter(m => isEverSent(m)).length,
@@ -405,12 +411,6 @@ export default function CRMMatchmaking() {
       (m.singleAName || "").toLowerCase().includes(q) ||
       (m.singleBName || "").toLowerCase().includes(q)
     );
-  };
-
-  // Hide pending matches where either person is already in an active proposal (within 48h)
-  const isMatchBlocked = (m: any) => {
-    if (m.status !== "pending") return false;
-    return activeMatchSingleIds.has(m.singleAId) || activeMatchSingleIds.has(m.singleBId);
   };
 
   const filteredMatchesBySubTab = {
