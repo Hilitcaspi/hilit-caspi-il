@@ -8,7 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%A7%D7%A8%D7%90%D7%AA%D7%99%20%D7%90%D7%AA%20%D7%94%D7%9B%D7%AA%D7%91%D7%95%D7%AA%20%D7%95%D7%99%D7%A9%20%D7%9C%D7%99%20%D7%A9%D7%90%D7%9C%D7%94";
-const CALENDLY_URL = "https://calendly.com/hilitcaspi/meet-with-me";
+const INTRO_MEETING_URL = "/single-session";
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("he-IL", { year: "numeric", month: "long", day: "numeric" });
@@ -30,10 +30,9 @@ export default function Blog() {
             <Link href="/blog" className="text-[#ffe27c] font-semibold">מאמרים</Link>
             <a href="/#podcast" className="hover:text-[#ffe27c] transition-colors">פודקאסט</a>
           </div>
-          <a href={CALENDLY_URL} target="_blank" rel="noopener noreferrer"
-            onClick={() => track({ eventType: "calendly_click", page: "/blog" })}
+          <a href={INTRO_MEETING_URL}
             className="bg-[#ffe27c] text-[#191265] font-bold px-4 py-2 rounded-full text-sm hover:bg-white transition-all">
-            קביעת פגישה
+            פגישת היכרות
           </a>
         </div>
       </nav>
@@ -136,11 +135,10 @@ export default function Blog() {
       {/* ── CTA ── */}
       <section className="py-12 px-6 bg-[#f0eadc] text-center">
         <h2 className="text-xl font-black text-[#191265] mb-3">רוצה לדעת מה מתאים לך?</h2>
-        <p className="text-[#727272] mb-5">שיחת היכרות חינמית של 15 דקות. בלי מחויבות.</p>
-        <a href={CALENDLY_URL} target="_blank" rel="noopener noreferrer"
-          onClick={() => track({ eventType: "calendly_click", page: "/blog" })}
+        <p className="text-[#727272] mb-5">פגישת היכרות אישית. 60 דקות שישנו לך את הכיוון.</p>
+        <a href={INTRO_MEETING_URL}
           className="inline-block bg-[#191265] text-white font-black px-8 py-4 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 hover:scale-105">
-          ♡ לקביעת שיחה חינמית
+          ♡ לפרטים ולקביעת פגישה
         </a>
       </section>
 

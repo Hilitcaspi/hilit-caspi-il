@@ -21,7 +21,7 @@ const PODCAST_IMG  = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/B
 
 // ─── External Links ───────────────────────────────────────────────────────────
 const LINKS = {
-  calendly:   "https://calendly.com/hilitcaspi/meet-with-me",
+  // calendly removed - all meetings go through /single-session or WhatsApp
   whatsapp:   "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A9%D7%9E%D7%95%D7%A2%20%D7%99%D7%95%D7%AA%D7%A8",
   // Context-specific WhatsApp messages
   waCoaching: "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%AA%D7%A2%D7%A0%D7%99%D7%99%D7%A0%D7%AA%20%D7%91%D7%A4%D7%A8%D7%98%D7%99%D7%9D%20%D7%A0%D7%95%D7%A1%D7%A4%D7%99%D7%9D%20%D7%9C%D7%92%D7%91%D7%99%20%D7%97%D7%91%D7%99%D7%9C%D7%AA%20%D7%94%D7%9C%D7%99%D7%95%D7%95%D7%99%20%D7%94%D7%90%D7%99%D7%A9%D7%99",
@@ -277,8 +277,7 @@ export default function Home() {
                 📊 CRM
               </a>
             )}
-            <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
-              onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
+            <a href="/single-session"
               className="bg-[#ffe27c] text-[#191265] font-bold px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105">
            ♡ פגישת היכרות
             </a>
@@ -308,8 +307,7 @@ export default function Home() {
                     📊 ניהול CRM
                   </a>
                 )}
-                <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
-                  onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
+                <a href="/single-session"
                   className="bg-[#ffe27c] text-[#191265] font-bold px-5 py-3 rounded-full text-center mt-2">
                   ♡ פגישת היכרות
                 </a>
@@ -349,10 +347,9 @@ export default function Home() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
-                onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
+              <a href="/single-session"
                 className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl text-center">
-                ♡ אשמח לקבוע פגישת היכרות
+                ♡ פגישת היכרות אישית
               </a>
               <button onClick={() => scrollTo("guide")}
                 className="border-2 border-white/40 text-white font-semibold text-lg px-8 py-4 rounded-2xl hover:border-[#ffe27c] hover:text-[#ffe27c] transition-all duration-300 text-center">
@@ -692,16 +689,18 @@ export default function Home() {
                 </a>
               </motion.div>
 
-              {/* 4 - Intro Meeting */}
+              {/* 4 - Intro Meeting ₪500 */}
               <motion.div variants={fadeUp} className="bg-white/10 border border-white/20 rounded-3xl p-6 text-right flex flex-col hover:bg-white/15 transition-all duration-300">
                 <div className="text-3xl mb-3">♡</div>
-                <span className="inline-block bg-green-400/20 text-green-300 text-xs font-bold px-3 py-1 rounded-full mb-3 w-fit">חינם</span>
-                <h3 className="text-white font-black text-base mb-1">פגישת היכרות</h3>
-                <p className="text-white/60 text-sm leading-relaxed flex-1 mb-5">
-                  שיחה אישית איתי להבין איפה אני יכולה לעזור לך, בלי התחייבות.
+                <span className="inline-block bg-[#ffe27c]/20 text-[#ffe27c] text-xs font-bold px-3 py-1 rounded-full mb-3 w-fit">פגישה אישית</span>
+                <h3 className="text-white font-black text-base mb-1">פגישת היכרות אישית</h3>
+                <p className="text-[#ffe27c] font-black text-lg mb-1">₪500</p>
+                <p className="text-white/60 text-sm leading-relaxed flex-1 mb-3">
+                  60 דקות אישיות איתי. נבין יחד מה מעכב אותך ונבנה דרך ברורה לזוגיות.
                 </p>
-                <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer" className="block bg-[#ffe27c] text-[#191265] font-black text-sm py-3 rounded-xl text-center hover:bg-white transition-colors">
-                  לתיאום פגישה ←
+                <p className="text-[#ffe27c]/70 text-xs mb-4">🎁 מקוזז מחבילת ליווי אישי</p>
+                <a href="/single-session" className="block bg-[#ffe27c] text-[#191265] font-black text-sm py-3 rounded-xl text-center hover:bg-white transition-colors">
+                  לפרטים ולקביעת פגישה
                 </a>
               </motion.div>
 
@@ -840,7 +839,7 @@ export default function Home() {
       </section>
 
       {/* ── LEAD MAGNET ── */}
-      <section id="guide" className="bg-white py-20 px-6" style={{ scrollMarginTop: '60px' }}>
+      <section id="guide" className="bg-white py-20 px-6" style={{ scrollMarginTop: '80px' }}>
         <AnimatedSection>
           <div className="max-w-5xl mx-auto">
             {/* Free Guide CTA - top banner */}
@@ -912,10 +911,9 @@ export default function Home() {
                   className="block w-full bg-[#ffe27c] text-[#191265] font-black text-base py-4 rounded-2xl hover:bg-white transition-all duration-300 text-center shadow-xl mb-3">
                   ♡ פרטים ורכישה
                 </a>
-                <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
-                  onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
+                <a href="/single-session"
                   className="block w-full border-2 border-white/40 text-white font-semibold text-sm py-3 rounded-2xl hover:border-white/70 transition-all duration-300 text-center">
-                  ♡ קודם רוצה לדבר? פגישת היכרות
+                  ♡ קודם רוצה לדבר? פגישת היכרות ₪500
                 </a>
               </motion.div>
             </div>
@@ -996,10 +994,9 @@ export default function Home() {
               <strong className="text-[#191265]">כולן טעו.</strong> ואני מאמינה שגם את תופתעי.
             </motion.p>
             <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
-                onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
+              <a href="/single-session"
                 className="bg-[#191265] text-white font-black text-lg px-10 py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 hover:scale-105 shadow-xl">
-                ♡ פגישת היכרות
+                ♡ פגישת היכרות אישית ₪500
               </a>
               <a href={LINKS.waCoaching} target="_blank" rel="noopener noreferrer"
                 className="border-2 border-[#191265] text-[#191265] font-bold text-lg px-10 py-5 rounded-2xl hover:bg-[#191265] hover:text-white transition-all duration-300">
@@ -1046,7 +1043,7 @@ export default function Home() {
             <div>
               <h4 className="text-[#ffe27c] font-bold mb-4">קישורים מהירים</h4>
               <div className="flex flex-col gap-2 text-white/70 text-sm">
-                <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer" onClick={() => track({ eventType: "whatsapp_click", page: "/" })} className="hover:text-[#ffe27c] transition-colors">פגישת היכרות</a>
+                <a href="/single-session" className="hover:text-[#ffe27c] transition-colors">פגישת היכרות</a>
                 <a href={LINKS.waGroup} target="_blank" rel="noopener noreferrer" className="hover:text-[#ffe27c] transition-colors">קבוצת וואטסאפ</a>
                 <a href={LINKS.spotify} target="_blank" rel="noopener noreferrer" className="hover:text-[#ffe27c] transition-colors">פודקאסט - Spotify</a>
                 <a href={LINKS.apple} target="_blank" rel="noopener noreferrer" className="hover:text-[#ffe27c] transition-colors">פודקאסט - Apple</a>

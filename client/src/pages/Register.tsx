@@ -1545,12 +1545,11 @@ export default function Register() {
               <div className="bg-[#ffe27c] rounded-2xl p-6 mb-6 text-right max-w-md mx-auto">
                 <p className="text-[#191265] font-bold mb-2">רוצה להאיץ את התהליך?</p>
                 <p className="text-[#191265]/80 text-sm mb-4">
-                  בליווי אישי נבין יחד מה מעכב אותך ונבנה דרך ברורה לזוגיות. פגישת היכרות ללא עלות.
+                  בליווי אישי נבין יחד מה מעכב אותך ונבנה דרך ברורה לזוגיות. פגישה אישית של 60 דקות.
                 </p>
-                <a href="https://calendly.com/hilitcaspi/meet-with-me" target="_blank" rel="noopener noreferrer"
-                  onClick={() => track({ eventType: "calendly_click", page: "/join" })}
+                <a href="/single-session"
                   className="inline-block bg-[#191265] text-white font-black px-6 py-3 rounded-xl hover:bg-[#1800ad] transition-colors text-sm">
-                  שיחת היכרות עם הילית
+                  פגישת היכרות עם הילית
                 </a>
               </div>
               <button onClick={() => navigate("/")}

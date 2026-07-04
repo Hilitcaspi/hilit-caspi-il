@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("Hi Hilit, I just purchased the coaching program and would love to get started!");
-const CALENDLY_URL = "https://calendly.com/hilitcaspi/60min";
+const CALENDLY_URL = "https://hilitcaspi.com/single-session";
 
 export default function EnThankYouCoaching() {
   useEffect(() => {

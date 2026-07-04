@@ -135,3 +135,21 @@
 - [x] Add "incomplete profile" indicator for admin view (already exists: getMissingData procedure)
 - [x] Fix existing 35 paid-but-inactive users to be active (UPDATE executed, 35 rows fixed)
 - [x] Fix Grow webhook to set isActive=true on payment (both new-record and existing-record branches)
+
+## Homepage & Product Pages Fixes Round 2 (July 4 - evening)
+- [x] Remove ALL Calendly links from entire site - replace "שיחת היכרות חינמית" with contact form/WhatsApp for "פגישת היכרות" (paid ₪500)
+- [x] Hero section: replace with "אשמח לקבוע פגישת היכרות" linking to /single-session
+- [x] Expand "השיטה שלי" section - already has methodology section with מדע האהבה explanation
+- [x] Free guide section: fixed scroll-margin-top to 0px so it scrolls all the way down
+- [x] Check if anyone clicks the free guide button - only 1 test lead from guide_form, 18 page views on guide pages. Low engagement.
+- [x] "בחרי את הדרך שלך" section: already reordered in Round 1 - מאגר first
+- [x] Fix back button: rewrote ScrollToTop with popstate listener for proper back navigation
+- [x] Fix scroll position: ScrollToTop now saves/restores scroll position via sessionStorage
+- [x] Ensure ALL product pages have "חזרה לעמוד הבית" button - already done in Round 1
+- [x] "פגישת היכרות אישית" product: updated FAQ to remove free database mention
+- [x] Guide page: already added in Round 1
+- [x] Course page: already added in Round 1
+- [x] Fix WhatsApp button in מאגר אישי section - message already says "מאגר האישי" (verified)
+- [x] Change coaching "8 פגישות" to "8-12 פגישות"
+- [x] "מוכנה לשנות את הסיפור שלך" section: replaced with /single-session link
+- [x] Behavior tracking: confirmed working - behaviorTracker.ts tracks section_view, scroll_depth, button_click, product_click events

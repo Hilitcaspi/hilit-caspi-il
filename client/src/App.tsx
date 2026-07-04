@@ -1,4 +1,5 @@
 import { useEffect, lazy, Suspense } from "react";
+import { useRef } from "react";
 import { trackPageView } from "@/lib/track";
 import { initBehaviorTracker, resetBehaviorTracker } from "@/lib/behaviorTracker";
 import { Toaster } from "@/components/ui/sonner";
@@ -117,29 +118,33 @@ function ReferrerDetector() {
 // Scroll to top on every route change
 function ScrollToTop() {
   const [location] = useLocation();
+  const isBackRef = useRef(false);
+
+  // Listen for popstate (browser back/forward) to set flag
   useEffect(() => {
-    // Only scroll to top on forward navigation (not back/forward)
-    const navType = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming)?.type;
-    const isBackForward = navType === "back_forward";
-    if (!isBackForward) {
-      // Use sessionStorage to detect back navigation
-      const prevPath = sessionStorage.getItem("__prev_path");
-      const scrollKey = `__scroll_${prevPath}`;
-      // Save current scroll position for the previous page
-      if (prevPath && prevPath !== location) {
-        sessionStorage.setItem(scrollKey, String(window.scrollY));
-      }
-      // Check if we're going back to a page we've been to
+    const onPop = () => { isBackRef.current = true; };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  useEffect(() => {
+    if (isBackRef.current) {
+      // Back navigation: restore saved scroll position
+      isBackRef.current = false;
       const savedScroll = sessionStorage.getItem(`__scroll_${location}`);
       if (savedScroll) {
-        // Restore scroll position
-        setTimeout(() => window.scrollTo({ top: parseInt(savedScroll), left: 0, behavior: "instant" }), 50);
+        setTimeout(() => window.scrollTo({ top: parseInt(savedScroll), left: 0, behavior: "instant" }), 80);
         sessionStorage.removeItem(`__scroll_${location}`);
-      } else {
-        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
       }
-      sessionStorage.setItem("__prev_path", location);
+    } else {
+      // Forward navigation: save current scroll for the page we're leaving, then scroll to top
+      const prevPath = sessionStorage.getItem("__prev_path");
+      if (prevPath && prevPath !== location) {
+        sessionStorage.setItem(`__scroll_${prevPath}`, String(window.scrollY));
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
+    sessionStorage.setItem("__prev_path", location);
     // Track page view on every route change
     trackPageView(location);
     resetBehaviorTracker(location);

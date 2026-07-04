@@ -9,7 +9,7 @@ import { Link, useParams } from "wouter";
 import { track } from "@/lib/track";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%A7%D7%A8%D7%90%D7%AA%D7%99%20%D7%90%D7%AA%20%D7%94%D7%9B%D7%AA%D7%91%D7%94%20%D7%95%D7%99%D7%A9%20%D7%9C%D7%99%20%D7%A9%D7%90%D7%9C%D7%94";
-const CALENDLY_URL = "https://calendly.com/hilitcaspi/meet-with-me";
+// Calendly removed - using /single-session for intro meetings
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString("he-IL", { year: "numeric", month: "long", day: "numeric" });
@@ -124,12 +124,11 @@ export default function BlogPost() {
             {/* ── CTA ── */}
             <div className="mt-16 bg-[#191265] rounded-3xl p-8 text-center">
               <h2 className="text-2xl font-black text-white mb-3">רוצה לדעת מה מתאים לך?</h2>
-              <p className="text-white/70 mb-6">שיחת היכרות חינמית של 15 דקות. בלי מחויבות.</p>
+              <p className="text-white/70 mb-6">פגישת היכרות אישית. 60 דקות שישנו לך את הכיוון.</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <a href={CALENDLY_URL} target="_blank" rel="noopener noreferrer"
-                  onClick={() => track({ eventType: "calendly_click", page: "/blog" })}
+                <a href="/single-session"
                   className="bg-[#ffe27c] text-[#191265] font-black px-6 py-3 rounded-xl hover:bg-white transition-all">
-                  ♡ לקביעת שיחה חינמית
+                  ♡ לפרטים ולקביעת פגישה
                 </a>
                 <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
                   className="border-2 border-white/40 text-white font-semibold px-6 py-3 rounded-xl hover:border-[#ffe27c] hover:text-[#ffe27c] transition-all">

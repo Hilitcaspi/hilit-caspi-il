@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const CALENDLY_URL = "https://calendly.com/hilitcaspi/60min";
+const CALENDLY_URL = "https://hilitcaspi.com/single-session";
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("Hi Hilit, I just booked a single session and would love to schedule it!");
 
 export default function EnThankYouSession() {

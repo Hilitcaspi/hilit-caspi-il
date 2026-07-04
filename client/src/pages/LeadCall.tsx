@@ -111,7 +111,7 @@ export default function LeadCall() {
           {/* Text */}
           <div className="text-right">
             <div className="inline-block bg-[#ffe27c]/20 border border-[#ffe27c]/40 text-[#ffe27c] text-sm font-semibold px-4 py-2 rounded-full mb-6">
-              שיחת היכרות חינמית ✦ 15 דקות
+אשמח לקבוע פגישת היכרות
             </div>
 
             <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-5">
@@ -122,9 +122,9 @@ export default function LeadCall() {
             </h1>
 
             <p className="text-white/75 text-lg leading-relaxed mb-8">
-              בשיחה של 15 דקות נבין יחד מה עוצר אותך ואיך נראה הצעד הנכון עבורך.
+              השאירי פרטים ואחזור אלייך תוך 24 שעות לתיאום פגישת היכרות אישית.
               <br />
-              <span className="text-white font-semibold">ללא עלות. ללא התחייבות.</span>
+              <span className="text-white font-semibold">60 דקות שישנו לך את הכיוון.</span>
             </p>
 
             {/* Trust signals */}
@@ -132,7 +132,7 @@ export default function LeadCall() {
               {[
                 { n: "500+", label: "נשים שליוויתי" },
                 { n: "200K+", label: "האזנות לפודקאסט" },
-                { n: "15 דק'", label: "שיחה חינמית" },
+                { n: "60 דק'", label: "פגישה אישית" },
               ].map(({ n, label }) => (
                 <div key={label} className="text-center">
                   <div className="text-2xl font-black text-[#ffe27c]">{n}</div>
@@ -231,11 +231,11 @@ export default function LeadCall() {
               disabled={createLead.isPending}
               className="bg-[#191265] text-white font-black text-xl py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {createLead.isPending ? "שולחת..." : "אני רוצה את השיחה החינמית"}
+              {createLead.isPending ? "שולחת..." : "אשמח לקבוע פגישת היכרות"}
             </button>
 
             <p className="text-center text-sm text-[#727272]">
-              ללא עלות. ללא התחייבות. 15 דקות שיכולות לשנות הכל.
+              אחזור אלייך תוך 24 שעות לתיאום הפגישה.
             </p>
           </form>
         </div>
@@ -276,7 +276,7 @@ export default function LeadCall() {
           <h2 className="text-3xl font-black text-white mb-3">
             מה קורה בשיחה?
           </h2>
-          <p className="text-white/60 mb-12 text-lg">15 דקות שמשנות כיוון</p>
+          <p className="text-white/60 mb-12 text-lg">60 דקות שמשנות כיוון</p>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[

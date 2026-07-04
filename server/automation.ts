@@ -529,7 +529,7 @@ export async function processMeetingReminders(): Promise<number> {
         '<div dir="rtl" style="font-family:Arial;padding:20px;color:#191265;">',
         `<h2>שלום ${firstName}</h2>`,
         `<p>יש לנו פגישה מחר: ${meetingDateStr} בשעה ${meetingTimeStr}</p>`,
-        '<a href="https://calendly.com/hilitcaspi/meet-with-me?utm_source=email&utm_medium=brevo&utm_campaign=sales_call&utm_content=reschedule" style="background:#ffe27c;color:#191265;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">תיאום מחדש</a>',
+        '<a href="https://hilitcaspi.com/single-session" style="background:#ffe27c;color:#191265;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">תיאום מחדש</a>',
         `<p>הילית כספי</p>`,
         '</div>',
       ].join('');

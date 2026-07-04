@@ -298,13 +298,10 @@ export default function Matches() {
                   <div className="text-[#191265]/60 text-xs">8 פגישות ליווי אישי + כניסה למאגר (שווי ₪249) כלולה</div>
                 </div>
                 <a
-                  href="https://calendly.com/hilitcaspi/meet-with-me"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => track({ eventType: "calendly_click", page: "/matches" })}
+                  href="/single-session"
                   className="bg-[#191265] text-white font-black px-6 py-3 rounded-2xl hover:bg-[#1800ad] transition-colors text-sm"
                 >
-                  ♡ קביעת שיחת היכרות
+                  ♡ פגישת היכרות אישית
                 </a>
               </div>
             </div>

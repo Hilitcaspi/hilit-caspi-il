@@ -420,8 +420,8 @@ function LeadCard({ lead, onStatusChange, onNotesChange, onLeadUpdate }: {
     const phone = `972${lead.phone.replace(/^0/, "").replace(/\D/g, "")}`;
     const firstName = lead.name.split(" ")[0];
     const messages = {
-      followup: `שלום ${firstName}, אני הילית כספי\n\nראיתי שעשית את שאלון ה-DNA שלי - רציתי לבדוק איך הולך\n\nיש שאלה קצרה שאני רוצה לשאול - אפשר לקבוע שיחה קצרה של 15 דקות?\nhttps://calendly.com/hilitcaspi/meet-with-me`,
-      meeting: `שלום ${firstName}\n\nמזכירה שיש לנו שיחה מחר - מחכה לדבר איתך!\n\nאם צריך לשנות את המועד אפשר לעשות זאת כאן:\nhttps://calendly.com/hilitcaspi/meet-with-me`,
+      followup: `שלום ${firstName}, אני הילית כספי\n\nראיתי שעשית את שאלון ה-DNA שלי - רציתי לבדוק איך הולך\n\nיש שאלה קצרה שאני רוצה לשאול - אפשר לקבוע פגישה אישית?\nhttps://hilitcaspi.com/single-session`,
+      meeting: `שלום ${firstName}\n\nמזכירה שיש לנו פגישה מחר - מחכה לדבר איתך!\n\nאם צריך לשנות את המועד אפשר לעשות זאת כאן:\nhttps://hilitcaspi.com/single-session`,
       welcome: `שלום ${firstName}\n\nשמחתי לקבל אותך! אני הילית כספי\n\nבקרוב אשלח לך את כל הפרטים. בינתיים אם יש שאלות אפשר לפנות אלי בכל עת`,
     };
     return `https://wa.me/${phone}?text=${encodeURIComponent(messages[msgType])}`;

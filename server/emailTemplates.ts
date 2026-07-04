@@ -10,7 +10,7 @@ export type EmailTemplate = {
   textBody: string;
 };
 
-const CALENDLY_15MIN = "https://calendly.com/hilitcaspi/meet-with-me?utm_source=email&utm_medium=brevo&utm_campaign=sales_call";
+const CALENDLY_15MIN = "https://hilitcaspi.com/single-session";
 
 // DNA profile descriptions for email personalization
 export const DNA_PROFILES: Record<string, { label_f: string; label_m: string; subtitle: string; superpower: string; challenge: string; match_f: string; match_m: string }> = {
@@ -1070,7 +1070,7 @@ export type JourneyKey =
 // ─── JOURNEY: Free Guide Nurture ─────────────────────────────────────────────
 const WA_GROUP_LINK = "https://hilitcaspi.com/api/wa/email";
 const WHATSAPP_DIRECT = "https://wa.me/972552442334";
-const CALENDLY_15 = "https://calendly.com/hilitcaspi/meet-with-me";
+const CALENDLY_15 = "https://hilitcaspi.com/single-session";
 const GUIDE_BUY = "https://hilitcaspi.com/guide";
 const DB_JOIN = "https://hilitcaspi.com/join";
 
@@ -1224,8 +1224,8 @@ const META_LEAD_DNA_EMAIL_2: EmailTemplate = {
 const META_LEAD_DNA_EMAIL_3: EmailTemplate = {
   subject: "{{firstName}}, קוד קופון מיוחד בשבילך",
   htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, מתנה קטנה ממני</h2><p>עברו כמה ימים מאז שנרשמת. רציתי לוודא שלא מפסידים:</p><div style="background:#191265;border-radius:12px;padding:24px;margin:24px 0;text-align:center"><p style="color:#ffe27c;font-size:14px;font-weight:700;margin:0 0 8px;letter-spacing:1px">קוד הקופון שלך</p><p style="color:#fff;font-size:32px;font-weight:900;margin:0 0 8px;letter-spacing:3px">HILIT10</p><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">10% הנחה על כל המוצרים</p></div><p>הקוד תקף לכל המוצרים:</p><a href="https://hilitcaspi.com/api/guide/download" class="secondary-cta">המדריך החינמי (0 ש"ח)</a><a href="https://hilitcaspi.com/guide" class="secondary-cta">המדריך "לבחור נכון" (249 ש"ח)</a>${urgencyBanner()}
-<a href="https://hilitcaspi.com/join" class="cta">כניסה למאגר הרווקים (499 ש"ח)</a><a href="https://calendly.com/hilitcaspi/meet-with-me" class="secondary-cta">שיחת התאמה חינמית</a><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
-  textBody: `{{firstName}}, קוד קופון מיוחד: HILIT10 (10% הנחה)\n\nמאגר: https://hilitcaspi.com/join\nמדריך: https://hilitcaspi.com/guide\nשיחה: https://calendly.com/hilitcaspi/meet-with-me\n\nהילית`,
+<a href="https://hilitcaspi.com/join" class="cta">כניסה למאגר הרווקים (499 ש"ח)</a><a href="https://hilitcaspi.com/single-session" class="secondary-cta">שיחת התאמה חינמית</a><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
+  textBody: `{{firstName}}, קוד קופון מיוחד: HILIT10 (10% הנחה)\n\nמאגר: https://hilitcaspi.com/join\nמדריך: https://hilitcaspi.com/guide\nשיחה: https://hilitcaspi.com/single-session\n\nהילית`,
 };
 
 export const EMAIL_SEQUENCES: Record<JourneyKey, EmailTemplate[]> = {

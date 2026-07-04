@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("Hi Hilit, I am interested in booking you as a speaker for an event.");
-const CALENDLY_URL = "https://calendly.com/hilitcaspi/meet-with-me";
+const INTRO_MEETING_URL = "/single-session";
 
 const TOPICS = [
   {
@@ -87,9 +87,9 @@ export default function EnSpeaking() {
             className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all">
             Inquire about booking
           </a>
-          <a href={CALENDLY_URL} target="_blank" rel="noopener noreferrer"
+          <a href={INTRO_MEETING_URL}
             className="border-2 border-white/40 text-white font-semibold text-lg px-8 py-4 rounded-2xl hover:border-[#ffe27c] hover:text-[#ffe27c] transition-all">
-            Schedule a call
+            Schedule a meeting
           </a>
         </div>
       </section>
@@ -148,9 +148,9 @@ export default function EnSpeaking() {
             className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all">
             Send a WhatsApp message
           </a>
-          <a href={CALENDLY_URL} target="_blank" rel="noopener noreferrer"
+          <a href={INTRO_MEETING_URL}
             className="border-2 border-white/40 text-white font-semibold text-lg px-8 py-4 rounded-2xl hover:border-[#ffe27c] hover:text-[#ffe27c] transition-all">
-            Book a discovery call
+            Book a discovery meeting
           </a>
         </div>
       </section>

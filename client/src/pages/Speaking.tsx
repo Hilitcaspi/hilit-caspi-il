@@ -5,7 +5,7 @@
 import { motion } from "framer-motion";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%A2%D7%95%D7%A0%D7%99%D7%99%D7%A0%D7%AA%20%D7%9C%D7%94%D7%96%D7%9E%D7%99%D7%9F%20%D7%90%D7%95%D7%AA%D7%9A%20%D7%9C%D7%94%D7%A8%D7%A6%D7%90%D7%94";
-const CALENDLY_URL = "https://calendly.com/hilitcaspi/meet-with-me";
+// Calendly removed - using /single-session for intro meetings
 
 const TOPICS = [
   {
