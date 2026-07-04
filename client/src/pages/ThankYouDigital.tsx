@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { trackPurchase } from "@/lib/metaPixel";
+import { track } from "@/lib/track";
 import { gaPurchase } from "@/lib/ga";
 
 const WHATSAPP_URL =
@@ -27,6 +28,7 @@ export default function ThankYouDigital() {
 
   useEffect(() => {
     trackPurchase({ value: 149, currency: "ILS", content_name: "מדריך לבחור נכון" });
+    track({ eventType: "purchase", page: "/thank-you/guide", metadata: { product: "guide", value: 149 } });
     gaPurchase("guide");
     const token = sessionStorage.getItem("guide_token");
     if (token) {

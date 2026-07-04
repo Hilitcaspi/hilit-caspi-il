@@ -25,7 +25,10 @@ const LINKS = {
   whatsapp:   "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A9%D7%9E%D7%95%D7%A2%20%D7%99%D7%95%D7%AA%D7%A8",
   // Context-specific WhatsApp messages
   waCoaching: "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%AA%D7%A2%D7%A0%D7%99%D7%99%D7%A0%D7%AA%20%D7%91%D7%A4%D7%A8%D7%98%D7%99%D7%9D%20%D7%A0%D7%95%D7%A1%D7%A4%D7%99%D7%9D%20%D7%9C%D7%92%D7%91%D7%99%20%D7%97%D7%91%D7%99%D7%9C%D7%AA%20%D7%94%D7%9C%D7%99%D7%95%D7%95%D7%99%20%D7%94%D7%90%D7%99%D7%A9%D7%99",
+  waDatabase: "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%AA%D7%A2%D7%A0%D7%99%D7%99%D7%A0%D7%AA%20%D7%91%D7%A4%D7%A8%D7%98%D7%99%D7%9D%20%D7%A0%D7%95%D7%A1%D7%A4%D7%99%D7%9D%20%D7%9C%D7%92%D7%91%D7%99%20%D7%94%D7%9E%D7%90%D7%92%D7%A8%20%D7%94%D7%90%D7%99%D7%A9%D7%99",
+  waIntro:    "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A7%D7%91%D7%95%D7%A2%20%D7%A4%D7%92%D7%99%D7%A9%D7%AA%20%D7%94%D7%99%D7%9B%D7%A8%D7%95%D7%AA",
   waGuide:    "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%AA%D7%A2%D7%A0%D7%99%D7%99%D7%A0%D7%AA%20%D7%91%D7%A4%D7%A8%D7%98%D7%99%D7%9D%20%D7%A0%D7%95%D7%A1%D7%A4%D7%99%D7%9D%20%D7%9C%D7%92%D7%91%D7%99%20%D7%94%D7%9E%D7%93%D7%A8%D7%99%D7%9A",
+  waMeeting:  "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A7%D7%91%D7%95%D7%A2%20%D7%A4%D7%92%D7%99%D7%A9%D7%AA%20%D7%94%D7%99%D7%9B%D7%A8%D7%95%D7%AA",
   waSpeaking: "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A0%D7%99%20%D7%9E%D7%AA%D7%A2%D7%A0%D7%99%D7%99%D7%A0%D7%AA%20%D7%9C%D7%92%D7%91%D7%99%20%D7%94%D7%96%D7%9E%D7%A0%D7%AA%20%D7%94%D7%A8%D7%A6%D7%90%D7%94",
   waGroup:    "https://hilitcaspi.com/api/wa/site",
   instagram:  "https://www.instagram.com/hilitcaspi_relationship",
@@ -205,6 +208,39 @@ export default function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Section visibility tracking
+  useEffect(() => {
+    const tracked = new Set<string>();
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && !tracked.has(entry.target.id)) {
+          tracked.add(entry.target.id);
+          track({ eventType: "section_view", page: "/", metadata: { section: entry.target.id } });
+        }
+      });
+    }, { threshold: 0.3 });
+    const sections = document.querySelectorAll("section[id]");
+    sections.forEach((s) => observer.observe(s));
+    return () => observer.disconnect();
+  }, []);
+
+  // Scroll depth tracking
+  useEffect(() => {
+    const milestones = [25, 50, 75, 100];
+    const reached = new Set<number>();
+    const onScroll = () => {
+      const pct = Math.round((window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100);
+      milestones.forEach((m) => {
+        if (pct >= m && !reached.has(m)) {
+          reached.add(m);
+          track({ eventType: "scroll_depth", page: "/", metadata: { depth: m } });
+        }
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (el) {
@@ -241,10 +277,10 @@ export default function Home() {
                 📊 CRM
               </a>
             )}
-            <a href={LINKS.calendly} target="_blank" rel="noopener noreferrer"
-              onClick={() => track({ eventType: "calendly_click", page: "/" })}
+            <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
+              onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
               className="bg-[#ffe27c] text-[#191265] font-bold px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105">
-           קביעת שיחת היכרות
+           ♡ פגישת היכרות
             </a>
           </div>
           {/* Mobile menu button */}
@@ -272,10 +308,10 @@ export default function Home() {
                     📊 ניהול CRM
                   </a>
                 )}
-                <a href={LINKS.calendly} target="_blank" rel="noopener noreferrer"
-                  onClick={() => track({ eventType: "calendly_click", page: "/" })}
+                <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
+                  onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
                   className="bg-[#ffe27c] text-[#191265] font-bold px-5 py-3 rounded-full text-center mt-2">
-                  קביעת שיחת היכרות
+                  ♡ פגישת היכרות
                 </a>
               </div>
             </motion.div>
@@ -313,10 +349,10 @@ export default function Home() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <a href={LINKS.calendly} target="_blank" rel="noopener noreferrer"
-                onClick={() => track({ eventType: "calendly_click", page: "/" })}
+              <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
+                onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
                 className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl text-center">
-                ♡ לקביעת שיחה חינמית
+                ♡ אשמח לקבוע פגישת היכרות
               </a>
               <button onClick={() => scrollTo("guide")}
                 className="border-2 border-white/40 text-white font-semibold text-lg px-8 py-4 rounded-2xl hover:border-[#ffe27c] hover:text-[#ffe27c] transition-all duration-300 text-center">
@@ -513,6 +549,28 @@ export default function Home() {
             <div className="grid md:grid-cols-3 gap-6">
               {[
                 {
+                  icon: "💛",
+                  badge: "הכי פופולרי",
+                  badgeColor: "bg-[#ffe27c] text-[#191265]",
+                  title: "מאגר הרווקים",
+                  subtitle: "Matchmaking אישי מדויק",
+                  text: "גישה למאגר הרווקים הבלעדי שלי - אנשים רציניים שעברו סינון קפדני. אני עושה את ה-matching בשבילך, בצורה אישית ומדויקת.",
+                  cta: "לפרטים ולהצטרפות",
+                  ctaLink: "/database",
+                  highlight: true,
+                },
+                {
+                  icon: "💫",
+                  badge: "💎 ליווי אישי",
+                  badgeColor: "bg-[#191265] text-white",
+                  title: "ליווי אישי",
+                  subtitle: "תהליך עומק אישי",
+                  text: "תהליך ליווי אישי מעמיק שבו עובדים יחד על הדפוסים, בונים את הפרופיל הנכון, ומוצאים את הדרך לזוגיות.",
+                  cta: "לפרטים ולרכישה",
+                  ctaLink: "/coaching",
+                  highlight: false,
+                },
+                {
                   icon: "📖",
                   badge: "חינם",
                   badgeColor: "bg-green-100 text-green-700",
@@ -521,28 +579,6 @@ export default function Home() {
                   text: "המדע הפסיכולוגי שישנה את הדרך שבה מחפשים אהבה. מרוכז, ישיר, ומלא בכלים שאפשר ליישם עוד הלילה.",
                   cta: "הורידו חינם",
                   ctaAction: () => scrollTo("guide"),
-                  highlight: false,
-                },
-                {
-                  icon: "💫",
-                  badge: "הכי פופולרי",
-                  badgeColor: "bg-[#ffe27c] text-[#191265]",
-                  title: "ליווי אישי",
-                  subtitle: "תהליך עומק אישי",
-                  text: "תהליך ליווי אישי מעמיק שבו עובדים יחד על הדפוסים, בונים את הפרופיל הנכון, ומוצאים את הדרך לזוגיות.",
-                  cta: "לפרטים ולרכישה",
-                  ctaLink: "/coaching",
-                  highlight: true,
-                },
-                {
-                  icon: "💎",
-                  badge: "בלעדי",
-                  badgeColor: "bg-[#191265] text-white",
-                  title: "מאגר הרווקים",
-                  subtitle: "Matchmaking אישי",
-                  text: "גישה למאגר הרווקים הבלעדי שלי - גברים שעברו סינון קפדני. אני עושה את ה-matching בשבילך, בצורה אישית ומדויקת.",
-                  cta: "לפרטים ולהצטרפות",
-                  ctaLink: "/database",
                   highlight: false,
                 },
               ].map(({ icon, badge, badgeColor, title, subtitle, text, cta, ctaLink, ctaAction, highlight }) => (
@@ -591,7 +627,7 @@ export default function Home() {
               </motion.h2>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5">
               {/* 1 - DNA Quiz (free) */}
               <motion.div variants={fadeUp} className="bg-white/10 border border-white/20 rounded-3xl p-6 text-right flex flex-col hover:bg-white/15 transition-all duration-300">
                 <div className="text-3xl mb-3">🧬</div>
@@ -653,7 +689,20 @@ export default function Home() {
                 </a>
               </motion.div>
 
-              {/* 4 - Coaching ₪2,900 */}
+              {/* 4 - Intro Meeting */}
+              <motion.div variants={fadeUp} className="bg-white/10 border border-white/20 rounded-3xl p-6 text-right flex flex-col hover:bg-white/15 transition-all duration-300">
+                <div className="text-3xl mb-3">♡</div>
+                <span className="inline-block bg-green-400/20 text-green-300 text-xs font-bold px-3 py-1 rounded-full mb-3 w-fit">חינם</span>
+                <h3 className="text-white font-black text-base mb-1">פגישת היכרות</h3>
+                <p className="text-white/60 text-sm leading-relaxed flex-1 mb-5">
+                  שיחה אישית איתי להבין איפה אני יכולה לעזור לך, בלי התחייבות.
+                </p>
+                <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer" className="block bg-[#ffe27c] text-[#191265] font-black text-sm py-3 rounded-xl text-center hover:bg-white transition-colors">
+                  לתיאום פגישה ←
+                </a>
+              </motion.div>
+
+              {/* 5 - Coaching ₪2,900 */}
               <motion.div variants={fadeUp} className="bg-white/10 border border-[#ffe27c]/40 rounded-3xl p-6 text-right flex flex-col hover:bg-white/15 transition-all duration-300">
                 <div className="text-3xl mb-3">🤝</div>
                 <span className="inline-block bg-[#ffe27c]/20 text-[#ffe27c] text-xs font-bold px-3 py-1 rounded-full mb-3 w-fit">💎 ליווי אישי</span>
@@ -662,7 +711,7 @@ export default function Home() {
                 <p className="text-white/60 text-sm leading-relaxed flex-1 mb-3">
                   תהליך אישי עמוק - DNA זוגי, פרופיל, דפוסים, וליווי עד הזוגיות.
                 </p>
-                <p className="text-[#ffe27c]/70 text-xs mb-4">🎁 כניסה למאגר הרווקים כלולה (שווי ₪499) - חינם!</p>
+                <p className="text-[#ffe27c]/70 text-xs mb-4">🎁 כניסה למאגר הרווקים כלולה בתהליך</p>
                 <a href="/coaching" className="block bg-[#ffe27c] text-[#191265] font-black text-sm py-3 rounded-xl text-center hover:bg-white transition-colors">
                   לפרטים ולרכישה
                 </a>
@@ -710,7 +759,7 @@ export default function Home() {
                 className="bg-[#191265] text-white font-bold px-8 py-4 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 hover:scale-105">
                 מלאו שאלון חינמי והצטרפו למאגר
               </a>
-              <a href={LINKS.waGuide} target="_blank" rel="noopener noreferrer"
+              <a href={LINKS.waDatabase} target="_blank" rel="noopener noreferrer"
                 className="border-2 border-[#191265] text-[#191265] font-bold px-8 py-4 rounded-2xl hover:bg-[#191265] hover:text-white transition-all duration-300">
                 שאלות? פנו אלינו בוואטסאפ
               </a>
@@ -788,7 +837,7 @@ export default function Home() {
       </section>
 
       {/* ── LEAD MAGNET ── */}
-      <section id="guide" className="bg-white py-20 px-6" style={{ scrollMarginTop: '80px' }}>
+      <section id="guide" className="bg-white py-20 px-6" style={{ scrollMarginTop: '60px' }}>
         <AnimatedSection>
           <div className="max-w-5xl mx-auto">
             {/* Free Guide CTA - top banner */}
@@ -848,7 +897,7 @@ export default function Home() {
                   <span className="text-3xl font-black">מ-₪2,960</span>
                 </div>
                 <div className="space-y-2 mb-6">
-                  {["8 פגישות אישיות עם הילית","ניתוח DNA זוגי מעמיק","בניית פרופיל אמיתי ומושך","כלים לשינוי דפוסים"].map(item => (
+                  {["8-12 פגישות אישיות עם הילית","ניתוח DNA זוגי מעמיק","בניית פרופיל אמיתי ומושך","כלים לשינוי דפוסים"].map(item => (
                     <div key={item} className="flex items-center gap-2 text-sm">
                       <span className="text-[#ffe27c]">✓</span>
                       <span className="text-white/80">{item}</span>
@@ -860,10 +909,10 @@ export default function Home() {
                   className="block w-full bg-[#ffe27c] text-[#191265] font-black text-base py-4 rounded-2xl hover:bg-white transition-all duration-300 text-center shadow-xl mb-3">
                   ♡ פרטים ורכישה
                 </a>
-                <a href="https://calendly.com/hilitcaspi/meet-with-me" target="_blank" rel="noopener noreferrer"
-                  onClick={() => track({ eventType: "calendly_click", page: "/" })}
+                <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
+                  onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
                   className="block w-full border-2 border-white/40 text-white font-semibold text-sm py-3 rounded-2xl hover:border-white/70 transition-all duration-300 text-center">
-                  ♡ קודם רוצה לדבר? שיחת היכרות חינמית
+                  ♡ קודם רוצה לדבר? פגישת היכרות
                 </a>
               </motion.div>
             </div>
@@ -944,10 +993,10 @@ export default function Home() {
               <strong className="text-[#191265]">כולן טעו.</strong> ואני מאמינה שגם את תופתעי.
             </motion.p>
             <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href={LINKS.calendly} target="_blank" rel="noopener noreferrer"
-                onClick={() => track({ eventType: "calendly_click", page: "/" })}
+              <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer"
+                onClick={() => track({ eventType: "whatsapp_click", page: "/" })}
                 className="bg-[#191265] text-white font-black text-lg px-10 py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 hover:scale-105 shadow-xl">
-                ♡ קביעת שיחת היכרות
+                ♡ פגישת היכרות
               </a>
               <a href={LINKS.waCoaching} target="_blank" rel="noopener noreferrer"
                 className="border-2 border-[#191265] text-[#191265] font-bold text-lg px-10 py-5 rounded-2xl hover:bg-[#191265] hover:text-white transition-all duration-300">
@@ -994,7 +1043,7 @@ export default function Home() {
             <div>
               <h4 className="text-[#ffe27c] font-bold mb-4">קישורים מהירים</h4>
               <div className="flex flex-col gap-2 text-white/70 text-sm">
-                <a href={LINKS.calendly} target="_blank" rel="noopener noreferrer" onClick={() => track({ eventType: "calendly_click", page: "/" })} className="hover:text-[#ffe27c] transition-colors">קביעת פגישה</a>
+                <a href={LINKS.waIntro} target="_blank" rel="noopener noreferrer" onClick={() => track({ eventType: "whatsapp_click", page: "/" })} className="hover:text-[#ffe27c] transition-colors">פגישת היכרות</a>
                 <a href={LINKS.waGroup} target="_blank" rel="noopener noreferrer" className="hover:text-[#ffe27c] transition-colors">קבוצת וואטסאפ</a>
                 <a href={LINKS.spotify} target="_blank" rel="noopener noreferrer" className="hover:text-[#ffe27c] transition-colors">פודקאסט - Spotify</a>
                 <a href={LINKS.apple} target="_blank" rel="noopener noreferrer" className="hover:text-[#ffe27c] transition-colors">פודקאסט - Apple</a>

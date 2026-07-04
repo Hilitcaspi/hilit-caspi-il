@@ -73,3 +73,23 @@
 - [x] Add DNA auto-link to skeleton update branch in registerBasicProfile
 - [x] Use useRef instead of useState for sessionId propagation (avoids stale closure race)
 - [x] One-time backfill: 76 existing singles updated with DNA type from CRM lead → dna_quiz_results
+
+## Homepage & Product Pages Improvements (July 4)
+- [x] Remove "שיחת היכרות" button from top navigation
+- [x] Replace "קביעת שיחה חינמית" button in hero section with "אשמח לקבוע פגישת היכרות" that links to WhatsApp
+- [ ] Add new section on homepage: "השיטה שלי" explaining the methodology (מדע האהבה) and how products were born from it
+- [x] Fix free guide scroll - should scroll all the way down to the free guide section (added scroll-margin-top)
+- [x] Check analytics: 639 guide_view, 35 guide_download, 51 CRM leads from guide_form. Guide IS generating leads.
+- [x] In "בחרי את הדרך שלך לזוגיות מאושרת" section - swapped order: מאגר first (highlighted), then ליווי, then חינמי
+- [x] Fix back button behavior: ScrollToTop now preserves scroll position on back/forward navigation
+- [x] Fix: all product pages now have "חזרה לאתר →" button in nav (Guide, Course, Database, Coaching)
+- [ ] Remove "כניסה חינם למאגר" from products - keep only for coaching process clients
+- [x] Add "פגישת היכרות אישית" to homepage products grid
+- [x] Add value proposition to guide page: "שווה ערך ל-2 פגישות אישיות איתי (שווי ₪1,000)"
+- [x] Add value proposition to course page: "שווה ערך ל-5 פגישות אישיות איתי (שווי ₪2,500)"
+- [x] Fix WhatsApp button in מאגר אישי section - now sends message about מאגר
+- [x] Change "8 פגישות אישיות" to "8 או 12 פגישות" in coaching product description
+- [x] In "מוכנה לשנות את הסיפור שלך" section - replaced Calendly with WhatsApp פגישת היכרות
+- [x] Add user behavior analytics tracking (section_view, scroll_depth, button_click, product_click, intro_meeting_click, free_guide_cta)
+- [x] Add purchase tracking to all ThankYou pages (coaching, course, database, guide, session)
+- [x] Add form_submit tracking to free guide download and database registration

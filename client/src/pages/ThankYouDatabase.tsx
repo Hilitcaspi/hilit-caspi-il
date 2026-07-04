@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import { trackPurchase } from "@/lib/metaPixel";
+import { track } from "@/lib/track";
 import { gaPurchase } from "@/lib/ga";
 import { trpc } from "@/lib/trpc";
 
@@ -20,6 +21,7 @@ export default function ThankYouDatabase() {
 
   useEffect(() => {
     trackPurchase({ value: 249, currency: "ILS", content_name: "מאגר רווקים" });
+    track({ eventType: "purchase", page: "/thank-you/database", metadata: { product: "database", value: 249 } });
     gaPurchase("database");
   }, []);
 

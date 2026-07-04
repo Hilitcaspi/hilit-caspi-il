@@ -19,7 +19,16 @@ type TrackEventType =
   | "calendly_click"
   | "whatsapp_click"
   | "podcast_click"
-  | "page_view";
+  | "page_view"
+  | "button_click"
+  | "section_view"
+  | "scroll_depth"
+  | "form_start"
+  | "form_submit"
+  | "product_click"
+  | "intro_meeting_click"
+  | "free_guide_cta"
+  | "purchase";
 
 interface TrackPayload {
   eventType: TrackEventType;
@@ -32,6 +41,7 @@ interface TrackPayload {
   utmMedium?: string;
   utmCampaign?: string;
   utmContent?: string;
+  metadata?: Record<string, string | number | boolean>;
 }
 
 function getUtmParams(): { utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string } {

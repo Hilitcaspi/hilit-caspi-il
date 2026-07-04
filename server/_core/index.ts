@@ -274,7 +274,7 @@ async function startServer() {
     try {
       const db = await getDb();
       if (!db) return;
-      const { eventType, email, leadId, page, emailJourney, emailIndex, utmSource, utmMedium, utmCampaign, utmContent } = req.body || {};
+      const { eventType, email, leadId, page, emailJourney, emailIndex, utmSource, utmMedium, utmCampaign, utmContent, metadata } = req.body || {};
       if (!eventType) return;
       await db.insert(analyticsEvents).values({
         eventType: eventType as any,
@@ -287,6 +287,7 @@ async function startServer() {
         utmMedium: utmMedium || null,
         utmCampaign: utmCampaign || null,
         utmContent: utmContent || null,
+        metadata: metadata ? JSON.stringify(metadata) : null,
         userAgent: (req.headers["user-agent"] || "").slice(0, 500),
         createdAt: Date.now(),
       });

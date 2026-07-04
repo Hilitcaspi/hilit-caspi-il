@@ -8,6 +8,13 @@
       "when": 1782381793961,
       "tag": "0000_spooky_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1783153115752,
+      "tag": "0001_modern_tomorrow_man",
+      "breakpoints": true
     }
   ]
 }

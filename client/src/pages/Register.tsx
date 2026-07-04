@@ -492,6 +492,7 @@ export default function Register() {
   const sendJoinEmailMutation = trpc.leads.submitPaidDatabase.useMutation();
   const registerBasicMutation = trpc.singles.registerBasicProfile.useMutation({
     onSuccess: (data) => {
+      track({ eventType: "form_submit", page: "/join", metadata: { form: "register_database" } });
       if (data?.questionnaireToken) setQuestionnaireToken(data.questionnaireToken);
       if (isFreeTokenPath) {
         // Free token path: go to done screen with questionnaire link

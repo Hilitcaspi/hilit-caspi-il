@@ -159,10 +159,15 @@ export default function CourseSales() {
           <Link href="/">
             <span className="text-white font-bold text-lg cursor-pointer hover:text-[#ffe27c] transition-colors">הילית כספי</span>
           </Link>
-          <button onClick={() => document.getElementById('course-wallet-hero')?.scrollIntoView({behavior:'smooth'})}
-            className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105">
-            הצטרפות לקורס ₪249
-          </button>
+          <div className="flex items-center gap-4">
+            <button onClick={() => document.getElementById('course-wallet-hero')?.scrollIntoView({behavior:'smooth'})}
+              className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105">
+              הצטרפות לקורס ₪249
+            </button>
+            <Link href="/">
+              <span className="text-white/80 hover:text-[#ffe27c] text-sm cursor-pointer transition-colors">חזרה לאתר →</span>
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -177,10 +182,13 @@ export default function CourseSales() {
               המסע<br />
               <span className="text-[#ffe27c]">מהפחד לבחירה</span>
             </h1>
-            <p className="text-white/75 text-lg leading-relaxed mb-6">
-              קורס מבוסס פסיכולוגיה חיובית (ייל, הרווארד) שמוביל אתכם מהמקום שבו אתם תקועים, למקום שבו בוחרים מתוך חופש ואוהבים נכון.
+            <p className="text-white/75 text-lg leading-relaxed mb-4">
+              קורס מבוסס פסיכולוגיה חיובית (ייל, הרוורד) שמוביל אתכם מהמקום שבו אתם תקועים, למקום שבו בוחרים מתוך חופש ואוהבים נכון.
               <br /><br />
               <span className="text-white font-semibold">בסוף הקורס מקבלים מפה זוגית אישית מלאה</span>, משהו אמיתי שאפשר לקחת לתהליך ליווי.
+            </p>
+            <p className="text-[#ffe27c] text-sm font-bold mb-6">
+              ✨ שווה ערך ל-5 פגישות אישיות איתי (שווי ₪2,500)
             </p>
 
             {/* Pricing */}

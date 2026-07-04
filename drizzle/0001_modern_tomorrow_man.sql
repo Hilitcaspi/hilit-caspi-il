@@ -1,0 +1,2 @@
+ALTER TABLE `analytics_events` MODIFY COLUMN `eventType` enum('email_open','email_click','guide_view','guide_download','database_view','database_cta','course_view','course_cta','coaching_view','coaching_cta','dna_quiz_start','dna_quiz_complete','calendly_click','whatsapp_click','podcast_click','page_view','button_click','section_view','scroll_depth','form_start','form_submit','product_click','intro_meeting_click','free_guide_cta') NOT NULL;--> statement-breakpoint
+ALTER TABLE `analytics_events` ADD `metadata` text;

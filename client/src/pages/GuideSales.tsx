@@ -83,7 +83,7 @@ export default function GuideSales() {
 
       {/* NAV */}
       <nav className="bg-[#191265] py-4 px-6 flex items-center justify-between">
-        <Link href="/" className="text-white/70 hover:text-white text-sm transition-colors">חזרה לאתר</Link>
+        <Link href="/" className="text-white/70 hover:text-white text-sm transition-colors flex items-center gap-1">→ חזרה לאתר</Link>
         <span className="text-white font-bold text-sm">הילית כספי</span>
         <div className="w-20" />
       </nav>
@@ -105,6 +105,9 @@ export default function GuideSales() {
             </h1>
             <p className="text-white/70 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
               לא עוד מדריך קריאה. מדריך עבודה פרקטי עם כלים מעשיים ותוצרים שמתארים לך בדיוק מי האדם שמתאים לך. השלב הראשון לפני שמגיעים אליי, ובמקום אחד.
+            </p>
+            <p className="text-[#ffe27c] text-sm font-bold mt-3">
+              ✨ שווה ערך ל-2 פגישות אישיות איתי (שווי ₪1,000)
             </p>
           </motion.div>
 

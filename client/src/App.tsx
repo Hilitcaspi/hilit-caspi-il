@@ -117,7 +117,28 @@ function ReferrerDetector() {
 function ScrollToTop() {
   const [location] = useLocation();
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    // Only scroll to top on forward navigation (not back/forward)
+    const navType = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming)?.type;
+    const isBackForward = navType === "back_forward";
+    if (!isBackForward) {
+      // Use sessionStorage to detect back navigation
+      const prevPath = sessionStorage.getItem("__prev_path");
+      const scrollKey = `__scroll_${prevPath}`;
+      // Save current scroll position for the previous page
+      if (prevPath && prevPath !== location) {
+        sessionStorage.setItem(scrollKey, String(window.scrollY));
+      }
+      // Check if we're going back to a page we've been to
+      const savedScroll = sessionStorage.getItem(`__scroll_${location}`);
+      if (savedScroll) {
+        // Restore scroll position
+        setTimeout(() => window.scrollTo({ top: parseInt(savedScroll), left: 0, behavior: "instant" }), 50);
+        sessionStorage.removeItem(`__scroll_${location}`);
+      } else {
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      }
+      sessionStorage.setItem("__prev_path", location);
+    }
     // Track page view on every route change
     trackPageView(location);
   }, [location]);

@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { useEffect } from "react";
 import { trackPurchase } from "@/lib/metaPixel";
+import { track } from "@/lib/track";
 import { gaPurchase } from "@/lib/ga";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית! רכשתי חבילת ליווי אישי 8 פגישות באתר ואשמח לעזרה 🙏");
@@ -15,6 +16,7 @@ const INSTAGRAM_URL = "https://www.instagram.com/hilitcaspi_relationship";
 export default function ThankYouCoaching() {
   useEffect(() => {
     trackPurchase({ value: 2900, currency: "ILS", content_name: "ליווי אישי 8 פגישות" });
+    track({ eventType: "purchase", page: "/thank-you/coaching", metadata: { product: "coaching", value: 2900 } });
     gaPurchase("coaching");
   }, []);
 

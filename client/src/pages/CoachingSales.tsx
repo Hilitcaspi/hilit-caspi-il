@@ -91,9 +91,12 @@ export default function CoachingSales() {
       <nav className={`fixed top-0 right-0 left-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#191265]/95 backdrop-blur-md shadow-lg" : "bg-[#191265]"}`}>
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/"><span className="text-white font-bold text-lg cursor-pointer hover:text-[#ffe27c] transition-colors">הילית כספי</span></Link>
-          <a href="#packages" className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105">
-            לבחירת תהליך
-          </a>
+          <div className="flex items-center gap-4">
+            <a href="#packages" className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105">
+              לבחירת תהליך
+            </a>
+            <Link href="/"><span className="text-white/80 hover:text-[#ffe27c] text-sm cursor-pointer transition-colors">חזרה לאתר →</span></Link>
+          </div>
         </div>
       </nav>
 

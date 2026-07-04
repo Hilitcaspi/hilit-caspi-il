@@ -67,6 +67,7 @@ export default function GuideFree() {
     onSuccess: () => {
       setSubmitted(true);
       track({ eventType: "guide_download", email: email.trim() });
+      track({ eventType: "form_submit", page: "/free-guide", metadata: { form: "free_guide", email: email.trim() } });
       trackLead({ content_name: "מדריך חינמי - 4 מלכודות" });
     },
     onError: (err: { message?: string }) => setError(err.message || "משהו השתבש, נסי שוב"),
