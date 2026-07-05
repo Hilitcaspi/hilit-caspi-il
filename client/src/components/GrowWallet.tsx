@@ -171,6 +171,7 @@ export default function GrowWallet({
   const validateCouponMutation = trpc.coupons.validate.useMutation();
   const saveLeadMutation = trpc.coupons.saveLead.useMutation();
   const createProcessMutation = trpc.payment.createProcess.useMutation();
+  const reportFailureMutation = trpc.payment.reportFailure.useMutation();
 
   // Capture UTM params from URL on mount and persist to sessionStorage
   useEffect(() => {
@@ -270,6 +271,14 @@ export default function GrowWallet({
           onFailure: (r: any) => {
             setWalletLoading(false);
             toast.error("התשלום נכשל. אנא נסי שוב.");
+            reportFailureMutation.mutate({
+              customerName: name.trim(),
+              customerEmail: email.trim(),
+              customerPhone: phone.trim() || undefined,
+              product,
+              errorMessage: typeof r === "string" ? r : JSON.stringify(r)?.slice(0, 200),
+              stage: "sdk_failure",
+            });
             callbacksRef.current.onFailure?.(r);
           },
           onCancel: () => {
@@ -283,6 +292,14 @@ export default function GrowWallet({
             console.error("[GrowWallet] SDK error:", e);
             setWalletLoading(false);
             toast.error("שגיאה בטעינת מערכת התשלום. אנא נסי שוב.");
+            reportFailureMutation.mutate({
+              customerName: name.trim(),
+              customerEmail: email.trim(),
+              customerPhone: phone.trim() || undefined,
+              product,
+              errorMessage: typeof e === "string" ? e : (e?.message || JSON.stringify(e))?.slice(0, 200),
+              stage: "sdk_failure",
+            });
           },
         },
       });
@@ -365,6 +382,14 @@ export default function GrowWallet({
       console.error("[GrowWallet] Payment init failed:", err);
       setWalletLoading(false);
       toast.error(`שגיאה ביצירת תהליך תשלום: ${err?.message || "נסי שוב בעוד מספר שניות."}`);
+      reportFailureMutation.mutate({
+        customerName: name.trim(),
+        customerEmail: email.trim(),
+        customerPhone: phone.trim() || undefined,
+        product,
+        errorMessage: err?.message?.slice(0, 200) || "Unknown error",
+        stage: "createProcess",
+      });
     }
   }, [name, email, phone, product, termsPath, termsAccepted]);
 

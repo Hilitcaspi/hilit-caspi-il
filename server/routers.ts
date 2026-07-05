@@ -6112,6 +6112,31 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const result = await createPaymentProcess({ ...input, sum: finalSum });
         return result; // { authCode, processToken? }
       }),
+
+    // Client reports SDK-level payment failure (onFailure callback from Grow SDK)
+    reportFailure: publicProcedure
+      .input(z.object({
+        customerName: z.string(),
+        customerEmail: z.string(),
+        customerPhone: z.string().optional(),
+        product: z.string(),
+        amount: z.number().optional(),
+        errorMessage: z.string().optional(),
+        stage: z.enum(["createProcess", "doPayment", "sdk_failure"]),
+      }))
+      .mutation(async ({ input }) => {
+        const { notifyPaymentFailure } = await import("./paymentFailureAlert");
+        await notifyPaymentFailure({
+          customerName: input.customerName,
+          customerEmail: input.customerEmail,
+          customerPhone: input.customerPhone,
+          product: input.product,
+          amount: input.amount,
+          errorMessage: input.errorMessage,
+          stage: input.stage,
+        });
+        return { ok: true };
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;

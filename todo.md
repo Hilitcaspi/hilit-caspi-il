@@ -198,3 +198,9 @@
 - [x] Resent match email to Or Amrani with Simon's photo (now loads correctly)
 - [x] Updated Mor Levi's 'about' field to new text (CRM reads 'about' not 'aboutMe')
 - [x] Updated Mor Levi's photo to new image
+
+## Payment Failure Notifications (July 6)
+- [x] Investigate today's actual payments (July 5-6) - 4 successful payments on July 5 (last at 17:39). System works. Hilit's failure was likely temporary Meshulam issue or card decline.
+- [x] Add real-time payment failure notification via email to Hilit
+- [x] Add real-time payment failure notification via WhatsApp to Hilit (+ partner)
+- [x] Notify on every failed payment attempt immediately (server-side createProcess failures + client-side SDK failures)

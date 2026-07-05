@@ -91,6 +91,7 @@ export interface CreatePaymentResult {
 }
 
 export async function createPaymentProcess(input: CreatePaymentInput): Promise<CreatePaymentResult> {
+  const { notifyPaymentFailure } = await import("./paymentFailureAlert");
   const config = PRODUCT_CONFIGS[input.product];
   if (!config) throw new Error(`Unknown product: ${input.product}`);
 
@@ -124,17 +125,40 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     params.append("maxPaymentNum", String(config.maxPaymentNum));
   }
 
-  const res = await globalThis.fetch(GROW_API_URL, {
-    method: "POST",
-    body: params.toString(),
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      ...BROWSER_HEADERS,
-    },
-  });
+  let res: Response;
+  try {
+    res = await globalThis.fetch(GROW_API_URL, {
+      method: "POST",
+      body: params.toString(),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        ...BROWSER_HEADERS,
+      },
+    });
+  } catch (fetchErr: any) {
+    void notifyPaymentFailure({
+      customerName: input.fullName,
+      customerEmail: input.email,
+      customerPhone: input.phone,
+      product: input.product,
+      amount: sum,
+      errorMessage: `Network error: ${fetchErr?.message || "fetch failed"}`,
+      stage: "createProcess",
+    });
+    throw fetchErr;
+  }
 
   if (!res.ok) {
     const text = await res.text();
+    void notifyPaymentFailure({
+      customerName: input.fullName,
+      customerEmail: input.email,
+      customerPhone: input.phone,
+      product: input.product,
+      amount: sum,
+      errorMessage: `HTTP ${res.status}: ${text.slice(0, 150)}`,
+      stage: "createProcess",
+    });
     throw new Error(`Grow API error ${res.status}: ${text.slice(0, 300)}`);
   }
 
@@ -142,6 +166,15 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   console.log("[GrowPayment] createPaymentProcess response:", JSON.stringify(json).slice(0, 500));
 
   if (!json.status || !json.data?.authCode) {
+    void notifyPaymentFailure({
+      customerName: input.fullName,
+      customerEmail: input.email,
+      customerPhone: input.phone,
+      product: input.product,
+      amount: sum,
+      errorMessage: `Grow returned: ${JSON.stringify(json).slice(0, 150)}`,
+      stage: "createProcess",
+    });
     throw new Error(`Grow API returned failure: ${JSON.stringify(json)}`);
   }
 
