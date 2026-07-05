@@ -24,14 +24,14 @@
 - [x] Diagnose broken "כן, מעניין אותי" button: wrong baseUrl (hilitcaspi.manus.space + VITE_OAUTH_PORTAL_URL) and answer vs response param
 - [x] Fix both baseUrls to https://hilitcaspi.com and use response=yes/no
 - [x] Checkpoint 9eb38df5 + pushed to GitHub
-- [ ] User to Publish this project so hilitcaspi.com points here (fixes all email links in production)
+- [x] User to Publish this project so hilitcaspi.com points here (fixes all email links in production)
 
 ## Grow wallet hang fix (this session)
 - [x] Rewrite growProxy to use express-parsed body (req.body) instead of raw stream read that never resolves after express.json (this was the wallet-hang root cause)
 - [x] Add hard timeout (8s primary / 12s fallback) + Cloudflare Worker fallback so the proxy never hangs forever
 - [x] Verify proxy responds quickly (3s) with authCode; added growProxy.test.ts regression test
 - [x] Save checkpoint (ae80665f) + push to GitHub
-- [ ] User to Publish so the proxy fix reaches production, then verify wallet opens on hilitcaspi.com
+- [x] User to Publish so the proxy fix reaches production, then verify wallet opens on hilitcaspi.com
 
 ## Children display on profile + match email (this session)
 - [x] Profile card (CRMMatchmaking): two separate rows — "יש ילדים וכמה" and "רוצה ילדים" — reading real questionnaire fields (hasKids/numKids/wantsKids) for ALL singles
@@ -172,8 +172,8 @@
 - [x] Blocking auto-expires after 48 hours or when the active match is resolved (declined/expired/matched)
 
 ## Add Details to "No Match" Tab (July 4)
-- [ ] Add wantsKids, hasKids, maritalStatus, height, education fields to singles without matches in "ללא התאמה" tab
-- [ ] Add same fields to recommended matches section below each single
+- [x] Add wantsKids, hasKids, maritalStatus, height, education fields to singles without matches in "ללא התאמה" tab
+- [x] Add same fields to recommended matches section below each single
 
 ## Add Details to "No Match" Tab (July 4)
 - [x] Add wantsKids, hasKids, maritalStatus, height, education fields to singles in "ללא התאמה" tab
@@ -181,3 +181,20 @@
 
 ## Hide Blocked Matches Instead of Red Indicator (July 4)
 - [x] Instead of showing blocked matches with red dot/disabled button, completely HIDE pending matches where either person is in an active proposal (for 48h or until resolved)
+
+## Generate Matches for Sivan Rahamim (July 5)
+- [x] Fixed Sivan's gender to female, age=41, seekingGender=male
+- [x] Deleted 12 wrong matches (she was matched as male with females)
+- [x] Generated 10 new correct matches via runMatchingForSingle (scores 58-73)
+
+## WhatsApp Campaign for Missing Profile Data (July 5)
+- [ ] Send personalized WhatsApp to 90 users with missing profile data
+- [ ] Messages list what's specifically missing for each person
+- [ ] Include profile link: /my-profile?email=X&token=Y
+- [ ] 1-minute intervals between messages
+
+## Storage Proxy Fix for Email Photos (July 5)
+- [x] Fixed: /manus-storage/ proxy now pipes image content directly instead of 307 redirect (email clients don't follow redirects)
+- [x] Resent match email to Or Amrani with Simon's photo (now loads correctly)
+- [x] Updated Mor Levi's 'about' field to new text (CRM reads 'about' not 'aboutMe')
+- [x] Updated Mor Levi's photo to new image
