@@ -58,10 +58,10 @@ const MATCHMAKING_JOIN = "https://hilitcaspi.com/join?utm_source=email&utm_mediu
 const COACHING_PAGE = "https://hilitcaspi.com/coaching?utm_source=email&utm_medium=brevo&utm_campaign=coaching";
 const COURSE_PAGE = "https://hilitcaspi.com/course?utm_source=email&utm_medium=brevo&utm_campaign=course";
 const DATABASE_PAGE = "https://hilitcaspi.com/database?utm_source=email&utm_medium=brevo&utm_campaign=database";
-const GROW_GUIDE = "https://pay.grow.link/60e9eca1047ef4a2d619c1ed0bca68a2-MzI2MDI4OQ?utm_source=email&utm_medium=brevo&utm_campaign=guide";
-const GROW_DATABASE = "https://pay.grow.link/60e9eca1047ef4a2d619c1ed0bca68a2-MzI2MDI4OQ?utm_source=email&utm_medium=brevo&utm_campaign=database";
-const GROW_COURSE = "https://pay.grow.link/0428cfc2217c8ce98a6897cc1629416f-MzI2MjUxMQ?utm_source=email&utm_medium=brevo&utm_campaign=course";
-const GROW_COACHING = "https://pay.grow.link/7e95519ddda0960adcffa9674ae563a5-MzI2MjUxOQ?utm_source=email&utm_medium=brevo&utm_campaign=coaching";
+const GROW_GUIDE = "https://hilitcaspi.com/guide?utm_source=email&utm_medium=brevo&utm_campaign=guide_abandon";
+const GROW_DATABASE = "https://hilitcaspi.com/database?utm_source=email&utm_medium=brevo&utm_campaign=database_abandon";
+const GROW_COURSE = "https://hilitcaspi.com/course?utm_source=email&utm_medium=brevo&utm_campaign=course_abandon";
+const GROW_COACHING = "https://hilitcaspi.com/coaching?utm_source=email&utm_medium=brevo&utm_campaign=coaching_abandon";
 const HILIT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
 const PAID_GUIDE_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/Hilit_Caspi_Paid_Guide_6518dc09.pdf";
 const UNSUBSCRIBE_BASE = "https://hilitcaspi.com/unsubscribe";
