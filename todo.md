@@ -204,3 +204,6 @@
 - [x] Add real-time payment failure notification via email to Hilit
 - [x] Add real-time payment failure notification via WhatsApp to Hilit (+ partner)
 - [x] Notify on every failed payment attempt immediately (server-side createProcess failures + client-side SDK failures)
+
+## Apple Pay Domain Verification Fix (July 6)
+- [x] Add .well-known/apple-developer-merchantid-domain-association file from Meshulam to fix Apple Pay on hilitcaspi.com
