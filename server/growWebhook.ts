@@ -80,13 +80,14 @@ function detectProductByAmount(sum: number): string | null {
 // Fallback: detect by description
 function detectProductByDesc(desc: string): string | null {
   const d = (desc || "").toLowerCase();
+  // IMPORTANT: bundle_tubav MUST be checked before guide/database because its description contains both "מדריך" and "מאגר"
+  if (d.includes("חבילת טו באב") || d.includes("bundle_tubav") || (d.includes("מאגר") && d.includes("מדריך"))) return "bundle_tubav";
   if (d.includes("המסע") && (d.includes("ליווי") || d.includes("12"))) return "coaching_mas";
   if (d.includes("הבנה") && (d.includes("ליווי") || d.includes("8"))) return "coaching";
   if (d.includes("ליווי") || d.includes("coaching") || d.includes("8 פגישות") || d.includes("פגישות אישיות")) return "coaching";
   if (d.includes("פגישה בודדת") || d.includes("session") || d.includes("פגישה אחת")) return "session";
   if (d.includes("קורס") || d.includes("course") || d.includes("המסע")) return "course";
   if (d.includes("מדריך") || d.includes("guide") || d.includes("לבחור נכון")) return "guide";
-  if (d.includes("חבילת טו באב") || d.includes("bundle_tubav") || (d.includes("מאגר") && d.includes("מדריך"))) return "bundle_tubav";
   if (d.includes("מאגר") || d.includes("database") || d.includes("רווקים")) return "database";
   if (d.includes("לייב") || d.includes("live") || d.includes("שאלות ותשובות") || d.includes("16.6") || d.includes("זום")) return "live_event";
   return null;
