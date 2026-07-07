@@ -6015,7 +6015,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
   payment: router({
     createProcess: publicProcedure
       .input(z.object({
-        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session"]),
+        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav"]),
         fullName: z.string().min(2),
         email: z.string().email(),
         phone: z.string().optional(),

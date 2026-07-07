@@ -56,6 +56,8 @@ const SignsGuide = lazy(() => import("@/pages/SignsGuide"));
 const LaMekabel = lazy(() => import("@/pages/LaMekabel"));
 const Brain = lazy(() => import("@/pages/Brain"));
 const TermsSingleSession = lazy(() => import("@/pages/TermsSingleSession"));
+const TuBavBundle = lazy(() => import("@/pages/TuBavBundle"));
+const ThankYouBundle = lazy(() => import("@/pages/ThankYouBundle"));
 
 // US English (EN) pages
 const EnHome = lazy(() => import("@/pages/en/Home"));
@@ -258,6 +260,8 @@ function HeRouter() {
           <Route path={"/signs"} component={SignsGuide} />
           <Route path={"/lamekabel"} component={LaMekabel} />
           <Route path={"/brain"} component={Brain} />
+          <Route path={"/tu-bav"} component={TuBavBundle} />
+          <Route path={"/thank-you/bundle"} component={ThankYouBundle} />
           {/* Keep /en/* routes for backward compat */}
           <Route path={"/en/database"} component={EnDatabaseSales} />
           <Route path={"/en/join"} component={EnRegister} />

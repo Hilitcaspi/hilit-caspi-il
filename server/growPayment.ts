@@ -54,6 +54,7 @@ const PAGE_CODES: Record<string, string> = {
   coaching:     process.env.GROW_PAGE_CODE_COACHING     || PROD_PAGE_CODE,
   coaching_mas: process.env.GROW_PAGE_CODE_COACHING_MAS || PROD_PAGE_CODE,
   session:      process.env.GROW_PAGE_CODE_SESSION      || PROD_PAGE_CODE,
+  bundle_tubav: process.env.GROW_PAGE_CODE_DATABASE   || PROD_PAGE_CODE,
 };
 
 const SITE_BASE = "https://hilitcaspi.com";
@@ -73,6 +74,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   coaching:     { description: "ליווי אישי - תהליך הבנה (8 פגישות) עם הילית כספי",  sum: 2960, maxPaymentNum: 8 },
   coaching_mas: { description: "ליווי אישי - תהליך המסע (12 פגישות) עם הילית כספי", sum: 4200, maxPaymentNum: 10 },
   session:      { description: "פגישת היכרות עם הילית כספי",                          sum: 500,  paymentNum: 1 },
+  bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון",            sum: 349,  paymentNum: 1 },
 };
 
 // ─── createPaymentProcess ─────────────────────────────────────────────────────
@@ -110,6 +112,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     coaching:     "/thank-you/coaching",
     coaching_mas: "/thank-you/coaching",
     session:      "/thank-you/session",
+    bundle_tubav: "/thank-you/bundle",
   };
   const successPath = SUCCESS_PATHS[input.product] || "/thank-you/digital";
   params.append("successUrl", `${SITE_BASE}${successPath}`);

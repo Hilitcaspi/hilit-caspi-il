@@ -87,6 +87,13 @@ export const GA_PRODUCTS = {
     price: 0, // update when known
     currency: "ILS",
   },
+  bundle_tubav: {
+    item_id: "bundle_tubav_349",
+    item_name: "חבילת טו באב - מאגר + מדריך",
+    item_category: "bundle",
+    price: 349,
+    currency: "ILS",
+  },
 } as const;
 
 export type ProductKey = keyof typeof GA_PRODUCTS;

@@ -215,3 +215,10 @@
 - [x] Confirmed: Domain verification file (.well-known/apple-developer-merchantid-domain-association) is correctly served (200 OK, 9122 bytes)
 - [x] Confirmed: All SDK service files exist at correct paths (/grow-sdk/sdk/1.3.5/js/services/a.min.js)
 - [x] Conclusion: Code-side is complete. Meshulam/Grow must register hilitcaspi.com in their Apple Developer Console (their step 4). Apple Pay will only appear on Safari/Apple devices once they complete this.
+
+## Tu B'Av Bundle Campaign (July 2026)
+- [ ] Research existing payment/guide/database flows for integration
+- [ ] Create hidden landing page /tu-bav-bundle with love-themed branding
+- [ ] Implement single payment of 349 NIS for bundle (database 249 + guide 99 instead of 249)
+- [ ] Post-purchase flow: database onboarding + one-time guide access email
+- [ ] Test full purchase flow end-to-end

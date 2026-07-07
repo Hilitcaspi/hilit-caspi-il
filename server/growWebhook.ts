@@ -69,6 +69,7 @@ function detectProductByAmount(sum: number): string | null {
   if (sum >= 2200 && sum <= 3200) return "coaching"; // הבנה full price (2960) or with coupon (2664)
   if (sum >= 340 && sum <= 400) return "coaching";   // הבנה installment (2960/8 = 370)
   if (sum >= 480 && sum <= 520) return "session";
+  if (sum === 349) return "bundle_tubav"; // Tu B'Av bundle: database + guide
   if (sum >= 240 && sum <= 260) return "course";
   if (sum >= 140 && sum <= 160) return "guide";
   if (sum >= 200 && sum <= 260) return "database"; // ₪249
@@ -85,6 +86,7 @@ function detectProductByDesc(desc: string): string | null {
   if (d.includes("פגישה בודדת") || d.includes("session") || d.includes("פגישה אחת")) return "session";
   if (d.includes("קורס") || d.includes("course") || d.includes("המסע")) return "course";
   if (d.includes("מדריך") || d.includes("guide") || d.includes("לבחור נכון")) return "guide";
+  if (d.includes("חבילת טו באב") || d.includes("bundle_tubav") || (d.includes("מאגר") && d.includes("מדריך"))) return "bundle_tubav";
   if (d.includes("מאגר") || d.includes("database") || d.includes("רווקים")) return "database";
   if (d.includes("לייב") || d.includes("live") || d.includes("שאלות ותשובות") || d.includes("16.6") || d.includes("זום")) return "live_event";
   return null;
@@ -391,6 +393,19 @@ async function handleLiveEvent(email: string, name: string, phone: string) {
   }).catch(err => console.error("[GrowWebhook][LiveEvent] Email failed:", err));
 }
 
+// ─── Tu B'Av Bundle handler ─────────────────────────────────────────────────────
+async function handleBundleTuBav(email: string, name: string, phone: string, transactionId: string = "") {
+  // Bundle = Database + Guide. Run both handlers.
+  // 1. Handle database onboarding (creates singles record, sends questionnaire email)
+  await handleDatabase(email, name, phone, transactionId);
+  // 2. Handle guide delivery (creates access token, sends guide email)
+  await handleGuide(email, name);
+  // 3. Notify owner about bundle purchase
+  await notifyOwner({ title: "רכישת חבילת טו באב! 💜", content: `${name} (${email}) רכש/ה את חבילת טו באב (מאגר + מדריך) ב-349 ₪. Transaction: ${transactionId || 'N/A'}` });
+  notifyOwnerWhatsApp({ name, email, phone, source: "bundle_tubav" }).catch(() => {});
+  console.log(`[GrowWebhook] Bundle Tu B'Av completed for ${email} (database + guide)`);
+}
+
 // ─── UTM extraction helper ────────────────────────────────────────────────────
 // Grow passes back any extra query params from the payment URL in the webhook body.
 // We look for utm_source / utm_medium / utm_campaign / utm_content in multiple places:
@@ -583,6 +598,7 @@ export async function handleGrowWebhook(body: any): Promise<void> {
       case "coaching_mas": await handleCoachingMas(email, name); break;
       case "session":  await handleSession(email, name); break;
       case "database": await handleDatabase(email, name, phone, transactionId); break;
+      case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
     }
 

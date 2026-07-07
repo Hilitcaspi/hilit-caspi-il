@@ -34,6 +34,7 @@ const PAGE_CODES: Record<string, string> = {
   coaching:     import.meta.env.VITE_GROW_PAGE_CODE_COACHING || PROD_PAGE_CODE,
   coaching_mas: import.meta.env.VITE_GROW_PAGE_CODE_COACHING_MAS || PROD_PAGE_CODE,
   session:      import.meta.env.VITE_GROW_PAGE_CODE_SESSION  || PROD_PAGE_CODE,
+  bundle_tubav: import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
 };
 
 const PRODUCT_CONFIGS: Record<string, { description: string; sum: number; paymentNum?: number; maxPaymentNum?: number }> = {
@@ -43,6 +44,7 @@ const PRODUCT_CONFIGS: Record<string, { description: string; sum: number; paymen
   coaching:     { description: "ליווי אישי - תהליך הבנה (8 פגישות) עם הילית כספי", sum: 2960, maxPaymentNum: 8 },
   coaching_mas: { description: "ליווי אישי - תהליך המסע (12 פגישות) עם הילית כספי", sum: 4200, maxPaymentNum: 10 },
   session:      { description: "פגישה בודדת עם הילית כספי", sum: 500, paymentNum: 1 },
+  bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון", sum: 349, paymentNum: 1 },
 };
 
 const SITE_BASE = window.location.origin;
@@ -134,7 +136,7 @@ declare global {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface GrowWalletProps {
-  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session";
+  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav";
   buttonLabel?: string;
   buttonClassName?: string;
   prefillName?: string;
