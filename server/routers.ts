@@ -2004,6 +2004,94 @@ export const appRouter = router({
       }),
 
     /**
+     * Get missing fields for a single by token (for the /join/complete page).
+     * Returns the user's first name and a list of missing field names.
+     */
+    getMissingFields: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return null;
+        const [profile] = await db.select().from(singles)
+          .where(eq(singles.questionnaireToken, input.token))
+          .limit(1);
+        if (!profile) return null;
+        if (!profile.isPaid) return null;
+
+        const missingFields: string[] = [];
+        if (!profile.age || profile.age === 0) missingFields.push("age");
+        if (!profile.height) missingFields.push("height");
+        if (!profile.city || profile.city === "") missingFields.push("city");
+        if (!profile.occupation || profile.occupation === "") missingFields.push("occupation");
+        if (!profile.photoUrl || profile.photoUrl === "") missingFields.push("photoUrl");
+        if (!profile.lastName || profile.lastName === "") missingFields.push("lastName");
+
+        return { firstName: profile.firstName, missingFields };
+      }),
+
+    /**
+     * Update only the missing fields for a single (from /join/complete page).
+     * Only updates fields that are currently empty/null.
+     */
+    updateMissingFields: publicProcedure
+      .input(z.object({
+        token: z.string(),
+        age: z.number().min(18).max(80).optional(),
+        height: z.number().min(100).max(250).optional(),
+        city: z.string().max(100).optional(),
+        occupation: z.string().max(150).optional(),
+        lastName: z.string().max(100).optional(),
+        photoBase64: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        const [profile] = await db.select().from(singles)
+          .where(eq(singles.questionnaireToken, input.token))
+          .limit(1);
+        if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "קישור לא תקין" });
+        if (!profile.isPaid) throw new TRPCError({ code: "FORBIDDEN", message: "גישה נדחתה" });
+
+        const patchData: Record<string, any> = { updatedAt: Date.now() };
+
+        // Only update fields that are currently missing
+        if (input.age && (!profile.age || profile.age === 0)) {
+          patchData.age = input.age;
+        }
+        if (input.height && !profile.height) {
+          patchData.height = input.height;
+        }
+        if (input.city && (!profile.city || profile.city === "")) {
+          patchData.city = input.city;
+        }
+        if (input.occupation && (!profile.occupation || profile.occupation === "")) {
+          patchData.occupation = input.occupation;
+        }
+        if (input.lastName && (!profile.lastName || profile.lastName === "")) {
+          patchData.lastName = input.lastName;
+        }
+        if (input.photoBase64 && (!profile.photoUrl || profile.photoUrl === "")) {
+          try {
+            const base64Data = input.photoBase64.replace(/^data:[^;]+;base64,/, "");
+            const buffer = Buffer.from(base64Data, "base64");
+            const ext = input.photoBase64.startsWith("data:image/png") ? "png" : "jpg";
+            const key = `singles-photos/${profile.firstName.replace(/\s+/g, '-').toLowerCase()}-${profile.id}-${Date.now()}.${ext}`;
+            const result = await storagePut(key, buffer, ext === "png" ? "image/png" : "image/jpeg");
+            patchData.photoUrl = result.url;
+          } catch (photoErr) {
+            console.error("[updateMissingFields] Photo upload failed:", photoErr);
+          }
+        }
+
+        if (Object.keys(patchData).length > 1) {
+          await db.update(singles).set(patchData).where(eq(singles.id, profile.id));
+        }
+
+        return { success: true, updatedFields: Object.keys(patchData).filter(k => k !== "updatedAt") };
+      }),
+
+    /**
      * Complete the scientific questionnaire and activate the single in the database.
      * Called after the 15-question quiz is completed via the email link.
      */

@@ -48,6 +48,7 @@ const MatchRespond = lazy(() => import("@/pages/MatchRespond"));
 const MatchOwnerApprove = lazy(() => import("@/pages/MatchOwnerApprove"));
 const CRMMatchmaking = lazy(() => import("@/pages/CRMMatchmaking"));
 const ScientificQuestionnaire = lazy(() => import("@/pages/ScientificQuestionnaire"));
+const ProfileComplete = lazy(() => import("@/pages/ProfileComplete"));
 const UserDashboard = lazy(() => import("@/pages/UserDashboard"));
 const LeadCall = lazy(() => import("@/pages/LeadCall"));
 const LiveEvent = lazy(() => import("@/pages/LiveEvent"));
@@ -169,6 +170,7 @@ function UsRouter() {
         <Switch>
           <Route path={"/"} component={EnHome} />
           <Route path={"/database"} component={EnDatabaseSales} />
+          <Route path={"/join/complete"} component={ProfileComplete} />
           <Route path={"/join/questionnaire"} component={ScientificQuestionnaire} />
           <Route path={"/join/:token"} component={EnRegister} />
           <Route path={"/join"} component={EnRegister} />
@@ -215,6 +217,7 @@ function HeRouter() {
         <Switch>
           <Route path={"/"} component={Home} />
           <Route path={"/dna-quiz"} component={DnaQuiz} />
+          <Route path={"/join/complete"} component={ProfileComplete} />
           <Route path={"/join/questionnaire"} component={ScientificQuestionnaire} />
           <Route path={"/join/:token"} component={Register} />
           <Route path={"/join"} component={Register} />

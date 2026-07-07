@@ -222,3 +222,9 @@
 - [ ] Implement single payment of 349 NIS for bundle (database 249 + guide 99 instead of 249)
 - [ ] Post-purchase flow: database onboarding + one-time guide access email
 - [ ] Test full purchase flow end-to-end
+
+## Profile Completion Page & Email Campaign (July 7)
+- [x] Build /join/complete?token=X page showing only missing fields for each user
+- [x] Backend API: fetch missing fields by token, save updates to DB
+- [x] Photo upload support on the complete page
+- [ ] Send emails to ~120 users with missing data (link to /join/complete or /join/questionnaire)
