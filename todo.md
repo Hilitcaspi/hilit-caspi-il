@@ -217,11 +217,11 @@
 - [x] Conclusion: Code-side is complete. Meshulam/Grow must register hilitcaspi.com in their Apple Developer Console (their step 4). Apple Pay will only appear on Safari/Apple devices once they complete this.
 
 ## Tu B'Av Bundle Campaign (July 2026)
-- [ ] Research existing payment/guide/database flows for integration
-- [ ] Create hidden landing page /tu-bav-bundle with love-themed branding
-- [ ] Implement single payment of 349 NIS for bundle (database 249 + guide 99 instead of 249)
-- [ ] Post-purchase flow: database onboarding + one-time guide access email
-- [ ] Test full purchase flow end-to-end
+- [x] Research existing payment/guide/database flows for integration
+- [x] Create hidden landing page /tu-bav with love-themed branding
+- [x] Implement single payment of 349 NIS for bundle (database 249 + guide 99 instead of 249)
+- [x] Post-purchase flow: database onboarding + one-time guide access email
+- [ ] Test full purchase flow end-to-end (use test1 coupon code)
 
 ## Profile Completion Page & Email Campaign (July 7)
 - [x] Build /join/complete?token=X page showing only missing fields for each user
@@ -233,3 +233,9 @@
 - [x] Add retry logic to ThankYouBundle.tsx (auto-retry up to 4 times with increasing delay when webhook hasn't arrived yet)
 - [x] Add same retry logic to ThankYouDatabase.tsx
 - [x] Fix bundle_tubav product detection in growWebhook.ts (was misidentified as "database" due to shared processToken)
+
+## Fix Tu B'Av Bundle Flow - Payment First, Then Registration (July 8)
+- [x] Fix handleBundleTuBav webhook: correctly identified by description "חבילת טו באב" (was misidentified as database due to shared processToken)
+- [x] handleBundleTuBav calls handleDatabase (creates singles record with isPaid=true, creates free_access_token, sends email with /join?free_token=XXX) + handleGuide (sends guide email)
+- [x] Fix ThankYouBundle page: removed email input form, replaced with "check your email" message (webhook already sends the join link + guide email automatically)
+- [x] Existing free_token flow in Register.tsx already skips payment step and goes profile → DNA → questionnaire → done
