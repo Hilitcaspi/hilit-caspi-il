@@ -517,10 +517,11 @@ export async function handleGrowWebhook(body: any): Promise<void> {
   }
   // 3. If still no product or product is "database" but sum=349, override to bundle_tubav
   if (!product) product = detectProductByAmount(sum);
-  // 4. Final override: if processToken matched "database" but sum is 349 (bundle price), it's actually bundle_tubav
-  if (product === "database" && sum === 349) {
+  // 4. Final override: if processToken matched "database" or "guide" but sum is 349 (bundle price), it's actually bundle_tubav
+  // The bundle uses the DATABASE pageCode, but Grow may return a processToken that matches guide hash.
+  if ((product === "database" || product === "guide") && sum === 349) {
+    console.log(`[GrowWebhook] Overriding product from ${product} to bundle_tubav based on sum=349`);
     product = "bundle_tubav";
-    console.log(`[GrowWebhook] Overriding product from database to bundle_tubav based on sum=349`);
   }
 
   console.log(`[GrowWebhook] Payment: ${name} (${email}) | product: ${product} | sum: ${sum} | tx: ${transactionId}`);

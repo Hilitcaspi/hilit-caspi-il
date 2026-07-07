@@ -239,3 +239,4 @@
 - [x] handleBundleTuBav calls handleDatabase (creates singles record with isPaid=true, creates free_access_token, sends email with /join?free_token=XXX) + handleGuide (sends guide email)
 - [x] Fix ThankYouBundle page: removed email input form, replaced with "check your email" message (webhook already sends the join link + guide email automatically)
 - [x] Existing free_token flow in Register.tsx already skips payment step and goes profile → DNA → questionnaire → done
+- [x] Fix critical bug: product detection override only checked database→bundle_tubav but NOT guide→bundle_tubav (Grow returned guide processToken for bundle payment). Now checks both.
