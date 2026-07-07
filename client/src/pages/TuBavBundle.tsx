@@ -34,18 +34,28 @@ function AnimatedSection({ children, className = "" }: { children: React.ReactNo
   );
 }
 
-/* Floating hearts component */
+/* SVG Heart icon - replaces all emoji hearts */
+function HeartIcon({ size = 16, color = "currentColor", className = "" }: { size?: number; color?: string; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} className={`inline-block ${className}`}>
+      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    </svg>
+  );
+}
+
+/* Floating SVG hearts component */
 function FloatingHearts() {
-  const hearts = ["❤️", "💕", "💗", "❤️", "💖", "💕", "❤️", "💗", "💖", "❤️", "💕", "💗"];
+  const heartColors = ["#ff4466", "#ff6b9d", "#ff8ab5", "#ff4466", "#ff6b9d", "#ff8ab5", "#ff4466", "#ff6b9d", "#ff8ab5", "#ff4466", "#ff6b9d", "#ff8ab5"];
+  const sizes = [18, 22, 16, 24, 20, 14, 22, 18, 26, 16, 20, 24];
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {hearts.map((heart, i) => (
+      {heartColors.map((color, i) => (
         <motion.div
           key={i}
-          className="absolute text-2xl md:text-3xl"
+          className="absolute"
           style={{ left: `${5 + (i * 8) % 90}%` }}
-          initial={{ y: "110vh", opacity: 0.4, rotate: -15 + Math.random() * 30 }}
-          animate={{ y: "-10vh", opacity: [0.4, 0.7, 0.4] }}
+          initial={{ y: "110vh", opacity: 0.3, rotate: -15 + Math.random() * 30 }}
+          animate={{ y: "-10vh", opacity: [0.3, 0.6, 0.3] }}
           transition={{
             duration: 10 + i * 1.5,
             repeat: Infinity,
@@ -53,7 +63,7 @@ function FloatingHearts() {
             delay: i * 0.8,
           }}
         >
-          {heart}
+          <HeartIcon size={sizes[i]} color={color} />
         </motion.div>
       ))}
     </div>
@@ -86,33 +96,45 @@ export default function TuBavBundle() {
         <FloatingHearts />
 
         <div className="relative z-10 max-w-4xl mx-auto px-6 pt-24 pb-16 text-center">
-          {/* Urgency badge */}
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2, duration: 0.5 }}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#ff4466]/30 to-[#ff6b9d]/30 border border-[#ff4466]/50 text-white text-sm font-bold px-5 py-2.5 rounded-full mb-6 backdrop-blur-sm">
-            <span className="animate-pulse">❤️</span> מבצע חד פעמי לחודש האהבה
-            <span className="animate-pulse">❤️</span>
+          
+          {/* Profile photo + name at top */}
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1, duration: 0.6 }}
+            className="mb-8">
+            <img src={PROFILE_IMG} alt="הילית כספי" className="w-24 h-24 rounded-full object-cover mx-auto mb-3 shadow-xl border-3 border-white/30" />
+            <p className="text-white font-bold text-sm">הילית כספי</p>
+            <p className="text-white/60 text-xs">מאמנת למציאת זוגיות</p>
           </motion.div>
 
-          <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.8 }}
+          {/* Urgency badge */}
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.5 }}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#ff4466]/30 to-[#ff6b9d]/30 border border-[#ff4466]/50 text-white text-sm font-bold px-5 py-2.5 rounded-full mb-6 backdrop-blur-sm">
+            <HeartIcon size={14} color="#ff6b9d" className="animate-pulse" />
+            <span>מבצע חד פעמי לחודש האהבה</span>
+            <HeartIcon size={14} color="#ff6b9d" className="animate-pulse" />
+          </motion.div>
+
+          <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.8 }}
             className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-4">
             יש לנו מטרה משותפת:
           </motion.h1>
-          <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.7 }}
-            className="text-3xl md:text-4xl lg:text-5xl font-black leading-tight mb-8"
+          <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 0.7 }}
+            className="text-3xl md:text-4xl lg:text-5xl font-black leading-tight mb-8 flex items-center justify-center gap-3"
             style={{ color: "#ff6b9d" }}>
-            למצוא לך דייט לט"ו באב! 💕
+            <span>למצוא לך דייט לט"ו באב!</span>
+            <HeartIcon size={36} color="#ff6b9d" />
           </motion.h2>
 
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8, duration: 0.7 }}
+          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 0.7 }}
             className="text-white/85 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto mb-10">
             לכבוד יום האהבה הישראלי, הכנתי חבילה מיוחדת שתעזור לך להגיע לדייט עם האדם הנכון. מאגר הרווקים שלי + המדריך "לבחור נכון" שילווה אותך בתהליך. הכל במחיר מטורף, פעם אחת בשנה.
           </motion.p>
 
           {/* Price hero box */}
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1, duration: 0.6 }}
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.1, duration: 0.6 }}
             className="bg-white/10 backdrop-blur-md border-2 border-[#ff6b9d]/40 rounded-3xl p-8 max-w-md mx-auto mb-10 relative overflow-hidden">
             {/* Corner ribbon */}
-            <div className="absolute top-4 left-4 bg-[#ff4466] text-white text-xs font-black px-3 py-1 rounded-full shadow-lg">
+            <div className="absolute top-4 left-4 bg-[#ff4466] text-white text-xs font-black px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+              <HeartIcon size={10} color="white" />
               חיסכון ₪399!
             </div>
             <p className="text-white/60 text-sm mb-2 mt-2">מאגר + מדריך</p>
@@ -123,18 +145,19 @@ export default function TuBavBundle() {
             <p className="text-white/50 text-xs">תשלום חד פעמי | ללא מנוי | מבצע לחודש יולי בלבד</p>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2, duration: 0.6 }}>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.3, duration: 0.6 }}>
             <button onClick={scrollToPayment}
-              className="bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white font-black text-lg px-12 py-5 rounded-full hover:shadow-xl hover:shadow-[#ff4466]/30 transition-all duration-200 active:scale-[0.97] shadow-lg">
-              רוצה דייט לטו באב ← ❤️
+              className="bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white font-black text-lg px-12 py-5 rounded-full hover:shadow-xl hover:shadow-[#ff4466]/30 transition-all duration-200 active:scale-[0.97] shadow-lg inline-flex items-center gap-3">
+              <span>רוצה דייט לטו באב</span>
+              <HeartIcon size={20} color="white" />
             </button>
           </motion.div>
 
           {/* Stats */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4, duration: 0.8 }}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5, duration: 0.8 }}
             className="flex gap-6 md:gap-10 justify-center pt-10 border-t border-white/10 mt-12 flex-wrap">
             {[
-              { val: "29 ביולי", label: "ט\"ו באב 💕" },
+              { val: "29 ביולי", label: "ט\"ו באב" },
               { val: "₪349", label: "במקום ₪748" },
               { val: "חד פעמי", label: "לא מנוי!" },
             ].map(({ val, label }) => (
@@ -159,7 +182,9 @@ export default function TuBavBundle() {
           </motion.div>
 
           <motion.div variants={fadeUp}>
-            <p className="text-[#ff4466] font-bold text-sm mb-3">מי אני?</p>
+            <p className="text-[#ff4466] font-bold text-sm mb-3 flex items-center gap-1">
+              <HeartIcon size={12} color="#ff4466" /> מי אני?
+            </p>
             <h2 className="text-3xl md:text-4xl font-black text-[#1a0a2e] mb-5 leading-tight">
               הילית כספי
               <br />
@@ -191,7 +216,7 @@ export default function TuBavBundle() {
         <AnimatedSection className="max-w-lg mx-auto text-center relative z-10">
           <motion.div variants={fadeUp}
             className="bg-[#ff4466] text-white text-xs font-black px-4 py-2 rounded-full mb-4 inline-flex items-center gap-2">
-            🔥 מבצע חד פעמי לטו באב
+            <HeartIcon size={12} color="white" /> מבצע חד פעמי לטו באב
           </motion.div>
           <motion.h3 variants={fadeUp} className="text-2xl font-black text-white mb-2">
             מאגר + מדריך = ₪349
@@ -202,7 +227,7 @@ export default function TuBavBundle() {
           <motion.div variants={fadeUp}>
             <GrowWallet
               product="bundle_tubav"
-              buttonLabel="רוצה להצטרף עכשיו ❤️"
+              buttonLabel="רוצה להצטרף עכשיו"
               buttonClassName="!bg-gradient-to-r !from-[#ff4466] !to-[#ff6b9d] !text-white !font-black !text-base !rounded-full hover:!shadow-xl hover:!shadow-[#ff4466]/30 !py-4"
               termsPath="/terms/database"
             />
@@ -212,13 +237,13 @@ export default function TuBavBundle() {
 
       {/* ═══════════ WHY NOW — URGENCY ═══════════ */}
       <section className="py-20 px-6 bg-[#fff5f5] relative overflow-hidden">
-        {/* Subtle hearts background */}
+        {/* Subtle hearts background pattern */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
           style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff4466'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E\")", backgroundSize: "60px", backgroundRepeat: "repeat" }} />
         
         <AnimatedSection className="max-w-3xl mx-auto text-center relative z-10">
           <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-[#ff4466]/10 text-[#ff4466] text-sm font-bold px-4 py-2 rounded-full mb-6">
-            ⏰ מבצע חד פעמי לחודש יולי בלבד
+            <HeartIcon size={14} color="#ff4466" /> מבצע חד פעמי לחודש יולי בלבד
           </motion.div>
           <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-[#1a0a2e] mb-6">
             למה דווקא עכשיו?
@@ -229,9 +254,10 @@ export default function TuBavBundle() {
           <motion.p variants={fadeUp} className="text-[#555] text-lg leading-relaxed mb-8">
             המטרה שלי ושלך אחת: <strong>לצאת לדייט ביום האהבה הישראלי</strong>. ולשם כך, אני מורידה מחירים, מגבירה התאמות, ונותנת לך את הכלים הכי טובים שלי.
           </motion.p>
-          <motion.div variants={fadeUp} className="bg-gradient-to-r from-[#ff4466]/10 to-[#ff6b9d]/10 border border-[#ff4466]/20 rounded-2xl p-6">
+          <motion.div variants={fadeUp} className="bg-gradient-to-r from-[#ff4466]/10 to-[#ff6b9d]/10 border border-[#ff4466]/20 rounded-2xl p-6 flex items-center justify-center gap-3">
+            <HeartIcon size={20} color="#ff4466" />
             <p className="text-[#1a0a2e] font-black text-xl">
-              🎯 המטרה: דייט ביום האהבה. המבצע הזה הוא הצעד הראשון.
+              המטרה: דייט ביום האהבה. המבצע הזה הוא הצעד הראשון.
             </p>
           </motion.div>
         </AnimatedSection>
@@ -257,10 +283,10 @@ export default function TuBavBundle() {
                 אני עוברת על כל פרופיל אישית. האלגוריתם שלי מבוסס על מודלים מדעיים שמובילים לזוגיות ארוכת טווח. התאמות נשלחות רק כשיש אחוז התאמה גבוה על בסיס עשרות פרמטרים.
               </p>
               <ul className="text-[#555] text-sm space-y-2">
-                <li className="flex items-start gap-2"><span className="text-[#ff4466] mt-0.5">❤️</span> שאלון מדעי מקיף</li>
-                <li className="flex items-start gap-2"><span className="text-[#ff4466] mt-0.5">❤️</span> התאמות מבוססות אלגוריתם</li>
-                <li className="flex items-start gap-2"><span className="text-[#ff4466] mt-0.5">❤️</span> ליווי אישי שלי בתהליך</li>
-                <li className="flex items-start gap-2"><span className="text-[#ff4466] mt-0.5">❤️</span> ללא מנוי חודשי</li>
+                <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff4466" className="mt-0.5 shrink-0" /> שאלון מדעי מקיף</li>
+                <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff4466" className="mt-0.5 shrink-0" /> התאמות מבוססות אלגוריתם</li>
+                <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff4466" className="mt-0.5 shrink-0" /> ליווי אישי שלי בתהליך</li>
+                <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff4466" className="mt-0.5 shrink-0" /> ללא מנוי חודשי</li>
               </ul>
               <div className="mt-5 pt-4 border-t border-[#ffe0e6]">
                 <span className="text-[#888] text-sm">מחיר רגיל: </span>
@@ -272,16 +298,18 @@ export default function TuBavBundle() {
             {/* Guide card */}
             <motion.div variants={fadeUp} className="bg-[#fff5f5] rounded-3xl p-8 shadow-md border border-[#ffe0e6] relative overflow-hidden">
               <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-[#ff6b9d]/10 to-transparent rounded-bl-full" />
-              <div className="bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white text-xs font-bold px-3 py-1.5 rounded-full inline-block mb-4">💕 בונוס מיוחד</div>
+              <div className="bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white text-xs font-bold px-3 py-1.5 rounded-full inline-flex items-center gap-1 mb-4">
+                <HeartIcon size={10} color="white" /> בונוס מיוחד
+              </div>
               <h3 className="text-2xl font-black text-[#1a0a2e] mb-3">המדריך "לבחור נכון"</h3>
               <p className="text-[#555] leading-relaxed mb-4">
                 המדריך הזה שווה ערך ל-2 שעות ייעוץ אישי איתי (₪1,000). הוא עוזר להבין מה באמת חשוב לך בזוגיות, איך לזהות התאמה אמיתית, ואיך להגיב נכון להתאמות שמגיעות. כי לפעמים מה שנראה "לא מושלם" הוא בדיוק מה שצריך.
               </p>
               <ul className="text-[#555] text-sm space-y-2">
-                <li className="flex items-start gap-2"><span className="text-[#ff6b9d] mt-0.5">💗</span> שווה ערך ל-2 שעות ייעוץ (₪1,000)</li>
-                <li className="flex items-start gap-2"><span className="text-[#ff6b9d] mt-0.5">💗</span> תרגילים מעשיים להבנת עצמך</li>
-                <li className="flex items-start gap-2"><span className="text-[#ff6b9d] mt-0.5">💗</span> כלים לזיהוי התאמה אמיתית</li>
-                <li className="flex items-start gap-2"><span className="text-[#ff6b9d] mt-0.5">💗</span> גישה דיגיטלית לצמיתות</li>
+                <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff6b9d" className="mt-0.5 shrink-0" /> שווה ערך ל-2 שעות ייעוץ (₪1,000)</li>
+                <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff6b9d" className="mt-0.5 shrink-0" /> תרגילים מעשיים להבנת עצמך</li>
+                <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff6b9d" className="mt-0.5 shrink-0" /> כלים לזיהוי התאמה אמיתית</li>
+                <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff6b9d" className="mt-0.5 shrink-0" /> גישה דיגיטלית לצמיתות</li>
               </ul>
               <div className="mt-5 pt-4 border-t border-[#ffe0e6]">
                 <span className="text-[#888] text-sm">מחיר רגיל: </span>
@@ -302,9 +330,10 @@ export default function TuBavBundle() {
           <motion.p variants={fadeUp} className="text-[#555] text-lg leading-relaxed mb-6">
             רוב האנשים שנכנסים למאגר שלי מקבלים התאמות תוך ימים. אבל חלקם לא יודעים איך להגיב. הם רואים פרופיל שלא תואם בדיוק את מה שדמיינו, ומוותרים. המדריך "לבחור נכון" נותן את הכלים להבין למה שלחתי את ההתאמה הזו, מה לחפש מעבר למה שרואים על הנייר, ואיך לגשת לדייט ראשון בצורה שמגדילה את הסיכוי שתצא מזה זוגיות.
           </motion.p>
-          <motion.div variants={fadeUp} className="bg-white border border-[#ffe0e6] rounded-2xl p-6">
+          <motion.div variants={fadeUp} className="bg-white border border-[#ffe0e6] rounded-2xl p-6 flex items-center justify-center gap-3">
+            <HeartIcon size={20} color="#ff6b9d" />
             <p className="text-[#1a0a2e] font-black text-lg">
-              💕 המאגר מביא את ההתאמות. המדריך עוזר לך לעשות איתן את הדבר הנכון.
+              המאגר מביא את ההתאמות. המדריך עוזר לך לעשות איתן את הדבר הנכון.
             </p>
           </motion.div>
         </AnimatedSection>
@@ -320,9 +349,9 @@ export default function TuBavBundle() {
           {/* Urgency banner */}
           <motion.div variants={fadeUp}
             className="bg-[#ff4466] text-white text-sm font-black px-6 py-3 rounded-full mb-8 inline-flex items-center gap-2 shadow-lg shadow-[#ff4466]/30">
-            <span className="animate-pulse">🔥</span>
-            מבצע חד פעמי לכבוד טו באב!
-            <span className="animate-pulse">🔥</span>
+            <HeartIcon size={14} color="white" className="animate-pulse" />
+            <span>מבצע חד פעמי לכבוד טו באב!</span>
+            <HeartIcon size={14} color="white" className="animate-pulse" />
           </motion.div>
 
           <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-white leading-tight mb-3">
@@ -336,10 +365,10 @@ export default function TuBavBundle() {
           <motion.div variants={fadeUp} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 mb-4 text-right">
             <p className="text-white font-bold text-base mb-3">מה כלול:</p>
             <ul className="text-white/80 text-sm space-y-2.5 mb-5">
-              <li>✅ <strong>הצטרפות למאגר הרווקים</strong> שאלון מדעי + התאמות אישיות (שווי ₪499)</li>
-              <li>✅ <strong>המדריך "לבחור נכון"</strong> שווה ערך ל-2 שעות ייעוץ אישי (שווי ₪1,000)</li>
-              <li>✅ <strong>ליווי אישי שלי</strong> אני עוברת על כל פרופיל</li>
-              <li>✅ <strong>ללא מנוי</strong> תשלום חד פעמי, בלי הפתעות</li>
+              <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff6b9d" className="mt-0.5 shrink-0" /> <span><strong>הצטרפות למאגר הרווקים</strong> שאלון מדעי + התאמות אישיות (שווי ₪499)</span></li>
+              <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff6b9d" className="mt-0.5 shrink-0" /> <span><strong>המדריך "לבחור נכון"</strong> שווה ערך ל-2 שעות ייעוץ אישי (שווי ₪1,000)</span></li>
+              <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff6b9d" className="mt-0.5 shrink-0" /> <span><strong>ליווי אישי שלי</strong> אני עוברת על כל פרופיל</span></li>
+              <li className="flex items-start gap-2"><HeartIcon size={14} color="#ff6b9d" className="mt-0.5 shrink-0" /> <span><strong>ללא מנוי</strong> תשלום חד פעמי, בלי הפתעות</span></li>
             </ul>
             <div className="flex items-center gap-3 justify-center pt-4 border-t border-white/20">
               <span className="line-through text-white/40 text-lg">₪748</span>
@@ -349,9 +378,10 @@ export default function TuBavBundle() {
           </motion.div>
 
           {/* Urgency reminder */}
-          <motion.div variants={fadeUp} className="bg-[#ff4466]/20 border border-[#ff4466]/40 rounded-xl p-3 mb-6">
+          <motion.div variants={fadeUp} className="bg-[#ff4466]/20 border border-[#ff4466]/40 rounded-xl p-3 mb-6 flex items-center justify-center gap-2">
+            <HeartIcon size={14} color="#ff6b9d" />
             <p className="text-white text-sm font-bold">
-              ❤️ המטרה שלנו: דייט ביום האהבה. הצטרפו עכשיו ואני מתחילה לחפש!
+              המטרה שלנו: דייט ביום האהבה. הצטרפו עכשיו ואני מתחילה לחפש!
             </p>
           </motion.div>
 
@@ -359,7 +389,7 @@ export default function TuBavBundle() {
           <motion.div variants={fadeUp}>
             <GrowWallet
               product="bundle_tubav"
-              buttonLabel="רוצה דייט לטו באב! ❤️"
+              buttonLabel="רוצה דייט לטו באב!"
               buttonClassName="!bg-gradient-to-r !from-[#ff4466] !to-[#ff6b9d] !text-white !font-black !text-lg !rounded-full hover:!shadow-xl hover:!shadow-[#ff4466]/30 !py-4"
               termsPath="/terms/database"
             />
@@ -403,7 +433,9 @@ export default function TuBavBundle() {
         <FloatingHearts />
 
         <AnimatedSection className="max-w-2xl mx-auto text-center relative z-10">
-          <motion.div variants={fadeUp} className="text-4xl mb-4">💕</motion.div>
+          <motion.div variants={fadeUp} className="mb-4">
+            <HeartIcon size={40} color="#ff6b9d" />
+          </motion.div>
           <motion.h2 variants={fadeUp} className="text-2xl md:text-3xl font-black text-white mb-3">
             ט"ו באב מתקרב.
           </motion.h2>
@@ -415,8 +447,9 @@ export default function TuBavBundle() {
           </motion.p>
           <motion.div variants={fadeUp}>
             <button onClick={scrollToPayment}
-              className="bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white font-black text-lg px-12 py-5 rounded-full hover:shadow-xl hover:shadow-[#ff4466]/30 transition-all duration-200 active:scale-[0.97] shadow-lg">
-              הצטרפות לחבילה ← ❤️
+              className="bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white font-black text-lg px-12 py-5 rounded-full hover:shadow-xl hover:shadow-[#ff4466]/30 transition-all duration-200 active:scale-[0.97] shadow-lg inline-flex items-center gap-3">
+              <span>הצטרפות לחבילה</span>
+              <HeartIcon size={20} color="white" />
             </button>
           </motion.div>
 
@@ -424,11 +457,11 @@ export default function TuBavBundle() {
           <motion.div variants={fadeUp} className="mt-10 pt-8 border-t border-white/10 flex flex-col gap-3">
             <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 bg-[#25D366]/20 border border-[#25D366]/30 text-[#25D366] font-bold px-6 py-3 rounded-xl hover:bg-[#25D366]/30 transition-all text-sm">
-              📱 שאלות? כתבו לי בוואטסאפ
+              שאלות? כתבו לי בוואטסאפ
             </a>
             <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white/70 font-bold px-6 py-3 rounded-xl hover:bg-white/10 transition-all text-sm">
-              📸 עקבו אחריי באינסטגרם
+              עקבו אחריי באינסטגרם
             </a>
           </motion.div>
         </AnimatedSection>
