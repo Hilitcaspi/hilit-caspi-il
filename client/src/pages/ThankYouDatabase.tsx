@@ -18,6 +18,8 @@ const INSTAGRAM_URL = "https://www.instagram.com/hilitcaspi_relationship";
 export default function ThankYouDatabase() {
   const [email, setEmail] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     trackPurchase({ value: 249, currency: "ILS", content_name: "מאגר רווקים" });
@@ -28,16 +30,33 @@ export default function ThankYouDatabase() {
   const getLinkMutation = trpc.singles.getQuestionnaireLink.useMutation({
     onSuccess: (data) => {
       if (data.url) {
+        setIsRetrying(false);
+        setRetryCount(0);
         window.location.href = data.url;
       } else if ((data as any).alreadyCompleted) {
+        setIsRetrying(false);
         setErrorMsg("השאלון כבר הושלם! ניתן להיכנס לאזור האישי.");
       } else if ((data as any).notFound) {
-        setErrorMsg("המייל לא נמצא במערכת. ייתכן שהתשלום עדיין מעובד. נסו שוב בעוד דקה, או כתבו לנו בוואטסאפ.");
+        // Webhook may not have arrived yet — auto-retry up to 4 times with increasing delay
+        if (retryCount < 4) {
+          setIsRetrying(true);
+          setErrorMsg("");
+          const delay = (retryCount + 1) * 3000; // 3s, 6s, 9s, 12s
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+            getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
+          }, delay);
+        } else {
+          setIsRetrying(false);
+          setErrorMsg("המייל לא נמצא במערכת. ייתכן שהתשלום עדיין מעובד. נסו שוב בעוד דקה, או כתבו לנו בוואטסאפ.");
+        }
       } else {
+        setIsRetrying(false);
         setErrorMsg("אירעה שגיאה. אפשר לכתוב לנו בוואטסאפ.");
       }
     },
     onError: () => {
+      setIsRetrying(false);
       setErrorMsg("אירעה שגיאה. אפשר לכתוב לנו בוואטסאפ.");
     },
   });
@@ -45,6 +64,8 @@ export default function ThankYouDatabase() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
+    setRetryCount(0);
+    setIsRetrying(false);
     if (!email.trim()) return;
     getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
   };
@@ -110,24 +131,27 @@ export default function ThankYouDatabase() {
                 onChange={(e) => { setEmail(e.target.value); setErrorMsg(""); }}
                 placeholder="example@gmail.com"
                 required
-                disabled={getLinkMutation.isPending}
+                disabled={getLinkMutation.isPending || isRetrying}
                 className="px-4 py-3 rounded-xl text-right text-[#191265] bg-white text-base focus:outline-none focus:ring-2 focus:ring-[#ffe27c] disabled:opacity-60 placeholder-gray-400"
               />
             </div>
 
+            {isRetrying && (
+              <p className="text-[#ffe27c]/80 text-sm text-center animate-pulse">מחפש את התשלום שלך... (נסיון {retryCount + 1}/4)</p>
+            )}
             {errorMsg && (
               <p className="text-[#ffe27c] text-sm text-center leading-relaxed">{errorMsg}</p>
             )}
 
             <button
               type="submit"
-              disabled={getLinkMutation.isPending}
+              disabled={getLinkMutation.isPending || isRetrying}
               className="bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-xl hover:bg-white transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {getLinkMutation.isPending ? (
+              {(getLinkMutation.isPending || isRetrying) ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="inline-block w-5 h-5 border-3 border-[#191265] border-t-transparent rounded-full animate-spin" />
-                  מכין...
+                  מעבד תשלום, אנא המתינו...
                 </span>
               ) : (
                 "המשך לשאלון המדעי ←"

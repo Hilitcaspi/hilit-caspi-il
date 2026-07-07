@@ -227,4 +227,9 @@
 - [x] Build /join/complete?token=X page showing only missing fields for each user
 - [x] Backend API: fetch missing fields by token, save updates to DB
 - [x] Photo upload support on the complete page
-- [ ] Send emails to ~120 users with missing data (link to /join/complete or /join/questionnaire)
+- [x] Send emails to ~120 users with missing data (link to /join/complete or /join/questionnaire)
+
+## Fix ThankYou page "email not found" after payment (July 8)
+- [x] Add retry logic to ThankYouBundle.tsx (auto-retry up to 4 times with increasing delay when webhook hasn't arrived yet)
+- [x] Add same retry logic to ThankYouDatabase.tsx
+- [x] Fix bundle_tubav product detection in growWebhook.ts (was misidentified as "database" due to shared processToken)
