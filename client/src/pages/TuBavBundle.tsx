@@ -12,6 +12,8 @@ import { track } from "@/lib/track";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, ראיתי את מבצע טו באב ויש לי שאלה");
 const INSTAGRAM_URL = "https://www.instagram.com/hilitcaspi_relationship";
+const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
+const ABOUT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-about_1da3754a.jpg";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -103,7 +105,7 @@ export default function TuBavBundle() {
 
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8, duration: 0.7 }}
             className="text-white/85 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto mb-10">
-            לכבוד יום האהבה הישראלי, הכנתי חבילה מיוחדת שתעזור לך להגיע לדייט עם בן/בת הזוג הנכון/ה. מאגר הרווקים שלי + המדריך "לבחור נכון" שילווה אותך בתהליך. הכל במחיר מטורף, פעם אחת בשנה.
+            לכבוד יום האהבה הישראלי, הכנתי חבילה מיוחדת שתעזור לך להגיע לדייט עם האדם הנכון. מאגר הרווקים שלי + המדריך "לבחור נכון" שילווה אותך בתהליך. הכל במחיר מטורף, פעם אחת בשנה.
           </motion.p>
 
           {/* Price hero box */}
@@ -132,7 +134,7 @@ export default function TuBavBundle() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4, duration: 0.8 }}
             className="flex gap-6 md:gap-10 justify-center pt-10 border-t border-white/10 mt-12 flex-wrap">
             {[
-              { val: "12 ביולי", label: "ט\"ו באב 💕" },
+              { val: "29 ביולי", label: "ט\"ו באב 💕" },
               { val: "₪349", label: "במקום ₪748" },
               { val: "חד פעמי", label: "לא מנוי!" },
             ].map(({ val, label }) => (
@@ -145,15 +147,78 @@ export default function TuBavBundle() {
         </div>
       </section>
 
+      {/* ═══════════ WHO AM I ═══════════ */}
+      <section className="py-20 px-6 bg-white">
+        <AnimatedSection className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+          <motion.div variants={fadeUp} className="relative">
+            <img src={ABOUT_IMG} alt="הילית כספי" loading="lazy" decoding="async" className="w-full max-w-sm mx-auto rounded-3xl object-cover shadow-2xl" />
+            <div className="absolute -bottom-4 -left-4 bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white rounded-2xl p-4 shadow-xl max-w-[180px]">
+              <div className="font-black text-xl">+2,400</div>
+              <div className="text-white/90 text-xs">רווקים במאגר</div>
+            </div>
+          </motion.div>
+
+          <motion.div variants={fadeUp}>
+            <p className="text-[#ff4466] font-bold text-sm mb-3">מי אני?</p>
+            <h2 className="text-3xl md:text-4xl font-black text-[#1a0a2e] mb-5 leading-tight">
+              הילית כספי
+              <br />
+              <span className="text-[#ff4466]">מומחית לזוגיות ושדכנית</span>
+            </h2>
+            <div className="space-y-4 text-[#555] leading-relaxed text-base">
+              <p>
+                שנים עסקתי בשאלה אחת: <strong className="text-[#1a0a2e]">למה אנשים טובים, חכמים ואוהבים לא מצליחים למצוא אהבה?</strong>
+              </p>
+              <p>
+                ליוויתי מאות אנשים שהצליחו בכל תחום בחיים, אבל הרגישו אבודים לגמרי בעולם הדייטינג. גיליתי שהבעיה אף פעם לא הייתה "שאין אנשים טובים". הבעיה הייתה תמיד דפוסים עמוקים שפועלים מתחת לפני השטח.
+              </p>
+              <p>
+                פיתחתי שיטה ייחודית שמשלבת פסיכולוגיה, אינטואיציה, וניסיון מעשי של שנים. עם השיטה הזו, <strong className="text-[#1a0a2e]">מאות אנשים מצאו את הזוגיות שחלמו עליה.</strong>
+              </p>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {["פסיכולוגיה חיובית", "NLP", "שדכנית", "בעלת פודקאסט", "מומחית לדפוסים זוגיים"].map(tag => (
+                <span key={tag} className="bg-[#1a0a2e] text-white text-xs px-3 py-1.5 rounded-full font-medium">{tag}</span>
+              ))}
+            </div>
+          </motion.div>
+        </AnimatedSection>
+      </section>
+
+      {/* ═══════════ EARLY PAYMENT CTA ═══════════ */}
+      <section className="py-12 px-6 relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #4a1942 0%, #6b1d3a 100%)" }}>
+        <AnimatedSection className="max-w-lg mx-auto text-center relative z-10">
+          <motion.div variants={fadeUp}
+            className="bg-[#ff4466] text-white text-xs font-black px-4 py-2 rounded-full mb-4 inline-flex items-center gap-2">
+            🔥 מבצע חד פעמי לטו באב
+          </motion.div>
+          <motion.h3 variants={fadeUp} className="text-2xl font-black text-white mb-2">
+            מאגר + מדריך = ₪349
+          </motion.h3>
+          <motion.p variants={fadeUp} className="text-white/60 text-sm mb-5">
+            במקום ₪748 | תשלום חד פעמי | ללא מנוי
+          </motion.p>
+          <motion.div variants={fadeUp}>
+            <GrowWallet
+              product="bundle_tubav"
+              buttonLabel="רוצה להצטרף עכשיו ❤️"
+              buttonClassName="!bg-gradient-to-r !from-[#ff4466] !to-[#ff6b9d] !text-white !font-black !text-base !rounded-full hover:!shadow-xl hover:!shadow-[#ff4466]/30 !py-4"
+              termsPath="/terms/database"
+            />
+          </motion.div>
+        </AnimatedSection>
+      </section>
+
       {/* ═══════════ WHY NOW — URGENCY ═══════════ */}
-      <section className="py-20 px-6 bg-white relative overflow-hidden">
+      <section className="py-20 px-6 bg-[#fff5f5] relative overflow-hidden">
         {/* Subtle hearts background */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
           style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff4466'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E\")", backgroundSize: "60px", backgroundRepeat: "repeat" }} />
         
         <AnimatedSection className="max-w-3xl mx-auto text-center relative z-10">
           <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-[#ff4466]/10 text-[#ff4466] text-sm font-bold px-4 py-2 rounded-full mb-6">
-            ⏰ מבצע חד פעמי — רק בחודש יולי
+            ⏰ מבצע חד פעמי לחודש יולי בלבד
           </motion.div>
           <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-[#1a0a2e] mb-6">
             למה דווקא עכשיו?
@@ -162,7 +227,7 @@ export default function TuBavBundle() {
             לכבוד חודש האהבה הישראלי, אני נותנת גז על ההתאמות. שולחת יותר הצעות, גם כאלה עם אחוזי התאמה שבדרך כלל הייתי מחכה איתם. למה? כי לפעמים מה שנראה "לא מושלם על הנייר" הוא בדיוק מה שצריך במציאות.
           </motion.p>
           <motion.p variants={fadeUp} className="text-[#555] text-lg leading-relaxed mb-8">
-            המטרה שלי ושלך אחת: <strong>שתצא/י לדייט ביום האהבה הישראלי</strong>. ולשם כך, אני מורידה מחירים, מגבירה התאמות, ונותנת לך את הכלים הכי טובים שלי.
+            המטרה שלי ושלך אחת: <strong>לצאת לדייט ביום האהבה הישראלי</strong>. ולשם כך, אני מורידה מחירים, מגבירה התאמות, ונותנת לך את הכלים הכי טובים שלי.
           </motion.p>
           <motion.div variants={fadeUp} className="bg-gradient-to-r from-[#ff4466]/10 to-[#ff6b9d]/10 border border-[#ff4466]/20 rounded-2xl p-6">
             <p className="text-[#1a0a2e] font-black text-xl">
@@ -173,18 +238,18 @@ export default function TuBavBundle() {
       </section>
 
       {/* ═══════════ WHAT YOU GET ═══════════ */}
-      <section className="py-20 px-6 bg-[#fff5f5]">
+      <section className="py-20 px-6 bg-white">
         <AnimatedSection className="max-w-4xl mx-auto">
           <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-[#1a0a2e] text-center mb-4">
             מה כלול בחבילה?
           </motion.h2>
           <motion.p variants={fadeUp} className="text-center text-[#ff4466] font-bold mb-12">
-            שני המוצרים הכי חזקים שלי — במחיר חד פעמי מטורף
+            שני המוצרים הכי חזקים שלי במחיר חד פעמי מטורף
           </motion.p>
 
           <div className="grid md:grid-cols-2 gap-8">
             {/* Database card */}
-            <motion.div variants={fadeUp} className="bg-white rounded-3xl p-8 shadow-md border border-[#ffe0e6] relative overflow-hidden">
+            <motion.div variants={fadeUp} className="bg-[#fff5f5] rounded-3xl p-8 shadow-md border border-[#ffe0e6] relative overflow-hidden">
               <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-[#ff4466]/10 to-transparent rounded-bl-full" />
               <div className="bg-[#1a0a2e] text-white text-xs font-bold px-3 py-1.5 rounded-full inline-block mb-4">מאגר הרווקים</div>
               <h3 className="text-2xl font-black text-[#1a0a2e] mb-3">הצטרפות למאגר שלי</h3>
@@ -205,7 +270,7 @@ export default function TuBavBundle() {
             </motion.div>
 
             {/* Guide card */}
-            <motion.div variants={fadeUp} className="bg-white rounded-3xl p-8 shadow-md border border-[#ffe0e6] relative overflow-hidden">
+            <motion.div variants={fadeUp} className="bg-[#fff5f5] rounded-3xl p-8 shadow-md border border-[#ffe0e6] relative overflow-hidden">
               <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-[#ff6b9d]/10 to-transparent rounded-bl-full" />
               <div className="bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white text-xs font-bold px-3 py-1.5 rounded-full inline-block mb-4">💕 בונוס מיוחד</div>
               <h3 className="text-2xl font-black text-[#1a0a2e] mb-3">המדריך "לבחור נכון"</h3>
@@ -229,7 +294,7 @@ export default function TuBavBundle() {
       </section>
 
       {/* ═══════════ WHY TOGETHER ═══════════ */}
-      <section className="py-20 px-6 bg-white">
+      <section className="py-20 px-6 bg-[#fff5f5]">
         <AnimatedSection className="max-w-3xl mx-auto text-center">
           <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-[#1a0a2e] mb-6">
             למה המדריך + המאגר ביחד?
@@ -237,7 +302,7 @@ export default function TuBavBundle() {
           <motion.p variants={fadeUp} className="text-[#555] text-lg leading-relaxed mb-6">
             רוב האנשים שנכנסים למאגר שלי מקבלים התאמות תוך ימים. אבל חלקם לא יודעים איך להגיב. הם רואים פרופיל שלא תואם בדיוק את מה שדמיינו, ומוותרים. המדריך "לבחור נכון" נותן את הכלים להבין למה שלחתי את ההתאמה הזו, מה לחפש מעבר למה שרואים על הנייר, ואיך לגשת לדייט ראשון בצורה שמגדילה את הסיכוי שתצא מזה זוגיות.
           </motion.p>
-          <motion.div variants={fadeUp} className="bg-[#fff5f5] border border-[#ffe0e6] rounded-2xl p-6">
+          <motion.div variants={fadeUp} className="bg-white border border-[#ffe0e6] rounded-2xl p-6">
             <p className="text-[#1a0a2e] font-black text-lg">
               💕 המאגר מביא את ההתאמות. המדריך עוזר לך לעשות איתן את הדבר הנכון.
             </p>
@@ -245,7 +310,7 @@ export default function TuBavBundle() {
         </AnimatedSection>
       </section>
 
-      {/* ═══════════ PAYMENT SECTION ═══════════ */}
+      {/* ═══════════ MAIN PAYMENT SECTION ═══════════ */}
       <section id="payment" className="py-20 px-6 relative overflow-hidden" ref={paymentRef}
         style={{ background: "linear-gradient(135deg, #1a0a2e 0%, #3d1052 50%, #6b1d3a 100%)" }}>
         
@@ -256,7 +321,7 @@ export default function TuBavBundle() {
           <motion.div variants={fadeUp}
             className="bg-[#ff4466] text-white text-sm font-black px-6 py-3 rounded-full mb-8 inline-flex items-center gap-2 shadow-lg shadow-[#ff4466]/30">
             <span className="animate-pulse">🔥</span>
-            מבצע חד פעמי — רק לחודש יולי לכבוד טו באב!
+            מבצע חד פעמי לכבוד טו באב!
             <span className="animate-pulse">🔥</span>
           </motion.div>
 
@@ -271,10 +336,10 @@ export default function TuBavBundle() {
           <motion.div variants={fadeUp} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 mb-4 text-right">
             <p className="text-white font-bold text-base mb-3">מה כלול:</p>
             <ul className="text-white/80 text-sm space-y-2.5 mb-5">
-              <li>✅ <strong>הצטרפות למאגר הרווקים</strong> — שאלון מדעי + התאמות אישיות (שווי ₪499)</li>
-              <li>✅ <strong>המדריך "לבחור נכון"</strong> — שווה ערך ל-2 שעות ייעוץ אישי (שווי ₪1,000)</li>
-              <li>✅ <strong>ליווי אישי שלי</strong> — אני עוברת על כל פרופיל</li>
-              <li>✅ <strong>ללא מנוי</strong> — תשלום חד פעמי, בלי הפתעות</li>
+              <li>✅ <strong>הצטרפות למאגר הרווקים</strong> שאלון מדעי + התאמות אישיות (שווי ₪499)</li>
+              <li>✅ <strong>המדריך "לבחור נכון"</strong> שווה ערך ל-2 שעות ייעוץ אישי (שווי ₪1,000)</li>
+              <li>✅ <strong>ליווי אישי שלי</strong> אני עוברת על כל פרופיל</li>
+              <li>✅ <strong>ללא מנוי</strong> תשלום חד פעמי, בלי הפתעות</li>
             </ul>
             <div className="flex items-center gap-3 justify-center pt-4 border-t border-white/20">
               <span className="line-through text-white/40 text-lg">₪748</span>
@@ -286,7 +351,7 @@ export default function TuBavBundle() {
           {/* Urgency reminder */}
           <motion.div variants={fadeUp} className="bg-[#ff4466]/20 border border-[#ff4466]/40 rounded-xl p-3 mb-6">
             <p className="text-white text-sm font-bold">
-              ❤️ המטרה שלנו: דייט ביום האהבה. הצטרפי עכשיו ואני מתחילה לחפש לך!
+              ❤️ המטרה שלנו: דייט ביום האהבה. הצטרפו עכשיו ואני מתחילה לחפש!
             </p>
           </motion.div>
 
@@ -307,7 +372,7 @@ export default function TuBavBundle() {
       </section>
 
       {/* ═══════════ FAQ ═══════════ */}
-      <section className="py-20 px-6 bg-[#fff5f5]">
+      <section className="py-20 px-6 bg-white">
         <AnimatedSection className="max-w-3xl mx-auto">
           <motion.h2 variants={fadeUp} className="text-3xl font-black text-[#1a0a2e] text-center mb-10">
             שאלות נפוצות
@@ -319,10 +384,10 @@ export default function TuBavBundle() {
               { q: "כמה זמן לוקח לקבל התאמות?", a: "ברגע שתמלאו את השאלון, אני מתחילה לחפש התאמות. בדרך כלל ההתאמה הראשונה מגיעה תוך ימים ספורים. ולכבוד טו באב, אני שולחת יותר הצעות מהרגיל ונותנת גז!" },
               { q: "האם יש מנוי חודשי?", a: "לא! תשלום חד פעמי של ₪349 וזהו. ללא מנוי, ללא חיובים נוספים. לעולם." },
               { q: "המדריך דיגיטלי? אפשר לקרוא בטלפון?", a: "כן, המדריך דיגיטלי ונגיש מכל מכשיר. הגישה שלכם נשמרת לצמיתות." },
-              { q: "עד מתי המבצע?", a: "המבצע חד פעמי לכבוד טו באב, תקף לחודש יולי 2026 בלבד. אחרי זה, כל מוצר חוזר למחיר הרגיל שלו." },
+              { q: "עד מתי המבצע?", a: "המבצע חד פעמי לכבוד טו באב (29 ביולי), תקף לחודש יולי 2026 בלבד. אחרי זה, כל מוצר חוזר למחיר הרגיל שלו." },
               { q: "אני כבר במאגר, אפשר לקנות רק את המדריך?", a: "בטח! המדריך נמכר גם בנפרד ב-249₪. הקישור: hilitcaspi.com/guide" },
             ].map(({ q, a }, i) => (
-              <motion.div key={i} variants={fadeUp} className="bg-white rounded-2xl p-6 border border-[#ffe0e6] shadow-sm">
+              <motion.div key={i} variants={fadeUp} className="bg-[#fff5f5] rounded-2xl p-6 border border-[#ffe0e6] shadow-sm">
                 <h3 className="text-[#1a0a2e] font-bold text-base mb-2">{q}</h3>
                 <p className="text-[#555] text-sm leading-relaxed">{a}</p>
               </motion.div>
