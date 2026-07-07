@@ -207,3 +207,11 @@
 
 ## Apple Pay Domain Verification Fix (July 6)
 - [x] Add .well-known/apple-developer-merchantid-domain-association file from Meshulam to fix Apple Pay on hilitcaspi.com
+
+## Apple Pay Investigation Complete (July 7)
+- [x] Investigated Apple Pay SDK integration in GrowWallet.tsx
+- [x] Confirmed: Grow SDK has built-in Apple Pay service (a.min.js) using native window.ApplePaySession
+- [x] Confirmed: The Meshulam Apple Pay SDK in index.html line 54 is for iframe-based flows (NOT needed for Grow SDK)
+- [x] Confirmed: Domain verification file (.well-known/apple-developer-merchantid-domain-association) is correctly served (200 OK, 9122 bytes)
+- [x] Confirmed: All SDK service files exist at correct paths (/grow-sdk/sdk/1.3.5/js/services/a.min.js)
+- [x] Conclusion: Code-side is complete. Meshulam/Grow must register hilitcaspi.com in their Apple Developer Console (their step 4). Apple Pay will only appear on Safari/Apple devices once they complete this.
