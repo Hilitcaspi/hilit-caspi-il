@@ -23,6 +23,7 @@
  * never freeze the wallet.
  */
 import type { Express, Request, Response } from "express";
+import { addToPaymentLogBuffer } from "../routers";
 
 const PROXY_BASE = "/api/grow-proxy";
 
@@ -167,7 +168,9 @@ export function registerGrowProxy(app: Express): void {
 
       // Log all proxy requests for debugging (especially Apple Pay)
       const bodySnippet = req.body ? JSON.stringify(req.body).slice(0, 300) : "(empty)";
-      console.log(`[GrowProxy] ${req.method} ${afterBase} → ${upstreamUrl} | body: ${bodySnippet}`);
+      const reqLog = `[GrowProxy] ${req.method} ${afterBase} → ${upstreamUrl} | body: ${bodySnippet}`;
+      console.log(reqLog);
+      addToPaymentLogBuffer(reqLog);
 
       // Build forwarded headers from express-parsed request.
       const headers: Record<string, string> = { ...SPOOF_HEADERS };
@@ -200,40 +203,47 @@ export function registerGrowProxy(app: Express): void {
         contentTypeOut = upstream.headers.get("content-type");
         // Log response details
         const respSnippet = buf.subarray(0, 500).toString("utf8");
-        console.log(`[GrowProxy] Direct response: HTTP ${status} | size: ${buf.length}B | content-type: ${contentTypeOut} | body: ${respSnippet}`);
+        const respLog = `[GrowProxy] Direct response: HTTP ${status} | size: ${buf.length}B | content-type: ${contentTypeOut} | body: ${respSnippet}`;
+        console.log(respLog);
+        addToPaymentLogBuffer(respLog);
       } catch (e: any) {
         primaryFailed = true;
-        console.warn(
-          "[GrowProxy] Direct Meshulam call failed/timed out:",
-          e?.name || e?.message || e,
-        );
+        const failMsg = `[GrowProxy] Direct Meshulam call failed/timed out: ${e?.name || e?.message || e}`;
+        console.warn(failMsg);
+        addToPaymentLogBuffer(failMsg);
       }
 
       // Fallback: if direct attempt timed out, errored, or was Incapsula-blocked,
       // retry via the Cloudflare Worker (different egress network).
       const blocked = buf ? looksBlocked(status, buf) : false;
       if (primaryFailed || blocked) {
-        console.log(`[GrowProxy] Triggering fallback (primaryFailed=${primaryFailed}, blocked=${blocked}, status=${status})`);
+        const fbTrigger = `[GrowProxy] Triggering fallback (primaryFailed=${primaryFailed}, blocked=${blocked}, status=${status})`;
+        console.log(fbTrigger);
+        addToPaymentLogBuffer(fbTrigger);
         try {
           const fbUrl = `${CF_WORKER_BASE}${afterBase}`;
+          addToPaymentLogBuffer(`[GrowProxy] Fallback URL: ${fbUrl}`);
           console.log(`[GrowProxy] Fallback URL: ${fbUrl}`);
           const fb = await fetchWithTimeout(fbUrl, init, FALLBACK_TIMEOUT_MS);
           const fbBuf = Buffer.from(await fb.arrayBuffer());
           const fbSnippet = fbBuf.subarray(0, 500).toString("utf8");
-          console.log(`[GrowProxy] Fallback response: HTTP ${fb.status} | size: ${fbBuf.length}B | body: ${fbSnippet}`);
+          const fbRespLog = `[GrowProxy] Fallback response: HTTP ${fb.status} | size: ${fbBuf.length}B | body: ${fbSnippet}`;
+          console.log(fbRespLog);
+          addToPaymentLogBuffer(fbRespLog);
           if (!looksBlocked(fb.status, fbBuf)) {
             buf = fbBuf;
             status = fb.status;
             contentTypeOut = fb.headers.get("content-type");
             console.log("[GrowProxy] ✓ Served via Cloudflare Worker fallback");
+            addToPaymentLogBuffer("[GrowProxy] ✓ Served via Cloudflare Worker fallback");
           } else {
             console.warn("[GrowProxy] ✗ Fallback also blocked!");
+            addToPaymentLogBuffer("[GrowProxy] ✗ Fallback also blocked!");
           }
         } catch (fbErr: any) {
-          console.warn(
-            "[GrowProxy] Worker fallback failed:",
-            fbErr?.name || fbErr?.message || fbErr,
-          );
+          const fbFailMsg = `[GrowProxy] Worker fallback failed: ${fbErr?.name || fbErr?.message || fbErr}`;
+          console.warn(fbFailMsg);
+          addToPaymentLogBuffer(fbFailMsg);
         }
       }
 
@@ -260,7 +270,9 @@ export function registerGrowProxy(app: Express): void {
       if (contentTypeOut) res.setHeader("Content-Type", contentTypeOut);
       res.status(status).send(buf);
     } catch (err: any) {
-      console.error("[GrowProxy] Proxy error:", err?.message || err);
+      const proxyErr = `[GrowProxy] Proxy error: ${err?.message || err}`;
+      console.error(proxyErr);
+      addToPaymentLogBuffer(proxyErr);
       res
         .status(502)
         .json({ status: false, err: { message: "grow proxy error" } });

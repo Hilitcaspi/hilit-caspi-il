@@ -22,6 +22,20 @@ import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as
 import { sendEmail } from "./brevo";
 import { sendWhatsApp } from "./joni";
 
+// ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
+const PAYMENT_LOG_BUFFER: string[] = [];
+const MAX_LOG_BUFFER = 200;
+
+export function addToPaymentLogBuffer(msg: string): void {
+  const entry = `[${new Date().toISOString()}] ${msg}`;
+  PAYMENT_LOG_BUFFER.push(entry);
+  if (PAYMENT_LOG_BUFFER.length > MAX_LOG_BUFFER) PAYMENT_LOG_BUFFER.shift();
+}
+
+export function getPaymentLogBuffer(last = 50): string[] {
+  return PAYMENT_LOG_BUFFER.slice(-last);
+}
+
 // ─── DNA type compatibility map ───────────────────────────────────────────────
 const COMPATIBLE_TYPES: Record<string, string> = {
   leader:      "anchor",
@@ -6254,7 +6268,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }))
       .mutation(async ({ input }) => {
         // Log full payment failure details for debugging (visible in server logs)
-        console.log(`[PaymentFailure] ${input.stage} | ${input.product} | ${input.customerName} | ${input.customerEmail} | processToken: ${input.processToken || 'N/A'} | error: ${input.errorMessage || 'N/A'}`);
+        const failLog = `[PaymentFailure] ${input.stage} | ${input.product} | ${input.customerName} | ${input.customerEmail} | processToken: ${input.processToken || 'N/A'} | error: ${input.errorMessage || 'N/A'}`;
+        console.log(failLog);
+        addToPaymentLogBuffer(failLog);
         const { notifyPaymentFailure } = await import("./paymentFailureAlert");
         await notifyPaymentFailure({
           customerName: input.customerName,
@@ -6277,8 +6293,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         email: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        console.log(`[PaymentStep] ${input.product} | ${input.step} | ${input.email || 'N/A'} | ${input.detail || ''}`);
+        const msg = `[PaymentStep] ${input.product} | ${input.step} | ${input.email || 'N/A'} | ${input.detail || ''}`;
+        console.log(msg);
+        addToPaymentLogBuffer(msg);
         return { ok: true };
+      }),
+
+    // Admin-only: retrieve recent payment/proxy logs from in-memory buffer
+    getLogs: protectedProcedure
+      .input(z.object({ last: z.number().min(1).max(200).default(50) }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+        return { logs: getPaymentLogBuffer(input.last) };
       }),
   }),
 });
