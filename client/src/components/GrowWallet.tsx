@@ -11,7 +11,7 @@
  * - No complex state machine that can get stuck
  */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useId } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -165,6 +165,7 @@ export default function GrowWallet({
   const [walletLoading, setWalletLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const instanceId = useId();
   const [couponCode, setCouponCode] = useState("");
   const [couponApplied, setCouponApplied] = useState<{ code: string; discountPercent?: number; discountAmount?: number; fixedPrice?: number } | null>(null);
   const [couponError, setCouponError] = useState("");
@@ -417,11 +418,11 @@ export default function GrowWallet({
       {!hasAllDetails && (
         <div className="flex flex-col gap-3 mb-4">
           <div>
-            <Label htmlFor="gw-name" className="text-sm font-medium mb-1 block" style={{ color: '#191265' }}>
+            <Label htmlFor={`gw-name-${instanceId}`} className="text-sm font-medium mb-1 block" style={{ color: '#191265' }}>
               שם מלא
             </Label>
             <Input
-              id="gw-name"
+              id={`gw-name-${instanceId}`}
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
@@ -431,11 +432,11 @@ export default function GrowWallet({
             />
           </div>
           <div>
-            <Label htmlFor="gw-email" className="text-sm font-medium mb-1 block" style={{ color: '#191265' }}>
+            <Label htmlFor={`gw-email-${instanceId}`} className="text-sm font-medium mb-1 block" style={{ color: '#191265' }}>
               אימייל
             </Label>
             <Input
-              id="gw-email"
+              id={`gw-email-${instanceId}`}
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -445,11 +446,11 @@ export default function GrowWallet({
             />
           </div>
           <div>
-            <Label htmlFor="gw-phone" className="text-sm font-medium mb-1 block" style={{ color: '#191265' }}>
+            <Label htmlFor={`gw-phone-${instanceId}`} className="text-sm font-medium mb-1 block" style={{ color: '#191265' }}>
               טלפון <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="gw-phone"
+              id={`gw-phone-${instanceId}`}
               type="tel"
               value={phone}
               onChange={e => setPhone(e.target.value)}
@@ -498,8 +499,8 @@ export default function GrowWallet({
 
       {/* Age confirmation */}
       <div className="flex items-start gap-2 mb-2">
-        <Checkbox id="gw-age" checked={ageConfirmed} onCheckedChange={(v) => setAgeConfirmed(!!v)} className="mt-0.5 shrink-0" />
-        <label htmlFor="gw-age" className="text-sm cursor-pointer leading-snug" style={{ color: '#191265' }}>
+        <Checkbox id={`gw-age-${instanceId}`} checked={ageConfirmed} onCheckedChange={(v) => setAgeConfirmed(!!v)} className="mt-0.5 shrink-0" />
+        <label htmlFor={`gw-age-${instanceId}`} className="text-sm cursor-pointer leading-snug" style={{ color: '#191265' }}>
           אני מאשר/ת שאני בן/בת 18 ומעלה
         </label>
       </div>
@@ -507,12 +508,12 @@ export default function GrowWallet({
       {termsPath && (
         <div className="flex items-start gap-2 mb-3">
           <Checkbox
-            id="gw-terms"
+            id={`gw-terms-${instanceId}`}
             checked={termsAccepted}
             onCheckedChange={(v) => setTermsAccepted(!!v)}
             className="mt-0.5 shrink-0"
           />
-          <label htmlFor="gw-terms" className="text-sm cursor-pointer leading-snug" style={{ color: '#191265' }}>
+          <label htmlFor={`gw-terms-${instanceId}`} className="text-sm cursor-pointer leading-snug" style={{ color: '#191265' }}>
             קראתי ואני מסכים/ה ל<a
               href={termsPath}
               target="_blank"

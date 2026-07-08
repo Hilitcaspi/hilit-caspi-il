@@ -257,3 +257,7 @@
 - [x] Include processToken in WhatsApp and email notifications for easier lookup in Grow dashboard
 - [x] Fix duplicate guide email (skip journey when called from bundle flow)
 - [x] Fix email preview text gibberish (add preheader div to guide + database emails, and add preheader param to baseTemplate for journey emails)
+
+## Fix age confirmation checkbox (July 8)
+- [x] Fix duplicate IDs in GrowWallet component (all instances shared id="gw-age") causing checkbox state mismatch on pages with multiple GrowWallet instances
+- [x] Use React useId() for unique IDs per instance (age checkbox, terms checkbox, name/email/phone inputs)
