@@ -1,7 +1,7 @@
 /**
- * ScientificQuestionnaire - The 15-question scientific compatibility quiz
+ * ScientificQuestionnaire - Full registration + 15-question scientific compatibility quiz
  * Route: /join/questionnaire?token=xxx
- * Flow: Opened via email link after payment → complete 15 questions → confirmation (in database)
+ * Flow: Opened via email link after payment → details → DNA → 15 questions → confirmation
  *
  * The token identifies the single and pre-fills their DNA type.
  */
@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { useSearch, useLocation } from "wouter";
 import { MATCH_QUESTIONS, IMPORTANCE_LABELS, type MatchAnswer } from "@/lib/matchmakingQuestions";
+import EmbeddedDnaQuiz from "@/components/EmbeddedDnaQuiz";
 
 const slideIn = {
   initial: { opacity: 0, y: 30 },
@@ -25,7 +26,29 @@ const DNA_LABELS: Record<string, { f: string; m: string }> = {
   anchor:      { f: "העוגן היציבה", m: "העוגן היציב" },
 };
 
-type Step = "intro" | "details" | "quiz" | "uploading" | "done" | "error" | "invalid";
+const CITIES = [
+  "תל אביב", "יפו", "רמת גן", "גבעתיים", "בני ברק",
+  "בת ים", "חולון", "אור יהודה", "אזור", "בני עיש",
+  "גבעת שמואל", "רמת השרון", "קריית אונו",
+  "ראשון לציון", "פתח תקווה", "רחובות", "הרצליה", "רעננה",
+  "כפר סבא", "הוד השרון", "ראש העין", "לוד", "רמלה",
+  "נס ציונה", "יבנה", "גן יבנה", "נתניה", "שוהם", "הדרום", "חריש",
+  "חדרה", "פרדס חנה", "בנימינה", "זכרון יעקב", "קיסריה", "עמק חפר",
+  "ירושלים", "מודיעין", "מודיעין מכבים רעות", "בית שמש",
+  "ביתר", "מעלה אדומים", "מעלה החמישה", "קריית מלאכי", "אלעד מנשה",
+  "חיפה", "קריית אתא", "קריית ביאליק", "קריית ים", "קריית מוצקין",
+  "נשר", "טירת הכרמל", "זיכרון יעקב", "באקה אלגרבייה", "אום אלפחם",
+  "עכו", "נהריה", "קריית שמונה", "צפת", "טבריה",
+  "מגדל", "יקנעם", "אופק", "בית שאן", "ראש פינה",
+  "קריית ימק",
+  "אשדוד", "אשקלון", "באר שבע", "אילת", "עפולה",
+  "קריית גת", "דימונה", "נתיבות", "שדרות", "אופקים",
+  "רהט", "לקיה", "ערד", "מיתר ביקע",
+  "העמק הגדול", "מגדל העמק",
+  "אריאל", "מאלה אדומים", "עפרה", "ביתאל", "אלקנה",
+].sort((a, b) => a.localeCompare(b, 'he'));
+
+type Step = "intro" | "details" | "partner_prefs" | "dna" | "quiz" | "uploading" | "done" | "error" | "invalid";
 
 export default function ScientificQuestionnaire() {
   const [, navigate] = useLocation();
@@ -35,13 +58,13 @@ export default function ScientificQuestionnaire() {
 
   const storageKey = token ? `questionnaire_progress_${token}` : null;
 
-  // Load saved progress from localStorage
   const [step, setStep] = useState<Step>("intro");
 
   // Scroll to top on every step change
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [step]);
+
   const [currentIndex, setCurrentIndex] = useState(() => {
     if (!storageKey) return 0;
     try {
@@ -65,20 +88,50 @@ export default function ScientificQuestionnaire() {
     return {};
   });
   const [errorMsg, setErrorMsg] = useState("");
-  // For skeleton records (Grow payment without profile form)
-  const [missingAge, setMissingAge] = useState("");
-  const [missingCity, setMissingCity] = useState("");
+
+  // ── Profile fields (details step) ──
   const [missingGender, setMissingGender] = useState<"female" | "male">("female");
-  const [missingBirthDate, setMissingBirthDate] = useState("");
-  // Additional skeleton fields
+  const [seekingGender, setSeekingGender] = useState<"female" | "male" | "any">("male");
+  const [birthDate, setBirthDate] = useState("");
+  const [phone, setPhone] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [missingCity, setMissingCity] = useState("");
   const [missingHeight, setMissingHeight] = useState("");
-  const [missingReligiosity, setMissingReligiosity] = useState<"secular" | "traditional" | "religious" | "orthodox" | "">("");
+  const [missingMaritalStatus, setMissingMaritalStatus] = useState<"single" | "divorced" | "widowed" | "">("");
+  const [missingReligiosity, setMissingReligiosity] = useState<"secular" | "traditional" | "religious" | "orthodox" | "datlash" | "">("");
+  const [shomerShabbat, setShomerShabbat] = useState<boolean | null>(null);
+  const [religiosityOrigin, setReligiosityOrigin] = useState("");
   const [missingEducation, setMissingEducation] = useState<"high_school" | "vocational" | "technician" | "student" | "bachelor" | "master" | "phd" | "other" | "">("");
   const [missingOccupation, setMissingOccupation] = useState("");
+  const [hasKids, setHasKids] = useState(false);
+  const [numKids, setNumKids] = useState("0");
+  const [wantsKids, setWantsKids] = useState("");
   const [missingAbout, setMissingAbout] = useState("");
-  const [missingMaritalStatus, setMissingMaritalStatus] = useState<"single" | "divorced" | "widowed" | "">("");
-  const [missingPhotoFile, setMissingPhotoFile] = useState<File | null>(null);
   const [missingPhotoBase64, setMissingPhotoBase64] = useState<string>("");
+
+  // ── Partner preferences ──
+  const [minAge, setMinAge] = useState("");
+  const [maxAge, setMaxAge] = useState("");
+  const [minHeight, setMinHeight] = useState("");
+  const [maxHeight, setMaxHeight] = useState("");
+  const [religiosityPref, setReligiosityPref] = useState<string[]>([]);
+  const [acceptsKids, setAcceptsKids] = useState("");
+  const [openToPartnerWithKids, setOpenToPartnerWithKids] = useState("");
+  const [locationPref, setLocationPref] = useState("");
+  const [partnerDescription, setPartnerDescription] = useState("");
+
+  // ── DNA ──
+  const [dnaType, setDnaType] = useState("");
+
+  // Derived age from birthDate
+  const calculatedAge = birthDate ? (() => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let a = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
+    return a;
+  })() : null;
 
   // If we have saved progress, start at quiz step instead of intro
   const [hasRestoredProgress] = useState(() => {
@@ -105,6 +158,7 @@ export default function ScientificQuestionnaire() {
       setStep("done");
     }
   }, [profile]);
+
   // Detect skeleton record: age=0 or city empty, will need details before quiz
   const isSkeleton = profile && (!profile.age || profile.age === 0 || !profile.city);
 
@@ -116,7 +170,6 @@ export default function ScientificQuestionnaire() {
 
   const completeMutation = trpc.singles.completeQuestionnaire.useMutation({
     onSuccess: () => {
-      // 🔥 Facebook Pixel: CompleteRegistration when questionnaire done
       try {
         if (typeof window !== "undefined" && (window as any).fbq) {
           (window as any).fbq("track", "CompleteRegistration", {
@@ -128,19 +181,15 @@ export default function ScientificQuestionnaire() {
       setStep("done");
     },
     onError: (err) => {
-      // Parse friendly error messages from validation errors
       let friendlyMsg = "אירעה שגיאה. אנא נסה/י שוב.";
       const raw = err.message || "";
-      if (raw.includes('"path": [ "height" ]') || raw.includes('path.*height') || raw.toLowerCase().includes('height')) {
+      if (raw.includes('height')) {
         friendlyMsg = "שגיאה בשדה הגובה. יש להזין גובה בסנטימטרים (לדוגמה: 170).";
-      } else if (raw.includes('"path": [ "age" ]') || raw.toLowerCase().includes('age')) {
+      } else if (raw.includes('age')) {
         friendlyMsg = "שגיאה בשדה הגיל. יש להזין גיל תקין.";
-      } else if (raw.includes('too_small') || raw.includes('too_big') || raw.includes('minimum') || raw.includes('maximum')) {
+      } else if (raw.includes('too_small') || raw.includes('too_big')) {
         friendlyMsg = "אחד מהערכים שהוזנו אינו תקין. אנא בדקי את הפרטים ונסי שוב.";
-      } else if (raw.includes('ZodError') || raw.includes('validation')) {
-        friendlyMsg = "חלק מהפרטים שהוזנו אינם תקינים. אנא בדקי ונסי שוב.";
       } else if (raw.length > 0 && !raw.includes('{') && !raw.includes('[')) {
-        // Only show the raw message if it doesn't look like JSON
         friendlyMsg = raw;
       }
       setErrorMsg(friendlyMsg);
@@ -149,7 +198,6 @@ export default function ScientificQuestionnaire() {
   });
 
   // Save progress to localStorage whenever answers or index changes
-  // MUST be here (before any early returns) to comply with Rules of Hooks
   useEffect(() => {
     if (!storageKey) return;
     try {
@@ -200,21 +248,21 @@ export default function ScientificQuestionnaire() {
     );
   }
 
-  const isFemale = profile.gender === "female";
-  const dnaLabel = profile.dnaType ? DNA_LABELS[profile.dnaType]?.[isFemale ? "f" : "m"] : null;
+  const isFemale = missingGender === "female";
+  const effectiveDnaType = dnaType || profile.dnaType || "";
+  const dnaLabel = effectiveDnaType ? DNA_LABELS[effectiveDnaType]?.[isFemale ? "f" : "m"] : null;
 
   // Filter questions based on profile
-  const isChapter2 = profile.maritalStatus === "divorced" || profile.maritalStatus === "widowed";
-  const profileAge = profile.age ?? 0;
+  const isChapter2 = missingMaritalStatus === "divorced" || missingMaritalStatus === "widowed" || profile.maritalStatus === "divorced" || profile.maritalStatus === "widowed";
+  const profileAge = calculatedAge || profile.age || 0;
   const activeQuestions = MATCH_QUESTIONS.filter(q => {
     if (q.chapter2Only && !isChapter2) return false;
-    if (q.forParentsOnly && !profile.hasKids) return false;
+    if (q.forParentsOnly && !hasKids && !profile.hasKids) return false;
     if (isChapter2 && (q.id === "q_kids_future" || q.id === "q_marriage")) return false;
     if (q.conditionalAge && profileAge < q.conditionalAge) return false;
     return true;
   });
 
-  // Safety: if saved currentIndex exceeds active questions (e.g. from stale localStorage), reset to last valid
   const safeCurrentIndex = Math.min(currentIndex, activeQuestions.length - 1);
   const currentQ = activeQuestions[safeCurrentIndex];
   const progress = ((safeCurrentIndex) / activeQuestions.length) * 100;
@@ -227,19 +275,15 @@ export default function ScientificQuestionnaire() {
     }));
   };
 
-  // For rankTop3: toggle an option in/out of the ranked list
   const handleRankToggle = (idx: number) => {
     const currentRank = Array.isArray(currentAnswer?.myAnswer) ? (currentAnswer.myAnswer as number[]) : [];
     const pos = currentRank.indexOf(idx);
     let newRank: number[];
     if (pos >= 0) {
-      // Remove from rank
       newRank = currentRank.filter(i => i !== idx);
     } else if (currentRank.length < 3) {
-      // Add to rank
       newRank = [...currentRank, idx];
     } else {
-      // Already 3 selected, replace last
       newRank = [...currentRank.slice(0, 2), idx];
     }
     handleAnswer(newRank);
@@ -256,26 +300,44 @@ export default function ScientificQuestionnaire() {
     if (safeCurrentIndex < activeQuestions.length - 1) {
       setCurrentIndex(safeCurrentIndex + 1);
     } else {
-      // Submit - clear saved progress
+      // Submit
       if (storageKey) {
         try { localStorage.removeItem(storageKey); } catch {}
       }
       setStep("uploading");
+      const ageVal = calculatedAge || (profile.age || 0);
       completeMutation.mutate({
         token,
         answers: Object.values(answers),
-        // Always pass personal details from the details step (works for both skeleton and non-skeleton records)
-        ...(missingAge ? { age: parseInt(missingAge) } : {}),
-        ...(missingCity ? { city: missingCity } : {}),
-        ...(missingGender ? { gender: missingGender } : {}),
-        ...(missingBirthDate ? { birthDate: missingBirthDate } : {}),
-        ...(missingHeight ? { height: (() => { const h = parseInt(missingHeight); return (h >= 50 && h < 100) ? h + 100 : h; })() } : {}),
-        ...(missingReligiosity ? { religiosity: missingReligiosity } : {}),
-        ...(missingEducation ? { education: missingEducation } : {}),
-        ...(missingOccupation ? { occupation: missingOccupation } : {}),
-        ...(missingAbout ? { about: missingAbout } : {}),
-        ...(missingMaritalStatus ? { maritalStatus: missingMaritalStatus } : {}),
-        ...(missingPhotoBase64 ? { photoBase64: missingPhotoBase64 } : {}),
+        age: ageVal > 0 ? ageVal : undefined,
+        gender: missingGender,
+        city: missingCity || undefined,
+        birthDate: birthDate || undefined,
+        height: missingHeight ? (() => { const h = parseInt(missingHeight); return (h >= 50 && h < 100) ? h + 100 : h; })() : undefined,
+        religiosity: missingReligiosity || undefined,
+        education: missingEducation || undefined,
+        occupation: missingOccupation || undefined,
+        about: missingAbout || undefined,
+        maritalStatus: missingMaritalStatus || undefined,
+        photoBase64: missingPhotoBase64 || undefined,
+        phone: phone || undefined,
+        lastName: lastName || undefined,
+        seekingGender: seekingGender || undefined,
+        shomerShabbat: shomerShabbat !== null ? shomerShabbat : undefined,
+        religiosityOrigin: religiosityOrigin === "cultural" || religiosityOrigin === "halachic" ? religiosityOrigin : undefined,
+        hasKids,
+        numKids: hasKids ? parseInt(numKids) || 0 : 0,
+        wantsKids: wantsKids === "yes" || wantsKids === "no" || wantsKids === "open" ? wantsKids : undefined,
+        minAgePreference: minAge ? parseInt(minAge) : undefined,
+        maxAgePreference: maxAge ? parseInt(maxAge) : undefined,
+        minHeightPreference: minHeight ? parseInt(minHeight) : undefined,
+        maxHeightPreference: maxHeight ? parseInt(maxHeight) : undefined,
+        religiosityPreference: religiosityPref.length > 0 ? religiosityPref.join(",") : undefined,
+        acceptsKids: acceptsKids === "yes" || acceptsKids === "no" || acceptsKids === "open" ? acceptsKids as "yes" | "no" | "open" : undefined,
+        openToPartnerWithKids: openToPartnerWithKids === "yes" || openToPartnerWithKids === "no" || openToPartnerWithKids === "depends_on_age" ? openToPartnerWithKids as any : undefined,
+        locationPreference: locationPref === "close" || locationPref === "anywhere" ? locationPref : undefined,
+        partnerDescription: partnerDescription || undefined,
+        dnaType: effectiveDnaType || undefined,
       });
     }
   };
@@ -285,12 +347,14 @@ export default function ScientificQuestionnaire() {
   };
 
   const currentAnswer = answers[currentQ?.id];
-  // For rankTop3: need at least 1 selection (ideally 3)
   const hasAnswer = currentAnswer?.myAnswer !== undefined &&
     (currentQ?.type === "rankTop3"
       ? Array.isArray(currentAnswer.myAnswer) && (currentAnswer.myAnswer as number[]).length >= 1
       : true
     );
+
+  // Validation for details step
+  const detailsValid = birthDate && missingCity && phone;
 
   return (
     <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">
@@ -322,16 +386,17 @@ export default function ScientificQuestionnaire() {
                   </div>
                 )}
                 <p className="text-[#555] text-base leading-relaxed max-w-lg mx-auto">
-                  כדי לבצע התאמות מדויקות, אני משתמשת ב-15 שאלות מדעיות שפותחו על בסיס מחקרי גוטמן, תיאוריית ההתקשרות ומודל Big Five.
+                  כדי לבצע התאמות מדויקות, נצטרך ממך כמה פרטים, שאלון DNA זוגי ו-15 שאלות מדעיות שפותחו על בסיס מחקרי גוטמן, תיאוריית ההתקשרות ומודל Big Five.
                 </p>
               </div>
 
               <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
-                <h3 className="font-black text-[#191265] mb-4 text-lg">לפני שמתחילים:</h3>
+                <h3 className="font-black text-[#191265] mb-4 text-lg">מה כולל התהליך:</h3>
                 <div className="space-y-3">
                   {[
-                    { icon: "🕐", text: "השאלון לוקח כ-15 דקות" },
-                    { icon: "🤫", text: "מלא/י במקום שקט: התשובות משפיעות על ההתאמות" },
+                    { icon: "📋", text: "מילוי פרטים אישיים (2-3 דקות)" },
+                    { icon: "🧬", text: "שאלון DNA זוגי — גילוי הפרופיל שלך (5 דקות)" },
+                    { icon: "🔬", text: "15 שאלות מדעיות להתאמה (10 דקות)" },
                     { icon: "💯", text: "אין תשובות נכונות או לא נכונות: ענה/י בכנות" },
                     { icon: "🔒", text: "הקישור אישי ולשימוש חד-פעמי בלבד" },
                   ].map(item => (
@@ -342,14 +407,6 @@ export default function ScientificQuestionnaire() {
                   ))}
                 </div>
               </div>
-
-              {dnaLabel && (
-                <div className="bg-[#191265] rounded-2xl p-5 mb-6 text-right">
-                  <p className="text-[#ffe27c] font-bold text-sm mb-1">הפרופיל הזוגי שלך</p>
-                  <p className="text-white font-black text-xl mb-2">{dnaLabel}</p>
-                  <p className="text-white/70 text-xs">הפרופיל הזה כבר נשמר ומשולב בחישוב ההתאמות שלך.</p>
-                </div>
-              )}
 
               {hasRestoredProgress && (
                 <div className="bg-[#ffe27c]/20 border border-[#ffe27c] rounded-xl p-4 mb-4 text-center">
@@ -362,175 +419,219 @@ export default function ScientificQuestionnaire() {
                 onClick={() => setStep("details")}
                 className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg"
               >
-                {hasRestoredProgress ? `המשך משאלה ${currentIndex + 1} ←` : "מוכן/ה: נתחיל! ←"}
+                {hasRestoredProgress ? `המשך משאלה ${currentIndex + 1} ←` : "בואו נתחיל! ←"}
               </button>
             </motion.div>
           )}
 
-          {/* ── DETAILS (skeleton records: Grow payment without profile form) ── */}
+          {/* ── DETAILS ── */}
           {step === "details" && (
             <motion.div key="details" {...slideIn}>
               <div className="text-center mb-8">
                 <div className="text-5xl mb-4">📋</div>
-                <h1 className="text-2xl font-black text-[#191265] mb-3">כמה פרטים קטנים</h1>
+                <h1 className="text-2xl font-black text-[#191265] mb-3">הפרטים שלך</h1>
                 <p className="text-[#555] text-sm leading-relaxed">
-                  כדי שנוכל להתאים לך את ההצעות הטובות ביותר, נצטרך עוד כמה פרטים.
+                  כדי שנוכל להתאים לך את ההצעות הטובות ביותר
                 </p>
               </div>
               <div className="bg-white rounded-2xl p-6 shadow-sm mb-6 space-y-5">
                 {/* Gender */}
                 <div>
-                  <label className="block text-[#191265] font-bold text-sm mb-2">מגדר</label>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">מגדר *</label>
                   <div className="flex gap-3">
                     {([{ v: "male", l: "גבר" }, { v: "female", l: "אישה" }] as const).map(({ v, l }) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setMissingGender(v)}
-                        className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all ${missingGender === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}
-                      >
+                      <button key={v} type="button" onClick={() => { setMissingGender(v); setSeekingGender(v === "female" ? "male" : "female"); }}
+                        className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all ${missingGender === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
                         {l}
                       </button>
                     ))}
                   </div>
                 </div>
-                {/* Age */}
+
+                {/* Seeking Gender */}
                 <div>
-                  <label className="block text-[#191265] font-bold text-sm mb-2">גיל</label>
-                  <input
-                    type="number"
-                    value={missingAge}
-                    onChange={e => setMissingAge(e.target.value)}
-                    min={18} max={80}
-                    placeholder="למשל: 35"
-                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265] transition-all"
-                  />
+                  <label className="block text-[#191265] font-bold text-sm mb-2">מחפש/ת *</label>
+                  <div className="flex gap-2">
+                    {([{ v: "male", l: "גבר" }, { v: "female", l: "אישה" }, { v: "any", l: "לא משנה" }] as const).map(({ v, l }) => (
+                      <button key={v} type="button" onClick={() => setSeekingGender(v)}
+                        className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${seekingGender === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {/* City */}
+
+                {/* Last Name */}
                 <div>
-                  <label className="block text-[#191265] font-bold text-sm mb-2">עיר מגורים</label>
-                  <input
-                    type="text"
-                    value={missingCity}
-                    onChange={e => setMissingCity(e.target.value)}
-                    placeholder="למשל: תל אביב"
-                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265] transition-all"
-                  />
+                  <label className="block text-[#191265] font-bold text-sm mb-2">שם משפחה</label>
+                  <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
+                    placeholder="שם משפחה"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265] transition-all" />
                 </div>
-                {/* Height */}
+
+                {/* Birth Date + Height */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[#191265] font-bold text-sm mb-2">תאריך לידה *</label>
+                    <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)}
+                      max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                      min={new Date(new Date().setFullYear(new Date().getFullYear() - 80)).toISOString().split('T')[0]}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] focus:outline-none focus:border-[#191265] text-right" />
+                    {calculatedAge && <p className="text-xs text-[#191265] mt-1 font-medium">גיל: {calculatedAge}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-[#191265] font-bold text-sm mb-2">גובה (ס"מ)</label>
+                    <input type="number" value={missingHeight} onChange={e => setMissingHeight(e.target.value)}
+                      onBlur={e => { const val = parseInt(e.target.value); if (!isNaN(val) && val >= 50 && val < 100) setMissingHeight(String(val + 100)); }}
+                      min={100} max={250} placeholder="170"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] focus:outline-none focus:border-[#191265] text-right" />
+                  </div>
+                </div>
+
+                {/* Phone */}
                 <div>
-                  <label className="block text-[#191265] font-bold text-sm mb-2">גובה (ס"מ)</label>
-                  <input
-                    type="number"
-                    value={missingHeight}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setMissingHeight(val);
-                    }}
-                    onBlur={e => {
-                      const val = parseInt(e.target.value);
-                      if (!isNaN(val) && val >= 50 && val < 100) {
-                        // Auto-convert: 75 → 175
-                        setMissingHeight(String(val + 100));
-                      }
-                    }}
-                    min={100} max={250}
-                    placeholder="למשל: 170"
-                    className={`w-full px-4 py-3 rounded-xl border-2 text-[#191265] text-right focus:outline-none transition-all ${
-                      missingHeight && (parseInt(missingHeight) < 100 || parseInt(missingHeight) > 250)
-                        ? 'border-red-400 focus:border-red-500'
-                        : 'border-[#e9e8e8] focus:border-[#191265]'
-                    }`}
-                  />
-                  {missingHeight && parseInt(missingHeight) < 100 && parseInt(missingHeight) >= 50 && (
-                    <p className="text-amber-600 text-xs mt-1">💡 נראה שהזנת {missingHeight} — האם התכוונת ל-{parseInt(missingHeight) + 100} ס"מ?</p>
-                  )}
-                  {missingHeight && (parseInt(missingHeight) < 50 || parseInt(missingHeight) > 250) && (
-                    <p className="text-red-500 text-xs mt-1">גובה חייב להיות בין 100 ל-250 ס"מ (למשל: 170)</p>
-                  )}
+                  <label className="block text-[#191265] font-bold text-sm mb-2">טלפון *</label>
+                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                    placeholder="050-0000000"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265] transition-all" />
                 </div>
+
+                {/* City (closed list) */}
+                <div>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">עיר מגורים *</label>
+                  <select value={missingCity} onChange={e => setMissingCity(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] focus:outline-none focus:border-[#191265] text-right bg-white">
+                    <option value="">בחרי עיר</option>
+                    {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
                 {/* Marital Status */}
                 <div>
-                  <label className="block text-[#191265] font-bold text-sm mb-2">מצב משפחתי</label>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">מצב משפחתי *</label>
                   <div className="flex gap-2 flex-wrap">
                     {([{ v: "single", l: "רווק/ה" }, { v: "divorced", l: "גרוש/ה" }, { v: "widowed", l: "אלמן/ה" }] as const).map(({ v, l }) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setMissingMaritalStatus(v)}
-                        className={`flex-1 min-w-[80px] py-3 rounded-xl border-2 font-medium text-sm transition-all ${missingMaritalStatus === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}
-                      >
+                      <button key={v} type="button" onClick={() => setMissingMaritalStatus(v)}
+                        className={`flex-1 min-w-[80px] py-3 rounded-xl border-2 font-medium text-sm transition-all ${missingMaritalStatus === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
                         {l}
                       </button>
                     ))}
                   </div>
                 </div>
-                {/* Religiosity */}
+
+                {/* Religiosity (with datlash) */}
                 <div>
-                  <label className="block text-[#191265] font-bold text-sm mb-2">זהות דתית</label>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">זהות דתית *</label>
                   <div className="flex gap-2 flex-wrap">
-                    {([{ v: "secular", l: "חילוני/ת" }, { v: "traditional", l: "מסורתי/ת" }, { v: "religious", l: "דתי/ה" }, { v: "orthodox", l: "חרדי/ת" }] as const).map(({ v, l }) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setMissingReligiosity(v)}
-                        className={`flex-1 min-w-[80px] py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${missingReligiosity === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}
-                      >
+                    {([{ v: "secular", l: "חילוני/ת" }, { v: "traditional", l: "מסורתי/ת" }, { v: "religious", l: "דתי/ה" }, { v: "orthodox", l: "חרדי/ת" }, { v: "datlash", l: "דתל\"ש" }] as const).map(({ v, l }) => (
+                      <button key={v} type="button" onClick={() => { setMissingReligiosity(v); setShomerShabbat(null); setReligiosityOrigin(""); }}
+                        className={`flex-1 min-w-[70px] py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${missingReligiosity === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
                         {l}
                       </button>
                     ))}
                   </div>
                 </div>
+
+                {/* Shomer Shabbat sub-question */}
+                {(missingReligiosity === "traditional" || missingReligiosity === "religious" || missingReligiosity === "datlash") && (
+                  <div>
+                    <label className="block text-[#191265] font-bold text-sm mb-2">שומר/ת שבת?</label>
+                    <div className="flex gap-3">
+                      {([{ v: true, l: "כן" }, { v: false, l: "לא" }] as const).map(({ v, l }) => (
+                        <button key={String(v)} type="button" onClick={() => setShomerShabbat(v)}
+                          className={`flex-1 py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${shomerShabbat === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Religiosity origin (traditional only) */}
+                {missingReligiosity === "traditional" && (
+                  <div>
+                    <label className="block text-[#191265] font-bold text-sm mb-2">איזה סוג מסורתיות?</label>
+                    <div className="flex gap-3">
+                      {([{ v: "cultural", l: "תרבותי (מסורת משפחתית)" }, { v: "halachic", l: "הלכתי (שומר מצוות חלקית)" }] as const).map(({ v, l }) => (
+                        <button key={v} type="button" onClick={() => setReligiosityOrigin(v)}
+                          className={`flex-1 py-2.5 rounded-xl border-2 font-medium text-xs transition-all ${religiosityOrigin === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Kids */}
+                <div>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">ילדים</label>
+                  <div className="flex gap-3 mb-3">
+                    {([{ v: false, l: "אין לי ילדים" }, { v: true, l: "יש לי ילדים" }] as const).map(({ v, l }) => (
+                      <button key={String(v)} type="button" onClick={() => setHasKids(v)}
+                        className={`flex-1 py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${hasKids === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  {hasKids && (
+                    <div className="mb-3">
+                      <label className="block text-[#191265] text-xs mb-1">כמה ילדים?</label>
+                      <input type="number" value={numKids} onChange={e => setNumKids(e.target.value)} min={1} max={15}
+                        className="w-24 px-3 py-2 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265]" />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-[#191265] text-xs mb-1">רוצה ילדים בעתיד?</label>
+                    <div className="flex gap-2">
+                      {([{ v: "yes", l: "כן" }, { v: "open", l: "פתוח/ה" }, { v: "no", l: "לא" }] as const).map(({ v, l }) => (
+                        <button key={v} type="button" onClick={() => setWantsKids(v)}
+                          className={`flex-1 py-2 rounded-xl border-2 font-medium text-xs transition-all ${wantsKids === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Education */}
                 <div>
                   <label className="block text-[#191265] font-bold text-sm mb-2">השכלה</label>
                   <div className="flex gap-2 flex-wrap">
                     {([{ v: "high_school", l: "תיכון" }, { v: "vocational", l: "הכשרה מקצועית" }, { v: "technician", l: "הנדסאי" }, { v: "student", l: "סטודנט/ית" }, { v: "bachelor", l: "תואר ראשון" }, { v: "master", l: "תואר שני" }, { v: "phd", l: "דוקטורט" }, { v: "other", l: "אחר" }] as const).map(({ v, l }) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setMissingEducation(v)}
-                        className={`flex-1 min-w-[80px] py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${missingEducation === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}
-                      >
+                      <button key={v} type="button" onClick={() => setMissingEducation(v)}
+                        className={`min-w-[80px] py-2.5 px-3 rounded-xl border-2 font-medium text-sm transition-all ${missingEducation === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
                         {l}
                       </button>
                     ))}
                   </div>
                 </div>
+
                 {/* Occupation */}
                 <div>
                   <label className="block text-[#191265] font-bold text-sm mb-2">עיסוק / תפקיד</label>
-                  <input
-                    type="text"
-                    value={missingOccupation}
-                    onChange={e => setMissingOccupation(e.target.value)}
+                  <input type="text" value={missingOccupation} onChange={e => setMissingOccupation(e.target.value)}
                     placeholder="למשל: מהנדסת תוכנה, מורה, עורך דין..."
-                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265] transition-all"
-                  />
+                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265] transition-all" />
                 </div>
+
                 {/* About me */}
                 <div>
                   <label className="block text-[#191265] font-bold text-sm mb-2">כמה מילים עליך</label>
-                  <textarea
-                    value={missingAbout}
-                    onChange={e => setMissingAbout(e.target.value)}
-                    rows={3}
+                  <textarea value={missingAbout} onChange={e => setMissingAbout(e.target.value)} rows={3}
                     placeholder="ספר/י על עצמך בכמה משפטים — מה אוהב/ת, מה מחפש/ת..."
-                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265] transition-all resize-none"
-                  />
+                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265] transition-all resize-none" />
                 </div>
+
                 {/* Photo upload */}
                 <div>
-                  <label className="block text-[#191265] font-bold text-sm mb-2">תמונת פרופיל (אופציונלי)</label>
-                  <div
-                    className="border-2 border-dashed border-[#e9e8e8] rounded-xl p-4 text-center cursor-pointer hover:border-[#191265] transition-all"
-                    onClick={() => document.getElementById("details-photo-input")?.click()}
-                  >
+                  <label className="block text-[#191265] font-bold text-sm mb-2">תמונת פרופיל</label>
+                  <div className="border-2 border-dashed border-[#e9e8e8] rounded-xl p-4 text-center cursor-pointer hover:border-[#191265] transition-all"
+                    onClick={() => document.getElementById("details-photo-input")?.click()}>
                     {missingPhotoBase64 ? (
                       <div className="flex flex-col items-center gap-2">
                         <img src={missingPhotoBase64} alt="תמונת פרופיל" className="w-24 h-24 rounded-full object-cover mx-auto" />
                         <p className="text-xs text-[#191265] font-medium">התמונה נטענה בהצלחה ✓</p>
-                        <button type="button" onClick={e => { e.stopPropagation(); setMissingPhotoBase64(""); setMissingPhotoFile(null); }} className="text-xs text-red-500 underline">הסר תמונה</button>
+                        <button type="button" onClick={e => { e.stopPropagation(); setMissingPhotoBase64(""); }} className="text-xs text-red-500 underline">הסר תמונה</button>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center gap-2 py-2">
@@ -540,42 +641,158 @@ export default function ScientificQuestionnaire() {
                       </div>
                     )}
                   </div>
-                  <input
-                    id="details-photo-input"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
+                  <input id="details-photo-input" type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
                     onChange={e => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       if (file.size > 5 * 1024 * 1024) { alert("התמונה גדולה מדי. אנא בחר/י תמונה עד 5MB."); return; }
-                      setMissingPhotoFile(file);
                       const reader = new FileReader();
                       reader.onload = ev => setMissingPhotoBase64(ev.target?.result as string || "");
                       reader.readAsDataURL(file);
-                    }}
-                  />
+                    }} />
                 </div>
               </div>
+
+              {!detailsValid && (
+                <p className="text-center text-red-500 text-xs mb-3">* יש למלא תאריך לידה, עיר מגורים וטלפון</p>
+              )}
               <button
-                onClick={() => {
-                  // Validate height before proceeding
-                  if (missingHeight) {
-                    const h = parseInt(missingHeight);
-                    if (isNaN(h) || h < 50 || h > 250) {
-                      alert("גובה חייב להיות בין 100 ל-250 ס\"מ (למשל: 170)");
-                      return;
-                    }
-                  }
-                  if (isSkeleton ? (missingAge && missingCity) : true) setStep("quiz");
-                }}
-                disabled={isSkeleton ? (!missingAge || !missingCity) : false}
+                onClick={() => setStep("partner_prefs")}
+                disabled={!detailsValid}
                 className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                המשך לשאלון ←
+                המשך ←
               </button>
             </motion.div>
           )}
+
+          {/* ── PARTNER PREFERENCES ── */}
+          {step === "partner_prefs" && (
+            <motion.div key="partner_prefs" {...slideIn}>
+              <div className="text-center mb-8">
+                <div className="text-5xl mb-4">💑</div>
+                <h1 className="text-2xl font-black text-[#191265] mb-3">מה חשוב לך בבן/בת הזוג?</h1>
+                <p className="text-[#555] text-sm leading-relaxed">
+                  זה עוזר לנו לסנן ולהתאים טוב יותר
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl p-6 shadow-sm mb-6 space-y-5">
+                {/* Age range */}
+                <div>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">טווח גילאים רצוי</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-[#727272]">מגיל</label>
+                      <input type="number" value={minAge} onChange={e => setMinAge(e.target.value)} min={18} max={80} placeholder="25"
+                        className="w-full px-3 py-2.5 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265]" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#727272]">עד גיל</label>
+                      <input type="number" value={maxAge} onChange={e => setMaxAge(e.target.value)} min={18} max={80} placeholder="45"
+                        className="w-full px-3 py-2.5 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265]" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Height range */}
+                <div>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">טווח גובה רצוי (ס"מ)</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-[#727272]">מ-</label>
+                      <input type="number" value={minHeight} onChange={e => setMinHeight(e.target.value)} min={140} max={220} placeholder="160"
+                        className="w-full px-3 py-2.5 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265]" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#727272]">עד</label>
+                      <input type="number" value={maxHeight} onChange={e => setMaxHeight(e.target.value)} min={140} max={220} placeholder="185"
+                        className="w-full px-3 py-2.5 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265]" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Religiosity preference (multi-select) */}
+                <div>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">דתיות רצויה (אפשר לבחור כמה)</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {([{ v: "secular", l: "חילוני/ת" }, { v: "traditional", l: "מסורתי/ת" }, { v: "religious", l: "דתי/ה" }, { v: "orthodox", l: "חרדי/ת" }, { v: "datlash", l: "דתל\"ש" }] as const).map(({ v, l }) => (
+                      <button key={v} type="button"
+                        onClick={() => setReligiosityPref(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])}
+                        className={`min-w-[70px] py-2 px-3 rounded-xl border-2 font-medium text-xs transition-all ${religiosityPref.includes(v) ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Open to partner with kids */}
+                <div>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">פתוח/ה לבן/בת זוג עם ילדים?</label>
+                  <div className="flex gap-2">
+                    {([{ v: "yes", l: "כן" }, { v: "depends_on_age", l: "תלוי בגיל" }, { v: "no", l: "לא" }] as const).map(({ v, l }) => (
+                      <button key={v} type="button" onClick={() => setOpenToPartnerWithKids(v)}
+                        className={`flex-1 py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${openToPartnerWithKids === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Location preference */}
+                <div>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">מיקום בן/בת הזוג</label>
+                  <div className="flex gap-3">
+                    {([{ v: "close", l: "קרוב אליי" }, { v: "anywhere", l: "לא משנה" }] as const).map(({ v, l }) => (
+                      <button key={v} type="button" onClick={() => setLocationPref(v)}
+                        className={`flex-1 py-2.5 rounded-xl border-2 font-medium text-sm transition-all ${locationPref === v ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#191265]"}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Partner description */}
+                <div>
+                  <label className="block text-[#191265] font-bold text-sm mb-2">תאר/י את בן/בת הזוג האידיאלי</label>
+                  <textarea value={partnerDescription} onChange={e => setPartnerDescription(e.target.value)} rows={3}
+                    placeholder="מה חשוב לך? מה אתה/את מחפש/ת?"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265] transition-all resize-none" />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setStep("details")}
+                  className="flex-1 border-2 border-[#191265] text-[#191265] font-bold py-3.5 rounded-2xl hover:bg-[#191265] hover:text-white transition-all">
+                  ← חזרה
+                </button>
+                <button onClick={() => setStep(effectiveDnaType ? "quiz" : "dna")}
+                  className="flex-1 bg-[#ffe27c] text-[#191265] font-black text-lg py-3.5 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg">
+                  המשך ←
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── DNA QUIZ ── */}
+          {step === "dna" && (
+            <motion.div key="dna" {...slideIn}>
+              <div className="text-center mb-6">
+                <div className="text-5xl mb-4">🧬</div>
+                <h1 className="text-2xl font-black text-[#191265] mb-3">שאלון DNA זוגי</h1>
+                <p className="text-[#555] text-sm leading-relaxed">
+                  20 שאלות קצרות שיעזרו לנו לזהות את הפרופיל הזוגי שלך
+                </p>
+              </div>
+              <EmbeddedDnaQuiz
+                initialGender={missingGender}
+                onComplete={(type, _gender, _sessionId) => {
+                  setDnaType(type);
+                  setStep("quiz");
+                }}
+              />
+            </motion.div>
+          )}
+
           {/* ── QUIZ ── */}
           {step === "quiz" && currentQ && (
             <motion.div key={`q-${currentIndex}`} {...slideIn}>
@@ -614,7 +831,6 @@ export default function ScientificQuestionnaire() {
 
                 {/* Answer options */}
                 {currentQ.type === "rankTop3" ? (
-                  // RankTop3: select up to 3 in order
                   <div className="space-y-2.5">
                     <p className="text-xs text-[#727272] mb-2">בחר/י עד 3, לפי סדר עדיפות (הראשון שתבחר/י = הכי חשוב)</p>
                     {currentQ.options.map((opt, idx) => {
@@ -622,15 +838,9 @@ export default function ScientificQuestionnaire() {
                       const pos = rank.indexOf(idx);
                       const isSelected = pos >= 0;
                       return (
-                        <button
-                          key={idx}
-                          onClick={() => handleRankToggle(idx)}
+                        <button key={idx} onClick={() => handleRankToggle(idx)}
                           className={`w-full text-right px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all duration-200 flex items-center justify-between
-                            ${isSelected
-                              ? "border-[#191265] bg-[#191265] text-white"
-                              : "border-[#e9e8e8] bg-white text-[#191265] hover:border-[#191265]/40"
-                            }`}
-                        >
+                            ${isSelected ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] bg-white text-[#191265] hover:border-[#191265]/40"}`}>
                           <span>{opt}</span>
                           {isSelected && (
                             <span className="text-xs font-black bg-[#ffe27c] text-[#191265] rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 mr-2">
@@ -644,24 +854,16 @@ export default function ScientificQuestionnaire() {
                       <p className="text-xs text-[#1800ad] font-medium">
                         {(currentAnswer.myAnswer as number[]).length === 3
                           ? "✅ בחרת 3 שפות, מעולה!"
-                          : `בחרת/י ${(currentAnswer.myAnswer as number[]).length}/3`
-                        }
+                          : `בחרת/י ${(currentAnswer.myAnswer as number[]).length}/3`}
                       </p>
                     )}
                   </div>
                 ) : (
-                  // Single choice (default)
                   <div className="space-y-2.5">
                     {currentQ.options.map((opt, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleAnswer(idx)}
+                      <button key={idx} onClick={() => handleAnswer(idx)}
                         className={`w-full text-right px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all duration-200
-                          ${currentAnswer?.myAnswer === idx
-                            ? "border-[#191265] bg-[#191265] text-white"
-                            : "border-[#e9e8e8] bg-white text-[#191265] hover:border-[#191265]/40"
-                          }`}
-                      >
+                          ${currentAnswer?.myAnswer === idx ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] bg-white text-[#191265] hover:border-[#191265]/40"}`}>
                         {opt}
                       </button>
                     ))}
@@ -671,25 +873,16 @@ export default function ScientificQuestionnaire() {
 
               {/* Importance */}
               {hasAnswer && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-2xl p-5 shadow-sm mb-4"
-                >
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  className="bg-white rounded-2xl p-5 shadow-sm mb-4">
                   <p className="text-sm font-bold text-[#191265] mb-3">
                     כמה חשוב לך שהשותף/ה יענה אותו דבר?
                   </p>
                   <div className="flex gap-2">
                     {([0, 1, 2] as const).map(imp => (
-                      <button
-                        key={imp}
-                        onClick={() => handleImportance(imp)}
+                      <button key={imp} onClick={() => handleImportance(imp)}
                         className={`flex-1 py-2.5 rounded-xl text-xs font-bold border-2 transition-all
-                          ${currentAnswer?.importance === imp
-                            ? "border-[#191265] bg-[#191265] text-white"
-                            : "border-[#e9e8e8] text-[#555] hover:border-[#191265]/40"
-                          }`}
-                      >
+                          ${currentAnswer?.importance === imp ? "border-[#191265] bg-[#191265] text-white" : "border-[#e9e8e8] text-[#555] hover:border-[#191265]/40"}`}>
                         {IMPORTANCE_LABELS[imp]}
                       </button>
                     ))}
@@ -700,22 +893,14 @@ export default function ScientificQuestionnaire() {
               {/* Navigation */}
               <div className="flex gap-3">
                 {currentIndex > 0 && (
-                  <button
-                    onClick={handleBack}
-                    className="flex-1 border-2 border-[#191265] text-[#191265] font-bold py-3.5 rounded-2xl hover:bg-[#191265] hover:text-white transition-all"
-                  >
+                  <button onClick={handleBack}
+                    className="flex-1 border-2 border-[#191265] text-[#191265] font-bold py-3.5 rounded-2xl hover:bg-[#191265] hover:text-white transition-all">
                     ← חזרה
                   </button>
                 )}
-                <button
-                  onClick={handleNext}
-                  disabled={!hasAnswer}
+                <button onClick={handleNext} disabled={!hasAnswer}
                   className={`flex-1 font-black text-lg py-3.5 rounded-2xl transition-all duration-300
-                    ${hasAnswer
-                      ? "bg-[#191265] text-white hover:bg-[#1800ad] hover:scale-[1.02] shadow-lg"
-                      : "bg-[#e9e8e8] text-[#727272] cursor-not-allowed"
-                    }`}
-                >
+                    ${hasAnswer ? "bg-[#191265] text-white hover:bg-[#1800ad] hover:scale-[1.02] shadow-lg" : "bg-[#e9e8e8] text-[#727272] cursor-not-allowed"}`}>
                   {currentIndex < activeQuestions.length - 1 ? "הבא ←" : "סיום ←"}
                 </button>
               </div>
@@ -742,7 +927,6 @@ export default function ScientificQuestionnaire() {
           {/* ── DONE ── */}
           {step === "done" && (
             <motion.div key="done" {...slideIn} className="flex flex-col items-center text-center py-10 max-w-md mx-auto">
-              {/* Success badge */}
               <div className="w-20 h-20 rounded-full bg-[#191265] flex items-center justify-center mb-6 shadow-xl">
                 <span className="text-4xl text-[#ffe27c]">✓</span>
               </div>
@@ -757,7 +941,6 @@ export default function ScientificQuestionnaire() {
                 ממוצע זמן המתנה: 7–14 ימים
               </p>
 
-              {/* Personal message from Hilit */}
               <div className="w-full bg-white rounded-3xl p-6 shadow-md mb-5 text-right">
                 <div className="flex items-center gap-3 mb-4">
                   <img
@@ -775,21 +958,14 @@ export default function ScientificQuestionnaire() {
                 </p>
               </div>
 
-              {/* WhatsApp CTA */}
-              <a
-                href="https://hilitcaspi.com/api/wa/site"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1da851] text-white font-bold py-4 rounded-2xl transition-all duration-300 text-base mb-3"
-              >
+              <a href="https://hilitcaspi.com/api/wa/site" target="_blank" rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1da851] text-white font-bold py-4 rounded-2xl transition-all duration-300 text-base mb-3">
                 💬 הצטרפ{isFemale ? "י" : ""} לקבוצת הוואטסאפ
               </a>
 
-              {/* Personal area */}
               <button
                 onClick={() => navigate(`/my-profile?email=${encodeURIComponent(profile?.email || '')}&token=${token}`)}
-                className="w-full bg-[#191265] text-white font-bold py-4 rounded-2xl text-base hover:bg-[#1800ad] transition-colors mb-4"
-              >
+                className="w-full bg-[#191265] text-white font-bold py-4 rounded-2xl text-base hover:bg-[#1800ad] transition-colors mb-4">
                 👤 לאזור האישי שלי
               </button>
 
@@ -799,7 +975,8 @@ export default function ScientificQuestionnaire() {
               </button>
             </motion.div>
           )}
-                    {/* ── ERROR ── */}
+
+          {/* ── ERROR ── */}
           {step === "error" && (
             <motion.div key="error" {...slideIn} className="text-center py-16">
               <div className="text-5xl mb-4">⚠️</div>
@@ -808,8 +985,7 @@ export default function ScientificQuestionnaire() {
               <div className="flex flex-col gap-3 max-w-xs mx-auto">
                 <button
                   onClick={() => { setStep("quiz"); setCurrentIndex(activeQuestions.length - 1); }}
-                  className="bg-[#191265] text-white font-bold py-3 rounded-2xl"
-                >
+                  className="bg-[#191265] text-white font-bold py-3 rounded-2xl">
                   נסה/י שוב
                 </button>
                 <a href="https://wa.me/972552442334" target="_blank" rel="noopener noreferrer"

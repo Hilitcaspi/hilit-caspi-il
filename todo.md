@@ -240,3 +240,13 @@
 - [x] Fix ThankYouBundle page: removed email input form, replaced with "check your email" message (webhook already sends the join link + guide email automatically)
 - [x] Existing free_token flow in Register.tsx already skips payment step and goes profile → DNA → questionnaire → done
 - [x] Fix critical bug: product detection override only checked database→bundle_tubav but NOT guide→bundle_tubav (Grow returned guide processToken for bundle payment). Now checks both.
+
+## Fix Bundle Questionnaire Missing Fields (July 8 - Part 2)
+- [x] Add missing fields to ScientificQuestionnaire details step: birthDate, phone, lastName, seekingGender, shomerShabbat, religiosityOrigin, hasKids, numKids, wantsKids, closed city list
+- [x] Add partner preferences step: age range, height range, religiosity, acceptsKids, location, freeText
+- [x] Add DNA quiz step (EmbeddedDnaQuiz) between details and scientific questions
+- [x] Fix DNA quiz integration (proper onComplete callback with dnaType)
+- [x] Update completeQuestionnaire mutation to accept and save all new fields
+- [x] Fix acceptsKids type (string enum → boolean conversion on server)
+- [x] Always update basic identity fields for all records (not just skeleton)
+- [x] Ensure all data saves correctly to the singles record in legacy DB

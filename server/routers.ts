@@ -2109,12 +2109,33 @@ export const appRouter = router({
         city: z.string().optional(),
         birthDate: z.string().optional(),
         height: z.number().min(100).max(250).optional(),
-        religiosity: z.enum(["secular", "traditional", "religious", "orthodox"]).optional(),
+        religiosity: z.enum(["secular", "traditional", "religious", "orthodox", "datlash"]).optional(),
         education: z.enum(["high_school", "vocational", "technician", "student", "bachelor", "master", "phd", "other"]).optional(),
         occupation: z.string().max(150).optional(),
         about: z.string().optional(),
         maritalStatus: z.enum(["single", "divorced", "widowed"]).optional(),
         photoBase64: z.string().optional(),
+        // Additional fields for bundle flow
+        phone: z.string().max(20).optional(),
+        lastName: z.string().max(100).optional(),
+        seekingGender: z.enum(["female", "male", "any"]).optional(),
+        shomerShabbat: z.boolean().optional(),
+        religiosityOrigin: z.enum(["cultural", "halachic"]).optional(),
+        hasKids: z.boolean().optional(),
+        numKids: z.number().min(0).max(15).optional(),
+        wantsKids: z.enum(["yes", "no", "open"]).optional(),
+        minAgePreference: z.number().min(18).max(80).optional(),
+        maxAgePreference: z.number().min(18).max(80).optional(),
+        minHeightPreference: z.number().min(100).max(250).optional(),
+        maxHeightPreference: z.number().min(100).max(250).optional(),
+        religiosityPreference: z.string().optional(),
+        acceptsKids: z.enum(["yes", "no", "open"]).optional(),
+        openToPartnerWithKids: z.enum(["yes", "no", "depends_on_age"]).optional(),
+        locationPreference: z.enum(["close", "anywhere"]).optional(),
+        partnerDescription: z.string().optional(),
+        interests: z.string().optional(),
+        dnaType: z.string().optional(),
+        dnaSessionId: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
         const db = await getDb();
@@ -2140,13 +2161,11 @@ export const appRouter = router({
         // Always update personal details if provided (all users, not just skeleton records)
         {
           const patchData: Record<string, any> = { updatedAt: now };
-          // For skeleton records (age=0 / city empty), also update basic identity fields
-          if (profile.age === 0 || !profile.city) {
-            if (input.age && input.age > 0) patchData.age = input.age;
-            if (input.gender) patchData.gender = input.gender;
-            if (input.city) patchData.city = input.city;
-            if (input.birthDate) patchData.birthDate = input.birthDate;
-          }
+          // Always update basic identity fields if provided
+          if (input.age && input.age > 0) patchData.age = input.age;
+          if (input.gender) patchData.gender = input.gender;
+          if (input.city) patchData.city = input.city;
+          if (input.birthDate) patchData.birthDate = input.birthDate;
           // Always save personal details from the details step (fixes bug where Grow-paid users lost their data)
           if (input.height && input.height > 0) patchData.height = input.height;
           if (input.religiosity) patchData.religiosity = input.religiosity;
@@ -2154,6 +2173,26 @@ export const appRouter = router({
           if (input.occupation) patchData.occupation = input.occupation;
           if (input.about) patchData.about = input.about;
           if (input.maritalStatus) patchData.maritalStatus = input.maritalStatus;
+          // Additional fields from bundle flow
+          if (input.phone) patchData.phone = input.phone;
+          if (input.lastName) patchData.lastName = input.lastName;
+          if (input.seekingGender) patchData.seekingGender = input.seekingGender;
+          if (input.shomerShabbat !== undefined) patchData.shomerShabbat = input.shomerShabbat;
+          if (input.religiosityOrigin) patchData.religiosityOrigin = input.religiosityOrigin;
+          if (input.hasKids !== undefined) patchData.hasKids = input.hasKids;
+          if (input.numKids !== undefined) patchData.numKids = input.numKids;
+          if (input.wantsKids) patchData.wantsKids = input.wantsKids;
+          if (input.minAgePreference) patchData.minAgePreference = input.minAgePreference;
+          if (input.maxAgePreference) patchData.maxAgePreference = input.maxAgePreference;
+          if (input.minHeightPreference) patchData.minHeightPreference = input.minHeightPreference;
+          if (input.maxHeightPreference) patchData.maxHeightPreference = input.maxHeightPreference;
+          if (input.religiosityPreference) patchData.religiosityPreference = input.religiosityPreference;
+          if (input.acceptsKids) patchData.acceptsKids = input.acceptsKids === "yes" ? true : input.acceptsKids === "no" ? false : null;
+          if (input.openToPartnerWithKids) patchData.openToPartnerWithKids = input.openToPartnerWithKids;
+          if (input.locationPreference) patchData.locationPreference = input.locationPreference;
+          if (input.partnerDescription) patchData.partnerDescription = input.partnerDescription;
+          if (input.interests) patchData.interests = input.interests;
+          if (input.dnaType) patchData.dnaType = input.dnaType;
           // Handle photo upload (for all users)
           if (input.photoBase64) {
             try {
