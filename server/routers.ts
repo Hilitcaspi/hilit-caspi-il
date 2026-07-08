@@ -2303,7 +2303,7 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) return null;
         const [profile] = await db.select().from(singles)
-          .where(eq(singles.email, input.email))
+          .where(sql`LOWER(${singles.email}) = ${input.email.trim().toLowerCase()}`)
           .limit(1);
         if (!profile) return null;
         // Token is mandatory - verify it matches
@@ -2390,11 +2390,12 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) return { success: false };
+        const normalizedEmail = input.email.trim().toLowerCase();
         const [profile] = await db.select().from(singles)
-          .where(eq(singles.email, input.email))
+          .where(sql`LOWER(${singles.email}) = ${normalizedEmail}`)
           .limit(1);
         if (!profile) return { success: false, notFound: true };
-        const dashboardUrl = `${input.origin}/my-profile?email=${encodeURIComponent(input.email)}&token=${profile.questionnaireToken || ''}`;
+        const dashboardUrl = `${input.origin}/my-profile?email=${encodeURIComponent(profile.email || normalizedEmail)}&token=${profile.questionnaireToken || ''}`;
         await sendEmail({
           to: { email: input.email, name: profile.firstName },
           subject: 'הקישור שלך לאזור האישי',
@@ -2417,7 +2418,7 @@ export const appRouter = router({
           questionnaireCompletedAt: singles.questionnaireCompletedAt,
           isPaid: singles.isPaid,
         }).from(singles)
-          .where(eq(singles.email, input.email))
+          .where(sql`LOWER(${singles.email}) = ${input.email.trim().toLowerCase()}`)
           .limit(1);
         if (!profile || !profile.isPaid) return { success: false, url: null, notFound: true };
         if (profile.questionnaireCompletedAt) return { success: true, url: null, alreadyCompleted: true };
