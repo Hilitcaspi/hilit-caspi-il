@@ -271,3 +271,6 @@
 ## Fix growProxy double-prefix bug (July 8)
 - [x] Fix resolveUpstream: was adding /api/light/server/1.0/ prefix to ALL paths, but SDK sends paths that already contain /api/light/web/1.0/ (e.g. drawWalletPageData). Result was double-prefixed URLs that returned 404/error from Meshulam, causing "מעבד..." to hang forever (translationsArr undefined → SDK crash)
 - [x] Add needsPrefix() check: only add prefix for bare endpoints (like /doPayment), skip for paths already containing /api/light/ or /api/providers/
+
+## Switch to official Meshulam CDN SDK (July 8)
+- [x] Replace local SDK (/grow-sdk/gs.min.js) with official Meshulam CDN (https://cdn.meshulam.co.il/sdk/gs.min.js) — SDK communicates directly with Meshulam servers from the browser, bypassing the grow-proxy entirely

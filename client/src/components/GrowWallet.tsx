@@ -52,8 +52,8 @@ const SITE_BASE = window.location.origin;
 // NOTE: createPaymentProcess is handled server-side via tRPC (payment.createProcess)
 // This avoids CORS issues and keeps credentials secure on the server.
 
-// Self-hosted SDK path
-const GROW_SDK_URL = "/grow-sdk/gs.min.js";
+// Official Meshulam CDN SDK
+const GROW_SDK_URL = "https://cdn.meshulam.co.il/sdk/gs.min.js";
 
 // ─── SDK Script Preloader ─────────────────────────────────────────────────────
 // Just loads the script tag — does NOT call init()
