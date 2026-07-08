@@ -255,5 +255,5 @@
 - [x] Add processToken to failure reports (client sends it, server includes in notification)
 - [x] Extract cleaner error message from SDK onFailure response (r.message instead of raw JSON)
 - [x] Include processToken in WhatsApp and email notifications for easier lookup in Grow dashboard
-- [ ] Fix duplicate guide email (skip journey when called from bundle flow)
-- [ ] Fix email preview text gibberish (add preheader div)
+- [x] Fix duplicate guide email (skip journey when called from bundle flow)
+- [x] Fix email preview text gibberish (add preheader div to guide + database emails, and add preheader param to baseTemplate for journey emails)

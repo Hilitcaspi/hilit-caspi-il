@@ -85,7 +85,7 @@ function urgencyBanner(): string {
   </div>`;
 }
 
-function baseTemplate(content: string, recipientEmail?: string, leadId?: number): string {
+function baseTemplate(content: string, recipientEmail?: string, leadId?: number, preheader?: string): string {
   let unsubLink: string;
   if (leadId && recipientEmail) {
     const token = Buffer.from(`${leadId}:${recipientEmail}`).toString("base64");
@@ -124,6 +124,7 @@ function baseTemplate(content: string, recipientEmail?: string, leadId?: number)
 </style>
 </head>
 <body>
+${preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preheader} &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847;</div>` : ''}
 <div class="container">
   <div class="header">
     <img src="${HILIT_IMG}" alt="הילית כספי" />
