@@ -277,17 +277,17 @@ export default function GrowWallet({
           onFailure: (r: any) => {
             setWalletLoading(false);
             toast.error("התשלום נכשל. אנא נסי שוב.");
-            console.error("[GrowWallet] onFailure full response:", JSON.stringify(r, null, 2));
-            // Extract meaningful error message from SDK response
+            // Send FULL raw SDK response to server for debugging
+            const fullRaw = JSON.stringify(r)?.slice(0, 500) || "(empty)";
             const errMsg = typeof r === "string" ? r
               : r?.message ? `${r.message}${r.status !== undefined ? ` (קוד: ${r.status})` : ""}`
-              : JSON.stringify(r)?.slice(0, 200);
+              : fullRaw.slice(0, 200);
             reportFailureMutation.mutate({
               customerName: name.trim(),
               customerEmail: email.trim(),
               customerPhone: phone.trim() || undefined,
               product,
-              errorMessage: errMsg,
+              errorMessage: `${errMsg} | RAW: ${fullRaw}`,
               stage: "sdk_failure",
               processToken: lastProcessTokenRef.current || undefined,
             });
@@ -301,18 +301,19 @@ export default function GrowWallet({
             setWalletLoading(false);
           },
           onError: (e: any) => {
-            console.error("[GrowWallet] onError full response:", JSON.stringify(e, null, 2));
             setWalletLoading(false);
             toast.error("שגיאה בטעינת מערכת התשלום. אנא נסי שוב.");
+            // Send FULL raw SDK error to server for debugging
+            const fullRaw = JSON.stringify(e)?.slice(0, 500) || "(empty)";
             const errMsg = typeof e === "string" ? e
               : e?.message ? `${e.message}${e.status !== undefined ? ` (קוד: ${e.status})` : ""}`
-              : JSON.stringify(e)?.slice(0, 200);
+              : fullRaw.slice(0, 200);
             reportFailureMutation.mutate({
               customerName: name.trim(),
               customerEmail: email.trim(),
               customerPhone: phone.trim() || undefined,
               product,
-              errorMessage: errMsg,
+              errorMessage: `${errMsg} | RAW: ${fullRaw}`,
               stage: "sdk_failure",
               processToken: lastProcessTokenRef.current || undefined,
             });

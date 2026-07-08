@@ -6253,6 +6253,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         processToken: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
+        // Log full payment failure details for debugging (visible in server logs)
+        console.log(`[PaymentFailure] ${input.stage} | ${input.product} | ${input.customerName} | ${input.customerEmail} | processToken: ${input.processToken || 'N/A'} | error: ${input.errorMessage || 'N/A'}`);
         const { notifyPaymentFailure } = await import("./paymentFailureAlert");
         await notifyPaymentFailure({
           customerName: input.customerName,
