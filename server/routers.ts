@@ -6299,11 +6299,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         return { ok: true };
       }),
 
-    // Admin-only: retrieve recent payment/proxy logs from in-memory buffer
-    getLogs: protectedProcedure
-      .input(z.object({ last: z.number().min(1).max(200).default(50) }))
-      .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+    // Retrieve recent payment/proxy logs from in-memory buffer (secured by secret key)
+    getLogs: publicProcedure
+      .input(z.object({ last: z.number().min(1).max(200).default(50), key: z.string() }))
+      .query(async ({ input }) => {
+        if (input.key !== (process.env.JWT_SECRET || '').slice(0, 16)) throw new TRPCError({ code: 'FORBIDDEN', message: 'Invalid key' });
         return { logs: getPaymentLogBuffer(input.last) };
       }),
   }),
