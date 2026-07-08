@@ -250,3 +250,10 @@
 - [x] Fix acceptsKids type (string enum → boolean conversion on server)
 - [x] Always update basic identity fields for all records (not just skeleton)
 - [x] Ensure all data saves correctly to the singles record in legacy DB
+
+## Payment failure alert improvements
+- [x] Add processToken to failure reports (client sends it, server includes in notification)
+- [x] Extract cleaner error message from SDK onFailure response (r.message instead of raw JSON)
+- [x] Include processToken in WhatsApp and email notifications for easier lookup in Grow dashboard
+- [ ] Fix duplicate guide email (skip journey when called from bundle flow)
+- [ ] Fix email preview text gibberish (add preheader div)

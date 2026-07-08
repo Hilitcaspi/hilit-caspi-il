@@ -95,7 +95,7 @@ function detectProductByDesc(desc: string): string | null {
 
 // ─── Product handlers ─────────────────────────────────────────────────────────
 
-async function handleGuide(email: string, name: string) {
+async function handleGuide(email: string, name: string, opts?: { skipJourney?: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
@@ -131,8 +131,10 @@ async function handleGuide(email: string, name: string) {
   } else {
     await db.insert(crmLeads).values({ name, email, status: "client_guide", product: "guide", source: "guide_form", createdAt: now, updatedAt: now }).catch(() => {});
   }
-  // Start nurture journey
-  startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender: "female", journeyKey: "women_guide" }).catch(() => {});
+  // Start nurture journey (skip when called from bundle flow to avoid duplicate emails)
+  if (!opts?.skipJourney) {
+    startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender: "female", journeyKey: "women_guide" }).catch(() => {});
+  }
 }
 
 async function handleCourse(email: string, name: string) {
@@ -400,7 +402,8 @@ async function handleBundleTuBav(email: string, name: string, phone: string, tra
   // 1. Handle database onboarding (creates singles record, sends questionnaire email)
   await handleDatabase(email, name, phone, transactionId);
   // 2. Handle guide delivery (creates access token, sends guide email)
-  await handleGuide(email, name);
+  // Skip the women_guide journey to avoid sending a duplicate "ברוכה הבאה לצד השני" email
+  await handleGuide(email, name, { skipJourney: true });
   // 3. Notify owner about bundle purchase
   await notifyOwner({ title: "רכישת חבילת טו באב! 💜", content: `${name} (${email}) רכש/ה את חבילת טו באב (מאגר + מדריך) ב-349 ₪. Transaction: ${transactionId || 'N/A'}` });
   notifyOwnerWhatsApp({ name, email, phone, source: "bundle_tubav" }).catch(() => {});

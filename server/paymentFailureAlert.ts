@@ -42,6 +42,7 @@ export interface PaymentFailureInfo {
   amount?: number;
   errorMessage?: string;
   stage: "createProcess" | "doPayment" | "sdk_failure";
+  processToken?: string;
 }
 
 const PRODUCT_LABELS: Record<string, string> = {
@@ -73,6 +74,7 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
     `מוצר: ${productLabel}`,
     `שלב: ${stageLabel}`,
     info.errorMessage ? `שגיאה: ${info.errorMessage.slice(0, 100)}` : null,
+    info.processToken ? `טוקן תהליך: ${info.processToken.slice(0, 20)}` : null,
     `זמן: ${now}`,
   ].filter(Boolean).join("\n");
 
@@ -87,6 +89,7 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
         <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">מוצר</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${productLabel}</td></tr>
         <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">שלב הכשל</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${stageLabel}</td></tr>
         ${info.errorMessage ? `<tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">שגיאה</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${info.errorMessage.slice(0, 200)}</td></tr>` : ""}
+        ${info.processToken ? `<tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">טוקן תהליך</td><td style="padding: 8px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 12px;">${info.processToken}</td></tr>` : ""}
         <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">זמן</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${now}</td></tr>
       </table>
       <p style="margin-top: 16px; color: #666;">ייתכן שמדובר בכרטיס שנדחה או בעיה זמנית ב-Meshulam. אם זה חוזר על עצמו, כדאי לבדוק בלוח הבקרה של Grow.</p>

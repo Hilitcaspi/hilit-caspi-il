@@ -175,6 +175,9 @@ export default function GrowWallet({
   const createProcessMutation = trpc.payment.createProcess.useMutation();
   const reportFailureMutation = trpc.payment.reportFailure.useMutation();
 
+  // Track processToken from createProcess so we can include it in failure reports
+  const lastProcessTokenRef = useRef<string | null>(null);
+
   // Capture UTM params from URL on mount and persist to sessionStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -273,13 +276,18 @@ export default function GrowWallet({
           onFailure: (r: any) => {
             setWalletLoading(false);
             toast.error("התשלום נכשל. אנא נסי שוב.");
+            // Extract meaningful error message from SDK response
+            const errMsg = typeof r === "string" ? r
+              : r?.message ? `${r.message}${r.status !== undefined ? ` (קוד: ${r.status})` : ""}`
+              : JSON.stringify(r)?.slice(0, 200);
             reportFailureMutation.mutate({
               customerName: name.trim(),
               customerEmail: email.trim(),
               customerPhone: phone.trim() || undefined,
               product,
-              errorMessage: typeof r === "string" ? r : JSON.stringify(r)?.slice(0, 200),
+              errorMessage: errMsg,
               stage: "sdk_failure",
+              processToken: lastProcessTokenRef.current || undefined,
             });
             callbacksRef.current.onFailure?.(r);
           },
@@ -294,13 +302,17 @@ export default function GrowWallet({
             console.error("[GrowWallet] SDK error:", e);
             setWalletLoading(false);
             toast.error("שגיאה בטעינת מערכת התשלום. אנא נסי שוב.");
+            const errMsg = typeof e === "string" ? e
+              : e?.message ? `${e.message}${e.status !== undefined ? ` (קוד: ${e.status})` : ""}`
+              : JSON.stringify(e)?.slice(0, 200);
             reportFailureMutation.mutate({
               customerName: name.trim(),
               customerEmail: email.trim(),
               customerPhone: phone.trim() || undefined,
               product,
-              errorMessage: typeof e === "string" ? e : (e?.message || JSON.stringify(e))?.slice(0, 200),
+              errorMessage: errMsg,
               stage: "sdk_failure",
+              processToken: lastProcessTokenRef.current || undefined,
             });
           },
         },
@@ -376,6 +388,9 @@ export default function GrowWallet({
         utmContent,
         ga4ClientId,
       });
+
+      // Save processToken for failure reporting (if SDK payment fails later)
+      lastProcessTokenRef.current = result.processToken || null;
 
       // Step 5: Render wallet (opens the payment overlay)
       window.growPayment!.renderPaymentOptions(result.authCode);

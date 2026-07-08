@@ -6250,6 +6250,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         amount: z.number().optional(),
         errorMessage: z.string().optional(),
         stage: z.enum(["createProcess", "doPayment", "sdk_failure"]),
+        processToken: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
         const { notifyPaymentFailure } = await import("./paymentFailureAlert");
@@ -6261,6 +6262,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           amount: input.amount,
           errorMessage: input.errorMessage,
           stage: input.stage,
+          processToken: input.processToken,
         });
         return { ok: true };
       }),
