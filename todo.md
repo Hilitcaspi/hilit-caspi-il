@@ -216,6 +216,12 @@
 - [x] Confirmed: All SDK service files exist at correct paths (/grow-sdk/sdk/1.3.5/js/services/a.min.js)
 - [x] Conclusion: Code-side is complete. Meshulam/Grow must register hilitcaspi.com in their Apple Developer Console (their step 4). Apple Pay will only appear on Safari/Apple devices once they complete this.
 
+## Apple Pay FULLY RESOLVED (July 8) — two root causes found & fixed
+- [x] Root cause 1: domain-association file signed by EXPIRED Apple cert (2021 file, cert expired May 2024). Replaced with current valid file (valid to Apr 2029), deployed via Manus, verified live (createdOn 1715203320642).
+- [x] Root cause 2: Incapsula blocks the prod server's egress IP on /doPayment (Apple Pay merchant-session call) with an EMPTY HTTP 500; growProxy looksBlocked() only caught 403/503+HTML so the Worker fallback never fired. Fixed: any 5xx now triggers the fallback. Deployed via Manus.
+- [x] End-to-end verified in production: tRPC createProcess → drawWalletPageData → doPayment(type 13) via /api/grow-proxy returns a valid Apple merchant session for hilitcaspi.com. See apple-pay-investigation.md.
+- [ ] Final confirmation: real Apple Pay purchase on iPhone
+
 ## Tu B'Av Bundle Campaign (July 2026)
 - [x] Research existing payment/guide/database flows for integration
 - [x] Create hidden landing page /tu-bav with love-themed branding

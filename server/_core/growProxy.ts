@@ -36,16 +36,25 @@ const PRIMARY_TIMEOUT_MS = 8000;
 const FALLBACK_TIMEOUT_MS = 12000;
 
 function looksBlocked(status: number, body: Buffer): boolean {
-  // Incapsula soft-blocks this server's egress IP on sensitive endpoints
-  // (e.g. /doPayment — the Apple Pay merchant-session call) with an EMPTY
-  // HTTP 500 instead of the classic 403+HTML. Any 5xx from the direct attempt
-  // must therefore trigger the Cloudflare Worker fallback (verified working
-  // end-to-end for the Apple Pay flow). If Meshulam genuinely 5xx'd, the
-  // Worker returns the same error and we serve it — only latency is added.
+  // Incapsula blocks our server IP in multiple ways:
+  // 1. HTTP 500 empty response (sensitive endpoints like /doPayment)
+  // 2. HTTP 403 with Incapsula HTML
+  // 3. HTTP 404 redirect to grow.business HTML (newest form of blocking)
+  // Since Meshulam ALWAYS returns JSON for valid API calls, any non-JSON
+  // response is a sign of blocking.
   if (status >= 500) return true;
-  if (status !== 403) return false;
-  const head = body.subarray(0, 600).toString("utf8");
-  return /Incapsula|_Incapsula_Resource|Request unsuccessful/i.test(head);
+  if (status === 403 || status === 404) {
+    const head = body.subarray(0, 600).toString("utf8");
+    if (/Incapsula|_Incapsula_Resource|Request unsuccessful|grow\.business/i.test(head)) return true;
+    // If it's a 404 and doesn't look like JSON, it's likely a block
+    if (status === 404 && !head.trimStart().startsWith("{")) return true;
+  }
+  // Any response that isn't JSON from Meshulam is suspicious
+  if (body.length > 0) {
+    const firstChar = body.subarray(0, 1).toString("utf8").trim();
+    if (firstChar && firstChar !== "{" && firstChar !== "[" && status !== 200) return true;
+  }
+  return false;
 }
 
 // Browser-like headers to avoid Incapsula 403 blocking on server→Meshulam calls.
@@ -73,13 +82,17 @@ const HOP_BY_HOP = new Set([
   "x-real-ip",
 ]);
 
+// Incapsula blocks direct paths (e.g. /doPayment, /drawWalletPageData) but
+// allows the /api/light/server/1.0/ prefix. Meshulam routes correctly either way.
+const API_PREFIX = "/api/light/server/1.0";
+
 function resolveUpstream(pathAfterBase: string): string {
   // pathAfterBase always starts with "/"
   if (pathAfterBase === "/prod" || pathAfterBase.startsWith("/prod/")) {
     const rest = pathAfterBase.slice("/prod".length) || "/";
-    return `https://api.meshulam.co.il${rest}`;
+    return `https://api.meshulam.co.il${API_PREFIX}${rest}`;
   }
-  return `https://secure.meshulam.co.il${pathAfterBase}`;
+  return `https://secure.meshulam.co.il${API_PREFIX}${pathAfterBase}`;
 }
 
 /**
