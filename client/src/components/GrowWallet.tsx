@@ -277,6 +277,7 @@ export default function GrowWallet({
           onFailure: (r: any) => {
             setWalletLoading(false);
             toast.error("התשלום נכשל. אנא נסי שוב.");
+            console.error("[GrowWallet] onFailure full response:", JSON.stringify(r, null, 2));
             // Extract meaningful error message from SDK response
             const errMsg = typeof r === "string" ? r
               : r?.message ? `${r.message}${r.status !== undefined ? ` (קוד: ${r.status})` : ""}`
@@ -300,7 +301,7 @@ export default function GrowWallet({
             setWalletLoading(false);
           },
           onError: (e: any) => {
-            console.error("[GrowWallet] SDK error:", e);
+            console.error("[GrowWallet] onError full response:", JSON.stringify(e, null, 2));
             setWalletLoading(false);
             toast.error("שגיאה בטעינת מערכת התשלום. אנא נסי שוב.");
             const errMsg = typeof e === "string" ? e

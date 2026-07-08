@@ -155,6 +155,10 @@ export function registerGrowProxy(app: Express): void {
       const afterBase = fullPath.slice(PROXY_BASE.length) || "/";
       const upstreamUrl = resolveUpstream(afterBase);
 
+      // Log all proxy requests for debugging (especially Apple Pay)
+      const bodySnippet = req.body ? JSON.stringify(req.body).slice(0, 300) : "(empty)";
+      console.log(`[GrowProxy] ${req.method} ${afterBase} → ${upstreamUrl} | body: ${bodySnippet}`);
+
       // Build forwarded headers from express-parsed request.
       const headers: Record<string, string> = { ...SPOOF_HEADERS };
       for (const [key, value] of Object.entries(req.headers)) {
@@ -184,6 +188,9 @@ export function registerGrowProxy(app: Express): void {
         buf = Buffer.from(await upstream.arrayBuffer());
         status = upstream.status;
         contentTypeOut = upstream.headers.get("content-type");
+        // Log response details
+        const respSnippet = buf.subarray(0, 500).toString("utf8");
+        console.log(`[GrowProxy] Direct response: HTTP ${status} | size: ${buf.length}B | content-type: ${contentTypeOut} | body: ${respSnippet}`);
       } catch (e: any) {
         primaryFailed = true;
         console.warn(
@@ -194,16 +201,23 @@ export function registerGrowProxy(app: Express): void {
 
       // Fallback: if direct attempt timed out, errored, or was Incapsula-blocked,
       // retry via the Cloudflare Worker (different egress network).
-      if (primaryFailed || (buf && looksBlocked(status, buf))) {
+      const blocked = buf ? looksBlocked(status, buf) : false;
+      if (primaryFailed || blocked) {
+        console.log(`[GrowProxy] Triggering fallback (primaryFailed=${primaryFailed}, blocked=${blocked}, status=${status})`);
         try {
           const fbUrl = `${CF_WORKER_BASE}${afterBase}`;
+          console.log(`[GrowProxy] Fallback URL: ${fbUrl}`);
           const fb = await fetchWithTimeout(fbUrl, init, FALLBACK_TIMEOUT_MS);
           const fbBuf = Buffer.from(await fb.arrayBuffer());
+          const fbSnippet = fbBuf.subarray(0, 500).toString("utf8");
+          console.log(`[GrowProxy] Fallback response: HTTP ${fb.status} | size: ${fbBuf.length}B | body: ${fbSnippet}`);
           if (!looksBlocked(fb.status, fbBuf)) {
             buf = fbBuf;
             status = fb.status;
             contentTypeOut = fb.headers.get("content-type");
-            console.log("[GrowProxy] Served via Cloudflare Worker fallback");
+            console.log("[GrowProxy] ✓ Served via Cloudflare Worker fallback");
+          } else {
+            console.warn("[GrowProxy] ✗ Fallback also blocked!");
           }
         } catch (fbErr: any) {
           console.warn(
