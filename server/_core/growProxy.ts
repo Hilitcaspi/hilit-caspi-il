@@ -84,15 +84,25 @@ const HOP_BY_HOP = new Set([
 
 // Incapsula blocks direct paths (e.g. /doPayment, /drawWalletPageData) but
 // allows the /api/light/server/1.0/ prefix. Meshulam routes correctly either way.
+// IMPORTANT: The SDK's fetch interceptor (gs.min.js) strips the domain and keeps
+// the full path. So paths already containing /api/light/ must NOT be re-prefixed.
 const API_PREFIX = "/api/light/server/1.0";
+
+function needsPrefix(path: string): boolean {
+  // If the path already starts with /api/light/ it came from the SDK with the
+  // full Meshulam path intact — do NOT add another prefix.
+  return !path.startsWith("/api/light/") && !path.startsWith("/api/providers/");
+}
 
 function resolveUpstream(pathAfterBase: string): string {
   // pathAfterBase always starts with "/"
   if (pathAfterBase === "/prod" || pathAfterBase.startsWith("/prod/")) {
     const rest = pathAfterBase.slice("/prod".length) || "/";
-    return `https://api.meshulam.co.il${API_PREFIX}${rest}`;
+    const prefix = needsPrefix(rest) ? API_PREFIX : "";
+    return `https://api.meshulam.co.il${prefix}${rest}`;
   }
-  return `https://secure.meshulam.co.il${API_PREFIX}${pathAfterBase}`;
+  const prefix = needsPrefix(pathAfterBase) ? API_PREFIX : "";
+  return `https://secure.meshulam.co.il${prefix}${pathAfterBase}`;
 }
 
 /**

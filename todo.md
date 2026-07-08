@@ -267,3 +267,7 @@
 ## Fix age confirmation checkbox (July 8)
 - [x] Fix duplicate IDs in GrowWallet component (all instances shared id="gw-age") causing checkbox state mismatch on pages with multiple GrowWallet instances
 - [x] Use React useId() for unique IDs per instance (age checkbox, terms checkbox, name/email/phone inputs)
+
+## Fix growProxy double-prefix bug (July 8)
+- [x] Fix resolveUpstream: was adding /api/light/server/1.0/ prefix to ALL paths, but SDK sends paths that already contain /api/light/web/1.0/ (e.g. drawWalletPageData). Result was double-prefixed URLs that returned 404/error from Meshulam, causing "מעבד..." to hang forever (translationsArr undefined → SDK crash)
+- [x] Add needsPrefix() check: only add prefix for bare endpoints (like /doPayment), skip for paths already containing /api/light/ or /api/providers/
