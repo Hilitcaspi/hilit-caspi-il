@@ -179,6 +179,9 @@ export default function GrowWallet({
   // Track processToken from createProcess so we can include it in failure reports
   const lastProcessTokenRef = useRef<string | null>(null);
 
+  // Server-side step logger for debugging payment flow on mobile
+  const logStepMutation = trpc.payment.logStep.useMutation();
+
   // Capture UTM params from URL on mount and persist to sessionStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -260,12 +263,19 @@ export default function GrowWallet({
 
     setWalletLoading(true);
 
+    const logStep = (step: string, detail?: string) => {
+      try { logStepMutation.mutate({ product, step, detail: detail || "", email: email.trim() }); } catch {}
+    };
+
     try {
       // Step 1: Ensure script is loaded
+      logStep("1_script_load_start");
       await preloadGrowSDKScript();
       if (!window.growPayment) throw new Error("Grow SDK not available after script load");
+      logStep("1_script_load_done");
 
       // Step 2: Always call init() fresh — it's idempotent and ensures runtime is started
+      logStep("2_init_start");
       await window.growPayment.init({
         environment: GROW_ENV,
         version: GROW_VERSION,
@@ -321,8 +331,12 @@ export default function GrowWallet({
         },
       });
 
+      logStep("2_init_done");
+
       // Step 3: Wait for runtime to be fully ready
+      logStep("3_wait_runtime_start");
       await waitForGrowRuntime(12000);
+      logStep("3_wait_runtime_done");
 
       // Step 4: Create payment process via server-side tRPC (secure, no CORS issues)
       // Calculate discounted price if coupon is applied
@@ -379,6 +393,7 @@ export default function GrowWallet({
         await saveLeadMutation.mutateAsync({ name: fullName, email: userEmail, phone: userPhone || "", product });
       } catch { /* non-blocking */ }
 
+      logStep("4_createProcess_start");
       const result = await createProcessMutation.mutateAsync({
         product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session",
         fullName,
@@ -394,12 +409,16 @@ export default function GrowWallet({
 
       // Save processToken for failure reporting (if SDK payment fails later)
       lastProcessTokenRef.current = result.processToken || null;
+      logStep("4_createProcess_done", `authCode=${result.authCode?.slice(0,8)}... token=${result.processToken || 'N/A'}`);
 
       // Step 5: Render wallet (opens the payment overlay)
+      logStep("5_renderPaymentOptions_start");
       window.growPayment!.renderPaymentOptions(result.authCode);
+      logStep("5_renderPaymentOptions_done");
 
     } catch (err: any) {
-      console.error("[GrowWallet] Payment init failed:", err);
+      const errDetail = `${err?.message || 'Unknown'} | stack: ${err?.stack?.slice(0, 200) || 'N/A'}`;
+      logStep("ERROR", errDetail);
       setWalletLoading(false);
       toast.error(`שגיאה ביצירת תהליך תשלום: ${err?.message || "נסי שוב בעוד מספר שניות."}`);
       reportFailureMutation.mutate({
@@ -407,7 +426,7 @@ export default function GrowWallet({
         customerEmail: email.trim(),
         customerPhone: phone.trim() || undefined,
         product,
-        errorMessage: err?.message?.slice(0, 200) || "Unknown error",
+        errorMessage: errDetail.slice(0, 300),
         stage: "createProcess",
       });
     }

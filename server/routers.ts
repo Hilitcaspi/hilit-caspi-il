@@ -6268,6 +6268,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         });
         return { ok: true };
       }),
+
+    logStep: publicProcedure
+      .input(z.object({
+        product: z.string(),
+        step: z.string(),
+        detail: z.string().optional(),
+        email: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        console.log(`[PaymentStep] ${input.product} | ${input.step} | ${input.email || 'N/A'} | ${input.detail || ''}`);
+        return { ok: true };
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;
