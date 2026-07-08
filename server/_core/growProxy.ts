@@ -36,7 +36,14 @@ const PRIMARY_TIMEOUT_MS = 8000;
 const FALLBACK_TIMEOUT_MS = 12000;
 
 function looksBlocked(status: number, body: Buffer): boolean {
-  if (status !== 403 && status !== 503) return false;
+  // Incapsula soft-blocks this server's egress IP on sensitive endpoints
+  // (e.g. /doPayment — the Apple Pay merchant-session call) with an EMPTY
+  // HTTP 500 instead of the classic 403+HTML. Any 5xx from the direct attempt
+  // must therefore trigger the Cloudflare Worker fallback (verified working
+  // end-to-end for the Apple Pay flow). If Meshulam genuinely 5xx'd, the
+  // Worker returns the same error and we serve it — only latency is added.
+  if (status >= 500) return true;
+  if (status !== 403) return false;
   const head = body.subarray(0, 600).toString("utf8");
   return /Incapsula|_Incapsula_Resource|Request unsuccessful/i.test(head);
 }
