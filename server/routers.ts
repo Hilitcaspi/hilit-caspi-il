@@ -2090,7 +2090,7 @@ export const appRouter = router({
             const base64Data = input.photoBase64.replace(/^data:[^;]+;base64,/, "");
             const buffer = Buffer.from(base64Data, "base64");
             const ext = input.photoBase64.startsWith("data:image/png") ? "png" : "jpg";
-            const key = `singles-photos/${profile.firstName.replace(/\s+/g, '-').toLowerCase()}-${profile.id}-${Date.now()}.${ext}`;
+            const key = `singles-photos/single-${profile.id}-${Date.now()}.${ext}`;
             const result = await storagePut(key, buffer, ext === "png" ? "image/png" : "image/jpeg");
             patchData.photoUrl = result.url;
           } catch (photoErr) {
@@ -2213,7 +2213,7 @@ export const appRouter = router({
               const base64Data = input.photoBase64.replace(/^data:[^;]+;base64,/, "");
               const buffer = Buffer.from(base64Data, "base64");
               const ext = input.photoBase64.startsWith("data:image/png") ? "png" : "jpg";
-              const key = `singles-photos/${profile.firstName.replace(/\s+/g, '-').toLowerCase()}-${profile.id}-${Date.now()}.${ext}`;
+              const key = `singles-photos/single-${profile.id}-${Date.now()}.${ext}`;
               const result = await storagePut(key, buffer, ext === "png" ? "image/png" : "image/jpeg");
               patchData.photoUrl = result.url;
               console.log("[completeQuestionnaire] Photo uploaded:", result.url);
@@ -4186,11 +4186,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           bestPerPair.set(key, m);
         }
       }
-      // Re-sort by date desc (newest first) after dedup
+      // Re-sort by most relevant date desc (proposedAt if sent, else createdAt) so newly-sent matches appear at top
       const allMatches = Array.from(bestPerPair.values())
         .sort((a, b) => {
-          const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt) || 0;
-          const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt) || 0;
+          const aTime = a.proposedAt ? Number(a.proposedAt) : (a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt) || 0);
+          const bTime = b.proposedAt ? Number(b.proposedAt) : (b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt) || 0);
           return bTime - aTime;
         });
 

@@ -1075,7 +1075,7 @@ export default function CRMMatchmaking() {
                         </button>
                       )}
                       <span className="text-xs text-[#727272]">
-                        {new Date(typeof match.createdAt === 'number' ? match.createdAt : match.createdAt).toLocaleDateString("he-IL")}
+                        {new Date(match.proposedAt ? Number(match.proposedAt) : (typeof match.createdAt === 'number' ? match.createdAt : match.createdAt)).toLocaleDateString("he-IL")}
                       </span>
                       <span className="text-[#727272] text-sm">{isExpanded ? "▲" : "▼"}</span>
                     </div>

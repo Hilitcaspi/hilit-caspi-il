@@ -274,3 +274,19 @@
 
 ## Switch to official Meshulam CDN SDK (July 8)
 - [x] Replace local SDK (/grow-sdk/gs.min.js) with official Meshulam CDN (https://cdn.meshulam.co.il/sdk/gs.min.js) — SDK communicates directly with Meshulam servers from the browser, bypassing the grow-proxy entirely
+
+## Tu B'Av Campaign Creative Refresh (July 9)
+- [x] Create new Meta creatives in a softer, cleaner, more delicate style aligned with hilitcaspi.com
+- [x] Integrate Hilit's real photos into the Tu B'Av campaign creatives
+- [x] Add subtle branding bar/logo: "הילית כספי | מאמנת ומרצה למציאת זוגיות"
+- [x] Prepare feed and story ad variations adapted for Meta placements
+- [x] Audit /tu-bav landing page for UTMs, Meta Pixel, and campaign tracking readiness
+- [x] Deliver exact campaign guidance: audiences, budget, creative mix, and setup instructions
+
+## CRM Matchmaking Sort Fix (July 9)
+- [x] Sort sent/proposed matches by proposedAt instead of createdAt
+- [x] Show proposedAt date in CRM sent-match cards instead of createdAt
+
+## Fix Photo Upload Bug (July 9)
+- [x] Fix storagePut key containing Hebrew characters (firstName) causing "file path must be ASCII" error — changed to `single-{id}-{timestamp}.{ext}`
+- [x] Send photo reminder emails to 49 members who completed questionnaire without uploading a photo
