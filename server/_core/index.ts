@@ -647,7 +647,43 @@ async function startServer() {
     }
   });
 
-  // ─── Team Member Login (email/password auth for staff) ────────────────────
+  // ─── Team Member Login (form POST with redirect — Chrome mobile fallback) ──
+  app.post("/api/team/login-form", async (req, res) => {
+    try {
+      const { email, password } = req.body as { email?: string; password?: string };
+      if (!email || !password) {
+        res.redirect("/team/login?error=missing");
+        return;
+      }
+      const { authenticateTeamMember } = await import("../teamAuth");
+      const result = await authenticateTeamMember(email.trim().toLowerCase(), password);
+      if (!result) {
+        res.redirect("/team/login?error=invalid");
+        return;
+      }
+      res.cookie("team_token", result.token, {
+        httpOnly: true,
+        secure: req.protocol === "https" || req.headers["x-forwarded-proto"] === "https",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+      });
+      // Also set a non-httpOnly cookie so JS can read it for header fallback
+      res.cookie("team_token_js", result.token, {
+        httpOnly: false,
+        secure: req.protocol === "https" || req.headers["x-forwarded-proto"] === "https",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+      });
+      res.redirect("/crm/matchmaking");
+    } catch (err: any) {
+      console.error("[TeamLoginForm]", err);
+      res.redirect("/team/login?error=server");
+    }
+  });
+
+  // ─── Team Member Login (JSON API for SPA) ────────────────────
   app.post("/api/team/login", async (req, res) => {
     try {
       const { email, password } = req.body as { email?: string; password?: string };

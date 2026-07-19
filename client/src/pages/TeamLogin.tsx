@@ -1,56 +1,25 @@
 /**
  * Team Login Page — /team/login
- * Simple email/password login for team members (e.g., Sivan)
- * who need CRM/matchmaking access without Manus OAuth.
+ * Uses a native HTML form POST to /api/team/login-form for maximum browser compatibility.
+ * The server sets the cookie and redirects to /crm/matchmaking.
+ * This approach works on ALL browsers (Chrome, Safari, Firefox) without any JS fetch issues.
  */
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { trpc } from "@/lib/trpc";
 
 export default function TeamLogin() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [, navigate] = useLocation();
-  const utils = trpc.useUtils();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/team/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        credentials: "include",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "שגיאה בהתחברות");
-        setLoading(false);
-        return;
-      }
-
-      // Store token in localStorage for header-based auth (mobile Safari cookie issues)
-      if (data.token) {
-        localStorage.setItem("team_token", data.token);
-      }
-
-      // Full page reload to ensure cookie is properly sent on next requests
-      window.location.href = "/crm/matchmaking";
-    } catch (err) {
-      setError("שגיאה בהתחברות, נסו שוב");
-      setLoading(false);
-    }
-  };
+  // Check URL params for error messages from server redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get("error");
+    if (err === "invalid") setError("אימייל או סיסמה שגויים");
+    else if (err === "missing") setError("יש למלא אימייל וסיסמה");
+    else if (err === "server") setError("שגיאה בשרת, נסי שוב");
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#191265] to-[#2a1f8a] flex items-center justify-center p-4" dir="rtl">
@@ -61,16 +30,16 @@ export default function TeamLogin() {
           <p className="text-[#727272] text-sm mt-2">הילית כספי — ניהול מאגר</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Native HTML form - no JavaScript needed for submission */}
+        <form action="/api/team/login-form" method="POST" className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email" className="text-[#191265] font-medium">
               אימייל
             </Label>
             <Input
               id="email"
+              name="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               placeholder="name@example.com"
               required
               className="text-left"
@@ -85,9 +54,8 @@ export default function TeamLogin() {
             </Label>
             <Input
               id="password"
+              name="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
               dir="ltr"
@@ -103,10 +71,9 @@ export default function TeamLogin() {
 
           <Button
             type="submit"
-            disabled={loading}
             className="w-full bg-[#191265] hover:bg-[#1800ad] text-white font-bold text-lg py-6 rounded-2xl transition-all duration-300 hover:scale-[1.02] shadow-lg"
           >
-            {loading ? "מתחברת..." : "כניסה"}
+            כניסה
           </Button>
         </form>
 

@@ -32,7 +32,7 @@ export async function createContext(
 
   // If no Manus OAuth user, check for team JWT token
   if (!user) {
-    const teamTokenCookie = opts.req.cookies?.team_token;
+    const teamTokenCookie = opts.req.cookies?.team_token || opts.req.cookies?.team_token_js;
     const teamTokenHeader = opts.req.headers["x-team-token"] as string | undefined;
     const teamToken = teamTokenCookie || teamTokenHeader;
     if (teamToken) {

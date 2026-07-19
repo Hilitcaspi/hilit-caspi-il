@@ -70,11 +70,18 @@ const trpcClient = trpc.createClient({
         } catch {
           // sessionStorage unavailable
         }
-        // Team member token fallback (mobile Safari may not send HttpOnly cookies)
+        // Team member token fallback (mobile browsers may not send HttpOnly cookies)
         try {
           const teamToken = localStorage.getItem("team_token");
           if (teamToken) {
             return { "x-team-token": teamToken };
+          }
+        } catch {}
+        // Also check non-httpOnly cookie (set by form-based login)
+        try {
+          const cookieMatch = document.cookie.match(/team_token_js=([^;]+)/);
+          if (cookieMatch?.[1]) {
+            return { "x-team-token": cookieMatch[1] };
           }
         } catch {}
         return {};
