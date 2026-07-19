@@ -23,6 +23,10 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
+  // Don't redirect if user is on team login page or if team_token cookie exists
+  if (window.location.pathname.startsWith("/team/")) return;
+  if (document.cookie.includes("team_token")) return;
+
   window.location.href = getLoginUrl();
 };
 

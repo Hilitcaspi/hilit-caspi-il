@@ -266,7 +266,8 @@ export default function CRMMatchmaking() {
         <div className="text-center bg-white rounded-3xl p-10 shadow-2xl max-w-sm mx-4">
           <div className="text-5xl mb-4">🔐</div>
           <h1 className="text-2xl font-black text-[#191265] mb-2">ניהול מאגר</h1>
-          <a href={getLoginUrl()} className="block bg-[#191265] text-white font-bold text-lg px-8 py-4 rounded-2xl text-center mt-4">כניסה</a>
+          <a href="/team/login" className="block bg-[#191265] text-white font-bold text-lg px-8 py-4 rounded-2xl text-center mt-4">כניסת צוות</a>
+          <a href={getLoginUrl()} className="block text-[#727272] text-sm mt-3 underline">כניסה עם Manus</a>
         </div>
       </div>
     );

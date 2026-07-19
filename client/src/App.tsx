@@ -59,6 +59,7 @@ const Brain = lazy(() => import("@/pages/Brain"));
 const TermsSingleSession = lazy(() => import("@/pages/TermsSingleSession"));
 const TuBavBundle = lazy(() => import("@/pages/TuBavBundle"));
 const ThankYouBundle = lazy(() => import("@/pages/ThankYouBundle"));
+const TeamLogin = lazy(() => import("@/pages/TeamLogin"));
 
 // US English (EN) pages
 const EnHome = lazy(() => import("@/pages/en/Home"));
@@ -200,6 +201,7 @@ function UsRouter() {
           <Route path={"/crm"} component={CRM} />
           <Route path={"/match/respond"} component={MatchRespond} />
           <Route path={"/match/owner-approve"} component={MatchOwnerApprove} />
+          <Route path={"/team/login"} component={TeamLogin} />
           <Route path={"/404"} component={NotFound} />
           <Route component={NotFound} />
         </Switch>
@@ -265,6 +267,7 @@ function HeRouter() {
           <Route path={"/brain"} component={Brain} />
           <Route path={"/tu-bav"} component={TuBavBundle} />
           <Route path={"/thank-you/bundle"} component={ThankYouBundle} />
+          <Route path={"/team/login"} component={TeamLogin} />
           {/* Keep /en/* routes for backward compat */}
           <Route path={"/en/database"} component={EnDatabaseSales} />
           <Route path={"/en/join"} component={EnRegister} />

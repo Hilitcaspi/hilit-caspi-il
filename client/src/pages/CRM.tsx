@@ -735,20 +735,14 @@ export default function CRM() {
         <div className="text-center bg-white rounded-3xl p-10 shadow-2xl max-w-sm mx-4">
           <div className="text-5xl mb-4">🔐</div>
           <h1 className="text-2xl font-black text-[#191265] mb-2">CRM - הילית כספי</h1>
-          <p className="text-[#727272] mb-6 text-sm">ניהול לידים ולקוחות<br/>גישה מוגבלת למנהלת בלבד</p>
-          {user ? (
-            <div>
-              <p className="text-red-500 text-sm mb-4">המשתמש שלך אינו מוגדר כמנהל</p>
-              <a href="/" className="text-[#727272] text-sm underline">חזרה לאתר</a>
-            </div>
-          ) : (
-            <a
-              href={getLoginUrl()}
-              className="block bg-[#191265] text-white font-bold text-lg px-8 py-4 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 hover:scale-105 shadow-lg text-center"
-            >
-              כניסה עם Manus
-            </a>
-          )}
+          <p className="text-[#727272] mb-6 text-sm">ניהול לידים ולקוחות<br/>גישה מוגבלת לצוות בלבד</p>
+          <a
+            href="/team/login"
+            className="block bg-[#191265] text-white font-bold text-lg px-8 py-4 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 hover:scale-105 shadow-lg text-center"
+          >
+            כניסת צוות
+          </a>
+          <a href={getLoginUrl()} className="block text-[#727272] text-sm mt-3 underline">כניסה עם Manus</a>
         </div>
       </div>
     );

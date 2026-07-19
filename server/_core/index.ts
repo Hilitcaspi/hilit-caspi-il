@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -53,6 +54,7 @@ async function startServer() {
   // Body parser — 10MB to support base64 photo uploads in questionnaire
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
+  app.use(cookieParser());
 
   // Rate limiting — protect against abuse and DoS
   // General API: 200 requests per minute per IP
@@ -643,6 +645,62 @@ async function startServer() {
       void sendErrorAlert({ source: "express:update-ages", error: err, context: { route: req.path } });
       res.status(500).json({ error: String(err) });
     }
+  });
+
+  // ─── Team Member Login (email/password auth for staff) ────────────────────
+  app.post("/api/team/login", async (req, res) => {
+    try {
+      const { email, password } = req.body as { email?: string; password?: string };
+      if (!email || !password) {
+        res.status(400).json({ error: "Email and password are required" });
+        return;
+      }
+      const { authenticateTeamMember } = await import("../teamAuth");
+      const result = await authenticateTeamMember(email, password);
+      if (!result) {
+        res.status(401).json({ error: "Invalid email or password" });
+        return;
+      }
+      // Set team_token cookie (httpOnly, 7 days)
+      res.cookie("team_token", result.token, {
+        httpOnly: true,
+        secure: req.protocol === "https" || req.headers["x-forwarded-proto"] === "https",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+      res.json({ success: true, member: result.member, token: result.token });
+    } catch (err: any) {
+      console.error("[TeamLogin]", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Team member session check
+  app.get("/api/team/me", async (req, res) => {
+    try {
+      const token = req.cookies?.team_token || (req.headers["x-team-token"] as string);
+      if (!token) {
+        res.status(401).json({ error: "Not authenticated" });
+        return;
+      }
+      const { verifyTeamToken } = await import("../teamAuth");
+      const member = verifyTeamToken(token);
+      if (!member) {
+        res.status(401).json({ error: "Invalid or expired token" });
+        return;
+      }
+      res.json({ member });
+    } catch (err: any) {
+      console.error("[TeamMe]", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Team member logout
+  app.post("/api/team/logout", (req, res) => {
+    res.clearCookie("team_token", { path: "/" });
+    res.json({ success: true });
   });
 
   // tRPC API - with ECONNRESET recovery middleware

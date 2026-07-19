@@ -4,7 +4,7 @@
 import { COOKIE_NAME } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents } from "../drizzle/schema";
@@ -558,10 +558,27 @@ export const appRouter = router({
   system: systemRouter,
 
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => {
+      // If team member is authenticated, return a synthetic user-like object
+      if (!opts.ctx.user && opts.ctx.teamMember) {
+        return {
+          id: opts.ctx.teamMember.id,
+          openId: `team_${opts.ctx.teamMember.id}`,
+          name: opts.ctx.teamMember.name,
+          email: opts.ctx.teamMember.email,
+          role: 'admin' as const, // Grant admin-level UI access
+          lastSignedIn: new Date(),
+          loginMethod: 'team',
+          isTeamMember: true,
+        };
+      }
+      return opts.ctx.user;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      // Also clear team token if present
+      ctx.res.clearCookie("team_token", { path: "/" });
       return { success: true } as const;
     }),
   }),
@@ -951,16 +968,16 @@ export const appRouter = router({
       }),
 
     // Get all CRM leads (admin only)
-    getAll: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getAll: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       return db.select().from(crmLeads).orderBy(desc(crmLeads.createdAt));
     }),
 
     // Get leads that need follow-up (48h+ with no purchase, not yet flagged)
-    getNeedingFollowup: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getNeedingFollowup: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
 
@@ -979,7 +996,7 @@ export const appRouter = router({
     }),
 
     // Update lead status
-    updateStatus: protectedProcedure
+    updateStatus: teamProcedure
       .input(z.object({
         id: z.number(),
         status: z.enum([
@@ -995,7 +1012,7 @@ export const appRouter = router({
         ]),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.update(crmLeads).set({ status: input.status, updatedAt: Date.now() }).where(eq(crmLeads.id, input.id));
@@ -1032,10 +1049,10 @@ export const appRouter = router({
       }),
 
     // Update lead notes
-    updateNotes: protectedProcedure
+    updateNotes: teamProcedure
       .input(z.object({ id: z.number(), notes: z.string() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.update(crmLeads).set({ notes: input.notes }).where(eq(crmLeads.id, input.id));
@@ -1043,7 +1060,7 @@ export const appRouter = router({
       }),
 
     // Update lead contact fields (inline editing from CRM card)
-    updateLead: protectedProcedure
+    updateLead: teamProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().min(1).optional(),
@@ -1053,7 +1070,7 @@ export const appRouter = router({
         notes: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const { id, ...fields } = input;
@@ -1068,13 +1085,13 @@ export const appRouter = router({
       }),
 
     // Schedule a meeting
-    scheduleMeeting: protectedProcedure
+    scheduleMeeting: teamProcedure
       .input(z.object({
         id: z.number(),
         meetingAt: z.date(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.update(crmLeads).set({
@@ -1087,8 +1104,8 @@ export const appRouter = router({
       }),
 
     // Get upcoming meetings (next 7 days)
-    getUpcomingMeetings: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getUpcomingMeetings: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
 
@@ -1109,8 +1126,8 @@ export const appRouter = router({
     }),
 
     // Flag leads for follow-up (run periodically or manually)
-    flagForFollowup: protectedProcedure.mutation(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    flagForFollowup: teamProcedure.mutation(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -1138,8 +1155,8 @@ export const appRouter = router({
     }),
 
     // Get CRM stats
-    getStats: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getStats: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return {};
 
@@ -1211,10 +1228,10 @@ export const appRouter = router({
     }),
 
     // Get full journey for a single lead (emails sent, DNA quiz, singles profile)
-    getLeadJourney: protectedProcedure
+    getLeadJourney: teamProcedure
       .input(z.object({ leadId: z.number() }))
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -1631,7 +1648,7 @@ export const appRouter = router({
     // full profile (incl. phone/email/questionnaireToken) by sequential numeric id,
     // enabling IDOR enumeration of the whole database. It was unused by the client.
     // If an admin-only lookup is needed in the future, reintroduce it guarded by a
-    // role check (protectedProcedure + ctx.user.role === "admin").
+    // role check (teamProcedure + ctx.user.role === "admin").
 
     /**
      * Register a basic profile after payment (before the 15-question scientific questionnaire).
@@ -2429,10 +2446,10 @@ export const appRouter = router({
   }),
   // ── Adminn ──────────────────────────────────────────────────────────────────
   admin: router({
-    checkCompatibility: protectedProcedure
+    checkCompatibility: teamProcedure
       .input(z.object({ idA: z.number(), idB: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const [singleA] = await db.select().from(singles).where(eq(singles.id, input.idA)).limit(1);
@@ -2467,14 +2484,14 @@ export const appRouter = router({
      * Create a match record directly from the compatibility check tab and send proposal emails.
      * Used when Hilit wants to send a match without running the full algorithm first.
      */
-    createAndSendMatch: protectedProcedure
+    createAndSendMatch: teamProcedure
       .input(z.object({
         idA: z.number(),
         idB: z.number(),
         hilitsNote: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -2632,8 +2649,8 @@ export const appRouter = router({
         return { success: true, matchId, score };
       }),
 
-    getAllSingles: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getAllSingles: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       // Exclude seed/demo data - only show real registrations
@@ -2642,32 +2659,32 @@ export const appRouter = router({
         .orderBy(desc(singles.createdAt));
     }),
 
-    getAllLeads: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getAllLeads: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       return db.select().from(leads).orderBy(desc(leads.createdAt));
     }),
 
-    getAllQuizResults: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getAllQuizResults: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       return db.select().from(dnaQuizResults).orderBy(desc(dnaQuizResults.createdAt));
     }),
 
-    toggleActive: protectedProcedure
+    toggleActive: teamProcedure
       .input(z.object({ id: z.number(), isActive: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.update(singles).set({ isActive: input.isActive }).where(eq(singles.id, input.id));
         return { success: true };
       }),
 
-    getStats: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getStats: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return { totalSingles: 0, totalLeads: 0, totalQuizResults: 0, paidRegistrations: 0 };
 
@@ -2690,10 +2707,10 @@ export const appRouter = router({
      * Resend questionnaire email to all singles who haven't completed it yet.
      * Used to fix the bug where some users registered but never received the questionnaire email.
      */
-    resendPendingQuestionnaireEmails: protectedProcedure
+    resendPendingQuestionnaireEmails: teamProcedure
       .input(z.object({ origin: z.string() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         // Find all singles who have a questionnaireToken but haven't completed the questionnaire
@@ -2740,8 +2757,8 @@ export const appRouter = router({
     /**
      * Get all singles with missing age or city (for admin data-fix UI).
      */
-    getMissingData: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getMissingData: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       const rows = await db.select({
@@ -2803,7 +2820,7 @@ export const appRouter = router({
     /**
      * Patch age and/or city for a single (admin data-fix).
      */
-    patchMissingData: protectedProcedure
+    patchMissingData: teamProcedure
       .input(z.object({
         id: z.number(),
         age: z.number().min(18).max(120).optional(),
@@ -2817,7 +2834,7 @@ export const appRouter = router({
         maritalStatus: z.enum(["single", "divorced", "widowed"]).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const patch: Record<string, any> = { updatedAt: Date.now() };
@@ -2836,8 +2853,8 @@ export const appRouter = router({
   }),
   // ─── Email Preview & Test ───────────────────────────────────────────────────
   emails: router({
-    getAll: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getAll: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const journeyLabels: Record<JourneyKey, { label: string; gender: string; timing: string[] }> = {
         women_first_step: { label: "הצעד הראשון - נשים", gender: "נשים", timing: ["מיד", "אחרי 24 שעות", "אחרי 72 שעות"] },
         men_first_step:   { label: "הצעד הראשון - גברים", gender: "גברים", timing: ["מיד", "אחרי 24 שעות", "אחרי 72 שעות"] },
@@ -2884,13 +2901,13 @@ export const appRouter = router({
       });
     }),
 
-    sendTest: protectedProcedure
+    sendTest: teamProcedure
       .input(z.object({
         journeyKey: z.string(),
         emailIndex: z.number().min(0).max(5),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const sequence = EMAIL_SEQUENCES[input.journeyKey as JourneyKey];
         if (!sequence) throw new TRPCError({ code: "NOT_FOUND", message: "Journey not found" });
         const template = sequence[input.emailIndex];
@@ -2904,18 +2921,18 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    sendTestWhatsApp: protectedProcedure
+    sendTestWhatsApp: teamProcedure
       .input(z.object({ phone: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const phone = input.phone || "0552442334";
         const ok = await sendWhatsApp(phone, "בדיקת מערכת וואטסאפ מהילית כספי - הכל עובד! 💛");
         return { success: ok, phone };
       }),
 
-    sendTestFollowUp: protectedProcedure
+    sendTestFollowUp: teamProcedure
       .mutation(async ({ ctx }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const emailTemplate = buildMatchFollowUpEmail({
           firstName: "הילית",
           matchFirstName: "דניאל",
@@ -3018,10 +3035,10 @@ export const appRouter = router({
     /**
      * Admin: reset device fingerprint so a token can be used on a new device.
      */
-    resetDevice: protectedProcedure
+    resetDevice: teamProcedure
       .input(z.object({ token: z.string() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.update(productAccessTokens)
@@ -3142,7 +3159,7 @@ export const appRouter = router({
     /**
      * Admin: generate a product access token for a buyer.
      */
-    generate: protectedProcedure
+    generate: teamProcedure
       .input(z.object({
         email: z.string().email(),
         name: z.string().optional(),
@@ -3150,7 +3167,7 @@ export const appRouter = router({
         paymentRef: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -3458,10 +3475,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Get answers for a single (admin use).
      */
-    getAnswers: protectedProcedure
+    getAnswers: teamProcedure
       .input(z.object({ singleId: z.number() }))
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) return null;
         const [row] = await db.select().from(matchmakingAnswers)
@@ -3478,13 +3495,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * Returns top matches per person (admin only).
      * Threshold: 90% first, fallback to 80% if no matches found.
      */
-    runMatching: protectedProcedure
+    runMatching: teamProcedure
       .input(z.object({
         threshold: z.number().min(30).max(100).default(60),
         fallbackThreshold: z.number().min(20).max(100).default(45),
       }).optional())
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -3589,10 +3606,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * Run the matching algorithm for a single specific person.
      * Useful when a person has fewer than 3 matches and you want to top them up.
      */
-    runMatchingForSingle: protectedProcedure
+    runMatchingForSingle: teamProcedure
       .input(z.object({ singleId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const [single] = await db.select().from(singles).where(eq(singles.id, input.singleId)).limit(1);
@@ -3605,8 +3622,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * Refresh scoreBreakdown for existing matches that have hasAnswers=false.
      * Run this after singles complete the scientific questionnaire.
      */
-    refreshMatchScores: protectedProcedure.mutation(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    refreshMatchScores: teamProcedure.mutation(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -3656,8 +3673,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Get all pending matches awaiting Hilit's approval.
      */
-    getPendingMatches: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getPendingMatches: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
 
@@ -3676,13 +3693,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * Approve a match and send proposal emails to both parties.
      * Hilit reviews and clicks "approve" - emails go out automatically.
      */
-    approveMatch: protectedProcedure
+    approveMatch: teamProcedure
       .input(z.object({
         matchId: z.number(),
         hilitsNote: z.string().optional(), // Personal note from Hilit about why she believes in this match
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -4128,10 +4145,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Reject a pending match (admin dismisses it without sending).
      */
-    rejectMatch: protectedProcedure
+    rejectMatch: teamProcedure
       .input(z.object({ matchId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.update(matches).set({ status: "rejected", updatedAt: Date.now() }).where(eq(matches.id, input.matchId));
@@ -4141,8 +4158,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: list all singles in the database.
      */
-    listSingles: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    listSingles: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       return db.select().from(singles)
@@ -4153,8 +4170,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: list inactive singles (paid but didn't complete questionnaire) - shown as leads.
      */
-    listInactiveSingles: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    listInactiveSingles: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       return db.select().from(singles)
@@ -4165,8 +4182,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: list all matches (all statuses) for CRM.
      */
-    listPendingMatches: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    listPendingMatches: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
 
@@ -4259,8 +4276,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * Admin: backfill scores for all existing matches that have no score.
      * Run once to populate scoreBreakdown and autoExplanation for old matches.
      */
-    backfillMatchScores: protectedProcedure.mutation(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    backfillMatchScores: teamProcedure.mutation(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Recalculate ALL matches with the full v2.2 algorithm
@@ -4325,8 +4342,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * Admin: get active singles who have NEVER received any match proposal.
      * Ordered by registration date (oldest first = waiting longest).
      */
-    getSinglesWithoutMatches: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getSinglesWithoutMatches: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
 
@@ -4454,10 +4471,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: get top 3 matches for a specific single (by score).
      */
-    getTopMatchesForSingle: protectedProcedure
+    getTopMatchesForSingle: teamProcedure
       .input(z.object({ singleId: z.number() }))
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) return [];
         // Fetch the main single's age preferences for hard filtering
@@ -4602,10 +4619,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: release a single from an active match (returnedToPool = now).
      */
-    releaseFromMatch: protectedProcedure
+    releaseFromMatch: teamProcedure
       .input(z.object({ matchId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const now = Date.now();
@@ -4617,10 +4634,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * Admin: mark a pending match as "already sent before" (status → rejected with note).
      * This removes it from the top-3 suggestions without sending it.
      */
-    markMatchSentBefore: protectedProcedure
+    markMatchSentBefore: teamProcedure
       .input(z.object({ matchId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.update(matches).set({
@@ -4634,10 +4651,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: get full match history for a single (all statuses).
      */
-    getMatchHistory: protectedProcedure
+    getMatchHistory: teamProcedure
       .input(z.object({ singleId: z.number() }))
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) return [];
         const allMatches = await db.select().from(matches).where(
@@ -4697,10 +4714,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: get the current active match (proposed or matched) for a single.
      */
-    getSingleActiveMatch: protectedProcedure
+    getSingleActiveMatch: teamProcedure
       .input(z.object({ singleId: z.number() }))
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) return null;
         const activeMatches = await db.select().from(matches).where(
@@ -4755,10 +4772,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: toggle a single's active status.
      */
-    toggleSingleActive: protectedProcedure
+    toggleSingleActive: teamProcedure
       .input(z.object({ singleId: z.number(), isActive: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.update(singles).set({ isActive: input.isActive }).where(eq(singles.id, input.singleId));
@@ -4767,10 +4784,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: send a reminder email to a single who has not responded to a match proposal.
      */
-    sendMatchReminder: protectedProcedure
+    sendMatchReminder: teamProcedure
       .input(z.object({ matchId: z.number(), singleId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const [match] = await db.select().from(matches).where(eq(matches.id, input.matchId)).limit(1);
@@ -4805,14 +4822,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: update a single's photo URL directly (for fixing missing photos).
      */
-    updateSinglePhoto: protectedProcedure
+    updateSinglePhoto: teamProcedure
       .input(z.object({
         singleId: z.number(),
         photoBase64: z.string(),
         photoMime: z.string().default('image/jpeg'),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: 'FORBIDDEN' }); if (ctx.user && ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
         const base64Data = input.photoBase64.replace(/^data:[^;]+;base64,/, '');
@@ -4830,14 +4847,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: generate a free invite token to send to someone.
      */
-    generate: protectedProcedure
+    generate: teamProcedure
       .input(z.object({
         boundEmail: z.string().email().optional(),
         note: z.string().max(200).optional(),
         expiryDays: z.number().min(1).max(365).default(30),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -4933,8 +4950,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: list all invite tokens.
      */
-    getAll: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getAll: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       return db.select().from(inviteTokens).orderBy(desc(inviteTokens.createdAt));
@@ -4973,7 +4990,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!post) throw new TRPCError({ code: "NOT_FOUND", message: "מאמר לא נמצא" });
         return post;
       }),
-    upsert: protectedProcedure
+    upsert: teamProcedure
       .input(z.object({
         id: z.number().optional(),
         title: z.string().min(1),
@@ -4987,7 +5004,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         publishedAt: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const now = Date.now();
@@ -5013,10 +5030,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           return { id: (result as any)[0].insertId };
         }
       }),
-    delete: protectedProcedure
+    delete: teamProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.delete(blogPosts).where(eq(blogPosts.id, input.id));
@@ -5065,8 +5082,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }),
 
     // פאנל מסעות מפורט
-    journeyFunnel: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    journeyFunnel: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -5138,8 +5155,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     }),
 
     // פאנל שאלון DNA
-    quizFunnel: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    quizFunnel: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -5181,8 +5198,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     }),
 
     // ── פאנל מאגר רווקים ──────────────────────────────────────────────────────
-    matchmakingFunnel: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    matchmakingFunnel: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -5305,9 +5322,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     }),
 
     // סטטיסטיקות לדשבורד אדמין
-    getStats: protectedProcedure
+    getStats: teamProcedure
       .query(async ({ ctx }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         // Page/event analytics
@@ -5349,12 +5366,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }),
 
     // ── Sales by Channel (purchases with UTM attribution) ───────────────
-    salesByChannel: protectedProcedure
+    salesByChannel: teamProcedure
       .input(z.object({
         period: z.enum(["week", "month", "quarter", "all"]).default("all"),
       }).optional())
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const period = input?.period ?? "all";
@@ -5388,14 +5405,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }),
 
     // ── Email Detail - per-email stats with recipients ───────────────
-    emailDetail: protectedProcedure
+    emailDetail: teamProcedure
       .input(z.object({
         journeyKey: z.string(),
         emailIndex: z.number(),
         period: z.enum(["week", "month", "quarter", "all"]).default("all"),
       }))
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         let since = 0;
@@ -5465,12 +5482,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }),
 
     // ── WhatsApp Group Stats ──────────────────────────────────────────
-    waGroupStats: protectedProcedure
+    waGroupStats: teamProcedure
       .input(z.object({
         period: z.enum(["week", "month", "quarter", "all"]).default("month"),
       }).optional())
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const period = input?.period ?? "month";
@@ -5515,12 +5532,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }),
 
     // ── Journey Funnel with time filter ──────────────────────────────
-    journeyFunnelFiltered: protectedProcedure
+    journeyFunnelFiltered: teamProcedure
       .input(z.object({
         period: z.enum(["week", "month", "quarter", "all"]).default("all"),
       }).optional())
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const period = input?.period ?? "all";
@@ -5578,8 +5595,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }),
 
     // ── Smart Alerts & Recommendations ──────────────────────────────
-    alerts: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    alerts: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -5707,12 +5724,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     }),
 
     // ── Behavior Tracking Stats (Hotjar-style) ───────────────────────
-    behaviorStats: protectedProcedure
+    behaviorStats: teamProcedure
       .input(z.object({
         period: z.enum(["week", "month", "quarter", "all"]).default("month"),
       }).optional())
       .query(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const period = input?.period ?? "month";
@@ -5872,8 +5889,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         return req ?? null;
       }),
     // Admin: get all pending requests
-    getAllPending: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getAllPending: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       const { profileUpdateRequests } = await import("../drizzle/schema");
@@ -5886,14 +5903,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         .orderBy(desc(profileUpdateRequests.createdAt));
     }),
     // Admin: approve or reject
-    review: protectedProcedure
+    review: teamProcedure
       .input(z.object({
         requestId: z.number(),
         action: z.enum(["approve", "reject"]),
         adminNote: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const { profileUpdateRequests } = await import("../drizzle/schema");
@@ -6040,8 +6057,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       return { spotsLeft, total: 50, registered: rows.length };
     }),
 
-    getLiveRegistrations: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    getLiveRegistrations: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       const { liveEventRegistrations } = await import("../drizzle/schema");
@@ -6079,15 +6096,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         };
       }),
     // Admin: list all coupons
-    list: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    list: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
       const { discountCodes } = await import("../drizzle/schema");
       return db.select().from(discountCodes).orderBy(desc(discountCodes.createdAt));
     }),
     // Admin: create a coupon
-    create: protectedProcedure
+    create: teamProcedure
       .input(z.object({
         code: z.string().min(2).max(50),
         discountPercent: z.number().min(1).max(100).optional(),
@@ -6098,7 +6115,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         note: z.string().max(200).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const { discountCodes } = await import("../drizzle/schema");
@@ -6115,10 +6132,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         return { success: true };
       }),
     // Admin: toggle active status
-    toggle: protectedProcedure
+    toggle: teamProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const { discountCodes } = await import("../drizzle/schema");

@@ -290,3 +290,23 @@
 ## Fix Photo Upload Bug (July 9)
 - [x] Fix storagePut key containing Hebrew characters (firstName) causing "file path must be ASCII" error — changed to `single-{id}-{timestamp}.{ext}`
 - [x] Send photo reminder emails to 49 members who completed questionnaire without uploading a photo
+
+## Team Login System
+- [x] Create team_members table in LEGACY database
+- [x] Seed Sivan Levin (sivilevin@gmail.com) with password Sivan2026!
+- [x] Install bcryptjs + jsonwebtoken packages
+- [x] Create server/teamAuth.ts with authenticateTeamMember and verifyTeamToken
+- [x] Add POST /api/team/login endpoint (email+password → JWT cookie)
+- [x] Add GET /api/team/me endpoint (verify team token)
+- [x] Add POST /api/team/logout endpoint
+- [x] Add cookie-parser middleware for Express
+- [x] Extend context.ts with teamMember field (reads team_token cookie or X-Team-Token header)
+- [x] Add teamProcedure to trpc.ts (allows access if user OR teamMember)
+- [x] Update auth.me to return synthetic user object for team members
+- [x] Update all protectedProcedure → teamProcedure in routers.ts
+- [x] Update ctx.user.role checks to allow team members
+- [x] Build /team/login page (Hebrew UI, email+password form)
+- [x] Register /team/login route in App.tsx (both HeRouter and UsRouter)
+- [x] Update CRM and CRMMatchmaking auth gates to show team login option
+- [x] Update main.tsx to not redirect team members to Manus OAuth
+- [x] Send Sivan credentials email via Brevo
