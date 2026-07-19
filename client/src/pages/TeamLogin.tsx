@@ -39,11 +39,13 @@ export default function TeamLogin() {
         return;
       }
 
-      // Invalidate auth.me so tRPC picks up the team session from cookie
-      await utils.auth.me.invalidate();
-      
-      // Redirect to CRM matchmaking
-      navigate("/crm/matchmaking");
+      // Store token in localStorage for header-based auth (mobile Safari cookie issues)
+      if (data.token) {
+        localStorage.setItem("team_token", data.token);
+      }
+
+      // Full page reload to ensure cookie is properly sent on next requests
+      window.location.href = "/crm/matchmaking";
     } catch (err) {
       setError("שגיאה בהתחברות, נסו שוב");
       setLoading(false);
