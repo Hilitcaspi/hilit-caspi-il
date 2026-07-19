@@ -10,7 +10,7 @@ import { sql } from "drizzle-orm";
 import type { TeamMember } from "./_core/context";
 
 const JWT_SECRET = process.env.JWT_SECRET || "";
-const TEAM_TOKEN_EXPIRY = "7d"; // 7 days
+const TEAM_TOKEN_EXPIRY = "365d"; // 1 year (effectively permanent)
 
 export interface TeamTokenPayload {
   type: "team";

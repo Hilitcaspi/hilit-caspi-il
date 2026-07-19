@@ -667,7 +667,7 @@ async function startServer() {
         secure: req.protocol === "https" || req.headers["x-forwarded-proto"] === "https",
         sameSite: "lax",
         path: "/",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
       });
       res.json({ success: true, member: result.member, token: result.token });
     } catch (err: any) {
