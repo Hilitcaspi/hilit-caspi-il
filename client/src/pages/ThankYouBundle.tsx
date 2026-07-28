@@ -4,6 +4,7 @@
  * 1. Email with /join?free_token=XXX link (for full registration: profile + DNA + questionnaire)
  * 2. Email with guide access link
  * This page simply tells the user to check their email.
+ * 
  */
 
 import { motion } from "framer-motion";
@@ -12,7 +13,7 @@ import { trackPurchase } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import { gaPurchase } from "@/lib/ga";
 
-const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, רכשתי את חבילת טו באב ואשמח לעזרה");
+const WHATSAPP_SUPPORT_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, רכשתי את חבילת טו באב ואשמח לעזרה");
 
 export default function ThankYouBundle() {
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function ThankYouBundle() {
             </div>
           </motion.div>
 
+
           {/* Tips */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 0.6 }}
             className="bg-white rounded-2xl p-6 border border-[#e9e8e8] mb-6">
@@ -98,7 +100,7 @@ export default function ThankYouBundle() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1, duration: 0.6 }}
             className="text-center">
             <p className="text-[#888] text-sm mb-3">עדיין לא קיבלתם? כתבו לי ואעזור:</p>
-            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
+            <a href={WHATSAPP_SUPPORT_URL} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-[#25D366] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#1da851] transition-all text-sm">
               📱 וואטסאפ עם הילית
             </a>
