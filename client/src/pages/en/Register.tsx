@@ -149,9 +149,9 @@ export default function EnRegister() {
         consentDataSharing,
         consentEmailMarketing,
         registrationSource: "us_web",
-        utmSource: params.get("utm_source") || undefined,
-        utmMedium: params.get("utm_medium") || undefined,
-        utmCampaign: params.get("utm_campaign") || undefined,
+        utmSource: params.get("utm_source") || (params.get("ref") ? "referral" : undefined),
+        utmMedium: params.get("utm_medium") || (params.get("ref") ? "referral" : undefined),
+        utmCampaign: params.get("utm_campaign") || params.get("ref") || undefined,
         utmContent: params.get("utm_content") || undefined,
       });
       setRegisteredSingleId(result.singleId);
