@@ -830,6 +830,15 @@ export default function CRM() {
                 📊 אנליטיקס
               </Button>
             </a>
+            <a href="/crm/dashboard">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs bg-gradient-to-r from-[#191265] to-[#2d1f8a] border-[#191265] text-white hover:opacity-90 font-bold"
+              >
+                📈 דשבורד שיווק
+              </Button>
+            </a>
           </div>
         </div>
       </div>

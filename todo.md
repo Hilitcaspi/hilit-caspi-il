@@ -310,3 +310,16 @@
 - [x] Update CRM and CRMMatchmaking auth gates to show team login option
 - [x] Update main.tsx to not redirect team members to Manus OAuth
 - [x] Send Sivan credentials email via Brevo
+
+## Comprehensive Marketing/Sales Dashboard (Aug 2)
+- [ ] Server procedure: dashboardOverview (leads, revenue, conversions by custom date range)
+- [ ] Server procedure: channelBreakdown (leads + revenue per channel/campaign)
+- [ ] Server procedure: leadJourneyFunnel (email journey conversion rates per step)
+- [ ] Server procedure: revenueByProduct (revenue breakdown with prices)
+- [ ] Frontend: New Dashboard page replacing existing Analytics with date range picker
+- [ ] Frontend: KPI cards (total leads, total revenue, conversions, conversion rate)
+- [ ] Frontend: Channel/campaign performance table with revenue attribution
+- [ ] Frontend: Email journey funnel visualization (conversion after each email)
+- [ ] Frontend: Revenue by product breakdown
+- [ ] Frontend: Lead source breakdown chart
+- [ ] Frontend: Daily trend chart (leads + revenue over time)

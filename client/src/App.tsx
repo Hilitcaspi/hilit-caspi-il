@@ -19,6 +19,7 @@ const Matches = lazy(() => import("@/pages/Matches"));
 const Admin = lazy(() => import("@/pages/Admin"));
 const CRM = lazy(() => import("@/pages/CRM"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const EmailPreview = lazy(() => import("@/pages/EmailPreview"));
 const Unsubscribe = lazy(() => import("@/pages/Unsubscribe"));
 const Blog = lazy(() => import("@/pages/Blog"));
@@ -196,6 +197,7 @@ function UsRouter() {
           <Route path={"/refunds"} component={EnRefunds} />
           <Route path={"/crm/matchmaking"} component={CRMMatchmaking} />
           <Route path={"/crm/analytics"} component={Analytics} />
+          <Route path={"/crm/dashboard"} component={Dashboard} />
           <Route path={"/crm/emails"} component={EmailPreview} />
           <Route path={"/crm/blog"} component={BlogAdmin} />
           <Route path={"/crm"} component={CRM} />
@@ -227,6 +229,7 @@ function HeRouter() {
           <Route path={"/admin"} component={Admin} />
           <Route path={"/crm/matchmaking"} component={CRMMatchmaking} />
           <Route path={"/crm/analytics"} component={Analytics} />
+          <Route path={"/crm/dashboard"} component={Dashboard} />
           <Route path={"/crm/emails"} component={EmailPreview} />
           <Route path={"/crm/blog"} component={BlogAdmin} />
           <Route path={"/crm"} component={CRM} />

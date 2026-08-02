@@ -8,6 +8,7 @@ import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_c
 import { z } from "zod";
 import { getDb } from "./db";
 import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents } from "../drizzle/schema";
+import { dashboardRouter } from "./dashboardRouter";
 import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
 import type { ScoreBreakdown as FullScoreBreakdown } from "./compatibility";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
@@ -556,6 +557,7 @@ async function generateMatchesForSingle(singleId: number, gender: "female" | "ma
 // ─── App Router ───────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
+  dashboard: dashboardRouter,
 
   auth: router({
     me: publicProcedure.query(opts => {
