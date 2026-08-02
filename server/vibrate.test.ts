@@ -29,7 +29,7 @@ describe("Vibrate SMS Service", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": process.env.VIBRATE_API_KEY,
+          "Authorization": `Bearer ${process.env.VIBRATE_API_KEY}`,
         },
         body: JSON.stringify({
           recipients: ["0559348719"],

@@ -49,7 +49,7 @@ export async function sendSMS(phone: string, message: string): Promise<boolean> 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": VIBRATE_API_KEY,
+        "Authorization": `Bearer ${VIBRATE_API_KEY}`,
       },
       body: JSON.stringify({
         recipients: [normalizedPhone],
