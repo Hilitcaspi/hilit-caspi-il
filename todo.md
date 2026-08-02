@@ -312,14 +312,21 @@
 - [x] Send Sivan credentials email via Brevo
 
 ## Comprehensive Marketing/Sales Dashboard (Aug 2)
-- [ ] Server procedure: dashboardOverview (leads, revenue, conversions by custom date range)
-- [ ] Server procedure: channelBreakdown (leads + revenue per channel/campaign)
-- [ ] Server procedure: leadJourneyFunnel (email journey conversion rates per step)
-- [ ] Server procedure: revenueByProduct (revenue breakdown with prices)
-- [ ] Frontend: New Dashboard page replacing existing Analytics with date range picker
-- [ ] Frontend: KPI cards (total leads, total revenue, conversions, conversion rate)
-- [ ] Frontend: Channel/campaign performance table with revenue attribution
-- [ ] Frontend: Email journey funnel visualization (conversion after each email)
-- [ ] Frontend: Revenue by product breakdown
-- [ ] Frontend: Lead source breakdown chart
-- [ ] Frontend: Daily trend chart (leads + revenue over time)
+- [x] Server procedure: dashboardOverview (leads, revenue, conversions by custom date range)
+- [x] Server procedure: channelBreakdown (leads + revenue per channel/campaign)
+- [x] Server procedure: leadJourneyFunnel (email journey conversion rates per step)
+- [x] Server procedure: revenueByProduct (revenue breakdown with prices)
+- [x] Frontend: New Dashboard page replacing existing Analytics with date range picker
+- [x] Frontend: KPI cards (total leads, total revenue, conversions, conversion rate)
+- [x] Frontend: Channel/campaign performance table with revenue attribution
+- [x] Frontend: Email journey funnel visualization (conversion after each email)
+- [x] Frontend: Revenue by product breakdown
+- [x] Frontend: Lead source breakdown chart
+- [x] Frontend: Daily trend chart (leads + revenue over time)
+
+## Replace Green API WhatsApp with Vibrate SMS (Aug 2)
+- [x] Create server/vibrate.ts with sendSMS function (Vibrate API)
+- [x] Add VIBRATE_API_KEY secret
+- [x] Replace all sendWhatsApp calls with sendSMS in match flows (routers.ts, automation.ts, matchingScheduler.ts)
+- [x] Disable Green API (remove credentials or skip sending)
+- [x] Test SMS sending works correctly

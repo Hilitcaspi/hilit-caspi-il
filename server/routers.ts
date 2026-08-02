@@ -21,7 +21,7 @@ import { startJourney, getJourneyKey } from "./automation";
 import { ga4GenerateLead, ga4SignUp, clientIdFromEmail } from "./_core/ga4";
 import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as buildMatchProposalEmailTemplate, buildContactRevealEmail as buildContactRevealEmailTemplate, buildMatchRejectionAckEmail, buildOwnerMatchApprovalEmail, buildConsolationEmail, WOMEN_MATCHMAKING_EMAIL_1, MEN_MATCHMAKING_EMAIL_1, DNA_PROFILES, buildMatchFollowUpEmail } from "./emailTemplates";
 import { sendEmail } from "./brevo";
-import { sendWhatsApp } from "./joni";
+import { sendSMS, buildMatchSmsMessage } from "./vibrate";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -2631,20 +2631,19 @@ export const appRouter = router({
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
 
-        await notifyOwner({ title: "✅ התאמה נשלחה!", content: `ההצעה ל-${singleA.firstName} ו-${singleB.firstName} נשלחה. ממתינים לתגובה תוך 48 שעות.` });
-
-        const matchWaMsg = (firstName: string, matchName: string) =>
-          `היי ${firstName}! 💛\nשלחתי לך עכשיו מייל עם התאמה מיוחדת שבחרתי עבורך, ${matchName} מחכה לתשובתך!\nכדאי לבדוק את תיבת המייל (גם ספאם) וללחוץ על הקישור.\nהילית 💛`;
+        // Send SMS notifications via Vibrate
+        const smsMsgA = buildMatchSmsMessage(singleA.firstName, singleB.firstName, score);
+        const smsMsgB = buildMatchSmsMessage(singleB.firstName, singleA.firstName, score);
         const waNow = Date.now();
         await db.update(matches).set({ waSentAt: waNow }).where(eq(matches.id, matchId));
         if (singleA.phone) {
-          sendWhatsApp(singleA.phone, matchWaMsg(singleA.firstName, singleB.firstName)).catch(err =>
-            console.error("[WhatsApp] Failed to send to singleA:", err)
+          sendSMS(singleA.phone, smsMsgA).catch(err =>
+            console.error("[SMS] Failed to send to singleA:", err)
           );
         }
         if (singleB.phone) {
-          sendWhatsApp(singleB.phone, matchWaMsg(singleB.firstName, singleA.firstName)).catch(err =>
-            console.error("[WhatsApp] Failed to send to singleB:", err)
+          sendSMS(singleB.phone, smsMsgB).catch(err =>
+            console.error("[SMS] Failed to send to singleB:", err)
           );
         }
 
@@ -2928,7 +2927,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const phone = input.phone || "0552442334";
-        const ok = await sendWhatsApp(phone, "בדיקת מערכת וואטסאפ מהילית כספי - הכל עובד! 💛");
+        const ok = await sendSMS(phone, "בדיקת מערכת SMS מהילית כספי - הכל עובד!");
         return { success: ok, phone };
       }),
 
@@ -3815,21 +3814,19 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
 
-        await notifyOwner({ title: "✅ התאמה נשלחה!", content: `ההצעה ל-${singleA.firstName} ו-${singleB.firstName} נשלחה. ממתינים לתגובה תוך 48 שעות.` });
-
-        // Send WhatsApp notifications to both singles
-        const matchWaMsg = (firstName: string, matchName: string) =>
-          `היי ${firstName}! 💛\nשלחתי לך עכשיו מייל עם התאמה מיוחדת שבחרתי עבורך, ${matchName} מחכה לתשובתך!\nכדאי לבדוק את תיבת המייל (גם ספאם) וללחוץ על הקישור.\nהילית 💛`;
+        // Send SMS notifications via Vibrate
+        const smsMsgA2 = buildMatchSmsMessage(singleA.firstName, singleB.firstName, score);
+        const smsMsgB2 = buildMatchSmsMessage(singleB.firstName, singleA.firstName, score);
         const waNow2 = Date.now();
         await db.update(matches).set({ waSentAt: waNow2 }).where(eq(matches.id, input.matchId));
         if (singleA.phone) {
-          sendWhatsApp(singleA.phone, matchWaMsg(singleA.firstName, singleB.firstName)).catch(err =>
-            console.error("[WhatsApp] Failed to send to singleA:", err)
+          sendSMS(singleA.phone, smsMsgA2).catch(err =>
+            console.error("[SMS] Failed to send to singleA:", err)
           );
         }
         if (singleB.phone) {
-          sendWhatsApp(singleB.phone, matchWaMsg(singleB.firstName, singleA.firstName)).catch(err =>
-            console.error("[WhatsApp] Failed to send to singleB:", err)
+          sendSMS(singleB.phone, smsMsgB2).catch(err =>
+            console.error("[SMS] Failed to send to singleB:", err)
           );
         }
 
@@ -3918,19 +3915,19 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
         await notifyOwner({ title: "✅ התאמה נשלחה!", content: `ההצעה ל-${singleA.firstName} ו-${singleB.firstName} נשלחה בהצלחה.` });
-        // Send WhatsApp notifications to both singles
-        const ownerWaMsg = (firstName: string, matchName: string) =>
-          `היי ${firstName}! 💛\nשלחתי לך עכשיו מייל עם התאמה מיוחדת שבחרתי עבורך, ${matchName} מחכה לתשובתך!\nכדאי לבדוק את תיבת המייל (גם ספאם) וללחוץ על הקישור.\nהילית 💛`;
+        // Send SMS notifications via Vibrate
+        const smsMsgA3 = buildMatchSmsMessage(singleA.firstName, singleB.firstName, score);
+        const smsMsgB3 = buildMatchSmsMessage(singleB.firstName, singleA.firstName, score);
         const waNow3 = Date.now();
         await db.update(matches).set({ waSentAt: waNow3 }).where(eq(matches.id, match.id));
         if (singleA.phone) {
-          sendWhatsApp(singleA.phone, ownerWaMsg(singleA.firstName, singleB.firstName)).catch(err =>
-            console.error("[WhatsApp] Failed to send to singleA:", err)
+          sendSMS(singleA.phone, smsMsgA3).catch(err =>
+            console.error("[SMS] Failed to send to singleA:", err)
           );
         }
         if (singleB.phone) {
-          sendWhatsApp(singleB.phone, ownerWaMsg(singleB.firstName, singleA.firstName)).catch(err =>
-            console.error("[WhatsApp] Failed to send to singleB:", err)
+          sendSMS(singleB.phone, smsMsgB3).catch(err =>
+            console.error("[SMS] Failed to send to singleB:", err)
           );
         }
         return { success: true, action: "approved", sentTo: [singleA.email, singleB.email] };

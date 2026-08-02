@@ -7,7 +7,7 @@
  * - Client-side payment failures reported back from the Grow SDK
  */
 import { sendEmail } from "./brevo";
-import { sendWhatsApp } from "./joni";
+
 
 const HILIT_EMAIL = "hilit@hilitcaspi.com";
 const HILIT_PHONE = "0544530975";
@@ -104,8 +104,6 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
         subject: `🚨 תשלום נכשל - ${info.customerName} (${productLabel})`,
         htmlContent,
       }),
-      sendWhatsApp(HILIT_PHONE, waMsg),
-      sendWhatsApp(PARTNER_PHONE, waMsg),
     ]);
   } catch (err) {
     console.error("[PaymentFailureAlert] Failed to send notification:", err);

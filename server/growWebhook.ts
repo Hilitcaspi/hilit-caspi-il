@@ -36,7 +36,7 @@ import { getDb } from "./db";
 import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
-import { notifyOwnerWhatsApp } from "./joni";
+
 import { startJourney } from "./automation";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
@@ -118,7 +118,6 @@ async function handleGuide(email: string, name: string, opts?: { skipJourney?: b
   const PAID_GUIDE_URL = `${SITE_BASE}/guide/view?token=${guideToken}`;
   const firstName = name.trim().split(" ")[0];
   await notifyOwner({ title: "רכישת מדריך חדשה! 💛", content: `${name} (${email}) רכש את המדריך ב-149 ₪` });
-  notifyOwnerWhatsApp({ name, email, source: "paid_guide" }).catch(() => {});
   sendEmail({
     to: { email, name },
     subject: "המדריך שלך מחכה 💛",
@@ -165,7 +164,6 @@ async function handleCourse(email: string, name: string) {
   const GUIDE_URL = `${SITE_BASE}/guide/view?token=${guideToken}`;
   const firstName = name.trim().split(" ")[0];
   await notifyOwner({ title: "רכישת קורס חדשה! 🎓", content: `${name} (${email}) רכש את הקורס ב-249 ₪` });
-  notifyOwnerWhatsApp({ name, email, source: "paid_course" }).catch(() => {});
   sendEmail({
     to: { email, name },
     subject: "הקורס שלך מחכה! 🎓",
@@ -194,7 +192,6 @@ async function handleCoaching(email: string, name: string) {
   }
   const firstName = name.trim().split(" ")[0];
   await notifyOwner({ title: "רכישת ליווי אישי חדשה! 🌟", content: `${name} (${email}) רכש חבילת ליווי` });
-  notifyOwnerWhatsApp({ name, email, source: "paid_coaching" }).catch(() => {});
   sendEmail({
     to: { email, name },
     subject: "ברוכים הבאים לתהליך! 🌟",
@@ -217,7 +214,6 @@ async function handleCoachingMas(email: string, name: string) {
   }
   const firstName = name.trim().split(" ")[0];
   await notifyOwner({ title: "רכישת ליווי אישי חדשה! 🌟 תהליך המסע", content: `${name} (${email}) רכש תהליך המסע (12 פגישות) ב-4,200 ₪` });
-  notifyOwnerWhatsApp({ name, email, source: "paid_coaching_mas" }).catch(() => {});
   if (db) {
     await db.insert(leads).values({ name, email, phone: "", source: "paid_coaching_mas" }).catch(() => {});
     const now = Date.now();
@@ -250,7 +246,6 @@ async function handleSession(email: string, name: string) {
     await db.insert(leads).values({ name, email, phone: "", source: "paid_session" }).catch(() => {});
   }
   const firstName = name.trim().split(" ")[0];
-  notifyOwnerWhatsApp({ name, email, source: "paid_session" }).catch(() => {});
   sendEmail({
     to: { email, name },
     subject: "הפגישה שלנו מחכה! 💬",
@@ -334,7 +329,6 @@ async function handleDatabase(email: string, name: string, phone: string, transa
   const joinUrl = `${SITE_BASE}/join/questionnaire?token=${singleRecord.questionnaireToken}`;
 
   await notifyOwner({ title: "תשלום מאגר חדש! 💛", content: `${name} (${email}) שילם דמי רישום למאגר ב-249 ₪. Transaction: ${transactionId || 'N/A'}` });
-  notifyOwnerWhatsApp({ name, email, phone, source: "paid_database" }).catch(() => {});
 
   // Send personal join link email
   sendEmail({
@@ -387,7 +381,6 @@ async function handleLiveEvent(email: string, name: string, phone: string) {
     title: "נרשם/ה ללייב! 🎉",
     content: `${name} (${email}) רכש/ה כרטיס ללייב 16.6`,
   });
-  notifyOwnerWhatsApp({ name, email, source: "live_event" }).catch(() => {});
 
   sendEmail({
     to: { email, name },
@@ -406,7 +399,6 @@ async function handleBundleTuBav(email: string, name: string, phone: string, tra
   await handleGuide(email, name, { skipJourney: true });
   // 3. Notify owner about bundle purchase
   await notifyOwner({ title: "רכישת חבילת טו באב! 💜", content: `${name} (${email}) רכש/ה את חבילת טו באב (מאגר + מדריך) ב-349 ₪. Transaction: ${transactionId || 'N/A'}` });
-  notifyOwnerWhatsApp({ name, email, phone, source: "bundle_tubav" }).catch(() => {});
   console.log(`[GrowWebhook] Bundle Tu B'Av completed for ${email} (database + guide)`);
 }
 

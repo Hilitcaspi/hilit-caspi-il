@@ -12,7 +12,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { processPendingEmails, processMeetingReminders, processMatchFollowUps, retryUnsentMatchEmails, processMatchedPairFollowUps, processCartAbandonment } from "../automation";
 import { notifyOwner } from "./notification";
-import { notifyOwnerWhatsApp, sendLeadWelcomeWhatsApp } from "../joni";
+
 import { runWeeklyMatching, expireStaleMatches } from "../matchingScheduler";
 import { getDb } from "../db";
 import { matches, analyticsEvents } from "../../drizzle/schema";
@@ -469,10 +469,8 @@ async function startServer() {
               title: `ליד מטא חדש! 📣 (${source})`,
               content: `${name} (${email}${phone ? `, ${phone}` : ""}) הגיע מקמפיין Meta. מסע: ${journeyKey}`,
             });
-            notifyOwnerWhatsApp({ name, email, phone: phone || undefined, source }).catch(console.error);
             // Send welcome WhatsApp to lead if phone available
             if (phone) {
-              sendLeadWelcomeWhatsApp({ name, phone, source }).catch(console.error);
             }
           }
 
@@ -972,9 +970,7 @@ async function startServer() {
             title: `ליד מטא חדש! 📣 (${form.source})`,
             content: `${name} (${email}${phone ? `, ${phone}` : ""}) , מסע: ${form.journey}`,
           });
-          notifyOwnerWhatsApp({ name, email, phone: phone || undefined, source: form.source }).catch(console.error);
           if (phone) {
-            sendLeadWelcomeWhatsApp({ name, phone, source: form.source }).catch(console.error);
           }
           const nameParts = name.trim().split(" ");
           await startJ({

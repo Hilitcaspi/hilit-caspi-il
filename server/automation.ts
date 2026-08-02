@@ -14,7 +14,7 @@ import { getDb, resetDb } from "./db";
 import { emailLog, crmLeads, productAccessTokens, matches, singles } from "../drizzle/schema";
 import { and, eq, lt, gt, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { sendEmail, addContactToList } from "./brevo";
-import { sendWhatsApp } from "./joni";
+import { sendSMS } from "./vibrate";
 import { EMAIL_SEQUENCES, renderTemplate, DNA_PROFILES, type JourneyKey, buildMatchFollowUpEmail } from "./emailTemplates";
 import crypto from "crypto";
 
@@ -685,15 +685,14 @@ export async function processMatchFollowUps(): Promise<number> {
           .set({ followUpSentAt: Date.now() })
           .where(eq(matches.id, match.id));
         sent += emailsSent;
-
-        // Send WhatsApp reminders alongside follow-up emails
-        const followUpWaMsg = (firstName: string, matchName: string) =>
-          `היי ${firstName}! 💛\nשלחתי לך מייל עם התאמה מיוחדת שמחכה לתשובתך, ${matchName} כבר הגיב בחיוב!\nכדאי לבדוק את תיבת המייל (גם ספאם) וללחוץ על הקישור.\nהילית 💛`;
+        // Send SMS reminders alongside follow-up emails
+        const followUpSms = (firstName: string, matchName: string) =>
+          `היי ${firstName}, שלחתי לך מייל עם התאמה מיוחדת שמחכה לתשובתך. ${matchName} כבר הגיב בחיוב! כדאי לבדוק את תיבת המייל (גם ספאם ושיווק) וללחוץ על הקישור. הילית`;
         if (!match.approvedByA && singleA?.phone) {
-          sendWhatsApp(singleA.phone, followUpWaMsg(singleA.firstName, singleB.firstName)).catch(() => {});
+          sendSMS(singleA.phone, followUpSms(singleA.firstName, singleB.firstName)).catch(() => {});
         }
         if (!match.approvedByB && singleB?.phone) {
-          sendWhatsApp(singleB.phone, followUpWaMsg(singleB.firstName, singleA.firstName)).catch(() => {});
+          sendSMS(singleB.phone, followUpSms(singleB.firstName, singleA.firstName)).catch(() => {});
         }
       }
     } catch (err) {
