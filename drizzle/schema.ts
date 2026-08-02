@@ -112,6 +112,8 @@ export const singles = mysqlTable("singles", {
 
   // Photo
   photoUrl: text("photoUrl"),
+  photoUploadToken: varchar("photoUploadToken", { length: 64 }),
+  photoUploadTokenExpiresAt: bigint("photoUploadTokenExpiresAt", { mode: "number" }),
 
   // Scientific questionnaire token (sent by email after payment, used to complete the 15-question quiz)
   questionnaireToken: varchar("questionnaireToken", { length: 64 }),

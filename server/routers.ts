@@ -6324,5 +6324,52 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         return { logs: getPaymentLogBuffer(input.last) };
       }),
   }),
+
+  photoUpload: router({
+    getByToken: publicProcedure
+      .input(z.object({ token: z.string().min(1) }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [single] = await db.select({
+          id: singles.id,
+          firstName: singles.firstName,
+          photoUrl: singles.photoUrl,
+          photoUploadTokenExpiresAt: singles.photoUploadTokenExpiresAt,
+        })
+          .from(singles)
+          .where(eq(singles.photoUploadToken, input.token))
+          .limit(1);
+        if (!single) throw new TRPCError({ code: "NOT_FOUND", message: "Token not found" });
+        if (single.photoUploadTokenExpiresAt && single.photoUploadTokenExpiresAt < Date.now()) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Token expired" });
+        }
+        return {
+          firstName: single.firstName,
+          existingPhotoUrl: single.photoUrl
+            ? (single.photoUrl.startsWith("http") ? single.photoUrl : `https://hilitcaspi.com${single.photoUrl}`)
+            : null,
+        };
+      }),
+
+    savePhoto: publicProcedure
+      .input(z.object({ token: z.string().min(1), photoUrl: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [single] = await db.select({ id: singles.id, photoUploadTokenExpiresAt: singles.photoUploadTokenExpiresAt })
+          .from(singles)
+          .where(eq(singles.photoUploadToken, input.token))
+          .limit(1);
+        if (!single) throw new TRPCError({ code: "NOT_FOUND", message: "Token not found" });
+        if (single.photoUploadTokenExpiresAt && single.photoUploadTokenExpiresAt < Date.now()) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Token expired" });
+        }
+        await db.update(singles)
+          .set({ photoUrl: input.photoUrl, photoUploadToken: null, photoUploadTokenExpiresAt: null })
+          .where(eq(singles.id, single.id));
+        return { success: true };
+      }),
+  }),
 });
 export type AppRouter = typeof appRouter;

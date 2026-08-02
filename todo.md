@@ -330,3 +330,13 @@
 - [x] Replace all sendWhatsApp calls with sendSMS in match flows (routers.ts, automation.ts, matchingScheduler.ts)
 - [x] Disable Green API (remove credentials or skip sending)
 - [x] Test SMS sending works correctly
+
+## Send Photo Completion Requests to Remaining Singles (Aug 2)
+- [x] Build /upload-photo page (token-based, no login required)
+- [x] Add photoUploadToken + photoUploadTokenExpiresAt columns to singles table
+- [x] Create tRPC endpoints for token validation and photo save
+- [x] Query DB for eligible singles (isActive=true, photoUrl IS NULL, all other fields filled, no active token)
+- [x] Generate tokens for 30 eligible singles (including the 5 previously sent + 1 new)
+- [x] Send email to each with personal upload link (via Brevo) - 30 sent successfully
+- [x] Send SMS to each directing to check email (via Vibrate) - 30 sent successfully
+- [x] Fixed Vibrate API: correct URL is api.vibrate.co.il (not app.vibrate.co.il), field is 'message' not 'body'

@@ -15,6 +15,7 @@ import NotFound from "@/pages/NotFound";
 
 // Lazy loaded (non-critical)
 const Register = lazy(() => import("@/pages/Register"));
+const UploadPhoto = lazy(() => import("@/pages/UploadPhoto"));
 const Matches = lazy(() => import("@/pages/Matches"));
 const Admin = lazy(() => import("@/pages/Admin"));
 const CRM = lazy(() => import("@/pages/CRM"));
@@ -270,6 +271,7 @@ function HeRouter() {
           <Route path={"/brain"} component={Brain} />
           <Route path={"/tu-bav"} component={TuBavBundle} />
           <Route path={"/thank-you/bundle"} component={ThankYouBundle} />
+          <Route path={"/upload-photo"} component={UploadPhoto} />
           <Route path={"/team/login"} component={TeamLogin} />
           {/* Keep /en/* routes for backward compat */}
           <Route path={"/en/database"} component={EnDatabaseSales} />
