@@ -4221,6 +4221,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             hasKids: singles.hasKids, numKids: singles.numKids, wantsKids: singles.wantsKids,
             religiosity: singles.religiosity, about: singles.about, partnerDescription: singles.partnerDescription,
             height: singles.height, minAgePreference: singles.minAgePreference, maxAgePreference: singles.maxAgePreference,
+            maritalStatus: singles.maritalStatus, shomerShabbat: singles.shomerShabbat,
+            hasPets: singles.hasPets, petType: singles.petType, acceptsPets: singles.acceptsPets,
+            locationPreference: singles.locationPreference, smokingStatus: singles.smokingStatus,
+            subscriptionStartedAt: singles.subscriptionStartedAt, subscriptionRenewsAt: singles.subscriptionRenewsAt,
+            email: singles.email, isActive: singles.isActive,
           })
             .from(singles).where(inArray(singles.id, singleIds))
         : [];
@@ -4267,6 +4272,26 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           singleAMaxAge: a?.maxAgePreference,
           singleBMinAge: b?.minAgePreference,
           singleBMaxAge: b?.maxAgePreference,
+          singleAMaritalStatus: a?.maritalStatus,
+          singleBMaritalStatus: b?.maritalStatus,
+          singleAShomerShabbat: a?.shomerShabbat,
+          singleBShomerShabbat: b?.shomerShabbat,
+          singleAHasPets: a?.hasPets,
+          singleBHasPets: b?.hasPets,
+          singleAPetType: a?.petType,
+          singleBPetType: b?.petType,
+          singleALocationPref: a?.locationPreference,
+          singleBLocationPref: b?.locationPreference,
+          singleAAcceptsPets: a?.acceptsPets,
+          singleBAcceptsPets: b?.acceptsPets,
+          singleASmokingStatus: a?.smokingStatus,
+          singleBSmokingStatus: b?.smokingStatus,
+          singleASubscriptionEnd: a?.subscriptionRenewsAt,
+          singleBSubscriptionEnd: b?.subscriptionRenewsAt,
+          singleAEmail: a?.email,
+          singleBEmail: b?.email,
+          singleAIsActive: a?.isActive,
+          singleBIsActive: b?.isActive,
         };
       });
     }),
@@ -4459,6 +4484,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           hasKids: s.hasKids,
           numKids: s.numKids,
           wantsKids: s.wantsKids,
+          shomerShabbat: s.shomerShabbat,
+          hasPets: s.hasPets,
+          petType: s.petType,
+          smokingStatus: s.smokingStatus,
+          locationPreference: s.locationPreference,
+          about: s.about,
+          partnerDescription: s.partnerDescription,
+          email: s.email,
+          occupation: s.occupation,
+          subscriptionEnd: s.subscriptionRenewsAt,
+          minAgePreference: s.minAgePreference,
+          maxAgePreference: s.maxAgePreference,
           createdAt: s.createdAt,
           waitingDays,
           lastMatchAt: lastMatchDateBySingle.get(s.id) ?? null,
@@ -4838,6 +4875,100 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const result = await storagePut(key, buffer, input.photoMime);
         await db.update(singles).set({ photoUrl: result.url, updatedAt: Date.now() }).where(eq(singles.id, input.singleId));
         return { success: true, photoUrl: result.url };
+      }),
+
+    /**
+     * Admin: comprehensive inline edit for any single's profile fields.
+     */
+    updateSingleInline: teamProcedure
+      .input(z.object({
+        id: z.number(),
+        firstName: z.string().min(1).optional(),
+        lastName: z.string().optional(),
+        age: z.number().min(18).max(120).optional(),
+        city: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().email().optional(),
+        gender: z.enum(["male", "female"]).optional(),
+        height: z.number().min(100).max(250).optional(),
+        education: z.enum(["high_school", "vocational", "technician", "student", "bachelor", "master", "phd", "other"]).optional(),
+        religiosity: z.enum(["secular", "traditional", "religious", "orthodox", "datlash"]).optional(),
+        shomerShabbat: z.boolean().optional(),
+        occupation: z.string().optional(),
+        about: z.string().optional(),
+        maritalStatus: z.enum(["single", "divorced", "widowed"]).optional(),
+        hasKids: z.boolean().optional(),
+        numKids: z.number().optional(),
+        wantsKids: z.enum(["yes", "no", "open"]).optional(),
+        hasPets: z.boolean().optional(),
+        petType: z.string().optional(),
+        acceptsPets: z.boolean().optional(),
+        locationPreference: z.enum(["close", "anywhere"]).optional(),
+        smokingStatus: z.enum(["no", "occasionally", "yes"]).optional(),
+        smokingPreference: z.enum(["no_smokers", "occasionally_ok", "doesnt_matter"]).optional(),
+        minAgePreference: z.number().optional(),
+        maxAgePreference: z.number().optional(),
+        partnerDescription: z.string().optional(),
+        acceptsKids: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { id, ...fields } = input;
+        const patch: Record<string, any> = { updatedAt: Date.now() };
+        for (const [key, val] of Object.entries(fields)) {
+          if (val !== undefined) patch[key] = val;
+        }
+        await db.update(singles).set(patch).where(eq(singles.id, id));
+        return { success: true };
+      }),
+
+    /**
+     * Admin: update match detail status (talking, dating, met, together, ended).
+     */
+    updateMatchDetailStatus: teamProcedure
+      .input(z.object({
+        matchId: z.number(),
+        status: z.enum(["talking", "dating", "met", "together", "ended"]).nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(matches).set({ matchDetailStatus: input.status, updatedAt: Date.now() }).where(eq(matches.id, input.matchId));
+        return { success: true };
+      }),
+
+    /**
+     * Admin: deactivate a single (remove from database/pool).
+     */
+    deactivateSingle: teamProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(singles).set({ isActive: false, updatedAt: Date.now() }).where(eq(singles.id, input.id));
+        return { success: true };
+      }),
+
+    /**
+     * Admin: release a match (set status to rejected, return both to pool).
+     */
+    releaseMatch: teamProcedure
+      .input(z.object({ matchId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(matches).set({
+          status: "rejected",
+          matchDetailStatus: "ended",
+          returnedToPoolAt: Date.now(),
+          updatedAt: Date.now(),
+        }).where(eq(matches.id, input.matchId));
+        return { success: true };
       }),
   }),
 

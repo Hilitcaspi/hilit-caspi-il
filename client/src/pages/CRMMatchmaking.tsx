@@ -243,6 +243,11 @@ export default function CRMMatchmaking() {
     onError: (err: any) => toast.error(err?.message || "שגיאה בשחרור מהתאמה"),
   });
 
+  const updateMatchDetailStatus = (trpc.matchmaking as any).updateMatchDetailStatus.useMutation({
+    onSuccess: () => { refetchMatches(); toast.success('סטאטוס עודכן!'); },
+    onError: () => toast.error('שגיאה בעדכון'),
+  });
+
   const sendMatchReminder = (trpc.matchmaking as any).sendMatchReminder.useMutation({
     onSuccess: () => toast.success("תזכורת נשלחה במייל! 📧"),
     onError: (err: any) => toast.error(err?.message || "שגיאה בשליחת תזכורת"),
@@ -254,6 +259,16 @@ export default function CRMMatchmaking() {
       refetchSingles();
     },
     onError: (err: any) => toast.error('שגיאה בהעלאת התמונה: ' + err.message),
+  });
+
+  const deactivateSingle = (trpc.matchmaking as any).deactivateSingle.useMutation({
+    onSuccess: () => { refetchSingles(); refetchMatches(); toast.success('הרווק/ה הוסר/ה מהמאגר'); },
+    onError: (err: any) => toast.error(err?.message || 'שגיאה בהסרה'),
+  });
+
+  const updateSingleInline = (trpc.matchmaking as any).updateSingleInline.useMutation({
+    onSuccess: () => { refetchSingles(); refetchMatches(); toast.success('פרטים עודכנו!'); },
+    onError: (err: any) => toast.error(err?.message || 'שגיאה בעדכון'),
   });
 
   if (loading) {
@@ -313,6 +328,19 @@ export default function CRMMatchmaking() {
     autoExplanation?: string | null;
     matchedAt?: number | null;
     followUpSentAt?: number | null;
+    matchDetailStatus?: string | null;
+    matchWeekFollowupSentAt?: number | null;
+    matchMonthFollowupSentAt?: number | null;
+    singleAMaritalStatus?: string | null; singleBMaritalStatus?: string | null;
+    singleAShomerShabbat?: boolean | null; singleBShomerShabbat?: boolean | null;
+    singleAHasPets?: boolean | null; singleBHasPets?: boolean | null;
+    singleAPetType?: string | null; singleBPetType?: string | null;
+    singleAAcceptsPets?: boolean | null; singleBAcceptsPets?: boolean | null;
+    singleALocationPref?: string | null; singleBLocationPref?: string | null;
+    singleASmokingStatus?: string | null; singleBSmokingStatus?: string | null;
+    singleASubscriptionEnd?: number | null; singleBSubscriptionEnd?: number | null;
+    singleAEmail?: string | null; singleBEmail?: string | null;
+    singleAIsActive?: boolean | null; singleBIsActive?: boolean | null;
   }>;
 
   const typedTokens = (tokens as unknown) as Array<{
@@ -384,9 +412,10 @@ export default function CRMMatchmaking() {
     if (m.status === "expired") return true;
     return false;
   };
-  // Show ALL matches that were ever sent to singles (have proposedAt), excluding pending
-  const isEverSent = (m: any) => {
-    return m.proposedAt != null && m.status !== "pending";
+  // "proposed" tab = only currently active proposals (status=proposed, within 48h)
+  const isActiveProposal = (m: any) => {
+    if (m.status !== "proposed") return false;
+    return true; // show all proposed regardless of time (48h countdown shown in UI)
   };
 
   // Hide pending matches where either person is already in an active proposal (within 48h)
@@ -395,9 +424,23 @@ export default function CRMMatchmaking() {
     return activeMatchSingleIds.has(m.singleAId) || activeMatchSingleIds.has(m.singleBId);
   };
 
+  // IDs of singles currently in a "matched" match (not just proposed)
+  const matchedSingleIds = new Set<number>(
+    typedMatches.filter(m => m.status === "matched").flatMap(m => [m.singleAId, m.singleBId])
+  );
+
+  // Pending tab: only show score >= 70, hide if either person is in active match OR already matched
+  const isPendingVisible = (m: any) => {
+    if (m.status !== "pending") return false;
+    if (isMatchBlocked(m)) return false;
+    if ((m.score ?? 0) < 70) return false;
+    if (matchedSingleIds.has(m.singleAId) || matchedSingleIds.has(m.singleBId)) return false;
+    return true;
+  };
+
   const matchSubCounts = {
-    pending:  typedMatches.filter(m => m.status === "pending" && !isMatchBlocked(m)).length,
-    proposed: typedMatches.filter(m => isEverSent(m)).length,
+    pending:  typedMatches.filter(m => isPendingVisible(m)).length,
+    proposed: typedMatches.filter(m => isActiveProposal(m)).length,
     matched:  typedMatches.filter(m => m.status === "matched").length,
     rejected: typedMatches.filter(m => isNoMatch(m)).length,
     expired:  0, // merged into rejected
@@ -415,8 +458,8 @@ export default function CRMMatchmaking() {
   };
 
   const filteredMatchesBySubTab = {
-    pending:  typedMatches.filter(m => m.status === "pending" && !isMatchBlocked(m)).filter(filterMatchByName),
-    proposed: typedMatches.filter(m => isEverSent(m)).filter(filterMatchByName),
+    pending:  typedMatches.filter(m => isPendingVisible(m)).filter(filterMatchByName),
+    proposed: typedMatches.filter(m => isActiveProposal(m)).filter(filterMatchByName),
     matched:  typedMatches.filter(m => m.status === "matched").filter(filterMatchByName),
     rejected: typedMatches.filter(m => isNoMatch(m)).filter(filterMatchByName),
     expired:  [],
@@ -984,15 +1027,15 @@ export default function CRMMatchmaking() {
                 const emailOpened = isA ? match.emailAOpenedAt : match.emailBOpenedAt;
                 const tokenUsed = isA ? match.tokenAUsedAt : match.tokenBUsedAt;
                 const approved = isA ? match.approvedByA : match.approvedByB;
-                const isProposed = match.status === "proposed" || match.status === "matched" || match.status === "expired";
+                const isProposed = match.status === "proposed" || match.status === "matched" || match.status === "expired" || match.status === "rejected";
                 if (!isProposed) return null;
                 if (match.status === "matched") return { icon: "❤️", label: "אישרו: התאמה!", color: "bg-green-100 text-green-800" };
-                if (approved === false) return { icon: "❌", label: "דחה/תה את ההצעה", color: "bg-red-100 text-red-700" };
+                if (approved === false) return { icon: "❌", label: "דחה/תה", color: "bg-red-100 text-red-700" };
                 if (approved === true) return { icon: "✅", label: "אישר/ה", color: "bg-emerald-100 text-emerald-800" };
-                if (match.status === "expired") return { icon: "⏰", label: "ההצעה פגה", color: "bg-gray-100 text-gray-500" };
-                if (tokenUsed) return { icon: "👀", label: "טרם השיב/ה", color: "bg-amber-100 text-amber-800" };
-                if (emailOpened) return { icon: "📧", label: "טרם השיב/ה", color: "bg-blue-100 text-blue-700" };
-                return { icon: "⏳", label: "טרם השיב/ה", color: "bg-gray-100 text-gray-500" };
+                if (match.status === "expired" || match.status === "rejected") return { icon: "⏰", label: "לא ענה", color: "bg-orange-100 text-orange-700" };
+                if (tokenUsed) return { icon: "👀", label: "צפה, טרם השיב/ה", color: "bg-amber-100 text-amber-800" };
+                if (emailOpened) return { icon: "📧", label: "פתח מייל, טרם השיב/ה", color: "bg-blue-100 text-blue-700" };
+                return { icon: "⏳", label: "לא פתח מייל", color: "bg-gray-100 text-gray-500" };
               };
 
               const statusA = getPersonStatus(true);
@@ -1010,6 +1053,10 @@ export default function CRMMatchmaking() {
                   height: match.singleAHeight, minAge: match.singleAMinAge, maxAge: match.singleAMaxAge,
                   partnerDesc: match.singleAPartnerDesc,
                   personStatus: statusA, isA: true, id: match.singleAId,
+                  maritalStatus: match.singleAMaritalStatus, shomerShabbat: match.singleAShomerShabbat,
+                  hasPets: match.singleAHasPets, petType: match.singleAPetType, acceptsPets: match.singleAAcceptsPets,
+                  locationPref: match.singleALocationPref, smokingStatus: match.singleASmokingStatus,
+                  subscriptionEnd: match.singleASubscriptionEnd, email: match.singleAEmail, isActive: match.singleAIsActive,
                 },
                 {
                   name: match.singleBName, gender: match.singleBGender, city: match.singleBCity,
@@ -1020,6 +1067,10 @@ export default function CRMMatchmaking() {
                   height: match.singleBHeight, minAge: match.singleBMinAge, maxAge: match.singleBMaxAge,
                   partnerDesc: match.singleBPartnerDesc,
                   personStatus: statusB, isA: false, id: match.singleBId,
+                  maritalStatus: match.singleBMaritalStatus, shomerShabbat: match.singleBShomerShabbat,
+                  hasPets: match.singleBHasPets, petType: match.singleBPetType, acceptsPets: match.singleBAcceptsPets,
+                  locationPref: match.singleBLocationPref, smokingStatus: match.singleBSmokingStatus,
+                  subscriptionEnd: match.singleBSubscriptionEnd, email: match.singleBEmail, isActive: match.singleBIsActive,
                 },
               ];
 
@@ -1075,6 +1126,15 @@ export default function CRMMatchmaking() {
                           <Send size={12} />שלח התאמה
                         </button>
                       )}
+                      {/* 48h countdown for proposed matches */}
+                      {match.status === "proposed" && match.proposedAt && (() => {
+                        const elapsed = Date.now() - Number(match.proposedAt);
+                        const remaining = 48 * 60 * 60 * 1000 - elapsed;
+                        if (remaining <= 0) return <span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">⏰ פג תוקף</span>;
+                        const hoursLeft = Math.floor(remaining / (1000 * 60 * 60));
+                        const minsLeft = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+                        return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${hoursLeft < 12 ? 'text-red-600 bg-red-50' : 'text-blue-600 bg-blue-50'}`}>⏱ {hoursLeft}:{String(minsLeft).padStart(2, '0')} שעות</span>;
+                      })()}
                       <span className="text-xs text-[#727272]">
                         {new Date(match.proposedAt ? Number(match.proposedAt) : (typeof match.createdAt === 'number' ? match.createdAt : match.createdAt)).toLocaleDateString("he-IL")}
                       </span>
@@ -1119,13 +1179,21 @@ export default function CRMMatchmaking() {
                               {s.occ && <p>💼 {s.occ}</p>}
                               {s.education && <p>🎓 {EDUCATION_LABELS[s.education] || s.education}</p>}
                               {s.religiosity && <p>✨ {RELIGIOSITY_LABELS[s.religiosity] || s.religiosity}</p>}
+                              {s.maritalStatus && <p>💍 {s.maritalStatus === 'single' ? 'רווק/ה' : s.maritalStatus === 'divorced' ? 'גרוש/ה' : s.maritalStatus === 'widowed' ? 'אלמן/ה' : s.maritalStatus}</p>}
                               {s.height && <p>📏 {s.height} ס"מ</p>}
                               {s.hasKids != null && (
                                 <p>👶 {s.hasKids ? `יש ילדים${s.numKids ? ` (${s.numKids})` : ""}` : "אין ילדים"}{s.wantsKids ? ` · ${wantsKidsLabel[s.wantsKids] || s.wantsKids}` : ""}</p>
                               )}
+                              {s.shomerShabbat != null && <p>🕯️ {s.shomerShabbat ? 'שומר/ת שבת' : 'לא שומר/ת שבת'}</p>}
+                              {s.hasPets != null && <p>🐾 {s.hasPets ? `יש חיית מחמד${s.petType ? ` (${s.petType})` : ''}` : 'אין חיית מחמד'}{s.acceptsPets != null ? (s.acceptsPets ? ' · מוכן/ה לחיות' : ' · לא מוכן/ה לחיות') : ''}</p>}
+                              {s.smokingStatus && <p>🚬 {s.smokingStatus === 'no' ? 'לא מעשן/ת' : s.smokingStatus === 'yes' ? 'מעשן/ת' : s.smokingStatus === 'social' ? 'חברתי' : s.smokingStatus}</p>}
+                              {s.locationPref && <p>📍 {s.locationPref === 'local' ? 'רק באזור' : s.locationPref === 'flexible' ? 'גמיש/ה למרחק' : s.locationPref}</p>}
                               {s.phone && <p>📱 {s.phone}</p>}
                               {(s.minAge || s.maxAge) && (
                                 <p>🔍 מחפש/ת גיל: {s.minAge || ""}{s.minAge && s.maxAge ? "-" : ""}{s.maxAge || ""}</p>
+                              )}
+                              {s.subscriptionEnd && (
+                                <p className={`${Date.now() > s.subscriptionEnd ? 'text-red-500 font-semibold' : ''}`}>📅 מנוי עד: {new Date(s.subscriptionEnd).toLocaleDateString('he-IL')}{Date.now() > s.subscriptionEnd ? ' (פג!)' : ''}</p>
                               )}
                             </div>
                             {/* About snippet */}
@@ -1146,6 +1214,20 @@ export default function CRMMatchmaking() {
                                 <span>{s.personStatus.label}</span>
                               </div>
                             )}
+                            {/* Action buttons: edit + deactivate */}
+                            <div className="mt-2 flex gap-1 flex-wrap">
+                              {s.email && (
+                                <a href={`mailto:${s.email}`} className="inline-flex items-center gap-0.5 bg-gray-100 text-gray-700 text-[10px] px-2 py-1 rounded hover:bg-gray-200 transition-colors">
+                                  ✉️ {s.email}
+                                </a>
+                              )}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); if (window.confirm(`להסיר את ${s.name} מהמאגר לחלוטין?`)) deactivateSingle.mutate({ singleId: s.id }); }}
+                                className="inline-flex items-center gap-0.5 bg-red-50 text-red-600 text-[10px] px-2 py-1 rounded hover:bg-red-100 transition-colors"
+                              >
+                                🚫 הסר ממאגר
+                              </button>
+                            </div>
                             {/* WhatsApp — contact this person with the other's phone number */}
                             {s.phone && (() => {
                               const otherPerson = persons.find(p => p.id !== s.id);
@@ -1363,9 +1445,36 @@ export default function CRMMatchmaking() {
                         </div>
                       )}
 
-                      {/* Release both from an active (matched) match */}
+                      {/* Match detail status + release for matched */}
                       {match.status === "matched" && (
-                        <div className="flex gap-2 mb-3">
+                        <div className="space-y-3 mb-3">
+                          {/* Detail status dropdown */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold text-[#191265]">📊 סטאטוס:</span>
+                            <select
+                              value={match.matchDetailStatus || ''}
+                              onChange={(e) => {
+                                const val = e.target.value || null;
+                                updateMatchDetailStatus.mutate({ matchId: match.id, status: val });
+                              }}
+                              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white"
+                            >
+                              <option value="">לא נקבע</option>
+                              <option value="talking">💬 מדברים</option>
+                              <option value="dating">💕 יוצאים לדייט</option>
+                              <option value="met">🤝 נפגשו</option>
+                              <option value="together">❤️ ביחד</option>
+                              <option value="ended">🚫 לא הצליח</option>
+                            </select>
+                          </div>
+                          {/* Follow-up emails sent info */}
+                          {(match.matchWeekFollowupSentAt || match.matchMonthFollowupSentAt) && (
+                            <div className="flex items-center gap-3 text-[10px] text-[#727272]">
+                              {match.matchWeekFollowupSentAt && <span>📧 פולואפ שבוע: {new Date(match.matchWeekFollowupSentAt).toLocaleDateString('he-IL')}</span>}
+                              {match.matchMonthFollowupSentAt && <span>📧 פולואפ חודש: {new Date(match.matchMonthFollowupSentAt).toLocaleDateString('he-IL')}</span>}
+                            </div>
+                          )}
+                          {/* Release button */}
                           <button
                             onClick={() => {
                               if (window.confirm(`לשחרר את ${match.singleAName} ו-${match.singleBName} מההתאמה? שניהם יחזרו למאגר לקבלת התאמות חדשות.`)) {
@@ -1512,13 +1621,44 @@ export default function CRMMatchmaking() {
                           {s.hasKids != null && ` · ${s.hasKids ? `יש ילדים${s.numKids ? ` (${s.numKids})` : ''}` : 'אין ילדים'}`}
                           {s.wantsKids && ` · ${s.wantsKids === 'yes' ? 'רוצה ילדים' : s.wantsKids === 'no' ? 'לא רוצה ילדים' : 'פתוח לנושא'}`}
                         </p>
-                        {s.phone && (
-                          <a href={`https://wa.me/${s.phone.replace(/[^0-9]/g, '').replace(/^0/, '972')}`}
-                            target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 mt-1 text-xs text-green-600 hover:text-green-700">
-                            📱 {s.phone}
-                          </a>
+                        <p className="text-xs text-[#727272]">
+                          {s.shomerShabbat != null && `שבת: ${s.shomerShabbat ? 'כן' : 'לא'}`}
+                          {s.smokingStatus && ` · עישון: ${s.smokingStatus === 'no' ? 'לא מעשן' : s.smokingStatus === 'sometimes' ? 'לפעמים' : 'מעשן'}`}
+                          {s.hasPets != null && ` · חיות: ${s.hasPets ? (s.petType || 'כן') : 'אין'}`}
+                          {s.locationPreference && ` · מרחק: ${s.locationPreference}`}
+                        </p>
+                        {s.occupation && <p className="text-xs text-[#727272]">💼 {s.occupation}</p>}
+                        {(s.minAgePreference || s.maxAgePreference) && (
+                          <p className="text-xs text-[#727272]">🔍 מחפש/ת גיל: {s.minAgePreference || ''}{s.minAgePreference && s.maxAgePreference ? '-' : ''}{s.maxAgePreference || ''}</p>
                         )}
+                        {s.subscriptionEnd && (
+                          <p className={`text-xs ${Date.now() > s.subscriptionEnd ? 'text-red-500 font-semibold' : 'text-[#727272]'}`}>
+                            📅 מנוי עד: {new Date(s.subscriptionEnd).toLocaleDateString('he-IL')}{Date.now() > s.subscriptionEnd ? ' (פג!)' : ''}
+                          </p>
+                        )}
+                        {s.about && <p className="text-xs text-[#727272] mt-1 italic line-clamp-2">"על עצמי: {s.about}"</p>}
+                        {s.partnerDescription && <p className="text-xs text-[#727272] mt-0.5 line-clamp-2">💖 מחפש/ת: {s.partnerDescription}</p>}
+                        <div className="flex gap-1 mt-1.5 flex-wrap">
+                          {s.phone && (
+                            <a href={`https://wa.me/${s.phone.replace(/[^0-9]/g, '').replace(/^0/, '972')}`}
+                              target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-0.5 bg-green-50 text-green-700 text-[10px] px-2 py-1 rounded hover:bg-green-100 transition-colors">
+                              📱 {s.phone}
+                            </a>
+                          )}
+                          {s.email && (
+                            <a href={`mailto:${s.email}`}
+                              className="inline-flex items-center gap-0.5 bg-gray-100 text-gray-700 text-[10px] px-2 py-1 rounded hover:bg-gray-200 transition-colors">
+                              ✉️ {s.email}
+                            </a>
+                          )}
+                          <button
+                            onClick={() => { if (window.confirm(`להסיר את ${s.firstName} ${s.lastName || ''} מהמאגר?`)) deactivateSingle.mutate({ singleId: s.id }); }}
+                            className="inline-flex items-center gap-0.5 bg-red-50 text-red-600 text-[10px] px-2 py-1 rounded hover:bg-red-100 transition-colors"
+                          >
+                            🚫 הסר
+                          </button>
+                        </div>
                       </div>
                     </div>
 

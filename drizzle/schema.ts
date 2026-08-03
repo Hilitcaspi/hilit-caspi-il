@@ -249,6 +249,8 @@ export const matches = mysqlTable("matches", {
   matchMonthFollowupSentAt: bigint("matchMonthFollowupSentAt", { mode: "number" }),
   // When singles explicitly returned to the pool (null = still out)
   returnedToPoolAt: bigint("returnedToPoolAt", { mode: "number" }),
+  // Post-match detailed status (set by admin)
+  matchDetailStatus: mysqlEnum("matchDetailStatus", ["talking", "dating", "met", "together", "ended"]),
 
   createdAt: timestamp("createdAt").defaultNow(),
   updatedAt: bigint("updatedAt", { mode: "number" }).default(0),

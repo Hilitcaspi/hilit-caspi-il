@@ -1,0 +1,1 @@
+ALTER TABLE `matches` ADD `matchDetailStatus` enum('talking','dating','met','together','ended');
