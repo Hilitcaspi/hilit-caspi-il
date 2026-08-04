@@ -147,6 +147,10 @@ export const singles = mysqlTable("singles", {
   consentDataSharing: boolean("consentDataSharing").default(false).notNull(), // agrees profile shared with matches
   consentEmailMarketing: boolean("consentEmailMarketing").default(false).notNull(), // agrees to marketing emails
 
+  // CRM flags
+  isCoachingClient: boolean("isCoachingClient").default(false).notNull(), // pink highlight - coaching client
+  isNotBasic: boolean("isNotBasic").default(false).notNull(), // "לאו בסיסי" flag
+
   createdAt: bigint("createdAt", { mode: "number" }).notNull().default(0),
   updatedAt: bigint("updatedAt", { mode: "number" }).notNull().default(0),
 });

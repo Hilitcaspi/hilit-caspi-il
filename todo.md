@@ -340,3 +340,18 @@
 - [x] Send email to each with personal upload link (via Brevo) - 30 sent successfully
 - [x] Send SMS to each directing to check email (via Vibrate) - 30 sent successfully
 - [x] Fixed Vibrate API: correct URL is api.vibrate.co.il (not app.vibrate.co.il), field is 'message' not 'body'
+
+## CRM Phase 2 - Coaching Client Highlights & Improvements (Aug 4)
+- [x] DB: Add isCoachingClient column (boolean, pink highlight for coaching clients)
+- [x] DB: Add isNotBasic column (boolean, "לאו בסיסי" flag)
+- [x] Server: toggleCoachingClient procedure
+- [x] Server: toggleNotBasic procedure
+- [x] Server: getNonResponseCounts procedure (serial non-responder detection)
+- [x] Server: Add isCoachingClient, isNotBasic, updatedAt to listPendingMatches and getSinglesWithoutMatches returns
+- [x] Frontend: Pink highlight/border for coaching clients across all tabs (singles, matches, unmatched)
+- [x] Frontend: Coaching client badge (💜 מלווה) on all person cards
+- [x] Frontend: "לא בסיסי" badge (⭐) on all person cards
+- [x] Frontend: Toggle buttons for coaching client and not-basic in singles list
+- [x] Frontend: Serial non-responder badge (🚨 לא עונה) for 3+ non-responses
+- [x] Frontend: Separate "לא ענו" tab from "דחו" tab in matches
+- [x] Frontend: "עודכנו החודש" filter in singles tab

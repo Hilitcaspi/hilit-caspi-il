@@ -95,9 +95,10 @@ export default function CRMMatchmaking() {
   const [compatDropdownB, setCompatDropdownB] = useState(false);
   const [compatResult, setCompatResult] = useState<any>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [matchSubTab, setMatchSubTab] = useState<"pending" | "proposed" | "matched" | "rejected" | "expired" | "followup">("pending");
+  const [matchSubTab, setMatchSubTab] = useState<"pending" | "proposed" | "matched" | "rejected" | "no_response" | "expired" | "followup">("pending");
   const [matchSearch, setMatchSearch] = useState("");
   const [hideProposed, setHideProposed] = useState(false); // show all singles by default
+  const [showOnlyUpdatedThisMonth, setShowOnlyUpdatedThisMonth] = useState(false);
   const [photoUploadSingleId, setPhotoUploadSingleId] = useState<number | null>(null);
   const [topMatchesPage, setTopMatchesPage] = useState<Record<number, number>>({}); // singleId -> page (0=first 3, 1=next 3, etc.)
 
@@ -270,6 +271,19 @@ export default function CRMMatchmaking() {
     onSuccess: () => { refetchSingles(); refetchMatches(); toast.success('פרטים עודכנו!'); },
     onError: (err: any) => toast.error(err?.message || 'שגיאה בעדכון'),
   });
+  const toggleCoachingClient = (trpc.matchmaking as any).toggleCoachingClient.useMutation({
+    onSuccess: () => { refetchSingles(); refetchMatches(); refetchUnmatched(); toast.success('עודכן!'); },
+    onError: () => toast.error('שגיאה'),
+  });
+  const toggleNotBasic = (trpc.matchmaking as any).toggleNotBasic.useMutation({
+    onSuccess: () => { refetchSingles(); refetchMatches(); refetchUnmatched(); toast.success('עודכן!'); },
+    onError: () => toast.error('שגיאה'),
+  });
+
+  // Non-response counts for serial non-responder badge
+  const { data: nonResponseCounts = {} } = (trpc.matchmaking as any).getNonResponseCounts.useQuery(undefined, {
+    enabled: !!user && user.role === "admin",
+  }) as { data: Record<number, number> };
 
   if (loading) {
     return <div className="min-h-screen bg-[#f0eadc] flex items-center justify-center" dir="rtl"><div className="text-[#191265]">טוענת...</div></div>;
@@ -407,6 +421,16 @@ export default function CRMMatchmaking() {
   const now14daysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
   // "proposed" tab = ALL matches that were ever sent (proposedAt is set, not pending)
   // "no_match" tab = rejected OR expired only
+  const isRejected = (m: any) => {
+    if (m.status !== "rejected" && m.status !== "expired") return false;
+    // At least one side explicitly rejected
+    return m.approvedByA === false || m.approvedByB === false;
+  };
+  const isNoResponse = (m: any) => {
+    if (m.status !== "rejected" && m.status !== "expired") return false;
+    // Neither side explicitly rejected - both just didn't respond
+    return m.approvedByA !== false && m.approvedByB !== false;
+  };
   const isNoMatch = (m: any) => {
     if (m.status === "rejected") return true;
     if (m.status === "expired") return true;
@@ -442,7 +466,8 @@ export default function CRMMatchmaking() {
     pending:  typedMatches.filter(m => isPendingVisible(m)).length,
     proposed: typedMatches.filter(m => isActiveProposal(m)).length,
     matched:  typedMatches.filter(m => m.status === "matched").length,
-    rejected: typedMatches.filter(m => isNoMatch(m)).length,
+    rejected: typedMatches.filter(m => isRejected(m)).length,
+    no_response: typedMatches.filter(m => isNoResponse(m)).length,
     expired:  0, // merged into rejected
     followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo).length,
   };
@@ -461,7 +486,8 @@ export default function CRMMatchmaking() {
     pending:  typedMatches.filter(m => isPendingVisible(m)).filter(filterMatchByName),
     proposed: typedMatches.filter(m => isActiveProposal(m)).filter(filterMatchByName),
     matched:  typedMatches.filter(m => m.status === "matched").filter(filterMatchByName),
-    rejected: typedMatches.filter(m => isNoMatch(m)).filter(filterMatchByName),
+    rejected: typedMatches.filter(m => isRejected(m)).filter(filterMatchByName),
+    no_response: typedMatches.filter(m => isNoResponse(m)).filter(filterMatchByName),
     expired:  [],
     followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo).filter(filterMatchByName),
   };
@@ -477,6 +503,13 @@ export default function CRMMatchmaking() {
   const filteredSingles = typedSingles
     .filter(s => {
       if (hideProposed && proposedSingleIds.has(s.id)) return false;
+      if (showOnlyUpdatedThisMonth) {
+        const updAt = (s as any).updatedAt;
+        if (!updAt) return false;
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        if (updAt < startOfMonth) return false;
+      }
       if (!singlesSearch.trim()) return true;
       const q = singlesSearch.toLowerCase();
       const fullName = `${s.firstName} ${s.lastName || ""}`.toLowerCase();
@@ -612,6 +645,17 @@ export default function CRMMatchmaking() {
               >
                 {hideProposed ? `🔍 ללא הצעה פעילה (${filteredSingles.length})` : `👥 הכל (${filteredSingles.length})`}
               </button>
+              <button
+                onClick={() => setShowOnlyUpdatedThisMonth(v => !v)}
+                className={`flex-shrink-0 text-xs px-2 py-1 rounded-full border transition-colors ${
+                  showOnlyUpdatedThisMonth
+                    ? "bg-[#191265] text-white border-[#191265]"
+                    : "bg-white text-[#727272] border-gray-300 hover:border-[#191265]"
+                }`}
+                title={showOnlyUpdatedThisMonth ? "מציג רק מי שעודכן החודש" : "סנן לפי עדכון אחרון"}
+              >
+                {showOnlyUpdatedThisMonth ? "📅 עודכנו החודש" : "📅 עודכנו החודש"}
+              </button>
             </div>
 
             {filteredSingles.length === 0 && (
@@ -621,7 +665,7 @@ export default function CRMMatchmaking() {
               </div>
             )}
             {filteredSingles.map(single => (
-              <div key={single.id} className={`bg-white rounded-xl p-4 shadow-sm border-r-4 ${single.isActive ? "border-green-400" : "border-gray-200"}`}>
+              <div key={single.id} className={`rounded-xl p-4 shadow-sm border-r-4 ${(single as any).isCoachingClient ? "bg-pink-50 border-pink-400 ring-1 ring-pink-200" : single.isActive ? "bg-white border-green-400" : "bg-white border-gray-200"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -640,6 +684,13 @@ export default function CRMMatchmaking() {
                         </button>
                       )}
                       <span className="font-bold text-[#191265]">{single.firstName} {single.lastName || ""}</span>
+                      {(single as any).isCoachingClient && <span className="text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
+                      {(single as any).isNotBasic && <span className="text-[9px] bg-purple-200 text-purple-800 font-bold px-1.5 py-0.5 rounded-full">⭐ לא בסיסי</span>}
+                      {((nonResponseCounts as Record<number, number>)[single.id] ?? 0) >= 3 && (
+                        <span className="text-[9px] bg-red-200 text-red-800 font-bold px-1.5 py-0.5 rounded-full" title={`לא ענה ${(nonResponseCounts as Record<number, number>)[single.id]} פעמים`}>
+                          🚨 לא עונה ({(nonResponseCounts as Record<number, number>)[single.id]})
+                        </span>
+                      )}
                       <Badge className="text-xs bg-[#191265]/10 text-[#191265]">{GENDER_LABELS[single.gender] || single.gender}</Badge>
                       <span className="text-sm text-[#727272]">{displayAge(single.age)}</span>
                       {single.city && <span className="text-sm text-[#727272]">📍 {single.city}</span>}
@@ -669,7 +720,31 @@ export default function CRMMatchmaking() {
                       {single.phone && <span>📞 {single.phone}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => toggleCoachingClient.mutate({ id: single.id })}
+                      disabled={toggleCoachingClient.isPending}
+                      className={`text-[10px] px-2 py-1 rounded-full font-semibold transition-all ${
+                        (single as any).isCoachingClient
+                          ? "bg-pink-200 text-pink-800 hover:bg-pink-300"
+                          : "bg-gray-100 text-gray-500 hover:bg-pink-100 hover:text-pink-700"
+                      }`}
+                      title={(single as any).isCoachingClient ? "הסר סימון מלווה" : "סמן כמלווה"}
+                    >
+                      {(single as any).isCoachingClient ? "💜 מלווה" : "💜"}
+                    </button>
+                    <button
+                      onClick={() => toggleNotBasic.mutate({ id: single.id })}
+                      disabled={toggleNotBasic.isPending}
+                      className={`text-[10px] px-2 py-1 rounded-full font-semibold transition-all ${
+                        (single as any).isNotBasic
+                          ? "bg-purple-200 text-purple-800 hover:bg-purple-300"
+                          : "bg-gray-100 text-gray-500 hover:bg-purple-100 hover:text-purple-700"
+                      }`}
+                      title={(single as any).isNotBasic ? "הסר סימון לא בסיסי" : "סמן כלא בסיסי"}
+                    >
+                      {(single as any).isNotBasic ? "⭐ לא בסיסי" : "⭐"}
+                    </button>
                     <button
                       onClick={() => toggleActive.mutate({ singleId: single.id, isActive: !single.isActive })}
                       className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${
@@ -950,7 +1025,8 @@ export default function CRMMatchmaking() {
                 { id: "pending"  as const, label: "ממתין לשליחה",    icon: "⏳", count: matchSubCounts.pending },
                 { id: "proposed" as const, label: "נשלחו הצעות",      icon: "📨", count: matchSubCounts.proposed },
                 { id: "matched"  as const, label: "יש התאמה",        icon: "💛", count: matchSubCounts.matched },
-                { id: "rejected" as const, label: "אין התאמה",       icon: "❌", count: matchSubCounts.rejected },
+                { id: "rejected" as const, label: "דחו",             icon: "❌", count: matchSubCounts.rejected },
+                { id: "no_response" as const, label: "לא ענו",       icon: "🚨", count: matchSubCounts.no_response },
                 { id: "followup" as const, label: "מעקב אחרי התאמה", icon: "🔔", count: matchSubCounts.followup },
               ] as const).map(st => (
                 <button
@@ -990,7 +1066,12 @@ export default function CRMMatchmaking() {
             )}
             {matchSubTab === "rejected" && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-800">
-                ❌ <strong>אין התאמה</strong> — כולל: דחיות, הצעות שפג תוקפן, ומקרים שאחד אישר ואחד דחה. ניתן לראות מי עשה מה ליד כל שם.
+                ❌ <strong>דחו</strong> — התאמות שלפחות אחד מהצדדים דחה במפורש.
+              </div>
+            )}
+            {matchSubTab === "no_response" && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-orange-800">
+                🚨 <strong>לא ענו</strong> — התאמות שפג תוקפן בלי שאף צד דחה במפורש — פשוט לא הגיבו.
               </div>
             )}
             {matchSubTab === "followup" && (
@@ -1057,6 +1138,7 @@ export default function CRMMatchmaking() {
                   hasPets: match.singleAHasPets, petType: match.singleAPetType, acceptsPets: match.singleAAcceptsPets,
                   locationPref: match.singleALocationPref, smokingStatus: match.singleASmokingStatus,
                   subscriptionEnd: match.singleASubscriptionEnd, email: match.singleAEmail, isActive: match.singleAIsActive,
+                  isCoachingClient: (match as any).singleAIsCoachingClient, isNotBasic: (match as any).singleAIsNotBasic, updatedAt: (match as any).singleAUpdatedAt,
                 },
                 {
                   name: match.singleBName, gender: match.singleBGender, city: match.singleBCity,
@@ -1071,11 +1153,14 @@ export default function CRMMatchmaking() {
                   hasPets: match.singleBHasPets, petType: match.singleBPetType, acceptsPets: match.singleBAcceptsPets,
                   locationPref: match.singleBLocationPref, smokingStatus: match.singleBSmokingStatus,
                   subscriptionEnd: match.singleBSubscriptionEnd, email: match.singleBEmail, isActive: match.singleBIsActive,
+                  isCoachingClient: (match as any).singleBIsCoachingClient, isNotBasic: (match as any).singleBIsNotBasic, updatedAt: (match as any).singleBUpdatedAt,
                 },
               ];
 
+              const hasCoachingClient = (match as any).singleAIsCoachingClient || (match as any).singleBIsCoachingClient;
+
               return (
-                <div key={match.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div key={match.id} className={`rounded-xl shadow-sm overflow-hidden ${hasCoachingClient ? "bg-pink-50 border border-pink-200 ring-1 ring-pink-100" : "bg-white border border-gray-100"}`}>
                   {/* Header */}
                   <div
                     className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -1148,7 +1233,7 @@ export default function CRMMatchmaking() {
                       {/* Two profile cards side by side */}
                       <div className="grid grid-cols-2 gap-3 mb-4">
                         {persons.map((s, i) => (
-                          <div key={i} className="bg-[#f8f6f0] rounded-xl p-3">
+                          <div key={i} className={`rounded-xl p-3 ${(s as any).isCoachingClient ? 'bg-pink-50 ring-1 ring-pink-200' : 'bg-[#f8f6f0]'}`}>
                             {/* Photo + name */}
                             <div className="flex items-start gap-3 mb-2">
                               {s.photo ? (
@@ -1169,7 +1254,11 @@ export default function CRMMatchmaking() {
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="font-bold text-[#191265] text-sm truncate">{s.name || `#${s.id}`}</p>
+                                <p className="font-bold text-[#191265] text-sm truncate">
+                                  {s.name || `#${s.id}`}
+                                  {(s as any).isCoachingClient && <span className="ml-1 text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
+                                  {(s as any).isNotBasic && <span className="ml-1 text-[9px] bg-purple-200 text-purple-800 font-bold px-1.5 py-0.5 rounded-full">⭐ לא בסיסי</span>}
+                                </p>
                                 <p className="text-xs text-[#727272]">{s.gender ? GENDER_LABELS[s.gender] : ""} · {displayAge(s.age)} · {s.city}</p>
                                 {s.dna && <p className="text-xs text-[#1800ad] font-medium">{DNA_LABELS[s.dna] || s.dna}</p>}
                               </div>
@@ -1576,7 +1665,7 @@ export default function CRMMatchmaking() {
               </div>
             ) : (
               (singlesWithoutMatches as any[]).map((s: any) => (
-                <div key={s.id} className="bg-white rounded-xl shadow-sm border border-orange-100 overflow-hidden">
+                <div key={s.id} className={`rounded-xl shadow-sm overflow-hidden ${s.isCoachingClient ? 'bg-pink-50 border border-pink-200 ring-1 ring-pink-100' : 'bg-white border border-orange-100'}`}>
                   <div className="p-4">
                     {/* Person header */}
                     <div className="flex items-start gap-3 mb-3">
@@ -1596,6 +1685,8 @@ export default function CRMMatchmaking() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-bold text-[#191265]">{s.firstName} {s.lastName || ''}</p>
+                          {s.isCoachingClient && <span className="text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
+                          {s.isNotBasic && <span className="text-[9px] bg-purple-200 text-purple-800 font-bold px-1.5 py-0.5 rounded-full">⭐ לא בסיסי</span>}
                           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
                             ⏳ {s.waitingDays} ימים במאגר
                           </span>

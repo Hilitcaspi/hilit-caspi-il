@@ -4226,6 +4226,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             locationPreference: singles.locationPreference, smokingStatus: singles.smokingStatus,
             subscriptionStartedAt: singles.subscriptionStartedAt, subscriptionRenewsAt: singles.subscriptionRenewsAt,
             email: singles.email, isActive: singles.isActive,
+            isCoachingClient: singles.isCoachingClient, isNotBasic: singles.isNotBasic, updatedAt: singles.updatedAt,
           })
             .from(singles).where(inArray(singles.id, singleIds))
         : [];
@@ -4292,6 +4293,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           singleBEmail: b?.email,
           singleAIsActive: a?.isActive,
           singleBIsActive: b?.isActive,
+          singleAIsCoachingClient: a?.isCoachingClient,
+          singleBIsCoachingClient: b?.isCoachingClient,
+          singleAIsNotBasic: a?.isNotBasic,
+          singleBIsNotBasic: b?.isNotBasic,
+          singleAUpdatedAt: a?.updatedAt,
+          singleBUpdatedAt: b?.updatedAt,
         };
       });
     }),
@@ -4496,6 +4503,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           subscriptionEnd: s.subscriptionRenewsAt,
           minAgePreference: s.minAgePreference,
           maxAgePreference: s.maxAgePreference,
+          isCoachingClient: s.isCoachingClient,
+          isNotBasic: s.isNotBasic,
+          updatedAt: s.updatedAt,
           createdAt: s.createdAt,
           waitingDays,
           lastMatchAt: lastMatchDateBySingle.get(s.id) ?? null,
@@ -4969,6 +4979,66 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           updatedAt: Date.now(),
         }).where(eq(matches.id, input.matchId));
         return { success: true };
+      }),
+
+    // Toggle coaching client flag (pink highlight)
+    toggleCoachingClient: teamProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [current] = await db.select({ isCoachingClient: singles.isCoachingClient }).from(singles).where(eq(singles.id, input.id));
+        if (!current) throw new TRPCError({ code: "NOT_FOUND" });
+        const newVal = !current.isCoachingClient;
+        await db.update(singles).set({ isCoachingClient: newVal, updatedAt: Date.now() }).where(eq(singles.id, input.id));
+        return { success: true, isCoachingClient: newVal };
+      }),
+
+    // Toggle "not basic" flag
+    toggleNotBasic: teamProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [current] = await db.select({ isNotBasic: singles.isNotBasic }).from(singles).where(eq(singles.id, input.id));
+        if (!current) throw new TRPCError({ code: "NOT_FOUND" });
+        const newVal = !current.isNotBasic;
+        await db.update(singles).set({ isNotBasic: newVal, updatedAt: Date.now() }).where(eq(singles.id, input.id));
+        return { success: true, isNotBasic: newVal };
+      }),
+
+    // Count non-responses per single (for serial non-responder badge)
+    getNonResponseCounts: teamProcedure
+      .query(async ({ ctx }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        // Find matches where status is rejected/expired but neither side explicitly rejected
+        const allExpired = await db.select({
+          singleAId: matches.singleAId,
+          singleBId: matches.singleBId,
+          approvedByA: matches.approvedByA,
+          approvedByB: matches.approvedByB,
+        }).from(matches).where(
+          and(
+            or(eq(matches.status, "rejected"), eq(matches.status, "expired")),
+            ne(matches.approvedByA, true),
+            ne(matches.approvedByB, true)
+          )
+        );
+        // Count per single how many times they didn't respond
+        const counts: Record<number, number> = {};
+        for (const m of allExpired) {
+          if (m.approvedByA !== true) {
+            counts[m.singleAId] = (counts[m.singleAId] || 0) + 1;
+          }
+          if (m.approvedByB !== true) {
+            counts[m.singleBId] = (counts[m.singleBId] || 0) + 1;
+          }
+        }
+        return counts;
       }),
   }),
 
