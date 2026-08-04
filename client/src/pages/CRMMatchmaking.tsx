@@ -55,6 +55,67 @@ const MATCH_STATUS_CONFIG: Record<string, { label: string; color: string; icon: 
   expired:  { label: "פג תוקף", color: "bg-gray-100 text-gray-500",     icon: "⌛" },
 };
 
+// Internal admin notes component - editable textarea per single
+function AdminNotesField({ singleId }: { singleId: number }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const trpcUtils = trpc.useUtils();
+  const notesQuery = trpc.matchmaking.getAdminNotes.useQuery({ id: singleId });
+  const updateNotes = trpc.matchmaking.updateAdminNotes.useMutation({
+    onSuccess: () => {
+      trpcUtils.matchmaking.getAdminNotes.invalidate({ id: singleId });
+      setIsEditing(false);
+    },
+  });
+
+  const currentNotes = notesQuery.data?.notes || "";
+
+  return (
+    <div className="mt-3 pt-3 border-t border-[#e9e8e8]">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-bold text-[#191265]">📝 הערות פנימיות</span>
+        {!isEditing && (
+          <button
+            onClick={() => { setDraft(currentNotes); setIsEditing(true); }}
+            className="text-xs text-[#191265] underline hover:text-[#ffe27c] transition-colors"
+          >
+            ערוך
+          </button>
+        )}
+      </div>
+      {isEditing ? (
+        <div className="space-y-1">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            className="w-full text-sm border border-[#191265]/20 rounded-lg p-2 min-h-[60px] resize-y focus:outline-none focus:ring-2 focus:ring-[#ffe27c]"
+            placeholder="הערות פנימיות על המלווה (רק את רואה)..."
+            dir="rtl"
+            maxLength={2000}
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setIsEditing(false)}
+              className="text-xs px-3 py-1 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+            >
+              ביטול
+            </button>
+            <button
+              onClick={() => updateNotes.mutate({ id: singleId, notes: draft })}
+              disabled={updateNotes.isPending}
+              className="text-xs px-3 py-1 rounded-lg bg-[#191265] text-white hover:bg-[#1800ad] transition-colors disabled:opacity-50"
+            >
+              {updateNotes.isPending ? "שומר..." : "שמור"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-[#727272] whitespace-pre-wrap">{currentNotes || "אין הערות עדיין"}</p>
+      )}
+    </div>
+  );
+}
+
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "live_event" | "filter_search">("singles");
@@ -685,7 +746,7 @@ export default function CRMMatchmaking() {
                       )}
                       <span className="font-bold text-[#191265]">{single.firstName} {single.lastName || ""}</span>
                       {(single as any).isCoachingClient && <span className="text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
-                      {(single as any).isNotBasic && <span className="text-[9px] bg-purple-200 text-purple-800 font-bold px-1.5 py-0.5 rounded-full">⭐ לא בסיסי</span>}
+                      {(single as any).isNotBasic && <span className="text-[9px] bg-amber-200 text-amber-800 font-bold px-1.5 py-0.5 rounded-full">⭐ דורש תשומת לב</span>}
                       {((nonResponseCounts as Record<number, number>)[single.id] ?? 0) >= 3 && (
                         <span className="text-[9px] bg-red-200 text-red-800 font-bold px-1.5 py-0.5 rounded-full" title={`לא ענה ${(nonResponseCounts as Record<number, number>)[single.id]} פעמים`}>
                           🚨 לא עונה ({(nonResponseCounts as Record<number, number>)[single.id]})
@@ -741,9 +802,9 @@ export default function CRMMatchmaking() {
                           ? "bg-purple-200 text-purple-800 hover:bg-purple-300"
                           : "bg-gray-100 text-gray-500 hover:bg-purple-100 hover:text-purple-700"
                       }`}
-                      title={(single as any).isNotBasic ? "הסר סימון לא בסיסי" : "סמן כלא בסיסי"}
+                      title={(single as any).isNotBasic ? "הסר סימון דורש תשומת לב" : "סמן כדורש תשומת לב"}
                     >
-                      {(single as any).isNotBasic ? "⭐ לא בסיסי" : "⭐"}
+                      {(single as any).isNotBasic ? "⭐ דורש תשומת לב" : "⭐"}
                     </button>
                     <button
                       onClick={() => toggleActive.mutate({ singleId: single.id, isActive: !single.isActive })}
@@ -842,6 +903,9 @@ export default function CRMMatchmaking() {
                         <p className="text-[#727272] mt-0.5">{single.partnerDescription}</p>
                       </div>
                     )}
+
+                    {/* Admin Notes - internal only */}
+                    <AdminNotesField singleId={single.id} />
 
                     {/* Top Matches Panel with pagination */}
                     {(() => {
@@ -1273,7 +1337,7 @@ export default function CRMMatchmaking() {
                                 <p className="font-bold text-[#191265] text-sm truncate">
                                   {s.name || `#${s.id}`}
                                   {(s as any).isCoachingClient && <span className="ml-1 text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
-                                  {(s as any).isNotBasic && <span className="ml-1 text-[9px] bg-purple-200 text-purple-800 font-bold px-1.5 py-0.5 rounded-full">⭐ לא בסיסי</span>}
+                                  {(s as any).isNotBasic && <span className="ml-1 text-[9px] bg-amber-200 text-amber-800 font-bold px-1.5 py-0.5 rounded-full">⭐ דורש תשומת לב</span>}
                                 </p>
                                 <p className="text-xs text-[#727272]">{s.gender ? GENDER_LABELS[s.gender] : ""} · {displayAge(s.age)} · {s.city}</p>
                                 {s.dna && <p className="text-xs text-[#1800ad] font-medium">{DNA_LABELS[s.dna] || s.dna}</p>}
@@ -1702,7 +1766,7 @@ export default function CRMMatchmaking() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-bold text-[#191265]">{s.firstName} {s.lastName || ''}</p>
                           {s.isCoachingClient && <span className="text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
-                          {s.isNotBasic && <span className="text-[9px] bg-purple-200 text-purple-800 font-bold px-1.5 py-0.5 rounded-full">⭐ לא בסיסי</span>}
+                          {s.isNotBasic && <span className="text-[9px] bg-amber-200 text-amber-800 font-bold px-1.5 py-0.5 rounded-full">⭐ דורש תשומת לב</span>}
                           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
                             ⏳ {s.waitingDays} ימים במאגר
                           </span>

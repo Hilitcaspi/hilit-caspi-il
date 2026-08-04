@@ -5066,6 +5066,28 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
         return counts;
       }),
+
+    // Update admin notes for a single (internal only, never sent to clients)
+    updateAdminNotes: teamProcedure
+      .input(z.object({ id: z.number(), notes: z.string().max(2000) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(singles).set({ adminNotes: input.notes, updatedAt: Date.now() }).where(eq(singles.id, input.id));
+        return { success: true };
+      }),
+
+    // Get admin notes for a single
+    getAdminNotes: teamProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [row] = await db.select({ adminNotes: singles.adminNotes }).from(singles).where(eq(singles.id, input.id));
+        return { notes: row?.adminNotes || "" };
+      }),
   }),
 
   // ── Invite Tokens (Hilit sends free access manually) ──────────────────────

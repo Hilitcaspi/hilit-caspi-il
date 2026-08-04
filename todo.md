@@ -359,3 +359,10 @@
 ## Bug Fixes & Improvements (Aug 4 - continued)
 - [x] Fix ברק פרץ (ID 20100001): change gender to male, seekingGender to female, run matching
 - [x] Enrich suggestion cards in "ללא התאמה" tab with full details (height, education, religiosity, maritalStatus, hasKids, wantsKids, shomerShabbat, about, partnerDescription, etc.)
+
+## CRM Improvements - Internal Notes & Label Changes (Aug 4)
+- [x] Change ⭐ label from "לא בסיסי" to "דורש תשומת לב" across all UI
+- [x] Add adminNotes column to singles table (text, nullable) for internal notes
+- [x] Server: Add updateAdminNotes procedure (save/update notes per single)
+- [x] Frontend: Add editable notes field in the expanded single card (visible only in CRM)
+- [x] Verify coaching/attention badges do NOT appear in any match emails/SMS/public pages (confirmed: not in emailTemplates, not in WhatsApp messages, not in any public-facing client pages)

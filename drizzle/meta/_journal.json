@@ -43,6 +43,13 @@
       "when": 1785824744942,
       "tag": "0005_first_prism",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1785842699795,
+      "tag": "0006_old_wolfsbane",
+      "breakpoints": true
     }
   ]
 }
