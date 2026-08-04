@@ -902,9 +902,25 @@ export default function CRMMatchmaking() {
                                         </div>
                                       )}
                                       <p className="text-xs font-bold text-[#191265] truncate">{m.opponent?.name || `#${m.opponent?.id}`}</p>
-                                      <p className="text-[10px] text-[#727272]">{displayAge(m.opponent?.age)} · {m.opponent?.city || ""}</p>
+                                      <p className="text-[10px] text-[#727272]">{displayAge(m.opponent?.age)} · {m.opponent?.city || ""}{m.opponent?.height ? ` · ${m.opponent.height} ס"מ` : ''}</p>
+                                      <div className="text-[9px] text-[#727272] mt-0.5">
+                                        {m.opponent?.maritalStatus && <span>{MARITAL_LABELS[m.opponent.maritalStatus] || m.opponent.maritalStatus}</span>}
+                                        {m.opponent?.religiosity && <span> · {RELIGIOSITY_LABELS[m.opponent.religiosity] || m.opponent.religiosity}</span>}
+                                        {m.opponent?.education && <span> · {EDUCATION_LABELS[m.opponent.education] || m.opponent.education}</span>}
+                                      </div>
+                                      <div className="text-[9px] text-[#727272]">
+                                        {m.opponent?.hasKids != null && <span>{m.opponent.hasKids ? `ילדים${m.opponent.numKids ? ` (${m.opponent.numKids})` : ''}` : 'אין ילדים'}</span>}
+                                        {m.opponent?.wantsKids && <span> · {m.opponent.wantsKids === 'yes' ? 'רוצה ילדים' : m.opponent.wantsKids === 'no' ? 'לא רוצה' : 'פתוח'}</span>}
+                                      </div>
+                                      {m.opponent?.occupation && <p className="text-[9px] text-[#727272]">💼 {m.opponent.occupation}</p>}
                                       {m.opponent?.dnaType && (
-                                        <p className="text-[10px] text-[#1800ad] font-medium">{DNA_LABELS[m.opponent.dnaType] || m.opponent.dnaType}</p>
+                                        <p className="text-[10px] text-[#1800ad] font-medium">🧬 {DNA_LABELS[m.opponent.dnaType] || m.opponent.dnaType}</p>
+                                      )}
+                                      {m.opponent?.about && (
+                                        <p className="text-[9px] text-[#555] mt-0.5" title={m.opponent.about}>על עצמי: {m.opponent.about.length > 50 ? m.opponent.about.substring(0, 50) + '...' : m.opponent.about}</p>
+                                      )}
+                                      {m.opponent?.partnerDescription && (
+                                        <p className="text-[9px] text-[#555]" title={m.opponent.partnerDescription}>מחפש/ת: {m.opponent.partnerDescription.length > 50 ? m.opponent.partnerDescription.substring(0, 50) + '...' : m.opponent.partnerDescription}</p>
                                       )}
                                       <div className="mt-1.5 bg-[#ffe27c] text-[#191265] font-black text-xs px-2 py-0.5 rounded-full inline-block">
                                         {Math.round(m.score)}%
@@ -1759,31 +1775,54 @@ export default function CRMMatchmaking() {
                         <p className="text-xs font-bold text-[#191265] mb-2">💡 התאמות מומלצות:</p>
                         <div className="grid grid-cols-3 gap-2">
                           {s.suggestions.map((sug: any) => (
-                            <div key={sug.id} className="bg-[#f8f6f0] rounded-lg p-2 text-center">
-                              {sug.photoUrl ? (
-                                <button
-                                  onClick={() => setLightboxUrl(sug.photoUrl)}
-                                  className="focus:outline-none"
-                                  title="הגדל תמונה"
-                                >
-                                  <img src={sug.photoUrl} alt={sug.name} className="w-10 h-10 rounded-lg object-cover object-[center_20%] mx-auto mb-1 hover:opacity-80 cursor-zoom-in transition-opacity" />
-                                </button>
-                              ) : (
-                                <div className="w-10 h-10 rounded-lg bg-[#191265]/10 flex items-center justify-center mx-auto mb-1 text-lg">
-                                  {sug.gender === 'female' ? '👩' : '👨'}
+                            <div key={sug.id} className="bg-[#f8f6f0] rounded-lg p-3 text-right">
+                              <div className="flex items-center gap-2 mb-1">
+                                {sug.photoUrl ? (
+                                  <button
+                                    onClick={() => setLightboxUrl(sug.photoUrl)}
+                                    className="focus:outline-none flex-shrink-0"
+                                    title="הגדל תמונה"
+                                  >
+                                    <img src={sug.photoUrl} alt={sug.name} className="w-12 h-12 rounded-lg object-cover object-[center_20%] hover:opacity-80 cursor-zoom-in transition-opacity" />
+                                  </button>
+                                ) : (
+                                  <div className="w-12 h-12 rounded-lg bg-[#191265]/10 flex items-center justify-center text-lg flex-shrink-0">
+                                    {sug.gender === 'female' ? '👩' : '👨'}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-[#191265] truncate">{sug.name}</p>
+                                  <p className="text-[10px] text-[#727272]">{displayAge(sug.age)} · {sug.city || ''}{sug.height ? ` · ${sug.height} ס"מ` : ''}</p>
+                                  <div className="text-[10px] font-black text-[#1800ad]">{sug.score}%</div>
+                                </div>
+                              </div>
+                              <div className="text-[9px] text-[#727272] space-y-0.5 border-t border-gray-200 pt-1 mt-1">
+                                <p>
+                                  {sug.maritalStatus && <span>{MARITAL_LABELS[sug.maritalStatus] || sug.maritalStatus}</span>}
+                                  {sug.religiosity && <span> · {RELIGIOSITY_LABELS[sug.religiosity] || sug.religiosity}</span>}
+                                  {sug.education && <span> · {EDUCATION_LABELS[sug.education] || sug.education}</span>}
+                                </p>
+                                <p>
+                                  {sug.hasKids != null && <span>{sug.hasKids ? `ילדים${sug.numKids ? ` (${sug.numKids})` : ''}` : 'אין ילדים'}</span>}
+                                  {sug.wantsKids && <span> · {sug.wantsKids === 'yes' ? 'רוצה ילדים' : sug.wantsKids === 'no' ? 'לא רוצה ילדים' : 'פתוח לילדים'}</span>}
+                                </p>
+                                {sug.occupation && <p>💼 {sug.occupation}</p>}
+                                {sug.smokingStatus && sug.smokingStatus !== 'no' && <p>🚬 {sug.smokingStatus === 'yes' ? 'מעשן/ת' : sug.smokingStatus === 'social' ? 'חברתי' : sug.smokingStatus}</p>}
+                                {sug.dnaType && <p className="text-[#1800ad] font-medium">🧬 {DNA_LABELS[sug.dnaType] || sug.dnaType}</p>}
+                              </div>
+                              {sug.about && (
+                                <div className="text-[9px] text-[#555] mt-1 border-t border-gray-200 pt-1">
+                                  <span className="font-semibold">על עצמי:</span> {sug.about.length > 80 ? sug.about.substring(0, 80) + '...' : sug.about}
                                 </div>
                               )}
-                              <p className="text-xs font-bold text-[#191265] truncate">{sug.name}</p>
-                              <p className="text-[10px] text-[#727272]">{displayAge(sug.age)} · {sug.city || ''}{sug.height ? ` · ${sug.height}` : ''}</p>
-                              <p className="text-[9px] text-[#727272]">
-                                {sug.maritalStatus && `${MARITAL_LABELS[sug.maritalStatus] || sug.maritalStatus}`}
-                                {sug.education && ` · ${EDUCATION_LABELS[sug.education] || sug.education}`}
-                              </p>
-                              <p className="text-[9px] text-[#727272]">
-                                {sug.hasKids != null && `${sug.hasKids ? `ילדים${sug.numKids ? ` (${sug.numKids})` : ''}` : 'אין ילדים'}`}
-                                {sug.wantsKids && ` · ${sug.wantsKids === 'yes' ? 'רוצה' : sug.wantsKids === 'no' ? 'לא רוצה' : 'פתוח'} ילדים`}
-                              </p>
-                              <div className="text-[10px] font-black text-[#1800ad] mt-0.5">{sug.score}%</div>
+                              {sug.partnerDescription && (
+                                <div className="text-[9px] text-[#555] mt-0.5">
+                                  <span className="font-semibold">מחפש/ת:</span> {sug.partnerDescription.length > 80 ? sug.partnerDescription.substring(0, 80) + '...' : sug.partnerDescription}
+                                </div>
+                              )}
+                              {sug.phone && (
+                                <div className="text-[9px] text-[#727272] mt-1">📞 {sug.phone}</div>
+                              )}
                               {sug.hasActiveProposal && (
                                 <div className="text-[9px] bg-orange-100 text-orange-700 font-bold rounded px-1 py-0.5 mt-0.5">⏳ בהתאמה פעילה</div>
                               )}

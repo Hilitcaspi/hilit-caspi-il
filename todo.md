@@ -355,3 +355,7 @@
 - [x] Frontend: Serial non-responder badge (🚨 לא עונה) for 3+ non-responses
 - [x] Frontend: Separate "לא ענו" tab from "דחו" tab in matches
 - [x] Frontend: "עודכנו החודש" filter in singles tab
+
+## Bug Fixes & Improvements (Aug 4 - continued)
+- [x] Fix ברק פרץ (ID 20100001): change gender to male, seekingGender to female, run matching
+- [x] Enrich suggestion cards in "ללא התאמה" tab with full details (height, education, religiosity, maritalStatus, hasKids, wantsKids, shomerShabbat, about, partnerDescription, etc.)
