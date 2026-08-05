@@ -572,6 +572,7 @@ export default function CRMMatchmaking() {
     singleASubscriptionEnd?: number | null; singleBSubscriptionEnd?: number | null;
     singleAEmail?: string | null; singleBEmail?: string | null;
     singleAIsActive?: boolean | null; singleBIsActive?: boolean | null;
+    returnedToPoolAt?: number | null;
   }>;
 
   const typedTokens = (tokens as unknown) as Array<{
@@ -638,15 +639,37 @@ export default function CRMMatchmaking() {
   const now14daysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
   // "proposed" tab = ALL matches that were ever sent (proposedAt is set, not pending)
   // "no_match" tab = rejected OR expired only
+  // Classification uses tokenAUsedAt/tokenBUsedAt to distinguish explicit rejection from no response:
+  // - tokenUsedAt SET + approved=false → person clicked the link and explicitly rejected
+  // - tokenUsedAt NULL + approved=false/null → person never responded (default value)
+  // Categories:
+  // 1. Both approved=true (matched then released) → "דחו" tab
+  // 2. At least one person clicked AND rejected (tokenUsedAt set + approved=false) → "דחו" tab
+  // 3. Sent (proposedAt set) but no explicit rejection by anyone → "לא ענו" tab
   const isRejected = (m: any) => {
     if (m.status !== "rejected" && m.status !== "expired") return false;
-    // At least one side explicitly rejected
-    return m.approvedByA === false || m.approvedByB === false;
+    // Case 1: Was matched (both approved) then manually released
+    if (m.approvedByA === true && m.approvedByB === true) return true;
+    // Case 2: At least one person explicitly rejected (clicked the link and said no)
+    // "Explicitly rejected" = tokenUsedAt is set AND approved is false
+    const aExplicitlyRejected = m.tokenAUsedAt && m.approvedByA === false;
+    const bExplicitlyRejected = m.tokenBUsedAt && m.approvedByB === false;
+    if (aExplicitlyRejected || bExplicitlyRejected) return true;
+    return false;
   };
   const isNoResponse = (m: any) => {
     if (m.status !== "rejected" && m.status !== "expired") return false;
-    // Neither side explicitly rejected - both just didn't respond
-    return m.approvedByA !== false && m.approvedByB !== false;
+    // Must have been actually sent (proposedAt exists)
+    if (!m.proposedAt) return false;
+    // If both approved → not "no response" (it's a released match)
+    if (m.approvedByA === true && m.approvedByB === true) return false;
+    // If at least one person explicitly rejected (clicked + rejected) → goes to "דחו" not here
+    const aExplicitlyRejected = m.tokenAUsedAt && m.approvedByA === false;
+    const bExplicitlyRejected = m.tokenBUsedAt && m.approvedByB === false;
+    if (aExplicitlyRejected || bExplicitlyRejected) return false;
+    // Everything else: sent but nobody explicitly rejected
+    // Includes: both ghosted, one approved but other ghosted, expired without action
+    return true;
   };
   const isNoMatch = (m: any) => {
     if (m.status === "rejected") return true;
@@ -1363,7 +1386,24 @@ export default function CRMMatchmaking() {
               </div>
             )}
             {filteredMatchesBySubTab[matchSubTab].map(match => {
-              const cfg = MATCH_STATUS_CONFIG[match.status] || MATCH_STATUS_CONFIG.pending;
+              // Determine display status badge based on actual match outcome
+              let displayStatus = match.status;
+              if (match.status === 'rejected' || match.status === 'expired') {
+                const aExplicit = match.tokenAUsedAt && match.approvedByA === false;
+                const bExplicit = match.tokenBUsedAt && match.approvedByB === false;
+                if (match.approvedByA === true && match.approvedByB === true && match.returnedToPoolAt) {
+                  displayStatus = 'released'; // Was matched then manually released
+                } else if (aExplicit || bExplicit) {
+                  displayStatus = 'rejected'; // Someone explicitly rejected
+                } else {
+                  displayStatus = 'expired'; // No explicit rejection → show as "פג תוקף"
+                }
+              }
+              const EXTENDED_STATUS: Record<string, { label: string; color: string; icon: string }> = {
+                ...MATCH_STATUS_CONFIG,
+                released: { label: "שוחרר", color: "bg-purple-100 text-purple-800", icon: "🔓" },
+              };
+              const cfg = EXTENDED_STATUS[displayStatus] || MATCH_STATUS_CONFIG.pending;
               const isExpanded = expandedMatch === match.id;
 
 
@@ -1375,9 +1415,15 @@ export default function CRMMatchmaking() {
                 const isProposed = match.status === "proposed" || match.status === "matched" || match.status === "expired" || match.status === "rejected";
                 if (!isProposed) return null;
                 if (match.status === "matched") return { icon: "❤️", label: "אישרו: התאמה!", color: "bg-green-100 text-green-800" };
-                if (approved === false) return { icon: "❌", label: "דחה/תה", color: "bg-red-100 text-red-700" };
+                // Explicitly rejected: clicked the link AND chose to reject
+                if (tokenUsed && approved === false) return { icon: "❌", label: "דחה/תה", color: "bg-red-100 text-red-700" };
                 if (approved === true) return { icon: "✅", label: "אישר/ה", color: "bg-emerald-100 text-emerald-800" };
-                if (match.status === "expired" || match.status === "rejected") return { icon: "⏰", label: "לא ענה", color: "bg-orange-100 text-orange-700" };
+                // For expired/rejected matches: if they never clicked, show "no response"
+                if (match.status === "expired" || match.status === "rejected") {
+                  if (!tokenUsed) return { icon: "⏰", label: "לא ענה", color: "bg-orange-100 text-orange-700" };
+                  // tokenUsed but approved=false without explicit click? (edge case - default value)
+                  return { icon: "⏰", label: "לא ענה", color: "bg-orange-100 text-orange-700" };
+                }
                 if (tokenUsed) return { icon: "👀", label: "צפה, טרם השיב/ה", color: "bg-amber-100 text-amber-800" };
                 if (emailOpened) return { icon: "📧", label: "פתח מייל, טרם השיב/ה", color: "bg-blue-100 text-blue-700" };
                 return { icon: "⏳", label: "לא פתח מייל", color: "bg-gray-100 text-gray-500" };

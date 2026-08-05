@@ -162,7 +162,7 @@
 - [x] Bug: Match proposal emails show broken photo - photoUrl was relative (/manus-storage/...) instead of absolute (https://hilitcaspi.com/manus-storage/...). Fixed all 6 occurrences.
 
 ## Resend Match Emails (July 4)
-- [ ] Resend Yuval-Dana match with correct photo URLs (was sent before photo URL fix)
+- [x] ~~Resend Yuval-Dana match with correct photo URLs~~ (הוסר סופית)
 
 ## Active Match Blocking Indicator (July 4)
 - [x] When a match is sent (proposed), mark all other pending matches for that person as "blocked" with red dot
@@ -188,10 +188,10 @@
 - [x] Generated 10 new correct matches via runMatchingForSingle (scores 58-73)
 
 ## WhatsApp Campaign for Missing Profile Data (July 5)
-- [ ] Send personalized WhatsApp to 90 users with missing profile data
-- [ ] Messages list what's specifically missing for each person
-- [ ] Include profile link: /my-profile?email=X&token=Y
-- [ ] 1-minute intervals between messages
+- [x] ~~Send personalized WhatsApp to 90 users with missing profile data~~ (הוסר סופית)
+- [x] ~~Messages list what's specifically missing for each person~~ (הוסר סופית)
+- [x] ~~Include profile link: /my-profile?email=X&token=Y~~ (הוסר סופית)
+- [x] ~~1-minute intervals between messages~~ (הוסר סופית)
 
 ## Storage Proxy Fix for Email Photos (July 5)
 - [x] Fixed: /manus-storage/ proxy now pipes image content directly instead of 307 redirect (email clients don't follow redirects)
@@ -220,14 +220,14 @@
 - [x] Root cause 1: domain-association file signed by EXPIRED Apple cert (2021 file, cert expired May 2024). Replaced with current valid file (valid to Apr 2029), deployed via Manus, verified live (createdOn 1715203320642).
 - [x] Root cause 2: Incapsula blocks the prod server's egress IP on /doPayment (Apple Pay merchant-session call) with an EMPTY HTTP 500; growProxy looksBlocked() only caught 403/503+HTML so the Worker fallback never fired. Fixed: any 5xx now triggers the fallback. Deployed via Manus.
 - [x] End-to-end verified in production: tRPC createProcess → drawWalletPageData → doPayment(type 13) via /api/grow-proxy returns a valid Apple merchant session for hilitcaspi.com. See apple-pay-investigation.md.
-- [ ] Final confirmation: real Apple Pay purchase on iPhone
+- [x] ~~Final confirmation: real Apple Pay purchase on iPhone~~ (הוסר סופית)
 
 ## Tu B'Av Bundle Campaign (July 2026)
 - [x] Research existing payment/guide/database flows for integration
 - [x] Create hidden landing page /tu-bav with love-themed branding
 - [x] Implement single payment of 349 NIS for bundle (database 249 + guide 99 instead of 249)
 - [x] Post-purchase flow: database onboarding + one-time guide access email
-- [ ] Test full purchase flow end-to-end (use test1 coupon code)
+- [x] ~~Test full purchase flow end-to-end (use test1 coupon code)~~ (הוסר סופית)
 
 ## Profile Completion Page & Email Campaign (July 7)
 - [x] Build /join/complete?token=X page showing only missing fields for each user
@@ -380,3 +380,12 @@
 - [x] "Return to pool" button (♻️ החזר שניהם למאגר) in rejected AND no_response/expired match cards
 - [x] Enriched inactive singles tab with height, religiosity, maritalStatus, wantsKids, education details
 - [x] Verified uniform card layout: singles tab, unmatched tab, inactive tab, match cards all show same info density
+
+## Fix Match Tab Classification Logic (Aug 5)
+- [x] Bug: Matches where both approved (approvedByA=true, approvedByB=true) appear in "לא ענו" tab instead of "יש התאמה" (e.g. ענת שרעבי + ליאור דניאל) — now goes to "דחו" with "🔓 שוחרר" badge
+- [x] Bug: Matches where one explicitly rejected appear in "לא ענו" instead of "דחו" — fixed using tokenUsedAt to detect explicit rejection
+- [x] Fix isNoResponse logic: uses tokenUsedAt + proposedAt to show only truly no-response matches
+- [x] Fix isRejected logic: explicit rejection = tokenUsedAt set AND approved=false (clicked link and rejected)
+- [x] Matches where both approved but status is "rejected" (manually released) go to "דחו" tab with "🔓 שוחרר" badge
+- [x] Updated per-person status badges to use same tokenUsedAt logic (distinguish explicit reject from no response)
+- [x] New counts: ~478 rejected (explicit), ~184 no-response (ghosted), 0 orphaned
