@@ -3,13 +3,14 @@
  * URL: /crm/matchmaking
  */
 import { useState } from "react";
+import MatchmakingDashboard from "./MatchmakingDashboard";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown } from "lucide-react";
+import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 const RELIGIOSITY_LABELS: Record<string, string> = {
@@ -273,7 +274,7 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search">("singles");
+  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard">("singles");
   // Filter-search tab state
   const [filterGender, setFilterGender] = useState("");
   const [filterMinAge, setFilterMinAge] = useState("");
@@ -857,6 +858,7 @@ export default function CRMMatchmaking() {
             { id: "compatibility" as const, label: "בדיקת התאמה 🔍", icon: <Zap size={14} /> },
             { id: "filter_search" as const, label: "חיפוש מתקדם 🔎", icon: <Search size={14} /> },
             { id: "inactive" as const, label: "לא פעילים", icon: <span>🚫</span> },
+            { id: "dashboard" as const, label: "דאשבורד 📊", icon: <BarChart3 size={14} /> },
           ].map(tab => (
             <button
               key={tab.id}
@@ -2720,11 +2722,14 @@ export default function CRMMatchmaking() {
             )}
           </div>
         )}
+        {activeTab === "dashboard" && (
+          <MatchmakingDashboard />
+        )}
       </div>
     </div>
   );
 }
-// ── MissingDataTab ────────────────────────────────────────────────────────────
+// ── MissingDataTab ────────────────────────────────────────────────────────────────────────────────
 function MissingDataTab() {
   const { data: rows = [], isLoading, refetch } = trpc.admin.getMissingData.useQuery();
   const patchMutation = trpc.admin.patchMissingData.useMutation({

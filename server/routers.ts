@@ -5088,6 +5088,105 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const [row] = await db.select({ adminNotes: singles.adminNotes }).from(singles).where(eq(singles.id, input.id));
         return { notes: row?.adminNotes || "" };
       }),
+    // ── Dashboard: comprehensive matchmaking analytics ──────────────────────
+    getDashboardData: teamProcedure
+      .input(z.object({ from: z.number().optional(), to: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const now = Date.now();
+        const from = input.from || 0;
+        const to = input.to || now;
+        const allSingles = await db.select({
+          id: singles.id, createdAt: singles.createdAt, isActive: singles.isActive,
+          subscriptionRenewsAt: singles.subscriptionRenewsAt, isPaid: singles.isPaid,
+        }).from(singles).where(eq(singles.isSeed, false));
+        const allMatches = await db.select({
+          id: matches.id, status: matches.status, createdAt: matches.createdAt,
+          proposedAt: matches.proposedAt, matchedAt: matches.matchedAt,
+          singleAId: matches.singleAId, singleBId: matches.singleBId,
+          returnedToPoolAt: matches.returnedToPoolAt,
+          tokenAUsedAt: matches.tokenAUsedAt, tokenBUsedAt: matches.tokenBUsedAt,
+          approvedByA: matches.approvedByA, approvedByB: matches.approvedByB,
+        }).from(matches);
+        const totalActive = allSingles.filter(s => s.isActive && s.isPaid).length;
+        const newSignups = allSingles.filter(s => {
+          const ct = typeof s.createdAt === 'object' && s.createdAt !== null ? (s.createdAt as any).getTime() : Number(s.createdAt) || 0;
+          return ct >= from && ct <= to && s.isPaid;
+        }).length;
+        const matchesSent = allMatches.filter(m => m.proposedAt && m.proposedAt >= from && m.proposedAt <= to).length;
+        const matchesSucceeded = allMatches.filter(m => m.matchedAt && m.matchedAt >= from && m.matchedAt <= to).length;
+        const successRate = matchesSent > 0 ? Math.round((matchesSucceeded / matchesSent) * 100) : 0;
+        const activePaidSingles = allSingles.filter(s => s.isActive && s.isPaid);
+        const sentMatchesBySingle = new Map<number, number>();
+        for (const m of allMatches) {
+          if (!m.proposedAt) continue;
+          sentMatchesBySingle.set(m.singleAId, (sentMatchesBySingle.get(m.singleAId) || 0) + 1);
+          sentMatchesBySingle.set(m.singleBId, (sentMatchesBySingle.get(m.singleBId) || 0) + 1);
+        }
+        const matchCountDist = { zero: 0, one: 0, two: 0, three_plus: 0 };
+        for (const s of activePaidSingles) {
+          const cnt = sentMatchesBySingle.get(s.id) || 0;
+          if (cnt === 0) matchCountDist.zero++;
+          else if (cnt === 1) matchCountDist.one++;
+          else if (cnt === 2) matchCountDist.two++;
+          else matchCountDist.three_plus++;
+        }
+        const lastMatchBySingle = new Map<number, number>();
+        for (const m of allMatches) {
+          if (!m.proposedAt) continue;
+          const prev = lastMatchBySingle.get(m.singleAId) || 0;
+          if (m.proposedAt > prev) lastMatchBySingle.set(m.singleAId, m.proposedAt);
+          const prevB = lastMatchBySingle.get(m.singleBId) || 0;
+          if (m.proposedAt > prevB) lastMatchBySingle.set(m.singleBId, m.proposedAt);
+        }
+        let noMatch14 = 0, noMatch30 = 0;
+        const day14 = now - 14 * 24 * 60 * 60 * 1000;
+        const day30 = now - 30 * 24 * 60 * 60 * 1000;
+        for (const s of activePaidSingles) {
+          const last = lastMatchBySingle.get(s.id) || 0;
+          if (last < day14) noMatch14++;
+          if (last < day30) noMatch30++;
+        }
+        const totalRegistered = allSingles.filter(s => s.isPaid).length;
+        const totalSentAtLeastOne = new Set(Array.from(sentMatchesBySingle.entries()).filter(([,v]) => v > 0).map(([k]) => k)).size;
+        const totalApproved = new Set(
+          allMatches.filter(m => m.approvedByA === true).map(m => m.singleAId)
+            .concat(allMatches.filter(m => m.approvedByB === true).map(m => m.singleBId))
+        ).size;
+        const totalMatched = new Set(
+          allMatches.filter(m => m.status === 'matched' || (m.approvedByA === true && m.approvedByB === true))
+            .flatMap(m => [m.singleAId, m.singleBId])
+        ).size;
+        const activeMatchedNow = allMatches.filter(m => m.status === 'matched' && !m.returnedToPoolAt).length;
+        const day7f = now + 7 * 24 * 60 * 60 * 1000;
+        const day14f = now + 14 * 24 * 60 * 60 * 1000;
+        const day30f = now + 30 * 24 * 60 * 60 * 1000;
+        const renewals7 = activePaidSingles.filter(s => s.subscriptionRenewsAt && s.subscriptionRenewsAt > now && s.subscriptionRenewsAt <= day7f).length;
+        const renewals14 = activePaidSingles.filter(s => s.subscriptionRenewsAt && s.subscriptionRenewsAt > now && s.subscriptionRenewsAt <= day14f).length;
+        const renewals30 = activePaidSingles.filter(s => s.subscriptionRenewsAt && s.subscriptionRenewsAt > now && s.subscriptionRenewsAt <= day30f).length;
+        const expiredSubs = activePaidSingles.filter(s => s.subscriptionRenewsAt && s.subscriptionRenewsAt < now).length;
+        const dailySignups: { date: string; count: number }[] = [];
+        const dailyMatches: { date: string; sent: number; matched: number }[] = [];
+        for (let i = 29; i >= 0; i--) {
+          const dayStart = new Date(); dayStart.setHours(0,0,0,0); dayStart.setDate(dayStart.getDate() - i);
+          const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+          const ds = dayStart.getTime(); const de = dayEnd.getTime();
+          const label = `${dayStart.getDate()}/${dayStart.getMonth()+1}`;
+          dailySignups.push({ date: label, count: allSingles.filter(s => { const ct = typeof s.createdAt === 'object' && s.createdAt !== null ? (s.createdAt as any).getTime() : Number(s.createdAt) || 0; return ct >= ds && ct < de && s.isPaid; }).length });
+          dailyMatches.push({ date: label, sent: allMatches.filter(m => m.proposedAt && m.proposedAt >= ds && m.proposedAt < de).length, matched: allMatches.filter(m => m.matchedAt && m.matchedAt >= ds && m.matchedAt < de).length });
+        }
+        return {
+          kpis: { totalActive, newSignups, matchesSent, matchesSucceeded, successRate, activeMatchedNow },
+          matchCountDist,
+          noMatchDuration: { over14: noMatch14, over30: noMatch30 },
+          funnel: { registered: totalRegistered, sentAtLeastOne: totalSentAtLeastOne, approved: totalApproved, matched: totalMatched },
+          renewals: { in7: renewals7, in14: renewals14, in30: renewals30, expired: expiredSubs },
+          dailySignups,
+          dailyMatches,
+        };
+      }),
   }),
 
   // ── Invite Tokens (Hilit sends free access manually) ──────────────────────

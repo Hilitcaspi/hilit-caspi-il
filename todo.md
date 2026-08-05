@@ -393,3 +393,14 @@
 - [x] Fix matched tab: excluded released matches — was showing 82, now correctly shows 19 active
 - [x] Fix matchedSingleIds: released singles no longer block new pending matches
 - [x] DB fix: updated 63 zombie matches (status=matched + returnedToPoolAt) to status=rejected
+
+## CRM Database Dashboard (Aug 5)
+- [x] Server procedure: matchmakingDashboard with date range filtering
+- [x] KPIs: new signups, matches sent, success rate, active members, upcoming renewals
+- [x] Distribution: members by match count (0, 1, 2, 3+)
+- [x] Duration: members without match >14 days, >30 days
+- [x] Full funnel: registered → matches sent → approved → matched → follow-up
+- [x] Upcoming renewals (expiring in 7/14/30 days)
+- [x] Visual dashboard component with charts (bar, donut, funnel)
+- [x] Date range picker integration
+- [x] Integrate into CRM matchmaking page as sub-tab or section
