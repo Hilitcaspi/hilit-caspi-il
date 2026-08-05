@@ -116,9 +116,164 @@ function AdminNotesField({ singleId }: { singleId: number }) {
   );
 }
 
+// Full edit modal for all single fields
+function EditSingleModal({ single, onClose, onSave, isPending }: {
+  single: any;
+  onClose: () => void;
+  onSave: (data: any) => void;
+  isPending: boolean;
+}) {
+  const [form, setForm] = useState({
+    firstName: single.firstName || '',
+    lastName: single.lastName || '',
+    gender: single.gender || '',
+    age: single.age || '',
+    city: single.city || '',
+    phone: single.phone || '',
+    email: single.email || '',
+    height: single.height || '',
+    education: single.education || '',
+    religiosity: single.religiosity || '',
+    shomerShabbat: single.shomerShabbat ?? false,
+    occupation: single.occupation || '',
+    maritalStatus: single.maritalStatus || '',
+    hasKids: single.hasKids ?? single.hasChildren ?? false,
+    numKids: single.numKids ?? single.numberOfChildren ?? '',
+    wantsKids: single.wantsKids ?? single.wantsChildren ?? '',
+    hasPets: single.hasPets ?? false,
+    petType: single.petType || '',
+    acceptsPets: single.acceptsPets ?? false,
+    locationPreference: single.locationPreference || '',
+    smokingStatus: single.smokingStatus || '',
+    smokingPreference: single.smokingPreference || '',
+    minAgePreference: single.minAgePreference || '',
+    maxAgePreference: single.maxAgePreference || '',
+    about: single.about || single.aboutMe || '',
+    partnerDescription: single.partnerDescription || '',
+    acceptsKids: single.acceptsKids ?? false,
+  });
+
+  const set = (key: string, val: any) => setForm(prev => ({ ...prev, [key]: val }));
+
+  const handleSave = () => {
+    const payload: any = { id: single.id };
+    if (form.firstName && form.firstName !== single.firstName) payload.firstName = form.firstName;
+    if (form.lastName !== (single.lastName || '')) payload.lastName = form.lastName;
+    if (form.gender && form.gender !== single.gender) payload.gender = form.gender;
+    if (form.age && Number(form.age) !== single.age) payload.age = Number(form.age);
+    if (form.city !== (single.city || '')) payload.city = form.city;
+    if (form.phone !== (single.phone || '')) payload.phone = form.phone;
+    if (form.email !== (single.email || '')) payload.email = form.email;
+    if (form.height && Number(form.height) !== single.height) payload.height = Number(form.height);
+    if (form.education && form.education !== single.education) payload.education = form.education;
+    if (form.religiosity && form.religiosity !== single.religiosity) payload.religiosity = form.religiosity;
+    if (form.shomerShabbat !== (single.shomerShabbat ?? false)) payload.shomerShabbat = form.shomerShabbat;
+    if (form.occupation !== (single.occupation || '')) payload.occupation = form.occupation;
+    if (form.maritalStatus && form.maritalStatus !== single.maritalStatus) payload.maritalStatus = form.maritalStatus;
+    if (form.hasKids !== (single.hasKids ?? single.hasChildren ?? false)) payload.hasKids = form.hasKids;
+    if (form.numKids && Number(form.numKids) !== (single.numKids ?? single.numberOfChildren)) payload.numKids = Number(form.numKids);
+    if (form.wantsKids && form.wantsKids !== (single.wantsKids ?? single.wantsChildren)) payload.wantsKids = form.wantsKids;
+    if (form.hasPets !== (single.hasPets ?? false)) payload.hasPets = form.hasPets;
+    if (form.petType !== (single.petType || '')) payload.petType = form.petType;
+    if (form.acceptsPets !== (single.acceptsPets ?? false)) payload.acceptsPets = form.acceptsPets;
+    if (form.locationPreference && form.locationPreference !== single.locationPreference) payload.locationPreference = form.locationPreference;
+    if (form.smokingStatus && form.smokingStatus !== single.smokingStatus) payload.smokingStatus = form.smokingStatus;
+    if (form.smokingPreference && form.smokingPreference !== single.smokingPreference) payload.smokingPreference = form.smokingPreference;
+    if (form.minAgePreference && Number(form.minAgePreference) !== single.minAgePreference) payload.minAgePreference = Number(form.minAgePreference);
+    if (form.maxAgePreference && Number(form.maxAgePreference) !== single.maxAgePreference) payload.maxAgePreference = Number(form.maxAgePreference);
+    if (form.about !== (single.about || single.aboutMe || '')) payload.about = form.about;
+    if (form.partnerDescription !== (single.partnerDescription || '')) payload.partnerDescription = form.partnerDescription;
+    if (form.acceptsKids !== (single.acceptsKids ?? false)) payload.acceptsKids = form.acceptsKids;
+    onSave(payload);
+  };
+
+  const inputCls = "w-full text-sm border border-[#191265]/20 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#ffe27c] bg-white";
+  const labelCls = "text-xs font-semibold text-[#191265] mb-0.5 block";
+  const selectCls = "w-full text-sm border border-[#191265]/20 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#ffe27c] bg-white";
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full mx-4 max-h-[85vh] overflow-y-auto p-6" dir="rtl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-[#191265]">✏️ עריכת פרטים: {single.firstName} {single.lastName}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+
+        {/* Personal Info */}
+        <div className="mb-4">
+          <h3 className="text-sm font-bold text-[#191265] mb-2 border-b border-[#ffe27c] pb-1">פרטים אישיים</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={labelCls}>שם פרטי</label><input className={inputCls} value={form.firstName} onChange={e => set('firstName', e.target.value)} /></div>
+            <div><label className={labelCls}>שם משפחה</label><input className={inputCls} value={form.lastName} onChange={e => set('lastName', e.target.value)} /></div>
+            <div><label className={labelCls}>מגדר</label><select className={selectCls} value={form.gender} onChange={e => set('gender', e.target.value)}><option value="">בחר</option><option value="male">גבר</option><option value="female">אישה</option></select></div>
+            <div><label className={labelCls}>גיל</label><input type="number" className={inputCls} value={form.age} onChange={e => set('age', e.target.value)} min={18} max={120} /></div>
+            <div><label className={labelCls}>עיר</label><input className={inputCls} value={form.city} onChange={e => set('city', e.target.value)} /></div>
+            <div><label className={labelCls}>גובה (ס"מ)</label><input type="number" className={inputCls} value={form.height} onChange={e => set('height', e.target.value)} min={100} max={250} /></div>
+            <div><label className={labelCls}>טלפון</label><input className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
+            <div><label className={labelCls}>אימייל</label><input type="email" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} /></div>
+            <div><label className={labelCls}>מקצוע</label><input className={inputCls} value={form.occupation} onChange={e => set('occupation', e.target.value)} /></div>
+          </div>
+        </div>
+
+        {/* Status & Lifestyle */}
+        <div className="mb-4">
+          <h3 className="text-sm font-bold text-[#191265] mb-2 border-b border-[#ffe27c] pb-1">מצב ואורח חיים</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={labelCls}>השכלה</label><select className={selectCls} value={form.education} onChange={e => set('education', e.target.value)}><option value="">בחר</option><option value="high_school">תיכון</option><option value="vocational">הכשרה מקצועית</option><option value="technician">הנדסאי</option><option value="student">סטודנט/ית</option><option value="bachelor">תואר ראשון</option><option value="master">תואר שני</option><option value="phd">דוקטורט</option><option value="other">אחר</option></select></div>
+            <div><label className={labelCls}>דתיות</label><select className={selectCls} value={form.religiosity} onChange={e => set('religiosity', e.target.value)}><option value="">בחר</option><option value="secular">חילוני/ת</option><option value="traditional">מסורתי/ת</option><option value="religious">דתי/ת</option><option value="orthodox">חרדי/ת</option><option value="datlash">דתל"ש</option></select></div>
+            <div><label className={labelCls}>מצב משפחתי</label><select className={selectCls} value={form.maritalStatus} onChange={e => set('maritalStatus', e.target.value)}><option value="">בחר</option><option value="single">רווק/ה</option><option value="divorced">גרוש/ה</option><option value="widowed">אלמן/ה</option></select></div>
+            <div className="flex items-center gap-2 pt-5"><input type="checkbox" checked={form.shomerShabbat} onChange={e => set('shomerShabbat', e.target.checked)} className="w-4 h-4 rounded" /><span className="text-sm">שומר/ת שבת</span></div>
+            <div><label className={labelCls}>עישון</label><select className={selectCls} value={form.smokingStatus} onChange={e => set('smokingStatus', e.target.value)}><option value="">בחר</option><option value="no">לא מעשן/ת</option><option value="occasionally">לפעמים</option><option value="yes">מעשן/ת</option></select></div>
+            <div><label className={labelCls}>העדפת מיקום</label><select className={selectCls} value={form.locationPreference} onChange={e => set('locationPreference', e.target.value)}><option value="">בחר</option><option value="close">רק באזור</option><option value="anywhere">גמיש/ה למרחק</option></select></div>
+          </div>
+        </div>
+
+        {/* Kids & Pets */}
+        <div className="mb-4">
+          <h3 className="text-sm font-bold text-[#191265] mb-2 border-b border-[#ffe27c] pb-1">ילדים וחיות</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="flex items-center gap-2 pt-5"><input type="checkbox" checked={form.hasKids} onChange={e => set('hasKids', e.target.checked)} className="w-4 h-4 rounded" /><span className="text-sm">יש ילדים</span></div>
+            {form.hasKids && <div><label className={labelCls}>מספר ילדים</label><input type="number" className={inputCls} value={form.numKids} onChange={e => set('numKids', e.target.value)} min={0} max={20} /></div>}
+            <div><label className={labelCls}>רוצה ילדים</label><select className={selectCls} value={form.wantsKids} onChange={e => set('wantsKids', e.target.value)}><option value="">בחר</option><option value="yes">כן</option><option value="no">לא</option><option value="open">פתוח/ה</option></select></div>
+            <div className="flex items-center gap-2 pt-5"><input type="checkbox" checked={form.acceptsKids} onChange={e => set('acceptsKids', e.target.checked)} className="w-4 h-4 rounded" /><span className="text-sm">מוכן/ה לבן/בת זוג עם ילדים</span></div>
+            <div className="flex items-center gap-2 pt-5"><input type="checkbox" checked={form.hasPets} onChange={e => set('hasPets', e.target.checked)} className="w-4 h-4 rounded" /><span className="text-sm">יש חיית מחמד</span></div>
+            {form.hasPets && <div><label className={labelCls}>סוג חיה</label><input className={inputCls} value={form.petType} onChange={e => set('petType', e.target.value)} /></div>}
+            <div className="flex items-center gap-2 pt-5"><input type="checkbox" checked={form.acceptsPets} onChange={e => set('acceptsPets', e.target.checked)} className="w-4 h-4 rounded" /><span className="text-sm">מוכן/ה לחיות מחמד</span></div>
+          </div>
+        </div>
+
+        {/* Partner Preferences */}
+        <div className="mb-4">
+          <h3 className="text-sm font-bold text-[#191265] mb-2 border-b border-[#ffe27c] pb-1">העדפות בן/בת זוג</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={labelCls}>גיל מינימום</label><input type="number" className={inputCls} value={form.minAgePreference} onChange={e => set('minAgePreference', e.target.value)} min={18} max={120} /></div>
+            <div><label className={labelCls}>גיל מקסימום</label><input type="number" className={inputCls} value={form.maxAgePreference} onChange={e => set('maxAgePreference', e.target.value)} min={18} max={120} /></div>
+            <div><label className={labelCls}>העדפת עישון</label><select className={selectCls} value={form.smokingPreference} onChange={e => set('smokingPreference', e.target.value)}><option value="">בחר</option><option value="no_smokers">לא מעשנים</option><option value="occasionally_ok">לפעמים בסדר</option><option value="doesnt_matter">לא משנה</option></select></div>
+          </div>
+        </div>
+
+        {/* Free Text */}
+        <div className="mb-4">
+          <h3 className="text-sm font-bold text-[#191265] mb-2 border-b border-[#ffe27c] pb-1">טקסט חופשי</h3>
+          <div className="space-y-3">
+            <div><label className={labelCls}>על עצמי</label><textarea className={inputCls + " min-h-[60px] resize-y"} value={form.about} onChange={e => set('about', e.target.value)} /></div>
+            <div><label className={labelCls}>מחפש/ת בן/בת זוג</label><textarea className={inputCls + " min-h-[60px] resize-y"} value={form.partnerDescription} onChange={e => set('partnerDescription', e.target.value)} /></div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 justify-end pt-3 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 transition-colors">ביטול</button>
+          <button onClick={handleSave} disabled={isPending} className="px-6 py-2 rounded-lg bg-[#191265] text-white text-sm font-bold hover:bg-[#1800ad] transition-colors disabled:opacity-50">{isPending ? 'שומר...' : '💾 שמור שינויים'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "live_event" | "filter_search">("singles");
+  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search">("singles");
   // Filter-search tab state
   const [filterGender, setFilterGender] = useState("");
   const [filterMinAge, setFilterMinAge] = useState("");
@@ -161,6 +316,7 @@ export default function CRMMatchmaking() {
   const [hideProposed, setHideProposed] = useState(false); // show all singles by default
   const [showOnlyUpdatedThisMonth, setShowOnlyUpdatedThisMonth] = useState(false);
   const [photoUploadSingleId, setPhotoUploadSingleId] = useState<number | null>(null);
+  const [editingSingleId, setEditingSingleId] = useState<number | null>(null);
   const [topMatchesPage, setTopMatchesPage] = useState<Record<number, number>>({}); // singleId -> page (0=first 3, 1=next 3, etc.)
 
   // Queries
@@ -195,9 +351,9 @@ export default function CRMMatchmaking() {
     enabled: !!user && user.role === "admin" && activeTab === "compatibility",
   });
 
-  // Live event registrations
-  const { data: liveRegistrations = [], isLoading: liveLoading } = (trpc.events as any).getLiveRegistrations.useQuery(undefined, {
-    enabled: !!user && user.role === "admin" && activeTab === "live_event",
+  // All inactive singles (for the "לא פעילים" tab)
+  const { data: allInactiveSingles = [], refetch: refetchInactive } = (trpc.matchmaking as any).listInactiveSingles.useQuery(undefined, {
+    enabled: !!user && user.role === "admin" && activeTab === "inactive",
   });
 
   // Compatibility check mutation
@@ -596,6 +752,24 @@ export default function CRMMatchmaking() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Single Modal */}
+      {editingSingleId && (() => {
+        const single = singles.find((s: any) => s.id === editingSingleId);
+        if (!single) return null;
+        return (
+          <EditSingleModal
+            single={single}
+            onClose={() => setEditingSingleId(null)}
+            onSave={(data) => {
+              updateSingleInline.mutate(data, {
+                onSuccess: () => setEditingSingleId(null),
+              });
+            }}
+            isPending={updateSingleInline.isPending}
+          />
+        );
+      })()}
+
       {/* Header */}
       <div className="bg-[#191265] text-white px-4 py-4 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 flex-wrap">
@@ -660,7 +834,7 @@ export default function CRMMatchmaking() {
             { id: "update_requests" as const, label: `בקשות עדכון (${updateRequests.length})`, icon: <span>✏️</span> },
             { id: "compatibility" as const, label: "בדיקת התאמה 🔍", icon: <Zap size={14} /> },
             { id: "filter_search" as const, label: "חיפוש מתקדם 🔎", icon: <Search size={14} /> },
-            { id: "live_event" as const, label: "לייב 16.6 🎙️", icon: <span>🎙️</span> },
+            { id: "inactive" as const, label: "לא פעילים", icon: <span>🚫</span> },
           ].map(tab => (
             <button
               key={tab.id}
@@ -906,6 +1080,16 @@ export default function CRMMatchmaking() {
 
                     {/* Admin Notes - internal only */}
                     <AdminNotesField singleId={single.id} />
+
+                    {/* Edit button */}
+                    <div className="mt-3 pt-3 border-t border-[#e9e8e8]">
+                      <button
+                        onClick={() => setEditingSingleId(single.id)}
+                        className="inline-flex items-center gap-1.5 bg-[#191265] text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-[#1800ad] transition-colors"
+                      >
+                        ✏️ ערוך כל הפרטים
+                      </button>
+                    </div>
 
                     {/* Top Matches Panel with pagination */}
                     {(() => {
@@ -2410,59 +2594,62 @@ export default function CRMMatchmaking() {
           );
         })()}
 
-        {/* Live Event Tab */}
-        {activeTab === "live_event" && (
+        {/* Inactive Singles Tab */}
+        {activeTab === "inactive" && (
           <div className="space-y-4">
-            <div className="bg-[#191265] rounded-2xl p-5 text-white text-center">
-              <div className="text-3xl mb-2">🎙️</div>
-              <h2 className="text-xl font-black">לייב שאלות ותשובות | 16.6.2026 | 20:30</h2>
-              <p className="text-white/70 text-sm mt-1">{liveRegistrations.length} נרשמים</p>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3">
+              <p className="text-sm text-[#191265] font-semibold">🚫 חברי מאגר לא פעילים — אפשר להפעיל אותם חזרה</p>
+              <p className="text-xs text-[#727272] mt-1">{(allInactiveSingles as any[]).length} חברי מאגר לא פעילים</p>
             </div>
-            {liveLoading ? (
-              <div className="text-center py-10 text-[#727272]">טוענת...</div>
-            ) : liveRegistrations.length === 0 ? (
-              <div className="text-center py-10 text-[#727272]">
-                <div className="text-4xl mb-2">📭</div>
-                <p>אין נרשמים עדיין</p>
+            {(allInactiveSingles as any[]).length === 0 ? (
+              <div className="bg-white rounded-xl p-8 text-center text-[#727272]">
+                <div className="text-4xl mb-2">🎉</div>
+                <p>אין חברי מאגר לא פעילים</p>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <table className="w-full text-sm" dir="rtl">
-                  <thead className="bg-[#f0eadc]">
-                    <tr>
-                      <th className="px-4 py-3 text-right font-bold text-[#191265]">#</th>
-                      <th className="px-4 py-3 text-right font-bold text-[#191265]">שם</th>
-                      <th className="px-4 py-3 text-right font-bold text-[#191265]">מייל</th>
-                      <th className="px-4 py-3 text-right font-bold text-[#191265]">טלפון</th>
-                      <th className="px-4 py-3 text-right font-bold text-[#191265]">מדריך</th>
-                      <th className="px-4 py-3 text-right font-bold text-[#191265]">תאריך הרשמה</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(liveRegistrations as any[]).map((reg: any, i: number) => (
-                      <tr key={reg.id} className={i % 2 === 0 ? "bg-white" : "bg-[#fafaf8]"}>
-                        <td className="px-4 py-3 text-[#727272]">{i + 1}</td>
-                        <td className="px-4 py-3 font-semibold text-[#191265]">{reg.name}</td>
-                        <td className="px-4 py-3 text-[#727272]">{reg.email}</td>
-                        <td className="px-4 py-3 text-[#191265]">
-                          <a href={`https://wa.me/972${(reg.phone || '').replace(/^0/, '')}`} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">
-                            {reg.phone || 'לא צוין'}
+              <div className="space-y-2">
+                {(allInactiveSingles as any[]).map((s: any) => (
+                  <div key={s.id} className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-red-300">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-[#191265]">{s.firstName} {s.lastName}</span>
+                          {s.gender && <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">{s.gender === 'male' ? 'גבר' : 'אישה'}</span>}
+                          {s.age > 0 && <span className="text-xs text-[#727272]">{s.age}</span>}
+                          {s.city && <span className="text-xs text-[#727272]">📍 {s.city}</span>}
+                          {s.isCoachingClient && <span className="text-xs bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded">💜 מלווה</span>}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-sm text-[#727272] flex-wrap">
+                          {s.email && <span>✉️ {s.email}</span>}
+                          {s.phone && <span>📞 {s.phone}</span>}
+                          <span className="text-xs">נרשם: {s.createdAt ? new Date(s.createdAt).toLocaleDateString('he-IL') : ''}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            toggleActive.mutate({ singleId: s.id, isActive: true });
+                            refetchInactive();
+                            toast.success(`${s.firstName} הופעל מחדש!`);
+                          }}
+                          className="bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-green-600 transition-colors"
+                        >
+                          ✅ הפעל מחדש
+                        </button>
+                        {s.phone && (
+                          <a
+                            href={`https://wa.me/972${s.phone.replace(/^0/, '').replace(/-/g, '')}?text=${encodeURIComponent('היי ' + s.firstName + ', רציתי לבדוק אם את/ה מעוניין/ת לחזור למאגר הרווקים?')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-[#25D366] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#1da851] transition-colors"
+                          >
+                            💬 ואטסאפ
                           </a>
-                        </td>
-                        <td className="px-4 py-3">
-                          {reg.receivedGuide ? (
-                            <span className="text-green-600 font-semibold">✅ קיבל/ה</span>
-                          ) : (
-                            <span className="text-[#aaa]">לא</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-[#727272] text-xs">
-                          {reg.createdAt ? new Date(reg.createdAt).toLocaleString('he-IL') : ''}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

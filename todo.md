@@ -366,3 +366,11 @@
 - [x] Server: Add updateAdminNotes procedure (save/update notes per single)
 - [x] Frontend: Add editable notes field in the expanded single card (visible only in CRM)
 - [x] Verify coaching/attention badges do NOT appear in any match emails/SMS/public pages (confirmed: not in emailTemplates, not in WhatsApp messages, not in any public-facing client pages)
+
+## CRM Phase 3 - Remaining Tasks (Aug 5)
+- [x] Add "לא פעילים" (inactive) tab in CRM with list of inactive singles and reactivation button
+- [x] Remove "לייב 16/6" (live_event) tab from CRM
+- [x] Full inline edit modal for all fields (height, age range seeking, photo, status, kids, pets, smoking, location, shomer shabbat, education, religiosity)
+- [x] Uniform card layout across all tabs (same format everywhere)
+- [x] Enrich match cards in "ממתין לשליחה" with what each person seeks (age range, status, kids preference)
+- [x] Final verification: coaching/attention badges (💜⭐) and admin notes (📝) do NOT appear in match emails/SMS/WhatsApp/public pages
