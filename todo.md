@@ -374,3 +374,9 @@
 - [x] Uniform card layout across all tabs (same format everywhere)
 - [x] Enrich match cards in "ממתין לשליחה" with what each person seeks (age range, status, kids preference)
 - [x] Final verification: coaching/attention badges (💜⭐) and admin notes (📝) do NOT appear in match emails/SMS/WhatsApp/public pages
+
+## CRM Phase 3 - Final Improvements (Aug 5 - continued)
+- [x] Add "what they seek" summary to collapsed match card header (age, height, maritalStatus, wantsKids, age range seeking) - visible without expanding
+- [x] "Return to pool" button (♻️ החזר שניהם למאגר) in rejected AND no_response/expired match cards
+- [x] Enriched inactive singles tab with height, religiosity, maritalStatus, wantsKids, education details
+- [x] Verified uniform card layout: singles tab, unmatched tab, inactive tab, match cards all show same info density

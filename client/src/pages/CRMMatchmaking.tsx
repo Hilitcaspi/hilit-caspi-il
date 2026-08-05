@@ -1457,7 +1457,21 @@ export default function CRMMatchmaking() {
                           )}
                         </div>
                       )}
-
+                      {/* "What they seek" summary — visible in collapsed state */}
+                      {!isExpanded && (
+                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-[#555]">
+                          {persons.map((s, idx) => (
+                            <span key={idx} className="inline-flex items-center gap-1">
+                              <span className="font-bold text-[#191265]">{(s.name as string)?.split(' ')[0]}:</span>
+                              {s.age && <span>{displayAge(s.age as number)}</span>}
+                              {s.height && <span>· {s.height} ס"מ</span>}
+                              {s.maritalStatus && <span>· {MARITAL_LABELS[s.maritalStatus as string] || s.maritalStatus}</span>}
+                              {s.wantsKids && <span>· {(s.wantsKids as string) === 'yes' ? '👶 כן' : (s.wantsKids as string) === 'no' ? '👶 לא' : '👶 פתוח'}</span>}
+                              {(s.minAge || s.maxAge) && <span>· מחפש {s.minAge || '?'}-{s.maxAge || '?'}</span>}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {/* Quick send button visible in collapsed state for pending matches */}
@@ -1762,19 +1776,19 @@ export default function CRMMatchmaking() {
                         </div>
                       )}
 
-                      {/* Release both from rejected match */}
-                      {match.status === "rejected" && (
+                      {/* Release both from rejected/no-response match */}
+                      {(match.status === "rejected" || match.status === "expired") && (
                         <div className="flex gap-2 mb-3">
                           <button
                             onClick={() => {
-                              if (window.confirm(`לשחרר את ${match.singleAName} ו-${match.singleBName} מההתאמה הזו?`)) {
+                              if (window.confirm(`לשחרר את ${match.singleAName} ו-${match.singleBName} מההתאמה הזו? שניהם יחזרו למאגר.`)) {
                                 releaseFromMatch.mutate({ matchId: match.id });
                               }
                             }}
                             disabled={releaseFromMatch.isPending}
-                            className="flex items-center gap-1 bg-red-100 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 bg-green-100 text-green-700 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50"
                           >
-                            🔓 שחרר שניהם מהתאמה זו
+                            ♻️ החזר שניהם למאגר
                           </button>
                         </div>
                       )}
@@ -2619,10 +2633,17 @@ export default function CRMMatchmaking() {
                           {s.city && <span className="text-xs text-[#727272]">📍 {s.city}</span>}
                           {s.isCoachingClient && <span className="text-xs bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded">💜 מלווה</span>}
                         </div>
-                        <div className="flex items-center gap-3 mt-1 text-sm text-[#727272] flex-wrap">
+                        <div className="flex items-center gap-3 mt-1 text-xs text-[#727272] flex-wrap">
+                          {s.height && <span>{s.height} ס"מ</span>}
+                          {s.religiosity && <span>· {RELIGIOSITY_LABELS[s.religiosity] || s.religiosity}</span>}
+                          {s.maritalStatus && <span>· {MARITAL_LABELS[s.maritalStatus] || s.maritalStatus}</span>}
+                          {s.wantsKids && <span>· {s.wantsKids === 'yes' ? '👶 כן' : s.wantsKids === 'no' ? '👶 לא' : '👶 פתוח'}</span>}
+                          {s.education && <span>· {EDUCATION_LABELS[s.education] || s.education}</span>}
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 text-xs text-[#727272] flex-wrap">
                           {s.email && <span>✉️ {s.email}</span>}
                           {s.phone && <span>📞 {s.phone}</span>}
-                          <span className="text-xs">נרשם: {s.createdAt ? new Date(s.createdAt).toLocaleDateString('he-IL') : ''}</span>
+                          <span>נרשם: {s.createdAt ? new Date(s.createdAt).toLocaleDateString('he-IL') : ''}</span>
                         </div>
                       </div>
                       <div className="flex gap-2">
