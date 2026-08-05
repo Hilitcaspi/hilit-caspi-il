@@ -2812,22 +2812,33 @@ function MissingDataTab() {
   });
 
   // Local edit state: id -> { age, city, gender }
-  const [edits, setEdits] = useState<Record<number, { age: string; city: string; gender: string }>>({});
-
-  const getEdit = (id: number, field: "age" | "city" | "gender", fallback: string) =>
+    const [edits, setEdits] = useState<Record<number, Record<string, string>>>({});
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const getEdit = (id: number, field: string, fallback: string) =>
     edits[id]?.[field] ?? fallback;
-
-  const setField = (id: number, field: "age" | "city" | "gender", value: string) =>
-    setEdits(prev => ({ ...prev, [id]: { ...prev[id], age: prev[id]?.age ?? "", city: prev[id]?.city ?? "", gender: prev[id]?.gender ?? "", [field]: value } }));
-
+  const setField = (id: number, field: string, value: string) =>
+    setEdits(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
   const save = (row: any) => {
     const e = edits[row.id];
-    const age = e?.age ? parseInt(e.age) : undefined;
-    const city = e?.city || undefined;
-    const gender = (e?.gender as "male" | "female") || undefined;
-    if (!age && !city && !gender) { toast.error("לא הוזנו נתונים לעדכון"); return; }
-    patchMutation.mutate({ id: row.id, ...(age ? { age } : {}), ...(city ? { city } : {}), ...(gender ? { gender } : {}) });
+    if (!e || Object.values(e).every(v => !v)) { toast.error("לא הוזנו נתונים לעדכון"); return; }
+    const patch: any = { id: row.id };
+    if (e.age) patch.age = parseInt(e.age);
+    if (e.city) patch.city = e.city;
+    if (e.gender) patch.gender = e.gender;
+    if (e.height) patch.height = parseInt(e.height);
+    if (e.religiosity) patch.religiosity = e.religiosity;
+    if (e.education) patch.education = e.education;
+    if (e.maritalStatus) patch.maritalStatus = e.maritalStatus;
+    if (e.wantsKids) patch.wantsKids = e.wantsKids;
+    if (e.hasKids) patch.hasKids = e.hasKids === "true";
+    if (e.phone) patch.phone = e.phone;
+    if (e.occupation) patch.occupation = e.occupation;
+    patchMutation.mutate(patch);
   };
+  const updateSingleInline = (trpc.matchmaking as any).updateSingleInline.useMutation({
+    onSuccess: () => { toast.success("נשמר!"); refetch(); setEditingId(null); },
+    onError: () => toast.error("שגיאה"),
+  });
 
   if (isLoading) return <div className="text-center py-12 text-[#727272]">טוען...</div>;
 
@@ -2867,50 +2878,87 @@ function MissingDataTab() {
                 {row.phone && <span>📞 {row.phone}</span>}
               </div>
               {/* Edit fields */}
-              <div className="flex gap-2 flex-wrap items-end">
-                {/* Gender */}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 items-end">
                 <div>
-                  <label className="block text-xs text-[#727272] mb-1">מגדר</label>
-                  <select
-                    value={getEdit(row.id, "gender", row.gender || "male")}
-                    onChange={e => setField(row.id, "gender", e.target.value)}
-                    className="border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-sm text-[#191265] focus:outline-none focus:border-[#191265]"
-                  >
-                    <option value="male">גבר</option>
-                    <option value="female">אישה</option>
+                  <label className="block text-[10px] text-[#727272] mb-0.5">מגדר</label>
+                  <select value={getEdit(row.id, "gender", row.gender || "")} onChange={e => setField(row.id, "gender", e.target.value)}
+                    className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]">
+                    <option value="">בחר</option><option value="male">גבר</option><option value="female">אישה</option>
                   </select>
                 </div>
-                {/* Age */}
                 <div>
-                  <label className="block text-xs text-[#727272] mb-1">גיל (כרגע: {row.age || "?"})</label>
-                  <input
-                    type="number"
-                    min={18} max={80}
-                    value={getEdit(row.id, "age", "")}
-                    onChange={e => setField(row.id, "age", e.target.value)}
-                    placeholder="גיל"
-                    className="border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-sm text-[#191265] w-20 focus:outline-none focus:border-[#191265]"
-                  />
+                  <label className="block text-[10px] text-[#727272] mb-0.5">גיל ({row.age || "?"})</label>
+                  <input type="number" min={18} max={80} value={getEdit(row.id, "age", "")} onChange={e => setField(row.id, "age", e.target.value)}
+                    placeholder="גיל" className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]" />
                 </div>
-                {/* City */}
                 <div>
-                  <label className="block text-xs text-[#727272] mb-1">עיר (כרגע: {row.city || "ריק"})</label>
-                  <input
-                    type="text"
-                    value={getEdit(row.id, "city", "")}
-                    onChange={e => setField(row.id, "city", e.target.value)}
-                    placeholder="עיר מגורים"
-                    className="border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-sm text-[#191265] w-32 focus:outline-none focus:border-[#191265]"
-                  />
+                  <label className="block text-[10px] text-[#727272] mb-0.5">עיר ({row.city || "ריק"})</label>
+                  <input type="text" value={getEdit(row.id, "city", "")} onChange={e => setField(row.id, "city", e.target.value)}
+                    placeholder="עיר" className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]" />
                 </div>
-                <button
-                  onClick={() => save(row)}
-                  disabled={patchMutation.isPending}
-                  className="bg-[#191265] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#1800ad] transition-colors disabled:opacity-50"
-                >
-                  שמור
-                </button>
+                <div>
+                  <label className="block text-[10px] text-[#727272] mb-0.5">גובה ({row.height || "?"})</label>
+                  <input type="number" min={100} max={250} value={getEdit(row.id, "height", "")} onChange={e => setField(row.id, "height", e.target.value)}
+                    placeholder="ס'מ" className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]" />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#727272] mb-0.5">דתיות</label>
+                  <select value={getEdit(row.id, "religiosity", "")} onChange={e => setField(row.id, "religiosity", e.target.value)}
+                    className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]">
+                    <option value="">בחר</option><option value="secular">חילוני/ת</option><option value="traditional">מסורתי/ת</option><option value="religious">דתי/ת</option><option value="orthodox">חרדי/ת</option><option value="datlash">דתל"ש</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#727272] mb-0.5">מצב משפחתי</label>
+                  <select value={getEdit(row.id, "maritalStatus", "")} onChange={e => setField(row.id, "maritalStatus", e.target.value)}
+                    className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]">
+                    <option value="">בחר</option><option value="single">רווק/ה</option><option value="divorced">גרוש/ה</option><option value="widowed">אלמן/ה</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#727272] mb-0.5">רוצה ילדים</label>
+                  <select value={getEdit(row.id, "wantsKids", "")} onChange={e => setField(row.id, "wantsKids", e.target.value)}
+                    className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]">
+                    <option value="">בחר</option><option value="yes">כן</option><option value="no">לא</option><option value="open">פתוח/ה</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#727272] mb-0.5">יש ילדים</label>
+                  <select value={getEdit(row.id, "hasKids", "")} onChange={e => setField(row.id, "hasKids", e.target.value)}
+                    className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]">
+                    <option value="">בחר</option><option value="true">כן</option><option value="false">לא</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#727272] mb-0.5">טלפון</label>
+                  <input type="text" value={getEdit(row.id, "phone", "")} onChange={e => setField(row.id, "phone", e.target.value)}
+                    placeholder="050..." className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]" />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#727272] mb-0.5">מקצוע</label>
+                  <input type="text" value={getEdit(row.id, "occupation", "")} onChange={e => setField(row.id, "occupation", e.target.value)}
+                    placeholder="מקצוע" className="w-full border border-[#e9e8e8] rounded-lg px-2 py-1.5 text-xs text-[#191265] focus:outline-none focus:border-[#191265]" />
+                </div>
+                <div className="flex items-end gap-2 col-span-2">
+                  <button onClick={() => save(row)} disabled={patchMutation.isPending}
+                    className="bg-[#191265] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#1800ad] transition-colors disabled:opacity-50">
+                    שמור שינויים
+                  </button>
+                  <button onClick={() => setEditingId(row.id)}
+                    className="bg-[#ffe27c] text-[#191265] text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#ffd84a] transition-colors">
+                    ✏️ ערוך כל הפרטים
+                  </button>
+                </div>
               </div>
+              {/* Full edit modal for this person */}
+              {editingId === row.id && (
+                <EditSingleModal
+                  single={row}
+                  onClose={() => setEditingId(null)}
+                  onSave={(data: any) => updateSingleInline.mutate(data, { onSuccess: () => setEditingId(null) })}
+                  isPending={updateSingleInline.isPending}
+                />
+              )}
             </div>
           </div>
         </div>

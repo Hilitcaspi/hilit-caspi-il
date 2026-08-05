@@ -415,3 +415,11 @@
 - [x] Results: show compatibility percentage prominently (color-coded badge + border)
 - [x] Results: sort by highest compatibility score descending
 - [x] Added "בדוק התאמה לכולם" button to batch-check all results
+
+## Manual Profile Editing (Aug 5)
+- [x] Server: updateSingleProfile procedure (updateSingleInline already existed with all fields)
+- [x] Missing data tab: inline edit fields for each missing item (10 fields: gender, age, city, height, religiosity, maritalStatus, wantsKids, hasKids, phone, occupation)
+- [x] Missing data tab: "ערוך כל הפרטים" button opens full EditSingleModal
+- [x] Expanded profile card: full edit mode already existed via EditSingleModal (accessible from singles tab)
+- [x] Extended patchMissingData server procedure with wantsKids, hasKids, numKids, phone, smokingStatus, partnerDescription, minAge/maxAgePreference
+- [ ] Fix: toggleCoachingClient button not working (server works, may be frontend rendering issue)

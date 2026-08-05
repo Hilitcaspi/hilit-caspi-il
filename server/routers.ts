@@ -2828,27 +2828,30 @@ export const appRouter = router({
         city: z.string().min(1).max(100).optional(),
         gender: z.enum(["male", "female"]).optional(),
         height: z.number().min(100).max(250).optional(),
-        religiosity: z.enum(["secular", "traditional", "religious", "orthodox"]).optional(),
+        religiosity: z.enum(["secular", "traditional", "religious", "orthodox", "datlash"]).optional(),
         education: z.enum(["high_school", "vocational", "technician", "student", "bachelor", "master", "phd", "other"]).optional(),
         occupation: z.string().max(200).optional(),
         about: z.string().max(2000).optional(),
         maritalStatus: z.enum(["single", "divorced", "widowed"]).optional(),
+        wantsKids: z.enum(["yes", "no", "open"]).optional(),
+        hasKids: z.boolean().optional(),
+        numKids: z.number().optional(),
+        phone: z.string().max(20).optional(),
+        smokingStatus: z.enum(["no", "occasionally", "yes"]).optional(),
+        partnerDescription: z.string().max(2000).optional(),
+        minAgePreference: z.number().optional(),
+        maxAgePreference: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { id, ...fields } = input;
         const patch: Record<string, any> = { updatedAt: Date.now() };
-        if (input.age !== undefined) patch.age = input.age;
-        if (input.city !== undefined) patch.city = input.city;
-        if (input.gender !== undefined) patch.gender = input.gender;
-        if (input.height !== undefined) patch.height = input.height;
-        if (input.religiosity !== undefined) patch.religiosity = input.religiosity;
-        if (input.education !== undefined) patch.education = input.education;
-        if (input.occupation !== undefined) patch.occupation = input.occupation;
-        if (input.about !== undefined) patch.about = input.about;
-        if (input.maritalStatus !== undefined) patch.maritalStatus = input.maritalStatus;
-        await db.update(singles).set(patch).where(eq(singles.id, input.id));
+        for (const [key, val] of Object.entries(fields)) {
+          if (val !== undefined) patch[key] = val;
+        }
+        await db.update(singles).set(patch).where(eq(singles.id, id));
         return { success: true };
       }),
   }),
