@@ -690,7 +690,7 @@ export default function CRMMatchmaking() {
 
   // IDs of singles currently in a "matched" match (not just proposed)
   const matchedSingleIds = new Set<number>(
-    typedMatches.filter(m => m.status === "matched").flatMap(m => [m.singleAId, m.singleBId])
+    typedMatches.filter(m => m.status === "matched" && !m.returnedToPoolAt).flatMap(m => [m.singleAId, m.singleBId])
   );
 
   // Pending tab: only show score >= 70, hide if either person is in active match OR already matched
@@ -705,13 +705,12 @@ export default function CRMMatchmaking() {
   const matchSubCounts = {
     pending:  typedMatches.filter(m => isPendingVisible(m)).length,
     proposed: typedMatches.filter(m => isActiveProposal(m)).length,
-    matched:  typedMatches.filter(m => m.status === "matched").length,
+    matched:  typedMatches.filter(m => m.status === "matched" && !m.returnedToPoolAt).length,
     rejected: typedMatches.filter(m => isRejected(m)).length,
     no_response: typedMatches.filter(m => isNoResponse(m)).length,
     expired:  0, // merged into rejected
-    followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo).length,
+        followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo && !m.returnedToPoolAt).length,
   };
-
   // Filtered matches per sub-tab
   const filterMatchByName = (m: any) => {
     if (!matchSearch.trim()) return true;
@@ -725,11 +724,11 @@ export default function CRMMatchmaking() {
   const filteredMatchesBySubTab = {
     pending:  typedMatches.filter(m => isPendingVisible(m)).filter(filterMatchByName),
     proposed: typedMatches.filter(m => isActiveProposal(m)).filter(filterMatchByName),
-    matched:  typedMatches.filter(m => m.status === "matched").filter(filterMatchByName),
+    matched:  typedMatches.filter(m => m.status === "matched" && !m.returnedToPoolAt).filter(filterMatchByName),
     rejected: typedMatches.filter(m => isRejected(m)).filter(filterMatchByName),
     no_response: typedMatches.filter(m => isNoResponse(m)).filter(filterMatchByName),
     expired:  [],
-    followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo).filter(filterMatchByName),
+    followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo && !m.returnedToPoolAt).filter(filterMatchByName),
   };
 
   const baseUrl = window.location.origin;

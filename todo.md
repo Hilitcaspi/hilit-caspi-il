@@ -389,3 +389,7 @@
 - [x] Matches where both approved but status is "rejected" (manually released) go to "דחו" tab with "🔓 שוחרר" badge
 - [x] Updated per-person status badges to use same tokenUsedAt logic (distinguish explicit reject from no response)
 - [x] New counts: ~478 rejected (explicit), ~184 no-response (ghosted), 0 orphaned
+- [x] Fix followup tab: excluded released matches (returnedToPoolAt set) — was showing 56, now correctly shows 1
+- [x] Fix matched tab: excluded released matches — was showing 82, now correctly shows 19 active
+- [x] Fix matchedSingleIds: released singles no longer block new pending matches
+- [x] DB fix: updated 63 zombie matches (status=matched + returnedToPoolAt) to status=rejected
