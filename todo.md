@@ -404,3 +404,14 @@
 - [x] Visual dashboard component with charts (bar, donut, funnel)
 - [x] Date range picker integration
 - [x] Integrate into CRM matchmaking page as sub-tab or section
+
+## Enhanced Filter Search Tab (Aug 5)
+- [x] Add wantsKids filter (כן/לא/פתוח)
+- [x] Add maritalStatus filter (רווק, גרוש, אלמן)
+- [x] Add area/region grouping (מרכז/שרון/דרום/צפון/ירושלים)
+- [x] Add religiosity filter (already existed)
+- [x] Add hasKids filter
+- [x] Add height range filter (already existed)
+- [x] Results: show compatibility percentage prominently (color-coded badge + border)
+- [x] Results: sort by highest compatibility score descending
+- [x] Added "בדוק התאמה לכולם" button to batch-check all results

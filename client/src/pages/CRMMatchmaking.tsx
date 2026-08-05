@@ -40,6 +40,15 @@ const MARITAL_LABELS: Record<string, string> = {
   divorced: "גרוש/ה",
   widowed:  "אלמן/ה",
 };
+
+// Area/region groupings for city filter
+const AREA_CITIES: Record<string, string[]> = {
+  "מרכז": ["תל אביב", "רמת גן", "גבעתיים", "הרצליה", "רמת השרון", "כפר סבא", "רעננה", "פתח תקווה", "הוד השרון", "נתניה", "ראשון לציון", "בת ים", "בני ברק", "חולון", "רחובות", "יהוד", "אור יהודה", "גבעתיים", "קרית אונו", "קרית מוצקין"],
+  "שרון": ["נתניה", "רעננה", "כפר סבא", "ראש העין", "הרצליה", "פתח תקווה", "הוד השרון", "רמת השרון"],
+  "דרום": ["באר שבע", "אשדוד", "אשקלון", "נתיבות", "אופקים", "קרית גת"],
+  "צפון": ["חיפה", "נשר הגליל", "עתלית", "קריות", "טירת הכרמל", "זכרון יעקב", "עפולה"],
+  "ירושלים": ["ירושלים", "מודיעין", "מעלה אדומים", "בית שמש", "מבשרת"],
+};
 const GENDER_LABELS: Record<string, string> = {
   female: "אישה",
   male:   "גבר",
@@ -292,6 +301,7 @@ export default function CRMMatchmaking() {
   const [filterMaritalStatus, setFilterMaritalStatus] = useState("");
   const [filterWantsKids, setFilterWantsKids] = useState("");
   const [filterHasKids, setFilterHasKids] = useState("");
+  const [filterArea, setFilterArea] = useState("");
   const checkCompatForFilter = trpc.admin.checkCompatibility.useMutation({
     onSuccess: (data: any, vars: any) => {
       setFilterCompatResult(prev => ({ ...prev, [vars.idB]: data }));
@@ -2426,7 +2436,12 @@ export default function CRMMatchmaking() {
             if (filterGender && s.gender !== filterGender) return false;
             if (filterMinAge && s.age < parseInt(filterMinAge)) return false;
             if (filterMaxAge && s.age > parseInt(filterMaxAge)) return false;
-            if (filterCity && !(s.city || "").toLowerCase().includes(filterCity.toLowerCase())) return false;
+            if (filterArea) {
+              const areaCities = AREA_CITIES[filterArea] || [];
+              const sCity = (s.city || "").toLowerCase();
+              if (!areaCities.some(c => sCity.includes(c.toLowerCase()) || c.toLowerCase().includes(sCity))) return false;
+            }
+            if (filterCity && !filterArea && !(s.city || "").toLowerCase().includes(filterCity.toLowerCase())) return false;
             if (filterReligiosity && s.religiosity !== filterReligiosity) return false;
             if (filterDna && s.dnaType !== filterDna) return false;
             if (filterName && !(`${s.firstName} ${s.lastName || ""}`).toLowerCase().includes(filterName.toLowerCase())) return false;
@@ -2508,6 +2523,46 @@ export default function CRMMatchmaking() {
                       {Object.entries(DNA_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
                   </div>
+                  {/* Marital Status */}
+                  <div>
+                    <label className="block text-xs text-[#727272] mb-1">מצב משפחתי</label>
+                    <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)}
+                      className="w-full border border-[#e9e8e8] rounded-lg px-3 py-2 text-sm text-[#191265] focus:outline-none focus:border-[#191265]">
+                      <option value="">הכל</option>
+                      {Object.entries(MARITAL_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </div>
+                  {/* Wants Kids */}
+                  <div>
+                    <label className="block text-xs text-[#727272] mb-1">רוצה ילדים</label>
+                    <select value={filterWantsKids} onChange={e => setFilterWantsKids(e.target.value)}
+                      className="w-full border border-[#e9e8e8] rounded-lg px-3 py-2 text-sm text-[#191265] focus:outline-none focus:border-[#191265]">
+                      <option value="">הכל</option>
+                      <option value="yes">כן</option>
+                      <option value="no">לא</option>
+                      <option value="maybe">אולי</option>
+                      <option value="open">פתוח/ה</option>
+                    </select>
+                  </div>
+                  {/* Has Kids */}
+                  <div>
+                    <label className="block text-xs text-[#727272] mb-1">יש ילדים</label>
+                    <select value={filterHasKids} onChange={e => setFilterHasKids(e.target.value)}
+                      className="w-full border border-[#e9e8e8] rounded-lg px-3 py-2 text-sm text-[#191265] focus:outline-none focus:border-[#191265]">
+                      <option value="">הכל</option>
+                      <option value="yes">כן, יש ילדים</option>
+                      <option value="no">לא, אין ילדים</option>
+                    </select>
+                  </div>
+                  {/* Area */}
+                  <div>
+                    <label className="block text-xs text-[#727272] mb-1">אזור</label>
+                    <select value={filterArea} onChange={e => { setFilterArea(e.target.value); if (e.target.value) setFilterCity(""); }}
+                      className="w-full border border-[#e9e8e8] rounded-lg px-3 py-2 text-sm text-[#191265] focus:outline-none focus:border-[#191265]">
+                      <option value="">הכל</option>
+                      {Object.keys(AREA_CITIES).map(area => <option key={area} value={area}>{area}</option>)}
+                    </select>
+                  </div>
                   {/* Height range */}
                   <div>
                     <label className="block text-xs text-[#727272] mb-1">גובה מינימלי (ס"מ)</label>
@@ -2552,10 +2607,23 @@ export default function CRMMatchmaking() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => { setFilterGender(""); setFilterMinAge(""); setFilterMaxAge(""); setFilterCity(""); setFilterReligiosity(""); setFilterDna(""); setFilterName(""); setFilterCompatTarget(null); setFilterCompatSearch(""); setFilterCompatResult({}); setFilterMinHeight(""); setFilterMaxHeight(""); setFilterMaritalStatus(""); setFilterWantsKids(""); setFilterHasKids(""); }}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button onClick={() => { setFilterGender(""); setFilterMinAge(""); setFilterMaxAge(""); setFilterCity(""); setFilterReligiosity(""); setFilterDna(""); setFilterName(""); setFilterCompatTarget(null); setFilterCompatSearch(""); setFilterCompatResult({}); setFilterMinHeight(""); setFilterMaxHeight(""); setFilterMaritalStatus(""); setFilterWantsKids(""); setFilterHasKids(""); setFilterArea(""); }}
                     className="text-xs text-[#727272] underline">נקה הכל</button>
                   <span className="text-sm font-bold text-[#191265]">{filteredResults.length} תוצאות</span>
+                  {filterCompatTarget && (
+                    <button
+                      onClick={() => {
+                        const toCheck = filteredResults.filter(s => s.id !== filterCompatTarget && !filterCompatResult[s.id]);
+                        toCheck.slice(0, 50).forEach(s => {
+                          checkCompatForFilter.mutate({ idA: filterCompatTarget, idB: s.id });
+                        });
+                      }}
+                      className="text-xs bg-[#191265] text-white font-bold px-4 py-1.5 rounded-full hover:bg-[#191265]/80 transition-colors"
+                    >
+                      🔍 בדוק התאמה לכולם ({filteredResults.filter(s => s.id !== filterCompatTarget && !filterCompatResult[s.id]).length})
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2568,11 +2636,17 @@ export default function CRMMatchmaking() {
               ) : (
                 filteredResults.map(single => {
                   const compatData = filterCompatResult[single.id];
+                  const scoreColor = compatData ? (compatData.score >= 75 ? "border-green-500" : compatData.score >= 60 ? "border-amber-500" : compatData.score >= 45 ? "border-orange-400" : "border-red-300") : "border-[#191265]/20";
                   return (
-                    <div key={single.id} className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-[#191265]/20">
+                    <div key={single.id} className={`bg-white rounded-xl p-4 shadow-sm border-r-4 ${scoreColor}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
+                            {compatData && (
+                              <span className={`text-sm font-black px-2.5 py-1 rounded-full ${compatData.score >= 75 ? 'bg-green-100 text-green-700' : compatData.score >= 60 ? 'bg-amber-100 text-amber-700' : compatData.score >= 45 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-600'}`}>
+                                {Math.round(compatData.score)}%
+                              </span>
+                            )}
                             {single.photoUrl && (
                               <img src={single.photoUrl} alt={single.firstName}
                                 className="w-8 h-8 rounded-full object-cover border-2 border-[#191265]/20" />
