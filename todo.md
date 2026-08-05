@@ -422,4 +422,4 @@
 - [x] Missing data tab: "ערוך כל הפרטים" button opens full EditSingleModal
 - [x] Expanded profile card: full edit mode already existed via EditSingleModal (accessible from singles tab)
 - [x] Extended patchMissingData server procedure with wantsKids, hasKids, numKids, phone, smokingStatus, partnerDescription, minAge/maxAgePreference
-- [ ] Fix: toggleCoachingClient button not working (server works, may be frontend rendering issue)
+- [x] Fix: toggleCoachingClient button — added e.stopPropagation(), cursor-pointer, and better error toast with message

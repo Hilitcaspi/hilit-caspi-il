@@ -501,7 +501,7 @@ export default function CRMMatchmaking() {
   });
   const toggleCoachingClient = (trpc.matchmaking as any).toggleCoachingClient.useMutation({
     onSuccess: () => { refetchSingles(); refetchMatches(); refetchUnmatched(); toast.success('עודכן!'); },
-    onError: () => toast.error('שגיאה'),
+    onError: (err: any) => { console.error('[toggleCoaching]', err); toast.error('שגיאה בעדכון מלווה: ' + (err?.message || '')); },
   });
   const toggleNotBasic = (trpc.matchmaking as any).toggleNotBasic.useMutation({
     onSuccess: () => { refetchSingles(); refetchMatches(); refetchUnmatched(); toast.success('עודכן!'); },
@@ -991,9 +991,9 @@ export default function CRMMatchmaking() {
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={() => toggleCoachingClient.mutate({ id: single.id })}
+                      onClick={(e) => { e.stopPropagation(); toggleCoachingClient.mutate({ id: single.id }); }}
                       disabled={toggleCoachingClient.isPending}
-                      className={`text-[10px] px-2 py-1 rounded-full font-semibold transition-all ${
+                      className={`text-[10px] px-2 py-1 rounded-full font-semibold transition-all cursor-pointer ${
                         (single as any).isCoachingClient
                           ? "bg-pink-200 text-pink-800 hover:bg-pink-300"
                           : "bg-gray-100 text-gray-500 hover:bg-pink-100 hover:text-pink-700"
