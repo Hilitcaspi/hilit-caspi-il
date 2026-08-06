@@ -22,8 +22,8 @@ export default function ThankYouDatabase() {
   const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
-    trackPurchase({ value: 249, currency: "ILS", content_name: "מאגר רווקים" });
-    track({ eventType: "purchase", page: "/thank-you/database", metadata: { product: "database", value: 249 } });
+    trackPurchase({ value: 299, currency: "ILS", content_name: "מאגר רווקים" });
+    track({ eventType: "purchase", page: "/thank-you/database", metadata: { product: "database", value: 299 } });
     gaPurchase("database");
   }, []);
 

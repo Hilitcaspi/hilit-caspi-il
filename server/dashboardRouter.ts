@@ -6,7 +6,7 @@ import { sql } from "drizzle-orm";
 
 // Product prices for revenue calculation
 const PRODUCT_PRICES: Record<string, number> = {
-  database: 249,
+  database: 299,
   guide: 149,
   course: 249,
   session: 500,

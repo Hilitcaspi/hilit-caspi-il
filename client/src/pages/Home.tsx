@@ -360,7 +360,7 @@ export default function Home() {
             {/* Social proof strip */}
             <div className="flex gap-4 mt-10 pt-8 border-t border-white/10 flex-wrap">
               {[
-                { n: 2400, s: "+", label: "רווקים במאגר" },
+                { n: 5000, s: "+", label: "רווקים במאגר" },
                 { n: 200, s: "K+", label: "האזנות לפודקאסט" },
                 { n: 500, s: "+", label: "נשים שליוויתי" },
               ].map(({ n, s, label }) => (
@@ -678,8 +678,8 @@ export default function Home() {
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#191265] to-[#1800ad]" />
                 <div className="text-3xl mb-3">💛</div>
                 <span className="inline-block bg-[#191265]/15 text-[#191265] text-xs font-bold px-3 py-1 rounded-full mb-3 w-fit">הכי פופולרי</span>
-                <h3 className="text-[#191265] font-black text-base mb-1">כניסה למאגר הרווקים</h3>
-                <p className="text-[#191265] font-black text-lg mb-1">₪249 <span className="text-[#191265]/40 line-through text-sm font-normal">₪499</span></p>
+                <h3 className="text-[#191265] font-black text-base mb-1">המאגר החכם הגדול והמוביל בישראל</h3>
+                <p className="text-[#191265] font-black text-lg mb-1">₪299 <span className="text-[#191265]/40 line-through text-sm font-normal">₪499</span></p>
                 <p className="text-[#191265]/70 text-sm leading-relaxed flex-1 mb-3">
                   הפרופיל שלך נכנס למאגר הבלעדי. ההתאמות מבוססות על חישובים מתקדמים ועוברות אישור אישי של הילית לפני כל הצעה.
                 </p>
@@ -713,7 +713,7 @@ export default function Home() {
                 <p className="text-white/60 text-sm leading-relaxed flex-1 mb-3">
                   תהליך אישי עמוק - DNA זוגי, פרופיל, דפוסים, וליווי עד הזוגיות.
                 </p>
-                <p className="text-[#ffe27c]/70 text-xs mb-4">🎁 כניסה למאגר הרווקים כלולה בתהליך</p>
+                <p className="text-[#ffe27c]/70 text-xs mb-4">🎁 המאגר החכם הגדול והמוביל בישראל כלולה בתהליך</p>
                 <a href="/coaching" className="block bg-[#ffe27c] text-[#191265] font-black text-sm py-3 rounded-xl text-center hover:bg-white transition-colors">
                   לפרטים ולרכישה
                 </a>
@@ -893,7 +893,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-black mb-2">ליווי אישי - שתי תוכניות</h3>
                 <p className="text-white/75 text-sm leading-relaxed mb-4">
-                  תהליך "הבנה" (8 פגישות) או תהליך "המסע" (12 פגישות). שניהם כוללים כניסה למאגר הרווקים.
+                  תהליך "הבנה" (8 פגישות) או תהליך "המסע" (12 פגישות). שניהם כוללים המאגר החכם הגדול והמוביל בישראל.
                 </p>
                 <div className="flex items-center gap-3 mb-5">
                   <span className="text-3xl font-black">מ-₪2,960</span>

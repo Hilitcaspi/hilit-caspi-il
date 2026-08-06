@@ -84,7 +84,7 @@ export async function notifyOwnerWhatsApp(params: {
     params.source === "paid_coaching" ? "ליווי אישי (3 חודשים) 🌟" :
     params.source === "paid_coaching_mas" ? "ליווי מסע מלא (5 חודשים) ✨" :
     params.source === "paid_session" ? "פגישה אישית אחת (500 ₪) 💬" :
-    params.source === "paid_database" ? "מאגר הרווקים (249 ₪) 💛" :
+    params.source === "paid_database" ? "מאגר הרווקים (299 ₪) 💛" :
     params.source;
 
   const msg = [

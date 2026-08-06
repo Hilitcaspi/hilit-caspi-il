@@ -876,7 +876,7 @@ export default function DnaQuiz() {
                     </div>
                   </div>
                 </div>
-                <div className="text-[#ffe27c] font-black text-lg mb-1">דמי רצינות ורישום: ₪249 (חד-פעמי)</div>
+                <div className="text-[#ffe27c] font-black text-lg mb-1">דמי רצינות ורישום: ₪299 (חד-פעמי)</div>
                 <p className="text-white/50 text-xs mb-6">כל שאלון עובר בעיניי אישית לפני שמוזן למאגר</p>
                 <button
                   onClick={() => navigate(`/join?dna=${dnaType}&gender=${gender}&session=${sessionId.current}&name=${encodeURIComponent(captureForm.name)}&email=${encodeURIComponent(captureForm.email)}&phone=${encodeURIComponent(captureForm.phone)}`)}
@@ -931,7 +931,7 @@ export default function DnaQuiz() {
             <p className="text-[#191265]/80 text-sm leading-relaxed mb-4">
               מעבר למאגר, הילית מציעה תהליך ליווי אישי של 8 פגישות - שבו עובדים יחד על הדפוסים שלך,
               בונים את הפרופיל הנכון, ומוצאים את הדרך שלך לזוגיות.
-              <br /><strong>הצטרפות לליווי אישי כוללת כניסה למאגר הרווקים (שווי ₪249).</strong>
+              <br /><strong>הצטרפות לליווי אישי כוללת כניסה למאגר הרווקים (שווי ₪299).</strong>
             </p>
             <div className="flex items-center justify-between">
               <div>

@@ -46,10 +46,10 @@ function push(event: Record<string, unknown>) {
 // ─── Products catalogue ────────────────────────────────────────────────────────
 export const GA_PRODUCTS = {
   database: {
-    item_id: "database_249",
+    item_id: "database_299",
     item_name: "מאגר רווקים",
     item_category: "matchmaking",
-    price: 249,
+    price: 299,
     currency: "ILS",
   },
   course: {

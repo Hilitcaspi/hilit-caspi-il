@@ -112,8 +112,9 @@ export default function DatabaseSales() {
             <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-5">
               לא שידוך.<br />
               לא אפליקציה.<br />
-              <span className="text-[#ffe27c]">משהו אחר לגמרי.</span>
+            <span className="text-[#ffe27c]">משהו אחר לגמרי.</span>
             </h1>
+            <p className="text-[#ffe27c]/90 text-sm font-bold tracking-wide mb-3">המאגר החכם הגדול והמוביל בישראל • 5,000+ רווקים</p>
             <p className="text-white/75 text-lg leading-relaxed mb-8">
               בניתי שיטה שלוקחת את כל מה שטוב בכל אחד מהעולמות: גם המראה חשוב, גם הפרמטרים הבסיסיים, וגם הדפוסים הפנימיים שמנבאים אהבה שתחזיק לאורך שנים. לא בחרתי בין הגישות. שילבתי את כולן.
             </p>
@@ -135,7 +136,7 @@ export default function DatabaseSales() {
               <div className="absolute -inset-4 bg-gradient-to-br from-[#ffe27c]/30 to-[#1800ad]/30 rounded-3xl blur-2xl" />
               <img src={CASUAL_IMG} alt="הילית כספי" className="relative w-64 md:w-80 h-auto rounded-3xl object-cover shadow-2xl" />
               <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-[#191265] font-black text-2xl">2,400+</div>
+                <div className="text-[#191265] font-black text-2xl">5,000+</div>
                 <div className="text-[#727272] text-xs">רווקים במאגר</div>
               </div>
             </div>

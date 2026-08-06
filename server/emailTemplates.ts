@@ -80,7 +80,7 @@ function emailSignature(): string {
 function urgencyBanner(): string {
   return `<div style="background:linear-gradient(135deg,#7b0000 0%,#c0392b 100%); border-radius:12px; padding:16px 20px; margin:20px 0; text-align:center; border:2px solid #ff6b6b;">
     <p style="color:#ffe27c; font-size:13px; font-weight:700; margin:0 0 6px; letter-spacing:1px;">⏳ התראת מחיר</p>
-    <p style="color:#fff; font-size:15px; font-weight:700; margin:0 0 6px;">ההטבה שלך: ₪249 במקום ₪499</p>
+    <p style="color:#fff; font-size:15px; font-weight:700; margin:0 0 6px;">ההטבה שלך: ₪299 במקום ₪499</p>
     <p style="color:rgba(255,255,255,0.8); font-size:13px; margin:0;">הצטרפו עכשיו ותיהנו ממחיר מועדף - לא יהיה מחיר כזה שוב</p>
   </div>`;
 }
@@ -180,7 +180,7 @@ export const WOMEN_FIRST_STEP_EMAIL_1: EmailTemplate = {
     </div>
     <p>ובינתיים - הצטרפי לקבוצה השקטה שלי. שם אני משתפת תובנות שבועיות שלא מפרסמת בשום מקום אחר:</p>
     <a href="${WA_GROUP}" class="cta">הצטרפי לקבוצה השקטה שלי ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">2,400+ אנשים כבר שם. תוכן איכותי, ללא ספאם.</p>
+    <p style="color:#727272; font-size:13px; text-align:center;">5,000+ אנשים כבר שם. תוכן איכותי, ללא ספאם.</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -272,7 +272,7 @@ export const MEN_FIRST_STEP_EMAIL_1: EmailTemplate = {
     </div>
     <p>ובינתיים - הצטרף לקבוצה שלי לתוכן בלעדי ופרקטי:</p>
     <a href="${WA_GROUP}" class="cta">הצטרף לקבוצה ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">2,400+ אנשים כבר שם. תוכן איכותי, ללא ספאם.</p>
+    <p style="color:#727272; font-size:13px; text-align:center;">5,000+ אנשים כבר שם. תוכן איכותי, ללא ספאם.</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -789,7 +789,7 @@ export const ABANDONED_DATABASE_EMAIL_1: EmailTemplate = {
     </div>
     ${urgencyBanner()}
     <a href="${GROW_DATABASE}" class="cta">♡ הצטרפו למאגר עם ההנחה ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">₪224 במקום ₪249 · כניסה מיידית</p>
+    <p style="color:#727272; font-size:13px; text-align:center;">₪269 במקום ₪299 · כניסה מיידית</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1087,7 +1087,7 @@ const FREE_GUIDE_EMAIL_1: EmailTemplate = {
     <div class="quote">"הדבר הכי מפתיע שגיליתי? שרוב האנשים לא חסרים אהבה. הם חסרים את הכלים לזהות אותה כשהיא עומדת מולם."</div>
     <p>ובינתיים, אפשר להצטרף לקבוצת הוואטסאפ השקטה שלי:</p>
     <a href="https://hilitcaspi.com/api/wa/email" class="secondary-cta">הצטרפות לקבוצה השקטה ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">2,400+ אנשים כבר שם. תוכן איכותי, ללא ספאם.</p>
+    <p style="color:#727272; font-size:13px; text-align:center;">5,000+ אנשים כבר שם. תוכן איכותי, ללא ספאם.</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1096,7 +1096,7 @@ const FREE_GUIDE_EMAIL_1: EmailTemplate = {
 
 const FREE_GUIDE_EMAIL_PLACEHOLDER_REMOVE: EmailTemplate = {
   subject: "PLACEHOLDER",
-  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, המדריך שלך כאן</h2><p>שמח/ה שבחרת להוריד אותו. זה לא מקרי שהגעת לכאן.</p><p>המדריך מכיל 4 דפוסים שהמוח עושה בלי שאנחנו שמים לב, ושמעכבים אנשים ממציאת זוגיות.</p><div style="text-align:center;margin:28px 0"><a href="https://hilitcaspi.com/api/guide/download" class="cta">פתיחת המדריך החינמי</a></div><div class="quote">"הדבר הכי מפתיע שגיליתי? שרוב האנשים לא חסרים אהבה. הם חסרים את הכלים לזהות אותה כשהיא עומדת מולם."</div><p>בימים הקרובים אשלח תובנות נוספות. ובינתיים, אפשר להצטרף לקבוצת הוואטסאפ השקטה שלי:</p><a href="https://hilitcaspi.com/api/wa/email" class="secondary-cta">הצטרפות לקבוצה השקטה שלי</a><p style="color:#727272;font-size:13px;text-align:center">2,400+ אנשים כבר שם. תוכן איכותי, ללא ספאם.</p><p>ואם רוצים לדבר, אפשר לכתוב לי ישירות:</p><a href="https://wa.me/972552442334" class="secondary-cta">וואטסאפ עם הילית</a><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong><br>מאמנת ומשדכת</p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p><a href="https://wa.me/972552442334">וואטסאפ</a> · <a href="https://www.instagram.com/hilitcaspi_relationship">אינסטגרם</a></p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
+  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, המדריך שלך כאן</h2><p>שמח/ה שבחרת להוריד אותו. זה לא מקרי שהגעת לכאן.</p><p>המדריך מכיל 4 דפוסים שהמוח עושה בלי שאנחנו שמים לב, ושמעכבים אנשים ממציאת זוגיות.</p><div style="text-align:center;margin:28px 0"><a href="https://hilitcaspi.com/api/guide/download" class="cta">פתיחת המדריך החינמי</a></div><div class="quote">"הדבר הכי מפתיע שגיליתי? שרוב האנשים לא חסרים אהבה. הם חסרים את הכלים לזהות אותה כשהיא עומדת מולם."</div><p>בימים הקרובים אשלח תובנות נוספות. ובינתיים, אפשר להצטרף לקבוצת הוואטסאפ השקטה שלי:</p><a href="https://hilitcaspi.com/api/wa/email" class="secondary-cta">הצטרפות לקבוצה השקטה שלי</a><p style="color:#727272;font-size:13px;text-align:center">5,000+ אנשים כבר שם. תוכן איכותי, ללא ספאם.</p><p>ואם רוצים לדבר, אפשר לכתוב לי ישירות:</p><a href="https://wa.me/972552442334" class="secondary-cta">וואטסאפ עם הילית</a><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong><br>מאמנת ומשדכת</p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p><a href="https://wa.me/972552442334">וואטסאפ</a> · <a href="https://www.instagram.com/hilitcaspi_relationship">אינסטגרם</a></p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
   textBody: `{{firstName}}, המדריך שלך מוכן!\n\nפתיחה: https://hilitcaspi.com/api/guide/download\nקבוצת וואטסאפ: https://hilitcaspi.com/api/wa/email\n\nבאהבה,\nהילית`,
 };
 
@@ -1218,13 +1218,13 @@ const META_LEAD_DNA_EMAIL_1: EmailTemplate = {
 
 const META_LEAD_DNA_EMAIL_2: EmailTemplate = {
   subject: "השלמת את השאלון? הנה מה שמחכה לך",
-  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, הצעד הבא</h2><p>אם כבר עשית את שאלון ה-DNA, כל הכבוד! אם עוד לא, זה לוקח 3 דקות:</p><a href="https://www.hilitcaspi.com/dna-quiz" class="cta">שאלון ה-DNA (3 דקות)</a><p>אחרי שתסיים את השאלון, הצעד הטבעי הבא הוא להיכנס למאגר הרווקים. שם יש 3,000+ רווקים, כולם עברו אבחון DNA, וההתאמות מבוססות על האלגוריתם שלי.</p><div style="background:#f9f6f0;border-radius:12px;padding:20px 24px;margin:20px 0"><p style="font-size:15px;color:#191265;font-weight:700;margin:0 0 8px">כניסה למאגר הרווקים</p><p style="font-size:14px;color:#555;margin:0 0 12px">249 ש"ח. התאמות מבוססות אלגוריתם + אישור אישי שלי.</p><a href="https://hilitcaspi.com/join" style="display:inline-block;background:#191265;color:white;font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none">כניסה למאגר</a></div><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
+  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, הצעד הבא</h2><p>אם כבר עשית את שאלון ה-DNA, כל הכבוד! אם עוד לא, זה לוקח 3 דקות:</p><a href="https://www.hilitcaspi.com/dna-quiz" class="cta">שאלון ה-DNA (3 דקות)</a><p>אחרי שתסיים את השאלון, הצעד הטבעי הבא הוא להיכנס למאגר הרווקים. שם יש 5,000+ רווקים, כולם עברו אבחון DNA, וההתאמות מבוססות על האלגוריתם שלי.</p><div style="background:#f9f6f0;border-radius:12px;padding:20px 24px;margin:20px 0"><p style="font-size:15px;color:#191265;font-weight:700;margin:0 0 8px">כניסה למאגר הרווקים</p><p style="font-size:14px;color:#555;margin:0 0 12px">299 ש"ח. התאמות מבוססות אלגוריתם + אישור אישי שלי.</p><a href="https://hilitcaspi.com/join" style="display:inline-block;background:#191265;color:white;font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none">כניסה למאגר</a></div><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
   textBody: `{{firstName}}, השלמת את השאלון?\n\nשאלון: https://www.hilitcaspi.com/dna-quiz\nמאגר רווקים: https://hilitcaspi.com/join\n\nהילית`,
 };
 
 const META_LEAD_DNA_EMAIL_3: EmailTemplate = {
   subject: "{{firstName}}, קוד קופון מיוחד בשבילך",
-  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, מתנה קטנה ממני</h2><p>עברו כמה ימים מאז שנרשמת. רציתי לוודא שלא מפסידים:</p><div style="background:#191265;border-radius:12px;padding:24px;margin:24px 0;text-align:center"><p style="color:#ffe27c;font-size:14px;font-weight:700;margin:0 0 8px;letter-spacing:1px">קוד הקופון שלך</p><p style="color:#fff;font-size:32px;font-weight:900;margin:0 0 8px;letter-spacing:3px">HILIT10</p><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">10% הנחה על כל המוצרים</p></div><p>הקוד תקף לכל המוצרים:</p><a href="https://hilitcaspi.com/api/guide/download" class="secondary-cta">המדריך החינמי (0 ש"ח)</a><a href="https://hilitcaspi.com/guide" class="secondary-cta">המדריך "לבחור נכון" (249 ש"ח)</a>${urgencyBanner()}
+  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, מתנה קטנה ממני</h2><p>עברו כמה ימים מאז שנרשמת. רציתי לוודא שלא מפסידים:</p><div style="background:#191265;border-radius:12px;padding:24px;margin:24px 0;text-align:center"><p style="color:#ffe27c;font-size:14px;font-weight:700;margin:0 0 8px;letter-spacing:1px">קוד הקופון שלך</p><p style="color:#fff;font-size:32px;font-weight:900;margin:0 0 8px;letter-spacing:3px">HILIT10</p><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">10% הנחה על כל המוצרים</p></div><p>הקוד תקף לכל המוצרים:</p><a href="https://hilitcaspi.com/api/guide/download" class="secondary-cta">המדריך החינמי (0 ש"ח)</a><a href="https://hilitcaspi.com/guide" class="secondary-cta">המדריך "לבחור נכון" (299 ש"ח)</a>${urgencyBanner()}
 <a href="https://hilitcaspi.com/join" class="cta">כניסה למאגר הרווקים (499 ש"ח)</a><a href="https://hilitcaspi.com/single-session" class="secondary-cta">שיחת התאמה חינמית</a><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
   textBody: `{{firstName}}, קוד קופון מיוחד: HILIT10 (10% הנחה)\n\nמאגר: https://hilitcaspi.com/join\nמדריך: https://hilitcaspi.com/guide\nשיחה: https://hilitcaspi.com/single-session\n\nהילית`,
 };
@@ -1685,8 +1685,8 @@ export const WOMEN_V2_EMAIL_1: EmailTemplate = {
     <p>{{firstName}}, הפרופיל שלך הוא בדיוק מה שמאפשר לי לחפש עבורך התאמה אמיתית. במאגר שלי יש מאות גברים שעברו אבחון DNA זהה, ואני מחפשת את מי שמתאים לפרופיל שלך ספציפית.</p>
     <p>אין כאן אלגוריתם. אין כאן "סוויפ ימינה". יש כאן עיניים אנושיות שמסתכלות על שני פרופילים ואומרות: "כן, זה יכול לעבוד."</p>
     ${urgencyBanner()}
-    <a href="${MATCHMAKING_JOIN}" class="cta">כניסה למאגר הרווקים - ₪249 בלבד ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">₪499 המחיר המקורי | ₪249 מחיר מועדף | ללא דמי מנוי</p>
+    <a href="${MATCHMAKING_JOIN}" class="cta">כניסה למאגר הרווקים - ₪299 בלבד ←</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">₪499 המחיר המקורי | ₪299 מחיר מועדף | ללא דמי מנוי</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1709,10 +1709,10 @@ export const WOMEN_V2_EMAIL_2: EmailTemplate = {
     <div style="background:#191265; border-radius:14px; padding:24px 28px; margin:20px 0; text-align:center;">
       <p style="color:#ffe27c; font-size:13px; font-weight:600; margin:0 0 8px; letter-spacing:1px;">קוד קופון מיוחד</p>
       <p style="color:#ffffff; font-size:32px; font-weight:900; margin:0 0 6px; letter-spacing:4px;">LOVE10</p>
-      <p style="color:rgba(255,255,255,0.7); font-size:14px; margin:0;">10% הנחה נוספת על ₪249 = <strong style="color:#ffe27c;">₪224 בלבד</strong></p>
+      <p style="color:rgba(255,255,255,0.7); font-size:14px; margin:0;">10% הנחה נוספת על ₪299 = <strong style="color:#ffe27c;">₪269 בלבד</strong></p>
     </div>
     <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר עם קוד LOVE10 ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | מחיר מועדף ₪249 | עם קוד LOVE10 רק ₪224</p>
+    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | מחיר מועדף ₪299 | עם קוד LOVE10 רק ₪269</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1733,8 +1733,8 @@ export const WOMEN_V2_EMAIL_3: EmailTemplate = {
     </div>
     <p>{{firstName}}, אני רוצה לעשות את זה בשבילך.</p>
     ${urgencyBanner()}
-    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪249 ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | ₪249 מחיר מועדף | ללא דמי מנוי</p>
+    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪299 ←</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | ₪299 מחיר מועדף | ללא דמי מנוי</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1757,7 +1757,7 @@ export const WOMEN_V2_EMAIL_4: EmailTemplate = {
     <p style="color:#727272; font-size:13px; text-align:center;">שיחה של 60 דקות | ניתוח הפרופיל שלך | תוכנית פעולה אישית</p>
     <p>או אם את מוכנה להצטרף למאגר ישיר:</p>
     ${urgencyBanner()}
-    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪249 ←</a>
+    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪299 ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1781,8 +1781,8 @@ export const WOMEN_V2_EMAIL_5: EmailTemplate = {
     <a href="https://hilitcaspi.com/guide" class="secondary-cta">מדריך 'לבחור נכון' - ₪149 ←</a>
     <p style="color:#727272; font-size:13px; text-align:center;">כלים מעשיים. תרגילים. שיטה שעובדת.</p>
     <p>ואם כבר יודעים מה מחפשים ומוכנים לצעד הבא, המאגר פתוח:</p>
-    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪249 ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | מחיר מועדף ₪249 | ללא דמי מנוי</p>
+    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪299 ←</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | מחיר מועדף ₪299 | ללא דמי מנוי</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1799,9 +1799,9 @@ export const WOMEN_V2_EMAIL_6: EmailTemplate = {
     <div style="background:#191265; border-radius:14px; padding:28px; margin:24px 0; text-align:center;">
       <p style="color:#ffe27c; font-size:13px; font-weight:600; margin:0 0 8px; letter-spacing:1px;">קוד הקופון שלך</p>
       <p style="color:#ffffff; font-size:36px; font-weight:900; margin:0 0 8px; letter-spacing:4px;">LOVE10</p>
-      <p style="color:rgba(255,255,255,0.7); font-size:14px; margin:0;">10% הנחה נוספת על ₪249</p>
+      <p style="color:rgba(255,255,255,0.7); font-size:14px; margin:0;">10% הנחה נוספת על ₪299</p>
     </div>
-    <p>זה אומר שתצטרפי ב-<strong>₪224 בלבד</strong> (במקום ₪499 המחיר המקורי).</p>
+    <p>זה אומר שתצטרפי ב-<strong>₪269 בלבד</strong> (במקום ₪499 המחיר המקורי).</p>
     <p>או אם את מעדיפה לקבל כלים לפני שמחליטים - המדריך שלי בדיוק בשבילך:</p>
     <a href="https://hilitcaspi.com/guide" class="secondary-cta">מדריך 'לבחור נכון' - ₪249 ←</a>
     <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר עם קוד LOVE10 ←</a>
@@ -1842,8 +1842,8 @@ export const MEN_V2_EMAIL_1: EmailTemplate = {
       <p style="font-size:15px; color:#444; line-height:1.8; margin:0;">{{dnaTypeMatch}}</p>
     </div>
     <p>{{firstName}}, הפרופיל שלך הוא בדיוק מה שמאפשר לי לחפש עבורך התאמה אמיתית. במאגר שלי יש מאות נשים שעברו אבחון DNA זהה, ואני מחפשת את מי שמתאים לפרופיל שלך ספציפית.</p>
-    <a href="${MATCHMAKING_JOIN}" class="cta">כניסה למאגר הרווקים - ₪249 בלבד ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">₪499 המחיר המקורי | ₪249 מחיר מועדף | ללא דמי מנוי</p>
+    <a href="${MATCHMAKING_JOIN}" class="cta">כניסה למאגר הרווקים - ₪299 בלבד ←</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">₪499 המחיר המקורי | ₪299 מחיר מועדף | ללא דמי מנוי</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1865,10 +1865,10 @@ export const MEN_V2_EMAIL_2: EmailTemplate = {
     <div style="background:#191265; border-radius:14px; padding:24px 28px; margin:20px 0; text-align:center;">
       <p style="color:#ffe27c; font-size:13px; font-weight:600; margin:0 0 8px; letter-spacing:1px;">קוד קופון מיוחד</p>
       <p style="color:#ffffff; font-size:32px; font-weight:900; margin:0 0 6px; letter-spacing:4px;">LOVE10</p>
-      <p style="color:rgba(255,255,255,0.7); font-size:14px; margin:0;">10% הנחה נוספת על ₪249 = <strong style="color:#ffe27c;">₪224 בלבד</strong></p>
+      <p style="color:rgba(255,255,255,0.7); font-size:14px; margin:0;">10% הנחה נוספת על ₪299 = <strong style="color:#ffe27c;">₪269 בלבד</strong></p>
     </div>
     <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר עם קוד LOVE10 ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | מחיר מועדף ₪249 | עם קוד LOVE10 רק ₪224</p>
+    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | מחיר מועדף ₪299 | עם קוד LOVE10 רק ₪269</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1888,8 +1888,8 @@ export const MEN_V2_EMAIL_3: EmailTemplate = {
     </div>
     <p>זה לא קסם. זה שיטה. כשמתאימים שני פרופילים שמבינים מה הם מחפשים, הדברים קורים אחרת.</p>
     <p>{{firstName}}, אני רוצה לעשות את זה בשבילך.</p>
-    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪249 ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | ₪249 מחיר מועדף | ללא דמי מנוי</p>
+    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪299 ←</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | ₪299 מחיר מועדף | ללא דמי מנוי</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1912,8 +1912,8 @@ export const MEN_V2_EMAIL_4: EmailTemplate = {
       "אני לא שולחת התאמות סתם. כל התאמה שאני שולחת, אני יכולה לעמוד מאחוריה ולהסביר למה."
     </div>
     <p>{{firstName}}, הפרופיל שלך כבר מוכן. כל מה שנשאר זה להצטרף.</p>
-    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪249 ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | ₪249 מחיר מועדף | ללא דמי מנוי</p>
+    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪299 ←</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | ₪299 מחיר מועדף | ללא דמי מנוי</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -1922,7 +1922,7 @@ export const MEN_V2_EMAIL_4: EmailTemplate = {
 
 // מייל 5: CTA ישיר + מחיר (יום 10)
 export const MEN_V2_EMAIL_5: EmailTemplate = {
-  subject: "{{firstName}}, ₪249 במקום ₪499 - עד מתי?",
+  subject: "{{firstName}}, ₪299 במקום ₪499 - עד מתי?",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, רציתי להיות ישיר איתך</h2>
     <p>שלחתי לך כמה מיילים בשבועות האחרונים. ראיתי שאתה פותח אותם.</p>
@@ -1932,15 +1932,15 @@ export const MEN_V2_EMAIL_5: EmailTemplate = {
     <div style="background:#191265; border-radius:14px; padding:28px; margin:24px 0; text-align:center;">
       <p style="color:#ffe27c; font-size:13px; font-weight:600; margin:0 0 8px; letter-spacing:1px;">הטבה מיוחדת עבורך</p>
       <p style="color:rgba(255,255,255,0.5); font-size:16px; text-decoration:line-through; margin:0 0 4px;">₪499</p>
-      <p style="color:#ffffff; font-size:42px; font-weight:900; margin:0 0 8px;">₪249</p>
+      <p style="color:#ffffff; font-size:42px; font-weight:900; margin:0 0 8px;">₪299</p>
       <p style="color:rgba(255,255,255,0.7); font-size:13px; margin:0;">ללא דמי מנוי. פעם אחת.</p>
     </div>
     <p>אם לא תצטרף, לא יקרה כלום. אבל אם כן, אני מתחילה לחפש עבורך.</p>
-    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪249 עכשיו ←</a>
+    <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪299 עכשיו ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, מחיר מועדף ₪249 במקום ₪499.\n\nהצטרף: ${MATCHMAKING_JOIN}\n\nבאהבה,\nהילית`,
+  textBody: `{{firstName}}, מחיר מועדף ₪299 במקום ₪499.\n\nהצטרף: ${MATCHMAKING_JOIN}\n\nבאהבה,\nהילית`,
 };
 
 // מייל 6: קוד קופון LOVE10 + "המייל האחרון" (יום 14)
@@ -1953,9 +1953,9 @@ export const MEN_V2_EMAIL_6: EmailTemplate = {
     <div style="background:#191265; border-radius:14px; padding:28px; margin:24px 0; text-align:center;">
       <p style="color:#ffe27c; font-size:13px; font-weight:600; margin:0 0 8px; letter-spacing:1px;">קוד הקופון שלך</p>
       <p style="color:#ffffff; font-size:36px; font-weight:900; margin:0 0 8px; letter-spacing:4px;">LOVE10</p>
-      <p style="color:rgba(255,255,255,0.7); font-size:14px; margin:0;">10% הנחה נוספת על ₪249</p>
+      <p style="color:rgba(255,255,255,0.7); font-size:14px; margin:0;">10% הנחה נוספת על ₪299</p>
     </div>
-    <p>זה אומר שתצטרף ב-<strong>₪224 בלבד</strong> (במקום ₪499 המחיר המקורי).</p>
+    <p>זה אומר שתצטרף ב-<strong>₪269 בלבד</strong> (במקום ₪499 המחיר המקורי).</p>
     <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר עם קוד LOVE10 ←</a>
     <p style="color:#727272; font-size:13px; text-align:center;">הקוד תקף ל-48 שעות</p>
     <p>ואם יש לך שאלות לפני שמחליט, אתה מוזמן לכתוב לי ישירות בוואטסאפ:</p>

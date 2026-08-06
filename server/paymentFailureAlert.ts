@@ -46,7 +46,7 @@ export interface PaymentFailureInfo {
 }
 
 const PRODUCT_LABELS: Record<string, string> = {
-  database: "מאגר הרווקים (249 ₪)",
+  database: "מאגר הרווקים (299 ₪)",
   guide: "מדריך לבחור נכון (149 ₪)",
   course: "קורס המסע (249 ₪)",
   coaching: "ליווי אישי (3 חודשים)",

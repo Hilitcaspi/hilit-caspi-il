@@ -279,7 +279,7 @@ export default function SignsGuide() {
               <p className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">מי אני</p>
               <h2 className="text-2xl font-black text-[#191265] mb-4">הילית כספי</h2>
               <p className="text-[#555] leading-relaxed mb-4">
-                Relationship Expert ושדכנית מקצועית. מאות שעות של ליווי אינטנסיבי של רווקים ורווקות לזוגיות, פודקאסט עם למעלה מ-200,000 האזנות, ומאגר רווקים עם מעל 3,000 חברים.
+                Relationship Expert ושדכנית מקצועית. מאות שעות של ליווי אינטנסיבי של רווקים ורווקות לזוגיות, פודקאסט עם למעלה מ-200,000 האזנות, ומאגר רווקים עם מעל 5,000 חברים.
               </p>
               <p className="text-[#555] leading-relaxed mb-4">
                 מה שמייחד את הגישה שלי: אני לא מאמינה ב"טיפים לדייטינג". אני מאמינה שהדרך למצוא אהבה עוברת דרך הבנה עמוקה של עצמך - ושל מה שאת באמת מחפשת. מדע האהבה הוא הבסיס. הניסיון הוא הכלי.

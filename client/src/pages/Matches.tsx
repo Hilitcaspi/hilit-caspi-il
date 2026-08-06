@@ -295,7 +295,7 @@ export default function Matches() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-[#191265] font-black text-2xl">₪2,900</div>
-                  <div className="text-[#191265]/60 text-xs">8 פגישות ליווי אישי + כניסה למאגר (שווי ₪249) כלולה</div>
+                  <div className="text-[#191265]/60 text-xs">8 פגישות ליווי אישי + כניסה למאגר (שווי ₪299) כלולה</div>
                 </div>
                 <a
                   href="/single-session"

@@ -305,7 +305,7 @@ export default function CoachingSales() {
                   <div className="inline-block bg-[#ffe27c] text-[#191265] text-xs font-black px-3 py-1 rounded-full mb-3">כלול בשני התהליכים</div>
                   <h3 className="text-2xl font-black text-white mb-3">גישה למאגר הרווקים הבלעדי</h3>
                   <p className="text-white/75 text-sm leading-relaxed mb-4">
-                    מעל 2,400 רווקים ורווקות שעברו סינון אישי. לא אפליקציה. לא שדכן אקראי. מאגר שנבנה על בסיס DNA זוגי ואישור אישי של הילית לכל פרופיל.
+                    מעל 5,000 רווקים ורווקות שעברו סינון אישי. לא אפליקציה. לא שדכן אקראי. מאגר שנבנה על בסיס DNA זוגי ואישור אישי של הילית לכל פרופיל.
                     <br /><br />
                     לאחר התשלום תקבלו הסבר מלא על הכניסה למאגר ואיך להפעיל את הגישה.
                   </p>

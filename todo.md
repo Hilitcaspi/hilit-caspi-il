@@ -423,3 +423,8 @@
 - [x] Expanded profile card: full edit mode already existed via EditSingleModal (accessible from singles tab)
 - [x] Extended patchMissingData server procedure with wantsKids, hasKids, numKids, phone, smokingStatus, partnerDescription, minAge/maxAgePreference
 - [x] Fix: toggleCoachingClient button — added e.stopPropagation(), cursor-pointer, and better error toast with message
+
+## Price & Database Size Update (Aug 6)
+- [x] Change price from 249 to 299 in all pages, emails, payment flows, and content
+- [x] Change database size from 2,400/2400/3,000 to 5,000+ everywhere
+- [x] Add "המאגר החכם הגדול והמוביל בישראל" in DatabaseSales, Register, Home, DatabaseLanding

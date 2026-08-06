@@ -355,7 +355,7 @@ export default function Quiz() {
                 <div className="bg-[#f0eadc] rounded-2xl p-5 mb-6 text-right">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-[#191265] font-bold">גישה למאגר + 3 התאמות אישיות</span>
-                    <span className="text-[#191265] font-black text-xl">₪249</span>
+                    <span className="text-[#191265] font-black text-xl">₪299</span>
                   </div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-[#727272] text-sm">פרופיל מפורט + תמונה</span>
@@ -370,7 +370,7 @@ export default function Quiz() {
                   onClick={() => navigate(`/register?type=${result.personalityType}`)}
                   className="w-full bg-[#191265] text-white font-black text-lg py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 hover:scale-[1.02] shadow-xl mb-4"
                 >
-                  הצטרפי למאגר - ₪249 ←
+                  הצטרפי למאגר - ₪299 ←
                 </button>
                 <p className="text-[#727272] text-sm">
                   תשלום מאובטח • ביטול בכל עת

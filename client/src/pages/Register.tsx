@@ -277,7 +277,7 @@ export default function Register() {
     e.preventDefault();
     // If DNA already known (came from quiz), skip DNA step entirely
     if (dnaFromQuiz) {
-      trackInitiateCheckout({ value: 249, currency: "ILS", content_name: "מאגר רווקים" });
+      trackInitiateCheckout({ value: 299, currency: "ILS", content_name: "מאגר רווקים" });
       gaBeginCheckout("database");
       setStep("payment");
     } else {
@@ -620,13 +620,13 @@ export default function Register() {
               {/* Database intro (shown when coming from /database) */}
               {params.get("source") === "database" && (
                 <div className="bg-[#191265] rounded-2xl p-6 mb-6 text-right">
-                  <h2 className="text-[#ffe27c] font-black text-xl mb-3">💎 מאגר הרווקים של הילית כספי</h2>
+                  <h2 className="text-[#ffe27c] font-black text-xl mb-3">💎 המאגר החכם הגדול והמוביל בישראל</h2>
                   <p className="text-white/80 text-sm leading-relaxed mb-4">
                     המאגר שלי שונה מכל אפליקציה אחרת. ההתאמות מבוססות על חישובים מתקדמים ומודלים מדעיים, ולאחר מכן אני עוברת על כל הצעה אישית ומאשרת אותה בעצמי.
                   </p>
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     {[
-                      { n: "2,400+", l: "רווקים במאגר" },
+                      { n: "5,000+", l: "רווקים במאגר" },
                       { n: "500+", l: "סיפורי הצלחה" },
                       { n: "7-14", l: "ימים להתאמה ראשונה" },
                     ].map(({ n, l }) => (
@@ -638,7 +638,7 @@ export default function Register() {
                   </div>
                   <div className="bg-[#ffe27c]/10 border border-[#ffe27c]/30 rounded-xl p-3">
                     <p className="text-[#ffe27c] text-xs font-bold mb-1">הפלואו:</p>
-                    <p className="text-white/70 text-xs">מלא/י פרטים ושאלון DNA → תשלום ₪249 → מייל עם קישור לשאלון המדעי → אישור כניסה למאגר</p>
+                    <p className="text-white/70 text-xs">מלא/י פרטים ושאלון DNA → תשלום ₪299 → מייל עם קישור לשאלון המדעי → אישור כניסה למאגר</p>
                   </div>
                 </div>
               )}
@@ -1076,7 +1076,7 @@ export default function Register() {
                 </label>
                 <button type="submit"
                   className="w-full bg-[#191265] text-white font-black text-lg py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 shadow-xl">
-                  המשך לתשלום ₪249 ←
+                  המשך לתשלום ₪299 ←
                 </button>
               </form>
             </motion.div>
@@ -1250,7 +1250,7 @@ export default function Register() {
                   setDnaFromQuiz(dnaType);
                   setGender(quizGender as "female" | "male");
                   if (quizSessionId) setSessionId(quizSessionId);
-                  trackInitiateCheckout({ value: 249, currency: "ILS", content_name: "מאגר רווקים" });
+                  trackInitiateCheckout({ value: 299, currency: "ILS", content_name: "מאגר רווקים" });
                   setStep("payment");
                 }}
               />
@@ -1278,7 +1278,7 @@ export default function Register() {
                     </div>
                   ))}
                 </div>
-                <p className="text-white/60 text-xs mt-2">מחיר מועדף ₪249 במקום ₪499</p>
+                <p className="text-white/60 text-xs mt-2">מחיר מועדף ₪299 במקום ₪499</p>
               </div>
 
               <div className="text-center mb-8">
@@ -1306,7 +1306,7 @@ export default function Register() {
                 </div>
                 <div className="border-t border-white/20 mt-5 pt-5 flex justify-between items-center">
                   <span className="text-white/70">תשלום חד-פעמי</span>
-                  <span className="text-[#ffe27c] font-black text-3xl">₪249 <span className="text-white/40 line-through text-xl font-normal">₪499</span></span>
+                  <span className="text-[#ffe27c] font-black text-3xl">₪299 <span className="text-white/40 line-through text-xl font-normal">₪499</span></span>
                 </div>
               </div>
 

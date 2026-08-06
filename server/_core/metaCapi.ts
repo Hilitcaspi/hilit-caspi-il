@@ -18,7 +18,7 @@ const CAPI_URL = "https://graph.facebook.com/v21.0";
 
 // ─── Product catalog ──────────────────────────────────────────────────────────
 const CAPI_PRODUCTS: Record<string, { name: string; price: number; currency: string }> = {
-  database:     { name: "מאגר רווקים",          price: 249,  currency: "ILS" },
+  database:     { name: "מאגר רווקים",          price: 299,  currency: "ILS" },
   guide:        { name: "מדריך לבחור נכון",      price: 149,  currency: "ILS" },
   course:       { name: "קורס המסע",             price: 249,  currency: "ILS" },
   coaching:     { name: "ליווי אישי 8 פגישות",   price: 2900, currency: "ILS" },

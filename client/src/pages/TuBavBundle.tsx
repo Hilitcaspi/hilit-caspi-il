@@ -176,7 +176,7 @@ export default function TuBavBundle() {
           <motion.div variants={fadeUp} className="relative">
             <img src={ABOUT_IMG} alt="הילית כספי" loading="lazy" decoding="async" className="w-full max-w-sm mx-auto rounded-3xl object-cover shadow-2xl" />
             <div className="absolute -bottom-4 -left-4 bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white rounded-2xl p-4 shadow-xl max-w-[180px]">
-              <div className="font-black text-xl">+2,400</div>
+              <div className="font-black text-xl">+5,000</div>
               <div className="text-white/90 text-xs">רווקים במאגר</div>
             </div>
           </motion.div>
@@ -291,7 +291,7 @@ export default function TuBavBundle() {
               <div className="mt-5 pt-4 border-t border-[#ffe0e6]">
                 <span className="text-[#888] text-sm">מחיר רגיל: </span>
                 <span className="line-through text-[#888] text-sm">₪499</span>
-                <span className="text-[#1a0a2e] font-bold text-sm mr-2">₪249 בחבילה</span>
+                <span className="text-[#1a0a2e] font-bold text-sm mr-2">₪299 בחבילה</span>
               </div>
             </motion.div>
 

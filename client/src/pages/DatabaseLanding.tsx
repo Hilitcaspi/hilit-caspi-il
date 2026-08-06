@@ -1,7 +1,7 @@
 /**
  * DatabaseLanding — עמוד נחיתה ייעודי לקמפיין מאגר רווקים
  * מיועד לקהל: רווק/ה 28-38, מרכז הארץ, חילוני-מסורתי, ללא ילדים
- * מסר מרכזי: שדכנית אמיתית, לא אלגוריתם. תשלום חד-פעמי ₪249.
+ * מסר מרכזי: שדכנית אמיתית, לא אלגוריתם. תשלום חד-פעמי ₪299.
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -48,12 +48,12 @@ function StickyCTA() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#191265]/97 backdrop-blur-md border-t border-white/10 px-4 py-3 flex items-center justify-between gap-4">
       <div className="text-white text-sm hidden sm:block">
-        <span className="font-bold">מאגר רווקים | הילית כספי</span>
-        <span className="text-white/60 mr-2">תשלום חד-פעמי ₪249</span>
+        <span className="font-bold">המאגר החכם הגדול והמוביל בישראל | הילית כספי</span>
+        <span className="text-white/60 mr-2">תשלום חד-פעמי ₪299</span>
       </div>
       <Link href={JOIN_URL}>
         <span
-          onClick={() => trackInitiateCheckout({ value: 249, currency: "ILS", content_name: "מאגר רווקים" })}
+          onClick={() => trackInitiateCheckout({ value: 299, currency: "ILS", content_name: "מאגר רווקים" })}
           className="bg-[#ffe27c] text-[#191265] font-black px-6 py-3 rounded-xl text-base hover:bg-white transition-all duration-200 cursor-pointer block whitespace-nowrap"
         >
           הצטרפות למאגר ←
@@ -85,7 +85,7 @@ export default function DatabaseLanding() {
           <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.9 }} className="text-right order-2 md:order-1">
             <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
               className="inline-flex items-center gap-2 bg-[#ffe27c]/15 border border-[#ffe27c]/30 text-[#ffe27c] text-sm font-semibold px-4 py-2 rounded-full mb-6">
-              ✦ 3,000+ רווקים ורווקות במאגר
+              ✦ 5,000+ רווקים ורווקות במאגר
             </motion.div>
 
             <h1 className="text-4xl md:text-5xl lg:text-[3.4rem] font-black text-white leading-[1.15] mb-5">
@@ -103,14 +103,14 @@ export default function DatabaseLanding() {
             {/* Price box */}
             <div className="bg-white/8 border border-white/15 rounded-2xl px-5 py-4 mb-7 inline-block text-right">
               <div className="text-white/50 text-sm line-through mb-0.5">₪499 מחיר מקורי</div>
-              <div className="text-[#ffe27c] text-4xl font-black leading-none">₪249</div>
+              <div className="text-[#ffe27c] text-4xl font-black leading-none">₪299</div>
               <div className="text-white/60 text-sm mt-1">תשלום חד-פעמי · ללא דמי מנוי</div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
               <Link href={JOIN_URL}>
                 <span
-                  onClick={() => trackInitiateCheckout({ value: 249, currency: "ILS", content_name: "מאגר רווקים" })}
+                  onClick={() => trackInitiateCheckout({ value: 299, currency: "ILS", content_name: "מאגר רווקים" })}
                   className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-[1.03] shadow-2xl text-center cursor-pointer block"
                 >
                   ♡ הצטרפות למאגר עכשיו
@@ -182,7 +182,7 @@ export default function DatabaseLanding() {
               {[
                 { n: "1", title: "שאלון DNA", desc: "ממלאים שאלון מעמיק שחושף את הדפוסים הזוגיים האמיתיים שלך." },
                 { n: "2", title: "פרופיל אישי", desc: "מוסיפים תמונה ומשפטים. אני קוראת כל פרופיל ומאשרת אישית." },
-                { n: "3", title: "תשלום חד-פעמי", desc: "₪249 פעם אחת. ללא דמי מנוי. ללא הפתעות." },
+                { n: "3", title: "תשלום חד-פעמי", desc: "₪299 פעם אחת. ללא דמי מנוי. ללא הפתעות." },
                 { n: "4", title: "התאמות מדויקות", desc: "כשיש התאמה מעל 80%, שניכם מקבלים הצעה. רק אם שניכם אמרתם כן — הפרטים נחשפים." },
               ].map(step => (
                 <motion.div key={step.n} variants={fadeUp} className="relative">
@@ -212,10 +212,10 @@ export default function DatabaseLanding() {
                 עזבתי קריירה בהייטק כי הבנתי שמשימת חיי היא אחרת. ראיתי יותר מדי אנשים מוכשרים ומצליחים שנשארים לבד — לא כי משהו שבור בהם, אלא כי אף אחד לא ראה את הפרופיל האמיתי שלהם.
               </p>
               <p className="text-[#444] leading-relaxed mb-6">
-                בניתי שיטה שמשלבת מחקר פסיכולוגי, DNA זוגי, ואינטואיציה שצברתי מ-500+ שיחות עם לקוחות. הפודקאסט שלי נשמע 200,000+ פעמים. המאגר שלי מכיל 3,000+ רווקים שעברו אבחון מעמיק.
+                בניתי שיטה שמשלבת מחקר פסיכולוגי, DNA זוגי, ואינטואיציה שצברתי מ-500+ שיחות עם לקוחות. הפודקאסט שלי נשמע 200,000+ פעמים. המאגר שלי מכיל 5,000+ רווקים שעברו אבחון מעמיק.
               </p>
               <div className="flex gap-6 flex-wrap">
-                {[["500+", "לקוחות"], ["200K+", "האזנות"], ["3,000+", "במאגר"]].map(([n, l]) => (
+                {[["500+", "לקוחות"], ["200K+", "האזנות"], ["5,000+", "במאגר"]].map(([n, l]) => (
                   <div key={l} className="text-center">
                     <div className="text-2xl font-black text-[#191265]">{n}</div>
                     <div className="text-[#727272] text-xs">{l}</div>
@@ -285,17 +285,17 @@ export default function DatabaseLanding() {
             תפסיק/י לחפש לבד.
           </motion.h2>
           <motion.p variants={fadeUp} className="text-white/65 text-lg mb-8 max-w-lg mx-auto">
-            3,000+ רווקים ורווקות מחכים. שדכנית אמיתית שתחפש בשבילך. תשלום חד-פעמי.
+            5,000+ רווקים ורווקות מחכים. שדכנית אמיתית שתחפש בשבילך. תשלום חד-פעמי.
           </motion.p>
           <motion.div variants={fadeUp} className="flex flex-col items-center gap-3">
             <div className="bg-white/8 border border-white/15 rounded-2xl px-8 py-4 mb-2 inline-block">
               <div className="text-white/50 text-sm line-through">₪499</div>
-              <div className="text-[#ffe27c] text-5xl font-black leading-none">₪249</div>
+              <div className="text-[#ffe27c] text-5xl font-black leading-none">₪299</div>
               <div className="text-white/50 text-sm mt-1">תשלום חד-פעמי · ללא דמי מנוי</div>
             </div>
             <Link href={JOIN_URL}>
               <span
-                onClick={() => trackInitiateCheckout({ value: 249, currency: "ILS", content_name: "מאגר רווקים" })}
+                onClick={() => trackInitiateCheckout({ value: 299, currency: "ILS", content_name: "מאגר רווקים" })}
                 className="bg-[#ffe27c] text-[#191265] font-black text-xl px-12 py-5 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-[1.03] shadow-2xl cursor-pointer block"
               >
                 ♡ הצטרפות למאגר עכשיו

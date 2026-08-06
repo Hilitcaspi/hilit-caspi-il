@@ -77,7 +77,7 @@ export async function sendGA4Events(
 // ─── Product catalog ───────────────────────────────────────────────────────────
 
 export const GA4_PRODUCTS: Record<string, { id: string; name: string; price: number }> = {
-  database:  { id: "database",  name: "מאגר רווקים",         price: 249 },
+  database:  { id: "database",  name: "מאגר רווקים",         price: 299 },
   course:    { id: "course",    name: "קורס המסע",            price: 249 },
   coaching:  { id: "coaching",  name: "ליווי אישי 8 פגישות",  price: 2900 },
   guide:     { id: "guide",     name: "מדריך לבחור נכון",     price: 149 },

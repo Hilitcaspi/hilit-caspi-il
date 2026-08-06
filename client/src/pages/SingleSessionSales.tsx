@@ -230,7 +230,7 @@ export default function SingleSessionSales() {
               </p>
               <div className="flex flex-wrap gap-4">
                 {[
-                  { n: "2,400+", l: "רווקים במאגר" },
+                  { n: "5,000+", l: "רווקים במאגר" },
                   { n: "500+", l: "אנשים שליוויתי" },
                   { n: "200K+", l: "האזנות לפודקאסט" },
                 ].map(({ n, l }) => (

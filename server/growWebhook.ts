@@ -72,7 +72,7 @@ function detectProductByAmount(sum: number): string | null {
   if (sum === 349) return "bundle_tubav"; // Tu B'Av bundle: database + guide
   if (sum >= 240 && sum <= 260) return "course";
   if (sum >= 140 && sum <= 160) return "guide";
-  if (sum >= 200 && sum <= 260) return "database"; // ₪249
+  if (sum >= 280 && sum <= 320) return "database"; // ₪299
   if (sum >= 85 && sum <= 115) return "live_event";  // ₪99 live Q&A
   return null;
 }
@@ -328,7 +328,7 @@ async function handleDatabase(email: string, name: string, phone: string, transa
 
   const joinUrl = `${SITE_BASE}/join/questionnaire?token=${singleRecord.questionnaireToken}`;
 
-  await notifyOwner({ title: "תשלום מאגר חדש! 💛", content: `${name} (${email}) שילם דמי רישום למאגר ב-249 ₪. Transaction: ${transactionId || 'N/A'}` });
+  await notifyOwner({ title: "תשלום מאגר חדש! 💛", content: `${name} (${email}) שילם דמי רישום למאגר ב-299 ₪. Transaction: ${transactionId || 'N/A'}` });
 
   // Send personal join link email
   sendEmail({

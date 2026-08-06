@@ -25,7 +25,7 @@ describe("grow proxy (post-body-parser, no hang)", () => {
       const body = new URLSearchParams({
         pageCode: process.env.GROW_PAGE_CODE_DATABASE || "b497c06813ac",
         userId: process.env.GROW_USER_ID || "e02cfda4ca3d4736",
-        sum: "249",
+        sum: "299",
         description: "vitest proxy check",
         successUrl: "https://hilitcaspi.com/thank-you/database",
         cancelUrl: "https://hilitcaspi.com",

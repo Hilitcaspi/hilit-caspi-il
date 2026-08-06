@@ -155,7 +155,7 @@ export default function Speaking() {
             {[
               { n: "500+", label: "נשים שליוותי" },
               { n: "200K+", label: "האזנות לפודקאסט" },
-              { n: "2,400+", label: "רווקים במאגר" },
+              { n: "5,000+", label: "רווקים במאגר" },
             ].map(item => (
               <div key={item.label} className="bg-white/10 rounded-2xl p-6">
                 <div className="text-3xl font-black text-[#ffe27c] mb-1">{item.n}</div>

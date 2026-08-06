@@ -286,7 +286,7 @@ export default function GuideSales() {
                 המדריך הזה הוא תמצית של מה שלמדתי מאלפי שיחות, פגישות ותהליכים. לא תיאורטי, אלא מה שבאמת עובד בשטח.
               </p>
               <div className="flex gap-6">
-                {[{ n: "500+", label: "אנשים שליוויתי" }, { n: "2,400+", label: "רווקים במאגר" }, { n: "200K+", label: "האזנות לפודקאסט" }].map(({ n, label }) => (
+                {[{ n: "500+", label: "אנשים שליוויתי" }, { n: "5,000+", label: "רווקים במאגר" }, { n: "200K+", label: "האזנות לפודקאסט" }].map(({ n, label }) => (
                   <div key={label} className="text-center">
                     <div className="text-[#ffe27c] font-black text-2xl">{n}</div>
                     <div className="text-white/50 text-xs mt-1">{label}</div>

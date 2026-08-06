@@ -16,7 +16,7 @@ describe("Grow production credentials", () => {
     const params = new URLSearchParams();
     params.append("pageCode", pageCode!);
     params.append("userId", userId!);
-    params.append("sum", "249");
+    params.append("sum", "299");
     params.append("description", "vitest credential check");
     params.append("successUrl", "https://hilitcaspi.com/thank-you/database");
     params.append("cancelUrl", "https://hilitcaspi.com");

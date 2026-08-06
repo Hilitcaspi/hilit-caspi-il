@@ -68,7 +68,7 @@ export interface ProductConfig {
 }
 
 export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
-  database:     { description: "מאגר הרווקים של הילית כספי",                         sum: 249,  paymentNum: 1 },
+  database:     { description: "מאגר הרווקים של הילית כספי",                         sum: 299,  paymentNum: 1 },
   guide:        { description: "מדריך לבחור נכון של הילית כספי",                      sum: 149,  paymentNum: 1 },
   course:       { description: "קורס המסע של הילית כספי",                             sum: 249,  paymentNum: 1 },
   coaching:     { description: "ליווי אישי - תהליך הבנה (8 פגישות) עם הילית כספי",  sum: 2960, maxPaymentNum: 8 },
