@@ -275,6 +275,17 @@ export default function Register() {
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Manual validation for iOS Safari (which doesn't show native validation popups)
+    const form = e.target as HTMLFormElement;
+    if (!form.checkValidity()) {
+      const firstInvalid = form.querySelector(':invalid') as HTMLElement;
+      if (firstInvalid) {
+        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstInvalid.focus();
+      }
+      form.reportValidity();
+      return;
+    }
     // If DNA already known (came from quiz), skip DNA step entirely
     if (dnaFromQuiz) {
       trackInitiateCheckout({ value: 299, currency: "ILS", content_name: "מאגר רווקים" });
