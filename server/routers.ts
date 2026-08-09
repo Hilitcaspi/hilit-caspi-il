@@ -4646,6 +4646,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             matchId: m.id,
             score: m.score ?? 0,
             status: m.status,
+            approvedByA: m.approvedByA,
+            approvedByB: m.approvedByB,
             scoreBreakdown: m.scoreBreakdown,
             opponent: opponent ? {
               id: opponent.id,

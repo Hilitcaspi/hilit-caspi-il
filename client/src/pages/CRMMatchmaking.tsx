@@ -1207,13 +1207,20 @@ export default function CRMMatchmaking() {
                                       <div className="mt-1.5 bg-[#ffe27c] text-[#191265] font-black text-xs px-2 py-0.5 rounded-full inline-block">
                                         {Math.round(m.score)}%
                                       </div>
-                                      {(m.status === "proposed" || m.status === "matched" || m.status === "rejected") && (
+                                      {(m.status === "proposed" || m.status === "matched" || m.status === "rejected" || m.status === "expired") && (
                                         <div className={`mt-1 text-[10px] px-1.5 py-0.5 rounded-full inline-block font-bold ${
                                           m.status === "matched" ? "bg-green-100 text-green-700" :
                                           m.status === "proposed" ? "bg-blue-100 text-blue-700" :
+                                          (m.status === "rejected" && m.approvedByA === true && m.approvedByB === true) ? "bg-purple-100 text-purple-700" :
+                                          (m.status === "rejected" || m.status === "expired") ? "bg-orange-100 text-orange-600" :
                                           "bg-red-100 text-red-600"
                                         }`}>
-                                          {m.status === "proposed" ? "📨 כבר נשלחה" : m.status === "matched" ? "💛 התאמה!" : "❌ נדחה"}
+                                          {m.status === "proposed" ? "📨 כבר נשלחה" :
+                                           m.status === "matched" ? "💛 התאמה!" :
+                                           (m.status === "rejected" && m.approvedByA === true && m.approvedByB === true) ? "🔓 שוחרר" :
+                                           m.status === "expired" ? "⌛ פג תוקף" :
+                                           (m.approvedByA === true && m.approvedByB === true) ? "🔓 שוחרר" :
+                                           "❌ נדחה"}
                                         </div>
                                       )}
                                       {m.opponent?.phone && (
