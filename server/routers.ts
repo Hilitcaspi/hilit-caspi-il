@@ -4034,7 +4034,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         await db.update(matches).set({ ...tokenUsedField, updatedAt: now }).where(eq(matches.id, match.id));
 
         if (input.response === "no") {
-          await db.update(matches).set({ status: "rejected", updatedAt: now }).where(eq(matches.id, match.id));
+          const rejectData: Record<string, unknown> = { status: "rejected", updatedAt: now };
+          if (isA) rejectData.approvedByA = false;
+          else rejectData.approvedByB = false;
+          await db.update(matches).set(rejectData).where(eq(matches.id, match.id));
           // If the other party already said yes, send them a consolation email
           const otherAlreadyApproved = isA ? match.approvedByB : match.approvedByA;
           if (otherAlreadyApproved) {

@@ -662,9 +662,9 @@ export default function CRMMatchmaking() {
     // Case 1: Was matched (both approved) then manually released
     if (m.approvedByA === true && m.approvedByB === true) return true;
     // Case 2: At least one person explicitly rejected (clicked the link and said no)
-    // "Explicitly rejected" = tokenUsedAt is set AND approved is false
-    const aExplicitlyRejected = m.tokenAUsedAt && m.approvedByA === false;
-    const bExplicitlyRejected = m.tokenBUsedAt && m.approvedByB === false;
+    // "Explicitly rejected" = tokenUsedAt is set AND approved is NOT true (covers false and null)
+    const aExplicitlyRejected = m.tokenAUsedAt && m.approvedByA !== true;
+    const bExplicitlyRejected = m.tokenBUsedAt && m.approvedByB !== true;
     if (aExplicitlyRejected || bExplicitlyRejected) return true;
     return false;
   };
@@ -675,8 +675,8 @@ export default function CRMMatchmaking() {
     // If both approved → not "no response" (it's a released match)
     if (m.approvedByA === true && m.approvedByB === true) return false;
     // If at least one person explicitly rejected (clicked + rejected) → goes to "דחו" not here
-    const aExplicitlyRejected = m.tokenAUsedAt && m.approvedByA === false;
-    const bExplicitlyRejected = m.tokenBUsedAt && m.approvedByB === false;
+    const aExplicitlyRejected = m.tokenAUsedAt && m.approvedByA !== true;
+    const bExplicitlyRejected = m.tokenBUsedAt && m.approvedByB !== true;
     if (aExplicitlyRejected || bExplicitlyRejected) return false;
     // Everything else: sent but nobody explicitly rejected
     // Includes: both ghosted, one approved but other ghosted, expired without action
