@@ -6562,10 +6562,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           const [code] = await db.select().from(discountCodes)
             .where(eq(discountCodes.code, input.couponCode.toUpperCase()))
             .limit(1);
-          if (code && code.isActive &&
-            (!code.expiresAt || code.expiresAt > Date.now()) &&
-            (code.maxUses === null || code.maxUses === undefined || code.usedCount < code.maxUses) &&
-            (!code.product || code.product === input.product)) {
+         if (code && code.isActive &&
+           (!code.expiresAt || code.expiresAt > Date.now()) &&
+           (code.maxUses === null || code.maxUses === undefined || code.usedCount < code.maxUses) &&
+            (!code.product || code.product.split(",").map(p => p.trim()).includes(input.product))) {
             const basePrice = PRODUCT_CONFIGS[input.product]?.sum ?? 0;
             if (code.fixedPrice) {
               finalSum = code.fixedPrice;
