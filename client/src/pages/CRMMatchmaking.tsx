@@ -1405,13 +1405,13 @@ export default function CRMMatchmaking() {
             )}
             {filteredMatchesBySubTab[matchSubTab].map(match => {
               // Determine display status badge based on actual match outcome
-              let displayStatus = match.status;
-              if (match.status === 'rejected' || match.status === 'expired') {
-                const aExplicit = match.tokenAUsedAt && match.approvedByA === false;
-                const bExplicit = match.tokenBUsedAt && match.approvedByB === false;
-                if (match.approvedByA === true && match.approvedByB === true && match.returnedToPoolAt) {
-                  displayStatus = 'released'; // Was matched then manually released
-                } else if (aExplicit || bExplicit) {
+             let displayStatus = match.status;
+             if (match.status === 'rejected' || match.status === 'expired') {
+                const aExplicit = match.tokenAUsedAt && match.approvedByA !== true;
+                const bExplicit = match.tokenBUsedAt && match.approvedByB !== true;
+               if (match.approvedByA === true && match.approvedByB === true && match.returnedToPoolAt) {
+                 displayStatus = 'released'; // Was matched then manually released
+               } else if (aExplicit || bExplicit) {
                   displayStatus = 'rejected'; // Someone explicitly rejected
                 } else {
                   displayStatus = 'expired'; // No explicit rejection → show as "פג תוקף"
@@ -1432,16 +1432,16 @@ export default function CRMMatchmaking() {
                 const approved = isA ? match.approvedByA : match.approvedByB;
                 const isProposed = match.status === "proposed" || match.status === "matched" || match.status === "expired" || match.status === "rejected";
                 if (!isProposed) return null;
-                if (match.status === "matched") return { icon: "❤️", label: "אישרו: התאמה!", color: "bg-green-100 text-green-800" };
-                // Explicitly rejected: clicked the link AND chose to reject
-                if (tokenUsed && approved === false) return { icon: "❌", label: "דחה/תה", color: "bg-red-100 text-red-700" };
-                if (approved === true) return { icon: "✅", label: "אישר/ה", color: "bg-emerald-100 text-emerald-800" };
-                // For expired/rejected matches: if they never clicked, show "no response"
-                if (match.status === "expired" || match.status === "rejected") {
-                  if (!tokenUsed) return { icon: "⏰", label: "לא ענה", color: "bg-orange-100 text-orange-700" };
-                  // tokenUsed but approved=false without explicit click? (edge case - default value)
-                  return { icon: "⏰", label: "לא ענה", color: "bg-orange-100 text-orange-700" };
-                }
+               if (match.status === "matched") return { icon: "❤️", label: "אישרו: התאמה!", color: "bg-green-100 text-green-800" };
+               // Explicitly rejected: clicked the link AND chose to reject
+                if (tokenUsed && approved !== true) return { icon: "❌", label: "דחה/תה", color: "bg-red-100 text-red-700" };
+               if (approved === true) return { icon: "✅", label: "אישר/ה", color: "bg-emerald-100 text-emerald-800" };
+               // For expired/rejected matches: if they never clicked, show "no response"
+               if (match.status === "expired" || match.status === "rejected") {
+                 if (!tokenUsed) return { icon: "⏰", label: "לא ענה", color: "bg-orange-100 text-orange-700" };
+                  // tokenUsed but not approved - they rejected
+                  return { icon: "❌", label: "דחה/תה", color: "bg-red-100 text-red-700" };
+               }
                 if (tokenUsed) return { icon: "👀", label: "צפה, טרם השיב/ה", color: "bg-amber-100 text-amber-800" };
                 if (emailOpened) return { icon: "📧", label: "פתח מייל, טרם השיב/ה", color: "bg-blue-100 text-blue-700" };
                 return { icon: "⏳", label: "לא פתח מייל", color: "bg-gray-100 text-gray-500" };
