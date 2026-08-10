@@ -6441,7 +6441,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!code.isActive) return { valid: false as const, error: "קוד קופון אינו פעיל" };
         if (code.expiresAt && code.expiresAt < Date.now()) return { valid: false as const, error: "קוד הקופון פג תוקף" };
         if (code.maxUses !== null && code.maxUses !== undefined && code.usedCount >= code.maxUses) return { valid: false as const, error: "קוד הקופון מוצה" };
-        if (code.product && input.product && code.product !== input.product) return { valid: false as const, error: "קוד קופון זה אינו תקף למוצר זה" };
+        // Support comma-separated product list (e.g. "guide,course")
+        if (code.product && input.product) {
+          const allowedProducts = code.product.split(",").map(p => p.trim());
+          if (!allowedProducts.includes(input.product)) {
+            return { valid: false as const, error: "קוד קופון זה אינו תקף למוצר זה" };
+          }
+        }
         return {
           valid: true as const,
           discountPercent: code.discountPercent ?? undefined,
