@@ -158,16 +158,19 @@ export const dashboardRouter = router({
   // ── Monthly Targets ───────────────────────────────────────────────────────
   monthlyTargets: teamProcedure.query(async ({ ctx }) => {
     guardAdmin(ctx);
-    // Targets for current month - can be made configurable later
+    // Realistic high targets based on actual performance:
+    // Last 30 days: 2069 leads, 373 purchases (279 database + 81 bundle + 8 session + 3 guide + 1 course + 1 coaching)
+    // Revenue: ~279*299 + 81*349 + 8*500 + 3*149 + 1*499 + 1*2900 = ~118K
+    // Target: 20% growth over current performance
     return {
-      budget: 6000,       // Monthly ad spend target
-      leads: 1200,        // Monthly leads target
-      purchases: 80,      // Monthly purchases target
-      revenue: 25000,     // Monthly revenue target
-      databaseSales: 60,  // Database product sales target
-      guideSales: 15,     // Guide sales target
-      courseSales: 5,     // Course sales target
-      coachingSales: 2,   // Coaching sales target
+      budget: 8000,        // Monthly ad spend target (currently ~5K, push to 8K for growth)
+      leads: 2500,         // Monthly leads target (currently 2069, target +20%)
+      purchases: 450,      // Monthly purchases target (currently 373, target +20%)
+      revenue: 140000,     // Monthly revenue target (currently ~118K, target +20%)
+      databaseSales: 350,  // Database product (currently 279, target +25%)
+      guideSales: 20,      // Guide sales (currently 3, push with funnels)
+      courseSales: 10,     // Course sales (currently 1, push with funnels)
+      coachingSales: 5,    // Coaching clients (currently 1, high value target)
     };
   }),
 

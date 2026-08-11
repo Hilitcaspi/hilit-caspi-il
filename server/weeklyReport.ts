@@ -42,11 +42,17 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
     
     const now = Date.now();
     const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
     
     // KPIs
     const [[leadRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM crm_leads WHERE createdAt >= ${weekAgo}`) as any;
     const [[purchaseRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${weekAgo}`) as any;
     const [revenueRows] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${weekAgo} GROUP BY product`) as any;
+    
+    // Previous period KPIs (same period last week)
+    const [[prevLeadRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM crm_leads WHERE createdAt >= ${twoWeeksAgo} AND createdAt < ${weekAgo}`) as any;
+    const [[prevPurchaseRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${twoWeeksAgo} AND created_at < ${weekAgo}`) as any;
+    const [prevRevenueRows] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${twoWeeksAgo} AND created_at < ${weekAgo} GROUP BY product`) as any;
     
     const leads = Number(leadRow?.cnt ?? 0);
     const purchases = Number(purchaseRow?.cnt ?? 0);
@@ -58,6 +64,23 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
       revenue += rev;
       productLines.push(`${PRODUCT_LABELS[row.product] || row.product}: ${cnt} רכישות (₪${rev.toLocaleString()})`);
     }
+    
+    const prevLeads = Number(prevLeadRow?.cnt ?? 0);
+    const prevPurchases = Number(prevPurchaseRow?.cnt ?? 0);
+    let prevRevenue = 0;
+    for (const row of (prevRevenueRows as any[])) {
+      prevRevenue += Number(row.cnt) * (PRODUCT_PRICES[row.product] ?? 0);
+    }
+    
+    const pctChange = (curr: number, prev: number): string => {
+      if (prev === 0) return curr > 0 ? '+100%' : '—';
+      const change = Math.round((curr - prev) / prev * 100);
+      return change >= 0 ? `+${change}%` : `${change}%`;
+    };
+    const changeColor = (curr: number, prev: number): string => {
+      if (prev === 0) return '#6b7280';
+      return curr >= prev ? '#16a34a' : '#dc2626';
+    };
     
     // Meta Ads
     const since = new Date(weekAgo).toISOString().split("T")[0];
@@ -93,16 +116,19 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
         <td style="text-align: center; padding: 12px; background: #f0f9ff; border-radius: 8px; width: 25%;">
           <div style="font-size: 24px; font-weight: bold; color: #2563eb;">${leads}</div>
           <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">לידים</div>
+          <div style="font-size: 10px; color: ${changeColor(leads, prevLeads)}; margin-top: 2px;">${pctChange(leads, prevLeads)} (שבוע קודם: ${prevLeads})</div>
         </td>
         <td style="width: 4%;"></td>
         <td style="text-align: center; padding: 12px; background: #f0fdf4; border-radius: 8px; width: 25%;">
           <div style="font-size: 24px; font-weight: bold; color: #16a34a;">${purchases}</div>
           <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">רכישות</div>
+          <div style="font-size: 10px; color: ${changeColor(purchases, prevPurchases)}; margin-top: 2px;">${pctChange(purchases, prevPurchases)} (שבוע קודם: ${prevPurchases})</div>
         </td>
         <td style="width: 4%;"></td>
         <td style="text-align: center; padding: 12px; background: #fefce8; border-radius: 8px; width: 25%;">
           <div style="font-size: 24px; font-weight: bold; color: #ca8a04;">₪${revenue.toLocaleString()}</div>
           <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">הכנסות</div>
+          <div style="font-size: 10px; color: ${changeColor(revenue, prevRevenue)}; margin-top: 2px;">${pctChange(revenue, prevRevenue)} (שבוע קודם: ₪${prevRevenue.toLocaleString()})</div>
         </td>
         <td style="width: 4%;"></td>
         <td style="text-align: center; padding: 12px; background: #fdf2f8; border-radius: 8px; width: 25%;">

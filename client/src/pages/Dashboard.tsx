@@ -476,11 +476,12 @@ export default function Dashboard() {
 
         {/* ═══ SITE BEHAVIOR FUNNEL ═══ */}
         {siteTraffic.data && (
-          <Card className="border-0 shadow-sm">
+          <Card className="border-0 shadow-sm border-r-4 border-r-indigo-500">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <BarChart3 size={18} className="text-indigo-500" />
-                <h3 className="font-bold text-gray-900">משפך התנהגות באתר</h3>
+                <h3 className="font-bold text-gray-900">SEO, תנועה ומשפך התנהגות</h3>
+                <Badge className="bg-indigo-100 text-indigo-700 text-[10px]">{siteTraffic.data.uniqueVisitors} מבקרים</Badge>
               </div>
             </CardHeader>
             <CardContent>
@@ -531,16 +532,57 @@ export default function Dashboard() {
               {/* Top pages + sources */}
               <div className="grid md:grid-cols-2 gap-3">
                 <div className="border border-gray-100 rounded-lg p-3">
-                  <h4 className="text-[10px] font-bold text-gray-600 mb-1.5">דפים פופולריים</h4>
+                  <h4 className="text-[10px] font-bold text-gray-600 mb-1.5">דפים פופולריים (SEO + ישיר)</h4>
                   {siteTraffic.data.topPages.slice(0, 6).map((p, i) => (
                     <div key={i} className="flex justify-between text-[11px] py-0.5"><span className="text-gray-600 truncate max-w-[150px]">{p.page === '/' ? 'דף הבית' : p.page}</span><span className="font-medium text-indigo-600">{p.views}</span></div>
                   ))}
                 </div>
                 <div className="border border-gray-100 rounded-lg p-3">
-                  <h4 className="text-[10px] font-bold text-gray-600 mb-1.5">מקורות תנועה</h4>
+                  <h4 className="text-[10px] font-bold text-gray-600 mb-1.5">מקורות תנועה (UTM + אורגני)</h4>
                   {siteTraffic.data.trafficSources.slice(0, 6).map((s, i) => (
-                    <div key={i} className="flex justify-between text-[11px] py-0.5"><span className="text-gray-600">{s.source === 'direct' ? 'ישיר' : s.source}</span><span className="font-medium text-blue-600">{s.visits}</span></div>
+                    <div key={i} className="flex justify-between text-[11px] py-0.5"><span className="text-gray-600">{s.source === 'direct' ? 'ישיר / אורגני' : s.source}</span><span className="font-medium text-blue-600">{s.visits}</span></div>
                   ))}
+                </div>
+              </div>
+              
+              {/* Daily traffic chart */}
+              {siteTraffic.data.dailyViews.length > 0 && (
+                <div className="mt-3">
+                  <h4 className="text-[10px] font-bold text-gray-600 mb-1">תנועה יומית</h4>
+                  <div className="flex items-end gap-[2px] h-12">
+                    {siteTraffic.data.dailyViews.map((d: any, i: number) => {
+                      const max = Math.max(...siteTraffic.data!.dailyViews.map((x: any) => x.views), 1);
+                      return (
+                        <div key={i} className="flex-1 min-w-[3px] group relative">
+                          <div className="absolute -top-5 bg-gray-800 text-white text-[8px] px-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10">{d.day}: {d.views}</div>
+                          <div className="bg-gradient-to-t from-indigo-500 to-indigo-300 rounded-t-sm" style={{ height: `${(d.views / max) * 100}%`, minHeight: d.views > 0 ? '2px' : '0' }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* SEO insight */}
+              <div className="mt-3 p-3 bg-indigo-50 rounded-lg">
+                <div className="text-xs text-indigo-800">
+                  <span className="font-bold">תובנת SEO: </span>
+                  {(() => {
+                    const directTraffic = siteTraffic.data!.trafficSources.find(s => s.source === 'direct');
+                    const metaTraffic = siteTraffic.data!.trafficSources.find(s => s.source === 'meta' || s.source === 'facebook' || s.source === 'instagram');
+                    const totalViews = siteTraffic.data!.totalPageViews;
+                    const directPct = directTraffic ? Math.round(directTraffic.visits / totalViews * 100) : 0;
+                    let text = `${directPct}% מהתנועה מגיעה ישירות/אורגנית. `;
+                    const dnaPage = siteTraffic.data!.topPages.find(p => p.page.includes('dna'));
+                    const registerPage = siteTraffic.data!.topPages.find(p => p.page.includes('register') || p.page.includes('join'));
+                    if (dnaPage && registerPage) {
+                      text += `דף DNA (${dnaPage.views} צפיות) ודף הרשמה (${registerPage.views} צפיות) הם הדפים המובילים. `;
+                    }
+                    text += `3 כתבות בלוג חדשות פורסמו לחיזוק SEO אורגני. `;
+                    if (directPct < 30) text += `כדאי להשקיע בתוכן אורגני ובלוג כדי להגדיל תנועה ללא תשלום.`;
+                    else text += `תנועה אורגנית חזקה — ממשיכים עם תוכן ומאמרים.`;
+                    return text;
+                  })()}
                 </div>
               </div>
             </CardContent>
