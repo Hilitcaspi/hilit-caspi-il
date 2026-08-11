@@ -119,7 +119,7 @@ export async function startJourney({
     .from(emailLog)
     .where(
       and(
-        eq(emailLog.recipientEmail, email),
+        sql`LOWER(${emailLog.recipientEmail}) = ${email.toLowerCase().trim()}`,
         eq(emailLog.journeyKey, journeyKey),
         eq(emailLog.emailIndex, 1)
       )
@@ -979,11 +979,24 @@ export async function processCartAbandonment(): Promise<number> {
   let triggered = 0;
 
   for (const lead of recentLeads) {
-    // Check if this person already paid (has paymentRef in crmLeads)
+    // Normalize email for case-insensitive comparison
+    const normalizedEmail = lead.email.toLowerCase().trim();
+    
+    // Check if this person already has a COMPLETED payment via webhookIdempotency
+    // (if they paid, there will be a webhook entry for their email)
+    const { webhookIdempotency } = await import("../drizzle/schema");
+    const [alreadyPaidWebhook] = await db
+      .select({ id: webhookIdempotency.id })
+      .from(webhookIdempotency)
+      .where(sql`LOWER(${webhookIdempotency.email}) = ${normalizedEmail}`)
+      .limit(1);
+    if (alreadyPaidWebhook) continue;
+
+    // Check if this person already paid (has paymentRef in crmLeads) - case insensitive
     const [crmLead] = await db
       .select({ paymentRef: crmLeads.paymentRef, status: crmLeads.status })
       .from(crmLeads)
-      .where(eq(crmLeads.email, lead.email))
+      .where(sql`LOWER(${crmLeads.email}) = ${normalizedEmail}`)
       .limit(1);
 
     // If they have a paymentRef or are already a client, skip
