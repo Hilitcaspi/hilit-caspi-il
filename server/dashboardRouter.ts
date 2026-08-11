@@ -581,4 +581,80 @@ export const dashboardRouter = router({
         coachingCount: coaching.length,
       };
     }),
+
+  // Per-product funnel data
+  productFunnels: teamProcedure
+    .input(z.object({ startDate: z.number(), endDate: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { products: [] };
+      const { startDate, endDate } = input;
+      
+      // Get leads per product
+      const [leads] = await db.execute(sql`
+        SELECT product, COUNT(*) as cnt FROM crm_leads WHERE createdAt >= ${startDate} AND createdAt <= ${endDate} GROUP BY product ORDER BY cnt DESC
+      `) as any;
+      
+      // Get purchases per product
+      const [purchases] = await db.execute(sql`
+        SELECT product, COUNT(*) as cnt, SUM(sum) as revenue FROM payment_leads WHERE created_at >= ${startDate} AND created_at <= ${endDate} GROUP BY product ORDER BY cnt DESC
+      `) as any;
+      
+      const leadsMap: Record<string, number> = {};
+      (leads as any[]).forEach((r: any) => { leadsMap[r.product || 'unknown'] = Number(r.cnt); });
+      
+      const purchasesMap: Record<string, { count: number; revenue: number }> = {};
+      (purchases as any[]).forEach((r: any) => { 
+        purchasesMap[r.product || 'unknown'] = { count: Number(r.cnt), revenue: Number(r.revenue || 0) }; 
+      });
+      
+      const productLabels: Record<string, string> = {
+        database: 'מאגר',
+        guide: 'מדריך',
+        course: 'קורס',
+        coaching: 'ליווי',
+        session: 'פגישה',
+        tubav: 'חבילת טו באב',
+        dna: 'שאלון DNA',
+      };
+      
+      const allProducts = new Set([...Object.keys(leadsMap), ...Object.keys(purchasesMap)]);
+      const products = Array.from(allProducts)
+        .filter(p => p !== 'unknown' && p !== 'null')
+        .map(p => ({
+          key: p,
+          label: productLabels[p] || p,
+          leads: leadsMap[p] || 0,
+          purchases: purchasesMap[p]?.count || 0,
+          revenue: purchasesMap[p]?.revenue || 0,
+          conversionRate: leadsMap[p] ? Math.round((purchasesMap[p]?.count || 0) / leadsMap[p] * 1000) / 10 : 0,
+        }))
+        .sort((a, b) => b.revenue - a.revenue);
+      
+      return { products };
+    }),
+
+  // Social media stats (from Meta API)
+  socialStats: teamProcedure.query(async () => {
+    const token = process.env.META_ADS_TOKEN;
+    if (!token) return null;
+    try {
+      const res = await fetch('https://graph.facebook.com/v21.0/me/accounts?fields=name,id,fan_count,followers_count,instagram_business_account{id,username,followers_count,media_count}&access_token=' + token);
+      const data = await res.json();
+      if (!data.data) return null;
+      
+      const accounts = data.data.map((page: any) => ({
+        pageName: page.name,
+        pageFans: page.fan_count || 0,
+        igUsername: page.instagram_business_account?.username || null,
+        igFollowers: page.instagram_business_account?.followers_count || 0,
+        igPosts: page.instagram_business_account?.media_count || 0,
+      }));
+      
+      return { accounts, whatsappGroupSize: 1000 };
+    } catch {
+      return null;
+    }
+  }),
+
 });

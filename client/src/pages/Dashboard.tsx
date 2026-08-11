@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrendingUp, Users, DollarSign, Mail, MousePointerClick,
   ChevronDown, ChevronUp, ArrowLeft, Calendar, BarChart3,
-  Target, Zap, ShoppingCart, Dna, Megaphone, Heart, Lightbulb
+  Target, Zap, ShoppingCart, ShoppingBag, Dna, Megaphone, Heart, Lightbulb
 } from "lucide-react";
 
 // ─── Date presets ────────────────────────────────────────────────────────────
@@ -18,6 +18,13 @@ const PRESETS = [
   { label: "90 ימים", days: 90 },
   { label: "הכל", days: 365 * 3 },
 ] as const;
+
+function toDateStr(ts: number): string {
+  return new Date(ts).toISOString().split("T")[0];
+}
+function fromDateStr(s: string): number {
+  return new Date(s + "T00:00:00").getTime();
+}
 
 function formatCurrency(n: number): string {
   return `₪${n.toLocaleString("he-IL")}`;
@@ -68,9 +75,18 @@ export default function Dashboard() {
   const [preset, setPreset] = useState(2); // default: 30 days
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
   const [showAllLeads, setShowAllLeads] = useState(false);
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [useCustom, setUseCustom] = useState(false);
 
-  const endDate = useMemo(() => Date.now(), []);
-  const startDate = useMemo(() => endDate - PRESETS[preset].days * 24 * 60 * 60 * 1000, [preset, endDate]);
+  const endDate = useMemo(() => {
+    if (useCustom && customEnd) return fromDateStr(customEnd) + 86400000 - 1;
+    return Date.now();
+  }, [useCustom, customEnd]);
+  const startDate = useMemo(() => {
+    if (useCustom && customStart) return fromDateStr(customStart);
+    return Date.now() - PRESETS[preset].days * 24 * 60 * 60 * 1000;
+  }, [useCustom, customStart, preset]);
 
   const dateInput = { startDate, endDate };
 
@@ -80,6 +96,9 @@ export default function Dashboard() {
   const journeys = trpc.dashboard.journeyFunnel.useQuery(dateInput);
   const sources = trpc.dashboard.leadSources.useQuery(dateInput);
   const campaigns = trpc.dashboard.topCampaigns.useQuery(dateInput);
+  
+  const productFunnels = trpc.dashboard.productFunnels.useQuery({ startDate, endDate });
+  const socialStats = trpc.dashboard.socialStats.useQuery();
   const recentLeads = trpc.dashboard.recentLeads.useQuery({ ...dateInput, limit: 50 });
   const dailyTrend = trpc.dashboard.dailyTrend.useQuery(dateInput);
   const metaAds = trpc.dashboard.metaAdsPerformance.useQuery(dateInput);
@@ -105,14 +124,29 @@ export default function Dashboard() {
             {PRESETS.map((p, i) => (
               <button
                 key={i}
-                onClick={() => setPreset(i)}
+                onClick={() => { setPreset(i); setUseCustom(false); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                  preset === i ? "bg-white text-[#191265]" : "bg-white/10 text-white/80 hover:bg-white/20"
+                  preset === i && !useCustom ? "bg-white text-[#191265]" : "bg-white/10 text-white/80 hover:bg-white/20"
                 }`}
               >
                 {p.label}
               </button>
             ))}
+          </div>
+          <div className="flex items-center gap-1.5 mr-3 border-r border-white/20 pr-3">
+            <input
+              type="date"
+              value={customStart || toDateStr(startDate)}
+              onChange={(e) => { setCustomStart(e.target.value); setUseCustom(true); }}
+              className="bg-white/10 text-white text-xs rounded-lg px-2 py-1.5 border border-white/20 [color-scheme:dark]"
+            />
+            <span className="text-white/60 text-xs">—</span>
+            <input
+              type="date"
+              value={customEnd || toDateStr(Date.now())}
+              onChange={(e) => { setCustomEnd(e.target.value); setUseCustom(true); }}
+              className="bg-white/10 text-white text-xs rounded-lg px-2 py-1.5 border border-white/20 [color-scheme:dark]"
+            />
           </div>
         </div>
       </div>
@@ -396,51 +430,138 @@ export default function Dashboard() {
         )}
 
         {/* Email Journey Funnels */}
-        {journeys.data && journeys.data.length > 0 && (
+        {/* Lead-to-Purchase Funnel */}
+        {overview.data && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
-                <Mail size={18} className="text-teal-500" />
-                <h3 className="font-bold text-gray-900">מסעות מייל — המרות</h3>
+                <TrendingUp size={18} className="text-indigo-500" />
+                <h3 className="font-bold text-gray-900">משפך: ליד → רכישה</h3>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {journeys.data.filter(j => j.totalLeads > 5).map((j) => (
-                <div key={j.journeyKey} className="border border-gray-100 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">{j.label}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">{j.totalLeads} לידים</span>
-                      <Badge className={j.conversionRate >= 5 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}>
-                        {j.purchased} רכישות ({formatPercent(j.conversionRate)})
-                      </Badge>
+            <CardContent>
+              <div className="flex items-center justify-center gap-2">
+                {[
+                  { label: "לידים (DNA)", value: overview.data.dnaCompleted || overview.data.totalLeads, color: "bg-blue-500" },
+                  { label: "נרשמו למאגר", value: overview.data.totalPurchases, color: "bg-green-500" },
+                ].map((step, i, arr) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="text-center">
+                      <div className={`${step.color} text-white rounded-xl px-4 py-3 min-w-[80px]`}>
+                        <div className="text-2xl font-bold">{step.value}</div>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">{step.label}</div>
                     </div>
-                  </div>
-                  {/* Steps funnel */}
-                  <div className="flex gap-1 items-end h-10">
-                    {j.steps.map((step, i) => {
-                      const maxSent = Math.max(...j.steps.map(s => s.sent), 1);
-                      return (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
-                          <div className="absolute -top-7 bg-gray-800 text-white text-[9px] px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10">
-                            מייל {step.index + 1}: {step.sent} נשלחו, {step.opened} פתחו, {step.clicked} לחצו
-                          </div>
-                          <div className="w-full bg-teal-100 rounded-t-sm relative overflow-hidden" style={{ height: `${(step.sent / maxSent) * 100}%`, minHeight: "4px" }}>
-                            <div className="absolute bottom-0 w-full bg-teal-400 rounded-t-sm" style={{ height: `${step.sent > 0 ? (step.opened / step.sent) * 100 : 0}%` }} />
-                            <div className="absolute bottom-0 w-full bg-teal-600 rounded-t-sm" style={{ height: `${step.sent > 0 ? (step.clicked / step.sent) * 100 : 0}%` }} />
-                          </div>
-                          <span className="text-[9px] text-gray-400">{step.index + 1}</span>
+                    {i < arr.length - 1 && (
+                      <div className="text-center mx-1">
+                        <div className="text-lg text-gray-400">→</div>
+                        <div className="text-xs font-bold text-gray-600">
+                          {step.value > 0 ? formatPercent((arr[i + 1].value / step.value) * 100) : "0%"}
                         </div>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex gap-3 mt-1 text-[10px] text-gray-400">
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-teal-100 inline-block" /> נשלחו</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-teal-400 inline-block" /> פתחו</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-teal-600 inline-block" /> לחצו</span>
+                ))}
+              </div>
+              {metaAds.data && metaAds.data.totals.spend > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-100 grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-xs text-gray-500">עלות לליד</div>
+                    <div className="text-lg font-bold text-amber-600">{formatCurrency(Math.round(metaAds.data.totals.spend / Math.max(overview.data!.totalLeads, 1)))}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">עלות לרכישה</div>
+                    <div className="text-lg font-bold text-red-600">{formatCurrency(Math.round(metaAds.data.totals.spend / Math.max(overview.data!.totalPurchases, 1)))}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">ROAS</div>
+                    <div className={`text-lg font-bold ${metaAds.data.totals.roas >= 3 ? 'text-green-600' : metaAds.data.totals.roas >= 1.5 ? 'text-amber-600' : 'text-red-600'}`}>{metaAds.data.totals.roas}x</div>
                   </div>
                 </div>
-              ))}
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        
+        {/* ═══ PER-PRODUCT FUNNELS ═══ */}
+        {productFunnels.data && productFunnels.data.products.length > 0 && (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <ShoppingBag size={18} className="text-emerald-500" />
+                <h3 className="font-bold text-gray-900">משפך לפי מוצר</h3>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {productFunnels.data.products.map((p) => (
+                  <div key={p.key} className="border border-gray-100 rounded-xl p-4 hover:shadow-md transition">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-bold text-sm">{p.label}</span>
+                      {p.revenue > 0 && <Badge className="bg-green-100 text-green-700 text-[10px]">{formatCurrency(p.revenue)}</Badge>}
+                    </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex-1 bg-blue-100 rounded-lg p-2 text-center">
+                        <div className="text-lg font-bold text-blue-700">{p.leads}</div>
+                        <div className="text-[9px] text-blue-500">לידים</div>
+                      </div>
+                      <span className="text-gray-400">→</span>
+                      <div className="flex-1 bg-green-100 rounded-lg p-2 text-center">
+                        <div className="text-lg font-bold text-green-700">{p.purchases}</div>
+                        <div className="text-[9px] text-green-500">רכישות</div>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div className="bg-gradient-to-l from-green-400 to-green-600 h-2 rounded-full transition-all" style={{ width: Math.min(p.conversionRate, 100) + '%' }} />
+                    </div>
+                    <div className="text-center mt-1 text-xs font-medium" style={{ color: p.conversionRate >= 10 ? '#16a34a' : p.conversionRate >= 5 ? '#d97706' : '#dc2626' }}>
+                      {p.conversionRate}% המרה
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ═══ SOCIAL MEDIA & COMMUNITY ═══ */}
+        {socialStats.data && (
+          <Card className="border-0 shadow-sm bg-gradient-to-l from-pink-50 to-white">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-pink-500" />
+                <h3 className="font-bold text-gray-900">סושיאל וקהילה</h3>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {socialStats.data.accounts.map((acc: any, i: number) => (
+                  <div key={i} className="bg-white rounded-xl p-3 border border-gray-100 text-center">
+                    <div className="text-[10px] text-gray-500 mb-1">{acc.igUsername ? '@' + acc.igUsername : acc.pageName}</div>
+                    <div className="text-2xl font-bold text-pink-600">{acc.igFollowers > 0 ? acc.igFollowers.toLocaleString() : acc.pageFans.toLocaleString()}</div>
+                    <div className="text-[9px] text-gray-400">{acc.igFollowers > 0 ? 'עוקבים IG' : 'אוהדי FB'}</div>
+                    {acc.igPosts > 0 && <div className="text-[9px] text-gray-400 mt-0.5">{acc.igPosts} פוסטים</div>}
+                  </div>
+                ))}
+                <div className="bg-white rounded-xl p-3 border border-green-100 text-center">
+                  <div className="text-[10px] text-gray-500 mb-1">קבוצת WhatsApp</div>
+                  <div className="text-2xl font-bold text-green-600">{socialStats.data.whatsappGroupSize.toLocaleString()}</div>
+                  <div className="text-[9px] text-gray-400">חברים בקבוצה</div>
+                </div>
+              </div>
+              <div className="mt-3 p-3 bg-pink-50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <span className="text-pink-500 mt-0.5">💡</span>
+                  <div className="text-xs text-pink-800">
+                    <span className="font-bold">תובנה: </span>
+                    {socialStats.data.accounts.find((a: any) => a.igUsername === 'hilitcaspi_relationship')?.igFollowers || 0 > 3000 
+                      ? 'הפרופיל הראשי גדל יפה. שקלי לעשות שיתופי פעולה עם פרופילים דומים (מאמנות, תרפיסטיות) להגדלת החשיפה.'
+                      : 'כדאי להשקיע בתוכן אורגני (Reels, סטוריז) כדי להגדיל את קהל העוקבים.'}
+                    {' '}קבוצת ה-WhatsApp ({socialStats.data.whatsappGroupSize} חברים) היא ערוץ מכירה חזק — שלחי הצעות בלעדיות לקבוצה.
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
