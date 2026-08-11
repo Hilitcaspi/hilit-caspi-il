@@ -428,3 +428,15 @@
 - [x] Change price from 249 to 299 in all pages, emails, payment flows, and content
 - [x] Change database size from 2,400/2400/3,000 to 5,000+ everywhere
 - [x] Add "המאגר החכם הגדול והמוביל בישראל" in DatabaseSales, Register, Home, DatabaseLanding
+
+## Enhanced Marketing Dashboard with Meta Ads (Aug 11)
+- [x] Connected Meta Ads API (ads_read token) for live campaign data
+- [x] Server: metaAdsPerformance procedure - pulls from both main + boosts ad accounts
+- [x] Server: coachingRevenue procedure - sessions (500+) and coaching (2000+) from Grow payments
+- [x] Dashboard: Meta Ads KPIs (spend, revenue, ROAS, CPA, CPL, impressions)
+- [x] Dashboard: Campaigns table with spend/leads/purchases/CPL/CPA/ROAS per campaign
+- [x] Dashboard: Boosts table with spend/impressions/clicks/engagement/video views
+- [x] Dashboard: AI Insights section with automatic recommendations (winning campaigns, non-converting, high CPA)
+- [x] Dashboard: Coaching & Sessions revenue section with breakdown
+- [x] Updated META_CAPI_TOKEN (was expired)
+- [x] Added META_ADS_TOKEN for campaign data

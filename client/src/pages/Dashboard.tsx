@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrendingUp, Users, DollarSign, Mail, MousePointerClick,
   ChevronDown, ChevronUp, ArrowLeft, Calendar, BarChart3,
-  Target, Zap, ShoppingCart, Dna
+  Target, Zap, ShoppingCart, Dna, Megaphone, Heart, Lightbulb
 } from "lucide-react";
 
 // ─── Date presets ────────────────────────────────────────────────────────────
@@ -82,6 +82,8 @@ export default function Dashboard() {
   const campaigns = trpc.dashboard.topCampaigns.useQuery(dateInput);
   const recentLeads = trpc.dashboard.recentLeads.useQuery({ ...dateInput, limit: 50 });
   const dailyTrend = trpc.dashboard.dailyTrend.useQuery(dateInput);
+  const metaAds = trpc.dashboard.metaAdsPerformance.useQuery(dateInput);
+  const coachingRev = trpc.dashboard.coachingRevenue.useQuery(dateInput);
 
   const isLoading = overview.isLoading;
 
@@ -292,13 +294,68 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Top Campaigns */}
+
+        {/* ═══ META ADS PERFORMANCE ═══ */}
+        {metaAds.data && (metaAds.data.campaigns.length > 0 || metaAds.data.boosts.length > 0) && (
+          <>
+            <Card className="border-0 shadow-sm bg-gradient-to-l from-blue-50 to-white">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Megaphone size={18} className="text-blue-600" />
+                  <h3 className="font-bold text-gray-900">ביצועי Meta Ads</h3>
+                  <Badge className="bg-blue-100 text-blue-700 text-[10px]">Live from Meta API</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
+                  <div className="bg-white rounded-lg p-3 border border-blue-100"><div className="text-[10px] text-gray-500">הוצאה כוללת</div><div className="text-lg font-bold text-red-600">{formatCurrency(metaAds.data.totals.spend)}</div></div>
+                  <div className="bg-white rounded-lg p-3 border border-green-100"><div className="text-[10px] text-gray-500">הכנסה (רכישות)</div><div className="text-lg font-bold text-green-600">{formatCurrency(metaAds.data.totals.revenue)}</div></div>
+                  <div className="bg-white rounded-lg p-3 border border-purple-100"><div className="text-[10px] text-gray-500">ROAS</div><div className="text-lg font-bold text-purple-600">{metaAds.data.totals.roas}x</div></div>
+                  <div className="bg-white rounded-lg p-3 border border-amber-100"><div className="text-[10px] text-gray-500">עלות לרכישה</div><div className="text-lg font-bold text-amber-600">{formatCurrency(metaAds.data.totals.avgCPA)}</div></div>
+                  <div className="bg-white rounded-lg p-3 border border-teal-100"><div className="text-[10px] text-gray-500">עלות לליד</div><div className="text-lg font-bold text-teal-600">{formatCurrency(metaAds.data.totals.avgCPL)}</div></div>
+                  <div className="bg-white rounded-lg p-3 border border-gray-100"><div className="text-[10px] text-gray-500">חשיפות</div><div className="text-lg font-bold text-gray-700">{metaAds.data.totals.impressions.toLocaleString()}</div></div>
+                </div>
+                {metaAds.data.campaigns.length > 0 && (<div className="mb-4"><h4 className="text-sm font-bold text-gray-700 mb-2">קמפיינים (חשבון ראשי)</h4><div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="text-[10px] text-gray-500 border-b"><th className="text-right pb-1.5 font-medium">קמפיין</th><th className="text-center pb-1.5 font-medium">הוצאה</th><th className="text-center pb-1.5 font-medium">לידים</th><th className="text-center pb-1.5 font-medium">רכישות</th><th className="text-center pb-1.5 font-medium">CPL</th><th className="text-center pb-1.5 font-medium">CPA</th><th className="text-center pb-1.5 font-medium">ROAS</th><th className="text-center pb-1.5 font-medium">קליקים</th></tr></thead><tbody>{metaAds.data.campaigns.map((c, i) => (<tr key={i} className="border-b border-gray-50 hover:bg-blue-50/50"><td className="py-1.5 text-right font-medium max-w-[180px] truncate" title={c.name}>{c.name}</td><td className="py-1.5 text-center text-red-600 font-medium">{formatCurrency(c.spend)}</td><td className="py-1.5 text-center">{c.leads || '—'}</td><td className="py-1.5 text-center">{c.purchases > 0 ? <Badge className="bg-green-100 text-green-700 text-[10px]">{c.purchases}</Badge> : '—'}</td><td className="py-1.5 text-center">{c.cpl > 0 ? formatCurrency(c.cpl) : '—'}</td><td className="py-1.5 text-center"><span className={c.cpa > 0 && c.cpa <= 50 ? 'text-green-600 font-bold' : c.cpa > 100 ? 'text-red-500' : ''}>{c.cpa > 0 ? formatCurrency(c.cpa) : '—'}</span></td><td className="py-1.5 text-center"><span className={c.roas >= 3 ? 'text-green-600 font-bold' : c.roas > 0 ? 'text-amber-600' : ''}>{c.roas > 0 ? c.roas + 'x' : '—'}</span></td><td className="py-1.5 text-center text-gray-500">{c.clicks.toLocaleString()}</td></tr>))}</tbody></table></div></div>)}
+                {metaAds.data.boosts.length > 0 && (<div><h4 className="text-sm font-bold text-gray-700 mb-2">בוסטים (חשבון קידום)</h4><div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3"><div className="bg-pink-50 rounded p-2 text-center"><div className="text-[9px] text-gray-500">הוצאה</div><div className="font-bold text-sm text-red-600">{formatCurrency(metaAds.data.boostsTotals.spend)}</div></div><div className="bg-blue-50 rounded p-2 text-center"><div className="text-[9px] text-gray-500">חשיפות</div><div className="font-bold text-sm">{metaAds.data.boostsTotals.impressions.toLocaleString()}</div></div><div className="bg-purple-50 rounded p-2 text-center"><div className="text-[9px] text-gray-500">אינטראקציות</div><div className="font-bold text-sm">{metaAds.data.boostsTotals.engagement.toLocaleString()}</div></div><div className="bg-teal-50 rounded p-2 text-center"><div className="text-[9px] text-gray-500">צפיות וידאו</div><div className="font-bold text-sm">{metaAds.data.boostsTotals.videoViews.toLocaleString()}</div></div><div className="bg-amber-50 rounded p-2 text-center"><div className="text-[9px] text-gray-500">קליקים</div><div className="font-bold text-sm">{metaAds.data.boostsTotals.clicks.toLocaleString()}</div></div></div><div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="text-[10px] text-gray-500 border-b"><th className="text-right pb-1.5 font-medium">פוסט</th><th className="text-center pb-1.5 font-medium">הוצאה</th><th className="text-center pb-1.5 font-medium">חשיפות</th><th className="text-center pb-1.5 font-medium">קליקים</th><th className="text-center pb-1.5 font-medium">אינטראקציות</th><th className="text-center pb-1.5 font-medium">וידאו</th></tr></thead><tbody>{metaAds.data.boosts.map((b, i) => (<tr key={i} className="border-b border-gray-50 hover:bg-pink-50/50"><td className="py-1.5 text-right font-medium max-w-[200px] truncate" title={b.name}>{b.name}</td><td className="py-1.5 text-center text-red-600">{formatCurrency(b.spend)}</td><td className="py-1.5 text-center">{b.impressions.toLocaleString()}</td><td className="py-1.5 text-center">{b.clicks.toLocaleString()}</td><td className="py-1.5 text-center">{b.postEngagement.toLocaleString()}</td><td className="py-1.5 text-center">{b.videoViews > 0 ? b.videoViews.toLocaleString() : '—'}</td></tr>))}</tbody></table></div></div>)}
+              </CardContent>
+            </Card>
+            {/* AI Insights */}
+            <Card className="border-0 shadow-sm border-r-4 border-r-amber-400">
+              <CardHeader className="pb-2"><div className="flex items-center gap-2"><Lightbulb size={18} className="text-amber-500" /><h3 className="font-bold text-gray-900">תובנות והמלצות</h3></div></CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {metaAds.data.campaigns.filter(c => c.cpa > 0 && c.cpa <= 40).length > 0 && (<div className="flex gap-2 items-start bg-green-50 rounded-lg p-3"><span className="text-green-600 mt-0.5">✅</span><div><span className="font-bold text-green-800">קמפיינים מנצחים: </span><span className="text-green-700">{metaAds.data.campaigns.filter(c => c.cpa > 0 && c.cpa <= 40).map(c => c.name.substring(0, 30)).join(', ')} — עלות לרכישה מתחת ל-₪40. כדאי להגדיל תקציב.</span></div></div>)}
+                {metaAds.data.campaigns.filter(c => c.leads > 50 && c.purchases === 0).length > 0 && (<div className="flex gap-2 items-start bg-red-50 rounded-lg p-3"><span className="text-red-600 mt-0.5">⚠️</span><div><span className="font-bold text-red-800">לא ממירים: </span><span className="text-red-700">{metaAds.data.campaigns.filter(c => c.leads > 50 && c.purchases === 0).map(c => c.name.substring(0, 25) + ' (' + c.leads + ' לידים, 0 רכישות)').join('; ')} — לשקול לכבות או לשנות קהל.</span></div></div>)}
+                {metaAds.data.campaigns.filter(c => c.cpa > 100).length > 0 && (<div className="flex gap-2 items-start bg-amber-50 rounded-lg p-3"><span className="text-amber-600 mt-0.5">💡</span><div><span className="font-bold text-amber-800">עלות גבוהה: </span><span className="text-amber-700">{metaAds.data.campaigns.filter(c => c.cpa > 100).map(c => c.name.substring(0, 25) + ' (CPA: ₪' + c.cpa + ')').join('; ')} — לבדוק קהל/קריאייטיב.</span></div></div>)}
+                {metaAds.data.totals.roas > 0 && (<div className="flex gap-2 items-start bg-blue-50 rounded-lg p-3"><span className="text-blue-600 mt-0.5">📊</span><div><span className="font-bold text-blue-800">סיכום: </span><span className="text-blue-700">הוצאת {formatCurrency(metaAds.data.totals.spend)} והכנסת {formatCurrency(metaAds.data.totals.revenue)} מ-{metaAds.data.totals.purchases} רכישות. {metaAds.data.totals.roas >= 3 ? 'ROAS מצוין!' : metaAds.data.totals.roas >= 1.5 ? 'ROAS סביר — יש מקום לשיפור.' : 'ROAS נמוך — צריך אופטימיזציה.'}</span></div></div>)}
+                {metaAds.data.boostsTotals.spend > 0 && (<div className="flex gap-2 items-start bg-purple-50 rounded-lg p-3"><span className="text-purple-600 mt-0.5">📣</span><div><span className="font-bold text-purple-800">בוסטים: </span><span className="text-purple-700">הוצאת {formatCurrency(metaAds.data.boostsTotals.spend)}. {metaAds.data.boostsTotals.engagement.toLocaleString()} אינטראקציות, {metaAds.data.boostsTotals.videoViews.toLocaleString()} צפיות וידאו. עלות לאינטראקציה: {formatCurrency(Math.round(metaAds.data.boostsTotals.spend / Math.max(metaAds.data.boostsTotals.engagement, 1) * 100) / 100)}. בוסטים בונים מודעות למותג.</span></div></div>)}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* ═══ COACHING & SESSIONS ═══ */}
+        {coachingRev.data && (coachingRev.data.sessionCount > 0 || coachingRev.data.coachingCount > 0) && (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2"><div className="flex items-center gap-2"><Heart size={18} className="text-pink-500" /><h3 className="font-bold text-gray-900">ליווי ופגישות</h3></div></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <div className="bg-pink-50 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-500">תהליכי ליווי</div><div className="text-xl font-bold text-pink-600">{coachingRev.data.coachingCount}</div><div className="text-[10px] text-gray-500">{formatCurrency(coachingRev.data.totalCoachingRevenue)}</div></div>
+                <div className="bg-indigo-50 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-500">פגישות בודדות</div><div className="text-xl font-bold text-indigo-600">{coachingRev.data.sessionCount}</div><div className="text-[10px] text-gray-500">{formatCurrency(coachingRev.data.totalSessionRevenue)}</div></div>
+                <div className="bg-green-50 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-500">סה"כ הכנסה</div><div className="text-xl font-bold text-green-600">{formatCurrency(coachingRev.data.totalCoachingRevenue + coachingRev.data.totalSessionRevenue)}</div></div>
+                <div className="bg-amber-50 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-500">ממוצע לתהליך</div><div className="text-xl font-bold text-amber-600">{coachingRev.data.coachingCount > 0 ? formatCurrency(Math.round(coachingRev.data.totalCoachingRevenue / coachingRev.data.coachingCount)) : '—'}</div></div>
+              </div>
+              {(coachingRev.data.coaching.length > 0 || coachingRev.data.sessions.length > 0) && (<div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="text-[10px] text-gray-500 border-b"><th className="text-right pb-1.5 font-medium">שם</th><th className="text-center pb-1.5 font-medium">סכום</th><th className="text-center pb-1.5 font-medium">סוג</th><th className="text-right pb-1.5 font-medium">מקור</th><th className="text-right pb-1.5 font-medium">תאריך</th></tr></thead><tbody>{[...coachingRev.data.coaching, ...coachingRev.data.sessions].slice(0, 20).map((r, i) => (<tr key={i} className="border-b border-gray-50 hover:bg-gray-50"><td className="py-1.5 text-right font-medium">{r.name || r.email}</td><td className="py-1.5 text-center font-bold text-green-600">{formatCurrency(r.sum)}</td><td className="py-1.5 text-center"><Badge className={r.sum >= 1500 ? 'bg-pink-100 text-pink-700' : 'bg-indigo-100 text-indigo-700'}>{r.sum >= 1500 ? 'ליווי' : 'פגישה'}</Badge></td><td className="py-1.5 text-right text-gray-500">{r.source}</td><td className="py-1.5 text-right text-gray-500">{formatDate(r.date)}</td></tr>))}</tbody></table></div>)}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Top Campaigns (UTM-based) */}
         {campaigns.data && campaigns.data.length > 0 && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <Target size={18} className="text-amber-500" />
-                <h3 className="font-bold text-gray-900">קמפיינים מובילים</h3>
+                <h3 className="font-bold text-gray-900">קמפיינים מובילים (UTM)</h3>
               </div>
             </CardHeader>
             <CardContent>

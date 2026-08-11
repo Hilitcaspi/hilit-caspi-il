@@ -42,6 +42,33 @@ function guardAdmin(ctx: any) {
   if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 }
 
+
+// ── Meta Ads API helper ─────────────────────────────────────────────────────
+async function fetchMetaAdsInsights(since: string, until: string) {
+  const token = process.env.META_ADS_TOKEN;
+  const mainAccountId = "act_254697595735216";
+  const boostsAccountId = "act_3841144459522772";
+  const fields = "campaign_name,spend,impressions,clicks,reach,actions";
+  async function fetchAccount(accountId: string) {
+    try {
+      const url = `https://graph.facebook.com/v19.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&level=campaign&limit=50&access_token=${token}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) { console.error("Meta API error:", data.error.message); return []; }
+      return data.data || [];
+    } catch (e) { console.error("Meta fetch error:", e); return []; }
+  }
+  const [campaignData, boostData] = await Promise.all([fetchAccount(mainAccountId), fetchAccount(boostsAccountId)]);
+  function parseInsights(rows: any[]) {
+    return rows.map((r: any) => {
+      const actions = r.actions || [];
+      const gv = (t: string) => Number(actions.find((a: any) => a.action_type === t)?.value || 0);
+      return { name: r.campaign_name, spend: Number(r.spend || 0), impressions: Number(r.impressions || 0), reach: Number(r.reach || 0), clicks: Number(r.clicks || 0), purchases: gv("purchase"), leads: gv("lead"), registrations: gv("complete_registration"), videoViews: gv("video_view"), postEngagement: gv("post_engagement"), likes: gv("like"), comments: gv("comment"), shares: gv("post"), saves: gv("onsite_conversion.post_save"), cpl: gv("lead") > 0 ? Math.round(Number(r.spend) / gv("lead") * 10) / 10 : 0, cpa: gv("purchase") > 0 ? Math.round(Number(r.spend) / gv("purchase") * 10) / 10 : 0, roas: gv("purchase") > 0 ? Math.round(gv("purchase") * 299 / Number(r.spend) * 10) / 10 : 0 };
+    });
+  }
+  return { campaigns: parseInsights(campaignData), boosts: parseInsights(boostData) };
+}
+
 export const dashboardRouter = router({
   // ── Main Overview KPIs ──────────────────────────────────────────────────
   overview: teamProcedure
@@ -506,5 +533,52 @@ export const dashboardRouter = router({
         lastJourney: r.lastJourney,
         converted: !!r.purchasedProduct,
       }));
+    }),
+
+  // ── Meta Ads Campaign Performance ──────────────────────────────────────
+  metaAdsPerformance: teamProcedure
+    .input(z.object({ startDate: z.number(), endDate: z.number() }))
+    .query(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const since = new Date(input.startDate).toISOString().split("T")[0];
+      const until = new Date(input.endDate).toISOString().split("T")[0];
+      const metaData = await fetchMetaAdsInsights(since, until);
+      const totalSpend = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.spend, 0);
+      const totalPurchases = metaData.campaigns.reduce((s, c) => s + c.purchases, 0);
+      const totalLeads = metaData.campaigns.reduce((s, c) => s + c.leads, 0);
+      const totalImpressions = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.impressions, 0);
+      const totalReach = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.reach, 0);
+      return {
+        campaigns: metaData.campaigns.sort((a, b) => b.spend - a.spend),
+        boosts: metaData.boosts.sort((a, b) => b.spend - a.spend),
+        totals: { spend: totalSpend, purchases: totalPurchases, leads: totalLeads, impressions: totalImpressions, reach: totalReach, avgCPA: totalPurchases > 0 ? Math.round(totalSpend / totalPurchases) : 0, avgCPL: totalLeads > 0 ? Math.round(totalSpend / totalLeads * 10) / 10 : 0, roas: totalSpend > 0 ? Math.round(totalPurchases * 299 / totalSpend * 10) / 10 : 0, revenue: totalPurchases * 299 },
+        boostsTotals: { spend: metaData.boosts.reduce((s, c) => s + c.spend, 0), impressions: metaData.boosts.reduce((s, c) => s + c.impressions, 0), reach: metaData.boosts.reduce((s, c) => s + c.reach, 0), clicks: metaData.boosts.reduce((s, c) => s + c.clicks, 0), engagement: metaData.boosts.reduce((s, c) => s + c.postEngagement, 0), likes: metaData.boosts.reduce((s, c) => s + c.likes, 0), comments: metaData.boosts.reduce((s, c) => s + c.comments, 0), shares: metaData.boosts.reduce((s, c) => s + c.shares, 0), saves: metaData.boosts.reduce((s, c) => s + c.saves, 0), videoViews: metaData.boosts.reduce((s, c) => s + c.videoViews, 0) },
+      };
+    }),
+
+  // ── Coaching & Session Revenue ─────────────────────────────────────────
+  coachingRevenue: teamProcedure
+    .input(z.object({ startDate: z.number(), endDate: z.number() }))
+    .query(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      const { startDate, endDate } = input;
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [rows] = await db.execute(sql`
+        SELECT email, name, product, sum, created_at, utmSource, utmMedium, utmCampaign
+        FROM payment_leads
+        WHERE created_at >= ${startDate} AND created_at <= ${endDate} AND (CAST(sum AS UNSIGNED) >= 400)
+        ORDER BY created_at DESC
+      `) as any;
+      const sessions = (rows as any[]).filter((r: any) => Number(r.sum) >= 400 && Number(r.sum) < 1500);
+      const coaching = (rows as any[]).filter((r: any) => Number(r.sum) >= 1500);
+      return {
+        sessions: sessions.map((r: any) => ({ email: r.email, name: r.name, sum: Number(r.sum), date: Number(r.created_at), source: r.utmCampaign || r.utmSource || "direct" })),
+        coaching: coaching.map((r: any) => ({ email: r.email, name: r.name, sum: Number(r.sum), date: Number(r.created_at), source: r.utmCampaign || r.utmSource || "direct" })),
+        totalSessionRevenue: sessions.reduce((s: number, r: any) => s + Number(r.sum), 0),
+        totalCoachingRevenue: coaching.reduce((s: number, r: any) => s + Number(r.sum), 0),
+        sessionCount: sessions.length,
+        coachingCount: coaching.length,
+      };
     }),
 });
