@@ -643,7 +643,7 @@ export const dashboardRouter = router({
       const data = await res.json();
       if (!data.data) return null;
       
-      const accounts = data.data.map((page: any) => ({
+      const accounts = data.data.filter((page: any) => page.name !== 'Match.by.hilit').map((page: any) => ({
         pageName: page.name,
         pageFans: page.fan_count || 0,
         igUsername: page.instagram_business_account?.username || null,
