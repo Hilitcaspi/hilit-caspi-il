@@ -155,6 +155,22 @@ async function fetchMetaAdsInsights(since: string, until: string) {
 }
 
 export const dashboardRouter = router({
+  // ── Monthly Targets ───────────────────────────────────────────────────────
+  monthlyTargets: teamProcedure.query(async ({ ctx }) => {
+    guardAdmin(ctx);
+    // Targets for current month - can be made configurable later
+    return {
+      budget: 6000,       // Monthly ad spend target
+      leads: 1200,        // Monthly leads target
+      purchases: 80,      // Monthly purchases target
+      revenue: 25000,     // Monthly revenue target
+      databaseSales: 60,  // Database product sales target
+      guideSales: 15,     // Guide sales target
+      courseSales: 5,     // Course sales target
+      coachingSales: 2,   // Coaching sales target
+    };
+  }),
+
   // ── Email Engagement Analytics ────────────────────────────────────────────
   emailEngagement: teamProcedure
     .input(z.object({ startDate: z.number(), endDate: z.number() }))
@@ -415,17 +431,118 @@ export const dashboardRouter = router({
       const dnaCompleted = Number(dnaRow?.cnt ?? 0);
 
       return {
-        totalLeads,
-        totalPurchases,
-        totalRevenue,
-        conversionRate: Math.round(conversionRate * 10) / 10,
-        emailsSent,
-        emailsOpened,
-        emailsClicked,
-        unsubscribes,
-        dnaCompleted,
+       totalLeads,
+       totalPurchases,
+       totalRevenue,
+       conversionRate: Math.round(conversionRate * 10) / 10,
+       emailsSent,
+       emailsOpened,
+       emailsClicked,
+       unsubscribes,
+       dnaCompleted,
+     };
+   }),
+  // ── Overview with Period Comparison ────────────────────────────────────────
+  overviewWithComparison: teamProcedure
+    .input(z.object({ startDate: z.number(), endDate: z.number() }))
+    .query(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { startDate, endDate } = input;
+      const periodLength = endDate - startDate;
+      const prevStart = startDate - periodLength;
+      const prevEnd = startDate - 1;
+      
+      // Current period
+      const [[curr]] = await db.execute(sql`
+        SELECT 
+          (SELECT COUNT(*) FROM crm_leads WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}) as leads,
+          (SELECT COUNT(*) FROM payment_leads WHERE created_at >= ${startDate} AND created_at <= ${endDate}) as purchases,
+          (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'dna_quiz_complete' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as dna
+      `) as any;
+      
+      // Previous period
+      const [[prev]] = await db.execute(sql`
+        SELECT 
+          (SELECT COUNT(*) FROM crm_leads WHERE createdAt >= ${prevStart} AND createdAt <= ${prevEnd}) as leads,
+          (SELECT COUNT(*) FROM payment_leads WHERE created_at >= ${prevStart} AND created_at <= ${prevEnd}) as purchases,
+          (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'dna_quiz_complete' AND createdAt >= ${prevStart} AND createdAt <= ${prevEnd}) as dna
+      `) as any;
+      
+      // Revenue current
+      const [revCurr] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${startDate} AND created_at <= ${endDate} GROUP BY product`) as any;
+      let revenueCurr = 0;
+      const productSales: Record<string, number> = {};
+      for (const row of (revCurr as any[])) { 
+        const cnt = Number(row.cnt); 
+        revenueCurr += cnt * (PRODUCT_PRICES[row.product] ?? 0); 
+        productSales[row.product] = cnt;
+      }
+      
+      // Revenue previous
+      const [revPrev] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${prevStart} AND created_at <= ${prevEnd} GROUP BY product`) as any;
+      let revenuePrev = 0;
+      for (const row of (revPrev as any[])) { revenuePrev += Number(row.cnt) * (PRODUCT_PRICES[row.product] ?? 0); }
+      
+      // Lead journey attribution: leads from campaigns that converted
+      const [journeyAttribution] = await db.execute(sql`
+        SELECT 
+          cl.utmCampaign as campaign,
+          cl.utmSource as source,
+          COUNT(DISTINCT cl.id) as totalLeads,
+          COUNT(DISTINCT pl.id) as converted
+        FROM crm_leads cl
+        LEFT JOIN payment_leads pl ON pl.email = cl.email AND pl.created_at >= ${startDate}
+        WHERE cl.createdAt >= ${startDate} AND cl.createdAt <= ${endDate}
+        GROUP BY cl.utmCampaign, cl.utmSource
+        HAVING totalLeads > 2
+        ORDER BY converted DESC, totalLeads DESC
+        LIMIT 15
+      `) as any;
+      
+      const leads = Number(curr?.leads ?? 0);
+      const purchases = Number(curr?.purchases ?? 0);
+      const dna = Number(curr?.dna ?? 0);
+      const prevLeads = Number(prev?.leads ?? 0);
+      const prevPurchases = Number(prev?.purchases ?? 0);
+      const prevDna = Number(prev?.dna ?? 0);
+      
+      function pctChange(curr: number, prev: number): number {
+        if (prev === 0) return curr > 0 ? 100 : 0;
+        return Math.round((curr - prev) / prev * 100);
+      }
+      
+      return {
+        current: { leads, purchases, revenue: revenueCurr, dna, conversionRate: leads > 0 ? Math.round(purchases / leads * 1000) / 10 : 0 },
+        previous: { leads: prevLeads, purchases: prevPurchases, revenue: revenuePrev, dna: prevDna },
+        change: { 
+          leads: pctChange(leads, prevLeads), 
+          purchases: pctChange(purchases, prevPurchases), 
+          revenue: pctChange(revenueCurr, revenuePrev),
+          dna: pctChange(dna, prevDna),
+        },
+        productSales,
+        journeyAttribution: (journeyAttribution as any[]).map((r: any) => ({
+          campaign: r.campaign || 'ישיר',
+          source: r.source || 'direct',
+          leads: Number(r.totalLeads),
+          converted: Number(r.converted),
+          conversionRate: Number(r.totalLeads) > 0 ? Math.round(Number(r.converted) / Number(r.totalLeads) * 1000) / 10 : 0,
+        })),
+        // Industry benchmarks
+        benchmarks: {
+          emailOpenRate: 21.5,    // Email marketing industry avg
+          emailClickRate: 2.3,    // Industry avg
+          metaCPL: 15,            // Meta Ads avg CPL in Israel (services)
+          metaCPA: 80,            // Meta Ads avg CPA in Israel
+          metaROAS: 3.0,          // Healthy ROAS benchmark
+          conversionRate: 3.5,    // Lead-to-purchase avg for info products
+          igEngagement: 3.5,      // IG engagement rate benchmark
+        },
       };
     }),
+
 
   // ── Daily Trend (leads + revenue over time) ─────────────────────────────
   dailyTrend: teamProcedure

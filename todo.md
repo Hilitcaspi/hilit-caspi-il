@@ -487,3 +487,13 @@
 - [x] Build behavior analytics section in dashboard: funnel, interactions, traffic sources
 - [x] Funnel visualization: visit → DNA start → DNA complete → database CTA → purchase with % drop-off
 - [x] Email journey performance table with open rate, click rate, click-to-open per journey
+
+## Dashboard V2 - Professional Overhaul (Aug 11)
+- [x] Period comparison: every KPI shows change vs previous period (arrows + %)
+- [x] Industry benchmarks: open rate, CTR, ROAS, CPL compared to industry average
+- [x] Monthly targets: budget, leads, sales per product, revenue goals with progress bars
+- [x] Lead journey attribution: campaign → mailing journey → purchase (full path table)
+- [x] Round currency to whole numbers (no decimals)
+- [x] Deep professional insights (specific to campaigns, not generic)
+- [x] Social media section: engagement vs benchmark, saves vs shares analysis, growth
+- [x] Rebuilt entire Dashboard.tsx from scratch with professional design
