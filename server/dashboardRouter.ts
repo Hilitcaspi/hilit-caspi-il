@@ -155,6 +155,192 @@ async function fetchMetaAdsInsights(since: string, until: string) {
 }
 
 export const dashboardRouter = router({
+  // ── Email Engagement Analytics ────────────────────────────────────────────
+  emailEngagement: teamProcedure
+    .input(z.object({ startDate: z.number(), endDate: z.number() }))
+    .query(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { startDate, endDate } = input;
+      
+      // Overall email stats
+      const [[emailTotals]] = await db.execute(sql`
+        SELECT 
+          COUNT(*) as totalSent,
+          SUM(CASE WHEN openCount > 0 THEN 1 ELSE 0 END) as totalOpened,
+          SUM(CASE WHEN clickCount > 0 THEN 1 ELSE 0 END) as totalClicked,
+          AVG(openCount) as avgOpens,
+          AVG(clickCount) as avgClicks
+        FROM email_log 
+        WHERE sentAt >= ${startDate} AND sentAt <= ${endDate} AND sentAt > 0
+      `) as any;
+      
+      // Per-journey performance
+      const [journeyStats] = await db.execute(sql`
+        SELECT 
+          journey,
+          COUNT(*) as sent,
+          SUM(CASE WHEN openCount > 0 THEN 1 ELSE 0 END) as opened,
+          SUM(CASE WHEN clickCount > 0 THEN 1 ELSE 0 END) as clicked
+        FROM email_log 
+        WHERE sentAt >= ${startDate} AND sentAt <= ${endDate} AND sentAt > 0
+        GROUP BY journey ORDER BY sent DESC LIMIT 15
+      `) as any;
+      
+      // Per-email-index performance (which email in journey converts best)
+      const [indexStats] = await db.execute(sql`
+        SELECT 
+          journey, emailIndex,
+          COUNT(*) as sent,
+          SUM(CASE WHEN openCount > 0 THEN 1 ELSE 0 END) as opened,
+          SUM(CASE WHEN clickCount > 0 THEN 1 ELSE 0 END) as clicked
+        FROM email_log 
+        WHERE sentAt >= ${startDate} AND sentAt <= ${endDate} AND sentAt > 0
+        GROUP BY journey, emailIndex ORDER BY journey, emailIndex LIMIT 50
+      `) as any;
+      
+      // Daily email performance
+      const [dailyEmails] = await db.execute(sql`
+        SELECT 
+          DATE(FROM_UNIXTIME(sentAt/1000)) as day,
+          COUNT(*) as sent,
+          SUM(CASE WHEN openCount > 0 THEN 1 ELSE 0 END) as opened
+        FROM email_log 
+        WHERE sentAt >= ${startDate} AND sentAt <= ${endDate} AND sentAt > 0
+        GROUP BY day ORDER BY day
+      `) as any;
+      
+      const totalSent = Number(emailTotals?.totalSent ?? 0);
+      const totalOpened = Number(emailTotals?.totalOpened ?? 0);
+      const totalClicked = Number(emailTotals?.totalClicked ?? 0);
+      
+      return {
+        totals: {
+          sent: totalSent,
+          opened: totalOpened,
+          clicked: totalClicked,
+          openRate: totalSent > 0 ? Math.round(totalOpened / totalSent * 1000) / 10 : 0,
+          clickRate: totalSent > 0 ? Math.round(totalClicked / totalSent * 1000) / 10 : 0,
+          clickToOpenRate: totalOpened > 0 ? Math.round(totalClicked / totalOpened * 1000) / 10 : 0,
+        },
+        journeys: (journeyStats as any[]).map((j: any) => ({
+          journey: j.journey || 'unknown',
+          sent: Number(j.sent),
+          opened: Number(j.opened),
+          clicked: Number(j.clicked),
+          openRate: Number(j.sent) > 0 ? Math.round(Number(j.opened) / Number(j.sent) * 1000) / 10 : 0,
+          clickRate: Number(j.sent) > 0 ? Math.round(Number(j.clicked) / Number(j.sent) * 1000) / 10 : 0,
+        })),
+        emailSteps: (indexStats as any[]).map((s: any) => ({
+          journey: s.journey || 'unknown',
+          step: Number(s.emailIndex),
+          sent: Number(s.sent),
+          opened: Number(s.opened),
+          clicked: Number(s.clicked),
+        })),
+        daily: (dailyEmails as any[]).map((d: any) => ({
+          day: String(d.day),
+          sent: Number(d.sent),
+          opened: Number(d.opened),
+        })),
+      };
+    }),
+
+  // ── Site Traffic & SEO Analytics ──────────────────────────────────────────
+  siteTraffic: teamProcedure
+    .input(z.object({ startDate: z.number(), endDate: z.number() }))
+    .query(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      
+      const { startDate, endDate } = input;
+      
+      // Page views by page
+      const [pageViews] = await db.execute(sql`
+        SELECT page, COUNT(*) as views 
+        FROM analytics_events 
+        WHERE eventType = 'page_view' AND createdAt >= ${startDate} AND createdAt <= ${endDate}
+        GROUP BY page ORDER BY views DESC LIMIT 20
+      `) as any;
+      
+      // Total page views and unique sessions (approximate by distinct userAgent+page combos per day)
+      const [[totals]] = await db.execute(sql`
+        SELECT 
+          COUNT(*) as totalPageViews,
+          COUNT(DISTINCT CONCAT(COALESCE(email,''), COALESCE(userAgent,''))) as uniqueVisitors
+        FROM analytics_events 
+        WHERE eventType = 'page_view' AND createdAt >= ${startDate} AND createdAt <= ${endDate}
+      `) as any;
+      
+      // Daily page views
+      const [dailyViews] = await db.execute(sql`
+        SELECT DATE(FROM_UNIXTIME(createdAt/1000)) as day, COUNT(*) as views
+        FROM analytics_events 
+        WHERE eventType = 'page_view' AND createdAt >= ${startDate} AND createdAt <= ${endDate}
+        GROUP BY day ORDER BY day
+      `) as any;
+      
+      // UTM sources (where traffic comes from)
+      const [trafficSources] = await db.execute(sql`
+        SELECT 
+          COALESCE(utmSource, 'direct') as source,
+          COALESCE(utmMedium, 'none') as medium,
+          COUNT(*) as visits
+        FROM analytics_events 
+        WHERE eventType = 'page_view' AND createdAt >= ${startDate} AND createdAt <= ${endDate}
+        GROUP BY source, medium ORDER BY visits DESC LIMIT 15
+      `) as any;
+      
+      // Key interactions (button clicks, form starts, CTA clicks)
+      const [interactions] = await db.execute(sql`
+        SELECT eventType, COUNT(*) as cnt
+        FROM analytics_events 
+        WHERE eventType IN ('button_click','form_start','form_submit','dna_quiz_start','dna_quiz_complete','database_cta','guide_view','course_cta','product_click','free_guide_cta','intro_meeting_click')
+          AND createdAt >= ${startDate} AND createdAt <= ${endDate}
+        GROUP BY eventType ORDER BY cnt DESC
+      `) as any;
+      
+      // Funnel: page_view → dna_quiz_start → dna_quiz_complete → form_submit (purchase)
+      const [[funnelData]] = await db.execute(sql`
+        SELECT 
+          (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'page_view' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as pageViews,
+          (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'dna_quiz_start' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as dnaStarts,
+          (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'dna_quiz_complete' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as dnaCompletes,
+          (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'database_cta' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as databaseClicks,
+          (SELECT COUNT(*) FROM payment_leads WHERE created_at >= ${startDate} AND created_at <= ${endDate}) as purchases
+      `) as any;
+      
+      // Scroll depth distribution
+      const [scrollData] = await db.execute(sql`
+        SELECT 
+          JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.maxScroll')) as depth,
+          COUNT(*) as cnt
+        FROM analytics_events 
+        WHERE eventType = 'page_view' AND metadata IS NOT NULL AND createdAt >= ${startDate} AND createdAt <= ${endDate}
+          AND JSON_EXTRACT(metadata, '$.maxScroll') IS NOT NULL
+        GROUP BY depth ORDER BY CAST(depth AS UNSIGNED) DESC LIMIT 10
+      `) as any;
+      
+      return {
+        totalPageViews: Number(totals?.totalPageViews ?? 0),
+        uniqueVisitors: Number(totals?.uniqueVisitors ?? 0),
+        topPages: (pageViews as any[]).map((p: any) => ({ page: p.page, views: Number(p.views) })),
+        dailyViews: (dailyViews as any[]).map((d: any) => ({ day: String(d.day), views: Number(d.views) })),
+        trafficSources: (trafficSources as any[]).map((s: any) => ({ source: s.source, medium: s.medium, visits: Number(s.visits) })),
+        interactions: (interactions as any[]).map((i: any) => ({ event: i.eventType, count: Number(i.cnt) })),
+        funnel: {
+          pageViews: Number(funnelData?.pageViews ?? 0),
+          dnaStarts: Number(funnelData?.dnaStarts ?? 0),
+          dnaCompletes: Number(funnelData?.dnaCompletes ?? 0),
+          databaseClicks: Number(funnelData?.databaseClicks ?? 0),
+          purchases: Number(funnelData?.purchases ?? 0),
+        },
+        scrollDepth: (scrollData as any[]).map((s: any) => ({ depth: s.depth, count: Number(s.cnt) })),
+      };
+    }),
+
   // ── Social Insights (IG + FB + WhatsApp) ──────────────────────────────────
   socialInsights: teamProcedure
     .input(z.object({ startDate: z.number(), endDate: z.number() }))

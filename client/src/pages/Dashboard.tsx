@@ -105,6 +105,8 @@ export default function Dashboard() {
   const metaAds = trpc.dashboard.metaAdsPerformance.useQuery(dateInput);
   const coachingRev = trpc.dashboard.coachingRevenue.useQuery(dateInput);
   const sendReport = trpc.dashboard.sendWeeklyReport.useMutation();
+  const siteTraffic = trpc.dashboard.siteTraffic.useQuery(dateInput);
+  const emailEngagement = trpc.dashboard.emailEngagement.useQuery(dateInput);
 
   const isLoading = overview.isLoading;
 
@@ -645,6 +647,293 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </>
+        )}
+
+        {/* ═══ EMAIL ENGAGEMENT ═══ */}
+        {emailEngagement.data && emailEngagement.data.totals.sent > 0 && (
+          <Card className="border-0 shadow-sm bg-gradient-to-l from-amber-50 to-white">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Mail size={18} className="text-amber-500" />
+                <h3 className="font-bold text-gray-900">ביצועי מיילים ומסעות</h3>
+                <Badge className="bg-amber-100 text-amber-700 text-[10px]">{emailEngagement.data.totals.sent} נשלחו</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Email KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                <div className="bg-white rounded-xl p-3 border border-amber-100 text-center">
+                  <div className="text-[10px] text-gray-500">נשלחו</div>
+                  <div className="text-xl font-bold text-amber-600">{emailEngagement.data.totals.sent}</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-green-100 text-center">
+                  <div className="text-[10px] text-gray-500">נפתחו</div>
+                  <div className="text-xl font-bold text-green-600">{emailEngagement.data.totals.opened}</div>
+                  <div className="text-[9px] text-green-500">{emailEngagement.data.totals.openRate}%</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-blue-100 text-center">
+                  <div className="text-[10px] text-gray-500">קליקים</div>
+                  <div className="text-xl font-bold text-blue-600">{emailEngagement.data.totals.clicked}</div>
+                  <div className="text-[9px] text-blue-500">{emailEngagement.data.totals.clickRate}%</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-purple-100 text-center">
+                  <div className="text-[10px] text-gray-500">Click-to-Open</div>
+                  <div className="text-xl font-bold text-purple-600">{emailEngagement.data.totals.clickToOpenRate}%</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-gray-100 text-center">
+                  <div className="text-[10px] text-gray-500">מסעות פעילים</div>
+                  <div className="text-xl font-bold text-gray-700">{emailEngagement.data.journeys.length}</div>
+                </div>
+              </div>
+              
+              {/* Journey Performance Table */}
+              {emailEngagement.data.journeys.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-xs font-bold text-gray-700 mb-2">ביצועים לפי מסע</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-[10px] text-gray-500 border-b">
+                          <th className="text-right pb-1.5 font-medium">מסע</th>
+                          <th className="text-center pb-1.5 font-medium">נשלחו</th>
+                          <th className="text-center pb-1.5 font-medium">נפתחו</th>
+                          <th className="text-center pb-1.5 font-medium">קליקים</th>
+                          <th className="text-center pb-1.5 font-medium">% פתיחה</th>
+                          <th className="text-center pb-1.5 font-medium">% קליק</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {emailEngagement.data.journeys.map((j, i) => {
+                          const journeyLabels: Record<string, string> = {
+                            women_first_step: "נשים - הצעד הראשון",
+                            men_first_step: "גברים - הצעד הראשון",
+                            free_guide_nurture: "מדריך חינמי - חימום",
+                            meta_lead_dna: "מטא - שאלון DNA",
+                            sales_call_lead: "שיחת היכרות",
+                            women_matchmaking_welcome: "נשים - ברוך הבא",
+                            men_matchmaking_welcome: "גברים - ברוך הבא",
+                            abandoned_database: "נטישת עגלה - מאגר",
+                            abandoned_guide: "נטישת עגלה - מדריך",
+                          };
+                          return (
+                            <tr key={i} className="border-b border-gray-50 hover:bg-amber-50/50">
+                              <td className="py-1.5 text-right font-medium">{journeyLabels[j.journey] || j.journey}</td>
+                              <td className="py-1.5 text-center">{j.sent}</td>
+                              <td className="py-1.5 text-center text-green-600">{j.opened}</td>
+                              <td className="py-1.5 text-center text-blue-600">{j.clicked}</td>
+                              <td className="py-1.5 text-center">
+                                <span className={j.openRate >= 40 ? 'text-green-600 font-bold' : j.openRate >= 20 ? 'text-amber-600' : 'text-red-500'}>
+                                  {j.openRate}%
+                                </span>
+                              </td>
+                              <td className="py-1.5 text-center">
+                                <span className={j.clickRate >= 5 ? 'text-green-600 font-bold' : j.clickRate >= 2 ? 'text-amber-600' : 'text-gray-500'}>
+                                  {j.clickRate}%
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              {/* Email Insight */}
+              <div className="p-3 bg-amber-50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Lightbulb size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                  <div className="text-xs text-amber-800">
+                    <span className="font-bold">תובנה: </span>
+                    {emailEngagement.data.totals.openRate >= 40 
+                      ? `אחוז פתיחה מצוין (${emailEngagement.data.totals.openRate}%)! הכותרות עובדות. `
+                      : emailEngagement.data.totals.openRate >= 20 
+                      ? `אחוז פתיחה סביר (${emailEngagement.data.totals.openRate}%). נסי כותרות אישיות יותר. `
+                      : `אחוז פתיחה נמוך (${emailEngagement.data.totals.openRate}%). כדאי לבדוק: כותרות, תדירות שליחה, ושעת שליחה. `}
+                    {emailEngagement.data.totals.clickToOpenRate >= 15 
+                      ? `Click-to-Open מצוין (${emailEngagement.data.totals.clickToOpenRate}%) — התוכן רלוונטי.`
+                      : `Click-to-Open (${emailEngagement.data.totals.clickToOpenRate}%) — כדאי לשפר CTAs ותוכן.`}
+                    {emailEngagement.data.journeys.find(j => j.openRate < 15 && j.sent > 10) && (
+                      <> ⚠️ יש מסעות עם פתיחה נמוכה מאוד — שקלי לשנות כותרות או לכבות.</>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ═══ SITE TRAFFIC & BEHAVIOR ═══ */}
+        {siteTraffic.data && (
+          <Card className="border-0 shadow-sm bg-gradient-to-l from-indigo-50 to-white">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-indigo-500" />
+                <h3 className="font-bold text-gray-900">תנועה באתר וניתוח התנהגות</h3>
+                <Badge className="bg-indigo-100 text-indigo-700 text-[10px]">Analytics</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Traffic KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="bg-white rounded-xl p-3 border border-indigo-100 text-center">
+                  <div className="text-[10px] text-gray-500">צפיות דף</div>
+                  <div className="text-xl font-bold text-indigo-600">{siteTraffic.data.totalPageViews.toLocaleString()}</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-blue-100 text-center">
+                  <div className="text-[10px] text-gray-500">מבקרים ייחודיים</div>
+                  <div className="text-xl font-bold text-blue-600">{siteTraffic.data.uniqueVisitors.toLocaleString()}</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-green-100 text-center">
+                  <div className="text-[10px] text-gray-500">ממוצע דפים/מבקר</div>
+                  <div className="text-xl font-bold text-green-600">{siteTraffic.data.uniqueVisitors > 0 ? (siteTraffic.data.totalPageViews / siteTraffic.data.uniqueVisitors).toFixed(1) : '—'}</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-purple-100 text-center">
+                  <div className="text-[10px] text-gray-500">אינטראקציות</div>
+                  <div className="text-xl font-bold text-purple-600">{siteTraffic.data.interactions.reduce((s, i) => s + i.count, 0).toLocaleString()}</div>
+                </div>
+              </div>
+              
+              {/* Daily Views Chart */}
+              {siteTraffic.data.dailyViews.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-xs font-bold text-gray-600 mb-2">ביקורים יומיים</h4>
+                  <div className="flex items-end gap-[2px] h-20">
+                    {siteTraffic.data.dailyViews.map((d, i) => {
+                      const max = Math.max(...siteTraffic.data!.dailyViews.map(x => x.views), 1);
+                      return (
+                        <div key={i} className="flex-1 min-w-[6px] group relative">
+                          <div className="absolute -top-6 bg-gray-800 text-white text-[9px] px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10">
+                            {d.day?.slice(5)}: {d.views}
+                          </div>
+                          <div className="bg-gradient-to-t from-indigo-500 to-indigo-300 rounded-t-sm transition-all" style={{ height: `${(d.views / max) * 100}%`, minHeight: d.views > 0 ? '3px' : '0' }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Two columns: Top Pages + Traffic Sources */}
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                {/* Top Pages */}
+                <div className="border border-gray-100 rounded-xl p-3">
+                  <h4 className="text-xs font-bold text-gray-700 mb-2">דפים פופולריים</h4>
+                  <div className="space-y-1.5">
+                    {siteTraffic.data.topPages.slice(0, 8).map((p, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600 truncate max-w-[180px]">{p.page === '/' ? 'דף הבית' : p.page}</span>
+                        <span className="font-medium text-indigo-600">{p.views}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Traffic Sources */}
+                <div className="border border-gray-100 rounded-xl p-3">
+                  <h4 className="text-xs font-bold text-gray-700 mb-2">מקורות תנועה</h4>
+                  <div className="space-y-1.5">
+                    {siteTraffic.data.trafficSources.slice(0, 8).map((s, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">{s.source === 'direct' ? 'ישיר' : s.source} {s.medium !== 'none' ? `(${s.medium})` : ''}</span>
+                        <span className="font-medium text-blue-600">{s.visits}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Behavior Funnel */}
+              <div className="border border-gray-100 rounded-xl p-4">
+                <h4 className="text-xs font-bold text-gray-700 mb-3">משפך התנהגות: ביקור → שאלון → רכישה</h4>
+                <div className="flex items-center justify-center gap-1 flex-wrap">
+                  {[
+                    { label: "צפיות", value: siteTraffic.data.funnel.pageViews, color: "bg-indigo-500" },
+                    { label: "התחלת DNA", value: siteTraffic.data.funnel.dnaStarts, color: "bg-blue-500" },
+                    { label: "השלמת DNA", value: siteTraffic.data.funnel.dnaCompletes, color: "bg-purple-500" },
+                    { label: "לחיצה למאגר", value: siteTraffic.data.funnel.databaseClicks, color: "bg-amber-500" },
+                    { label: "רכישות", value: siteTraffic.data.funnel.purchases, color: "bg-green-500" },
+                  ].map((step, i, arr) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <div className="text-center">
+                        <div className={`${step.color} text-white rounded-lg px-3 py-2 min-w-[60px]`}>
+                          <div className="text-lg font-bold">{step.value}</div>
+                        </div>
+                        <div className="text-[9px] text-gray-500 mt-0.5">{step.label}</div>
+                      </div>
+                      {i < arr.length - 1 && (
+                        <div className="text-center mx-0.5">
+                          <div className="text-sm text-gray-400">→</div>
+                          <div className="text-[9px] font-bold text-gray-600">
+                            {step.value > 0 ? `${((arr[i + 1].value / step.value) * 100).toFixed(0)}%` : "—"}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Key Interactions */}
+              {siteTraffic.data.interactions.length > 0 && (
+                <div className="mt-4 border border-gray-100 rounded-xl p-3">
+                  <h4 className="text-xs font-bold text-gray-700 mb-2">אינטראקציות מפתח</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {siteTraffic.data.interactions.slice(0, 8).map((int, i) => {
+                      const labels: Record<string, string> = {
+                        dna_quiz_start: "התחלת שאלון",
+                        dna_quiz_complete: "השלמת שאלון",
+                        database_cta: "CTA מאגר",
+                        guide_view: "צפייה במדריך",
+                        course_cta: "CTA קורס",
+                        form_start: "התחלת טופס",
+                        form_submit: "שליחת טופס",
+                        button_click: "לחיצות כפתור",
+                        product_click: "לחיצה מוצר",
+                        free_guide_cta: "CTA מדריך חינמי",
+                        intro_meeting_click: "פגישת היכרות",
+                      };
+                      return (
+                        <div key={i} className="bg-gray-50 rounded-lg p-2 text-center">
+                          <div className="text-sm font-bold text-gray-800">{int.count}</div>
+                          <div className="text-[9px] text-gray-500">{labels[int.event] || int.event}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Insight */}
+              <div className="mt-3 p-3 bg-indigo-50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Lightbulb size={14} className="text-indigo-500 mt-0.5 shrink-0" />
+                  <div className="text-xs text-indigo-800">
+                    <span className="font-bold">תובנה: </span>
+                    {siteTraffic.data.funnel.dnaStarts > 0 && siteTraffic.data.funnel.pageViews > 0 && (
+                      <>
+                        {((siteTraffic.data.funnel.dnaStarts / siteTraffic.data.funnel.pageViews) * 100).toFixed(1)}% מהמבקרים מתחילים שאלון DNA.
+                        {siteTraffic.data.funnel.dnaCompletes > 0 && siteTraffic.data.funnel.dnaStarts > 0 && (
+                          <> {((siteTraffic.data.funnel.dnaCompletes / siteTraffic.data.funnel.dnaStarts) * 100).toFixed(0)}% משלימים אותו.</>
+                        )}
+                        {siteTraffic.data.funnel.purchases > 0 && siteTraffic.data.funnel.dnaCompletes > 0 && (
+                          <> {((siteTraffic.data.funnel.purchases / siteTraffic.data.funnel.dnaCompletes) * 100).toFixed(0)}% ממשלימי DNA רוכשים.</>
+                        )}
+                        {siteTraffic.data.funnel.dnaStarts > 0 && siteTraffic.data.funnel.dnaCompletes > 0 && 
+                         (siteTraffic.data.funnel.dnaCompletes / siteTraffic.data.funnel.dnaStarts) < 0.5 && (
+                          <> נשירה גבוהה בשאלון — כדאי לקצר או לפשט.</>
+                        )}
+                      </>
+                    )}
+                    {siteTraffic.data.topPages.length > 0 && (
+                      <> הדף הפופולרי ביותר: {siteTraffic.data.topPages[0].page === '/' ? 'דף הבית' : siteTraffic.data.topPages[0].page} ({siteTraffic.data.topPages[0].views} צפיות).</>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Recent Leads Table */}

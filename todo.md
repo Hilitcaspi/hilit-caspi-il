@@ -467,3 +467,23 @@
 - [x] Schedule: every Tuesday at 20:00 Israel time to hilitcaspi@gmail.com (setInterval in index.ts)
 - [x] Include: leads, purchases, revenue, spend, ROI, winning campaigns, what to improve
 - [x] Manual trigger: sendWeeklyReport mutation + "שלח דוח" button in dashboard header
+
+## SEO & Traffic Analytics in Dashboard (Aug 11)
+- [x] Add siteTraffic procedure - page views, unique visitors, top pages, referrers from analytics
+- [x] Add SEO/traffic section to dashboard - top pages, traffic sources, daily views chart
+- [x] Show behavior funnel: visit → DNA start → DNA complete → database CTA → purchase
+- [x] Key interactions breakdown (quiz starts, form submits, CTA clicks)
+- [x] Traffic insight with drop-off analysis
+
+## Blog Articles (Aug 11)
+- [x] Article 1: "המאגר החכם הגדול והמוביל בישראל" - about the 5000+ database
+- [x] Article 2: "סיפורי הצלחה — כשהמדע פוגש את האהבה" - success stories
+- [x] Article 3: "איך עובד המאגר החכם — השיטה שמאחורי ההתאמות" - how algorithm works
+- [x] All 3 articles inserted to blog_posts table with SEO meta tags
+
+## Behavior Tracking & Funnel Optimization (Aug 11)
+- [x] Track key user interactions: already tracking page_view, scroll_depth, button_click, form_start/submit, dna_quiz_start/complete
+- [x] Track email engagement: emailEngagement procedure with opens, clicks, per-journey, per-step
+- [x] Build behavior analytics section in dashboard: funnel, interactions, traffic sources
+- [x] Funnel visualization: visit → DNA start → DNA complete → database CTA → purchase with % drop-off
+- [x] Email journey performance table with open rate, click rate, click-to-open per journey
