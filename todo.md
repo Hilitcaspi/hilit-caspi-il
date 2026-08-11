@@ -440,3 +440,30 @@
 - [x] Dashboard: Coaching & Sessions revenue section with breakdown
 - [x] Updated META_CAPI_TOKEN (was expired)
 - [x] Added META_ADS_TOKEN for campaign data
+
+## Team Member Access (Aug 11)
+- [x] Add netaneal@menteshdigital.com to CRM (password: Anyspot1234!)
+
+## Instagram & Facebook Insights Integration (Aug 11)
+- [x] Exchange short-lived token for long-lived (60 days, expires Oct 10 2026) with instagram_manage_insights
+- [x] Server: socialInsights procedure - IG daily reach, follower_count, accounts_engaged, interactions, likes, comments, shares, saves
+- [x] Server: fbPageInsights procedure - FB page fans, followers
+- [x] Dashboard: IG Insights section with daily reach chart, engagement breakdown, follower growth
+- [x] Dashboard: FB Page section with fans + WhatsApp group
+- [x] Dashboard: Social insight/recommendation text
+
+## Comprehensive Dashboard Overhaul (Aug 11)
+- [x] Per-campaign funnels: leads → purchases with spend, CPL, CPA, ROAS per campaign
+- [x] UTM-based attribution: which campaign leads converted to purchases (full journey)
+- [x] Campaign recommendations: what to stop, what to scale, what to improve (AI-powered)
+- [x] Social media funnel: followers → engagement → reach
+- [x] WhatsApp group metrics: members shown
+- [x] Email marketing section: open rates, click rates in KPIs
+- [x] Visual overhaul: IG reach chart, color-coded KPIs, trend arrows
+
+## Weekly Email Report - Tuesday 20:00 (Aug 11)
+- [x] Create weeklyReport module (server/weeklyReport.ts) that aggregates all dashboard data
+- [x] Build HTML email template with KPIs, top campaigns, funnels, recommendations
+- [x] Schedule: every Tuesday at 20:00 Israel time to hilitcaspi@gmail.com (setInterval in index.ts)
+- [x] Include: leads, purchases, revenue, spend, ROI, winning campaigns, what to improve
+- [x] Manual trigger: sendWeeklyReport mutation + "שלח דוח" button in dashboard header

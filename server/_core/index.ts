@@ -908,6 +908,31 @@ async function startServer() {
   }, MATCH_CHECK_INTERVAL);
   if (SCHEDULERS_ENABLED) console.log("[MatchScheduler] Tri-daily matching scheduler started (runs every 3 days at 09:00 IL, full algorithm)");
 
+  // ─── Weekly Report Scheduler (Tuesday 20:00 Israel time) ──────────────────
+  const WEEKLY_REPORT_CHECK_INTERVAL = 30 * 60 * 1000; // check every 30 min
+  let lastWeeklyReportDate = "";
+  if (SCHEDULERS_ENABLED) setInterval(async () => {
+    try {
+      const now = new Date();
+      const israelTime = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+      const dayOfWeek = israelTime.getUTCDay(); // 0=Sun, 2=Tue
+      const hour = israelTime.getUTCHours();
+      const dateStr = israelTime.toISOString().split("T")[0];
+      
+      // Tuesday (day 2) at 20:00 Israel time
+      if (dayOfWeek === 2 && hour === 20 && lastWeeklyReportDate !== dateStr) {
+        lastWeeklyReportDate = dateStr;
+        console.log("[WeeklyReport] Sending weekly marketing report...");
+        const { generateAndSendWeeklyReport } = await import('../weeklyReport');
+        const result = await generateAndSendWeeklyReport();
+        console.log(`[WeeklyReport] Done: success=${result.success}${result.error ? ', error=' + result.error : ''}`);
+      }
+    } catch (err) {
+      console.error("[WeeklyReport] Scheduler error:", err);
+    }
+  }, WEEKLY_REPORT_CHECK_INTERVAL);
+  if (SCHEDULERS_ENABLED) console.log("[WeeklyReport] Weekly report scheduler started (Tuesday 20:00 IL)");
+
   // ─── Meta Lead Ads Polling (every 1 minute) ───────────────────────────────
   // Pulls new leads directly from Meta Graph API - does NOT rely on webhook
   // Tracks the last seen lead timestamp to avoid duplicates

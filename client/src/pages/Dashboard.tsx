@@ -7,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrendingUp, Users, DollarSign, Mail, MousePointerClick,
   ChevronDown, ChevronUp, ArrowLeft, Calendar, BarChart3,
-  Target, Zap, ShoppingCart, ShoppingBag, Dna, Megaphone, Heart, Lightbulb
+  Target, Zap, ShoppingCart, ShoppingBag, Dna, Megaphone, Heart, Lightbulb,
+  Instagram, Facebook, MessageCircle, Send, TrendingDown, ArrowUpRight, ArrowDownRight
 } from "lucide-react";
 
 // ─── Date presets ────────────────────────────────────────────────────────────
@@ -98,11 +99,12 @@ export default function Dashboard() {
   const campaigns = trpc.dashboard.topCampaigns.useQuery(dateInput);
   
   const productFunnels = trpc.dashboard.productFunnels.useQuery({ startDate, endDate });
-  const socialStats = trpc.dashboard.socialStats.useQuery();
+  const socialInsights = trpc.dashboard.socialInsights.useQuery(dateInput);
   const recentLeads = trpc.dashboard.recentLeads.useQuery({ ...dateInput, limit: 50 });
   const dailyTrend = trpc.dashboard.dailyTrend.useQuery(dateInput);
   const metaAds = trpc.dashboard.metaAdsPerformance.useQuery(dateInput);
   const coachingRev = trpc.dashboard.coachingRevenue.useQuery(dateInput);
+  const sendReport = trpc.dashboard.sendWeeklyReport.useMutation();
 
   const isLoading = overview.isLoading;
 
@@ -133,6 +135,14 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
+          <button
+            onClick={() => { if (confirm("לשלוח דוח שבועי עכשיו?")) sendReport.mutate(); }}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 text-white/80 hover:bg-white/20 transition flex items-center gap-1"
+            disabled={sendReport.isPending}
+          >
+            <Send size={12} />
+            {sendReport.isPending ? "שולח..." : "שלח דוח"}
+          </button>
           <div className="flex items-center gap-1.5 mr-3 border-r border-white/20 pr-3">
             <input
               type="date"
@@ -526,44 +536,115 @@ export default function Dashboard() {
         )}
 
         {/* ═══ SOCIAL MEDIA & COMMUNITY ═══ */}
-        {socialStats.data && (
-          <Card className="border-0 shadow-sm bg-gradient-to-l from-pink-50 to-white">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Users size={18} className="text-pink-500" />
-                <h3 className="font-bold text-gray-900">סושיאל וקהילה</h3>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {socialStats.data.accounts.map((acc: any, i: number) => (
-                  <div key={i} className="bg-white rounded-xl p-3 border border-gray-100 text-center">
-                    <div className="text-[10px] text-gray-500 mb-1">{acc.igUsername ? '@' + acc.igUsername : acc.pageName}</div>
-                    <div className="text-2xl font-bold text-pink-600">{acc.igFollowers > 0 ? acc.igFollowers.toLocaleString() : acc.pageFans.toLocaleString()}</div>
-                    <div className="text-[9px] text-gray-400">{acc.igFollowers > 0 ? 'עוקבים IG' : 'אוהדי FB'}</div>
-                    {acc.igPosts > 0 && <div className="text-[9px] text-gray-400 mt-0.5">{acc.igPosts} פוסטים</div>}
-                  </div>
-                ))}
-                <div className="bg-white rounded-xl p-3 border border-green-100 text-center">
-                  <div className="text-[10px] text-gray-500 mb-1">קבוצת WhatsApp</div>
-                  <div className="text-2xl font-bold text-green-600">{socialStats.data.whatsappGroupSize.toLocaleString()}</div>
-                  <div className="text-[9px] text-gray-400">חברים בקבוצה</div>
+        {socialInsights.data && (
+          <>
+            <Card className="border-0 shadow-sm bg-gradient-to-l from-pink-50 to-white">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Instagram size={18} className="text-pink-500" />
+                  <h3 className="font-bold text-gray-900">אינסטגרם — @{socialInsights.data.instagram.username}</h3>
+                  <Badge className="bg-pink-100 text-pink-700 text-[10px]">Insights</Badge>
                 </div>
-              </div>
-              <div className="mt-3 p-3 bg-pink-50 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <span className="text-pink-500 mt-0.5">💡</span>
-                  <div className="text-xs text-pink-800">
-                    <span className="font-bold">תובנה: </span>
-                    {socialStats.data.accounts.find((a: any) => a.igUsername === 'hilitcaspi_relationship')?.igFollowers || 0 > 3000 
-                      ? 'הפרופיל הראשי גדל יפה. שקלי לעשות שיתופי פעולה עם פרופילים דומים (מאמנות, תרפיסטיות) להגדלת החשיפה.'
-                      : 'כדאי להשקיע בתוכן אורגני (Reels, סטוריז) כדי להגדיל את קהל העוקבים.'}
-                    {' '}קבוצת ה-WhatsApp ({socialStats.data.whatsappGroupSize} חברים) היא ערוץ מכירה חזק — שלחי הצעות בלעדיות לקבוצה.
+              </CardHeader>
+              <CardContent>
+                {/* IG KPIs */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
+                  <div className="bg-white rounded-xl p-3 border border-pink-100 text-center">
+                    <div className="text-[10px] text-gray-500">עוקבים</div>
+                    <div className="text-xl font-bold text-pink-600">{socialInsights.data.instagram.followers.toLocaleString()}</div>
+                    {socialInsights.data.instagram.followerGrowth !== 0 && (
+                      <div className={`text-[10px] flex items-center justify-center gap-0.5 ${socialInsights.data.instagram.followerGrowth > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {socialInsights.data.instagram.followerGrowth > 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+                        {socialInsights.data.instagram.followerGrowth > 0 ? '+' : ''}{socialInsights.data.instagram.followerGrowth}
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-white rounded-xl p-3 border border-purple-100 text-center">
+                    <div className="text-[10px] text-gray-500">Reach (סה"כ)</div>
+                    <div className="text-xl font-bold text-purple-600">{socialInsights.data.instagram.totalReach.toLocaleString()}</div>
+                    <div className="text-[9px] text-gray-400">ממוצע: {socialInsights.data.instagram.avgDailyReach.toLocaleString()}/יום</div>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 border border-blue-100 text-center">
+                    <div className="text-[10px] text-gray-500">אינטראקציות</div>
+                    <div className="text-xl font-bold text-blue-600">{socialInsights.data.instagram.totalInteractions.toLocaleString()}</div>
+                    <div className="text-[9px] text-gray-400">engagement: {socialInsights.data.instagram.engagementRate}%</div>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 border border-red-100 text-center">
+                    <div className="text-[10px] text-gray-500">לייקים</div>
+                    <div className="text-xl font-bold text-red-500">{socialInsights.data.instagram.likes.toLocaleString()}</div>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 border border-amber-100 text-center">
+                    <div className="text-[10px] text-gray-500">תגובות</div>
+                    <div className="text-xl font-bold text-amber-600">{socialInsights.data.instagram.comments.toLocaleString()}</div>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 border border-teal-100 text-center">
+                    <div className="text-[10px] text-gray-500">שיתופים + שמירות</div>
+                    <div className="text-xl font-bold text-teal-600">{(socialInsights.data.instagram.shares + socialInsights.data.instagram.saves).toLocaleString()}</div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                
+                {/* IG Daily Reach Chart */}
+                {socialInsights.data.instagram.dailyReach.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-xs font-bold text-gray-600 mb-2">Reach יומי</h4>
+                    <div className="flex items-end gap-[2px] h-20">
+                      {socialInsights.data.instagram.dailyReach.map((d: any, i: number) => {
+                        const max = Math.max(...socialInsights.data!.instagram.dailyReach.map((x: any) => x.value), 1);
+                        return (
+                          <div key={i} className="flex-1 min-w-[6px] group relative">
+                            <div className="absolute -top-6 bg-gray-800 text-white text-[9px] px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10">
+                              {d.date?.slice(5)}: {d.value.toLocaleString()}
+                            </div>
+                            <div className="bg-gradient-to-t from-pink-400 to-pink-300 rounded-t-sm transition-all" style={{ height: `${(d.value / max) * 100}%`, minHeight: d.value > 0 ? '3px' : '0' }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* FB + WhatsApp row */}
+                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100">
+                  <div className="bg-blue-50 rounded-xl p-3 text-center">
+                    <Facebook size={14} className="text-blue-600 mx-auto mb-1" />
+                    <div className="text-lg font-bold text-blue-600">{socialInsights.data.facebook.fans.toLocaleString()}</div>
+                    <div className="text-[9px] text-gray-500">אוהדי FB</div>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-3 text-center">
+                    <MessageCircle size={14} className="text-green-600 mx-auto mb-1" />
+                    <div className="text-lg font-bold text-green-600">{socialInsights.data.whatsappGroupSize.toLocaleString()}</div>
+                    <div className="text-[9px] text-gray-500">קבוצת WhatsApp</div>
+                  </div>
+                  <div className="bg-pink-50 rounded-xl p-3 text-center">
+                    <Instagram size={14} className="text-pink-600 mx-auto mb-1" />
+                    <div className="text-lg font-bold text-pink-600">{socialInsights.data.instagram.posts}</div>
+                    <div className="text-[9px] text-gray-500">פוסטים</div>
+                  </div>
+                </div>
+                
+                {/* Social Insight */}
+                <div className="mt-3 p-3 bg-pink-50 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Lightbulb size={14} className="text-pink-500 mt-0.5 shrink-0" />
+                    <div className="text-xs text-pink-800">
+                      <span className="font-bold">תובנה: </span>
+                      {socialInsights.data.instagram.engagementRate > 5 
+                        ? `Engagement rate מצוין (${socialInsights.data.instagram.engagementRate}%)! התוכן עובד. כדאי להגביר תדירות פרסום.`
+                        : socialInsights.data.instagram.engagementRate > 2 
+                        ? `Engagement סביר (${socialInsights.data.instagram.engagementRate}%). נסי Reels קצרים ושאלות בסטוריז לשיפור.`
+                        : `Engagement נמוך (${socialInsights.data.instagram.engagementRate}%). מומלץ: Reels, שיתופי פעולה, ותוכן אינטראקטיבי.`}
+                      {' '}Reach ממוצע: {socialInsights.data.instagram.avgDailyReach.toLocaleString()}/יום.
+                      {socialInsights.data.instagram.followerGrowth > 0 
+                        ? ` גדלת ב-${socialInsights.data.instagram.followerGrowth} עוקבים בתקופה!` 
+                        : socialInsights.data.instagram.followerGrowth < 0 
+                        ? ` ירדת ב-${Math.abs(socialInsights.data.instagram.followerGrowth)} עוקבים — כדאי לבדוק תוכן.` 
+                        : ''}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
 
         {/* Recent Leads Table */}

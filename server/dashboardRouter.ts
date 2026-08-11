@@ -3,6 +3,7 @@ import { router, teamProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
+import { sendEmail } from "./brevo";
 
 // Product prices for revenue calculation
 const PRODUCT_PRICES: Record<string, number> = {
@@ -44,6 +45,90 @@ function guardAdmin(ctx: any) {
 
 
 // ── Meta Ads API helper ─────────────────────────────────────────────────────
+// ── Instagram & Facebook Insights API helper ────────────────────────────────
+async function fetchSocialInsights(since: number, until: number) {
+  const token = process.env.META_ADS_TOKEN;
+  if (!token) return null;
+  const PAGE_ID = "853268171195420"; // Hilit Caspi Relationship
+  const IG_ID = "17841476794270830";
+  
+  try {
+    // Get page token for insights
+    const pagesRes = await fetch(`https://graph.facebook.com/v25.0/me/accounts?fields=id,access_token&access_token=${token}`);
+    const pagesData = await pagesRes.json();
+    const page = pagesData.data?.find((p: any) => p.id === PAGE_ID);
+    const pageToken = page?.access_token || token;
+    
+    const sinceUnix = Math.floor(since / 1000);
+    const untilUnix = Math.floor(until / 1000);
+    
+    // IG time_series: reach, follower_count
+    const igTimeRes = await fetch(`https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=reach,follower_count&metric_type=time_series&period=day&since=${sinceUnix}&until=${untilUnix}&access_token=${pageToken}`);
+    const igTimeData = await igTimeRes.json();
+    
+    // IG total_value: accounts_engaged, total_interactions, likes, comments, shares, saves
+    const igTotalRes = await fetch(`https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=accounts_engaged,total_interactions,likes,comments,shares,saves&metric_type=total_value&period=day&since=${sinceUnix}&until=${untilUnix}&access_token=${pageToken}`);
+    const igTotalData = await igTotalRes.json();
+    
+    // IG profile info
+    const igProfileRes = await fetch(`https://graph.facebook.com/v25.0/${IG_ID}?fields=followers_count,media_count,username&access_token=${pageToken}`);
+    const igProfile = await igProfileRes.json();
+    
+    // FB Page info
+    const fbPageRes = await fetch(`https://graph.facebook.com/v25.0/${PAGE_ID}?fields=fan_count,followers_count,name&access_token=${pageToken}`);
+    const fbPage = await fbPageRes.json();
+    
+    // Parse IG time series
+    const reachData = igTimeData.data?.find((m: any) => m.name === 'reach')?.values || [];
+    const followerData = igTimeData.data?.find((m: any) => m.name === 'follower_count')?.values || [];
+    
+    // Parse IG totals
+    const totals: Record<string, number> = {};
+    for (const metric of (igTotalData.data || [])) {
+      totals[metric.name] = metric.total_value?.value || 0;
+    }
+    
+    // Calculate follower growth
+    const followerGrowth = followerData.length >= 2 
+      ? followerData[followerData.length - 1].value - followerData[0].value 
+      : 0;
+    
+    const totalReach = reachData.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
+    const avgDailyReach = reachData.length > 0 ? Math.round(totalReach / reachData.length) : 0;
+    
+    return {
+      instagram: {
+        username: igProfile.username || 'hilitcaspi_relationship',
+        followers: igProfile.followers_count || 0,
+        posts: igProfile.media_count || 0,
+        followerGrowth,
+        totalReach,
+        avgDailyReach,
+        accountsEngaged: totals.accounts_engaged || 0,
+        totalInteractions: totals.total_interactions || 0,
+        likes: totals.likes || 0,
+        comments: totals.comments || 0,
+        shares: totals.shares || 0,
+        saves: totals.saves || 0,
+        engagementRate: igProfile.followers_count > 0 
+          ? Math.round((totals.total_interactions || 0) / igProfile.followers_count * 1000) / 10 
+          : 0,
+        dailyReach: reachData.map((d: any) => ({ date: d.end_time?.split('T')[0], value: d.value || 0 })),
+        dailyFollowers: followerData.map((d: any) => ({ date: d.end_time?.split('T')[0], value: d.value || 0 })),
+      },
+      facebook: {
+        pageName: fbPage.name || 'Hilit Caspi Relationship',
+        fans: fbPage.fan_count || 0,
+        followers: fbPage.followers_count || 0,
+      },
+      whatsappGroupSize: 1000,
+    };
+  } catch (err) {
+    console.error("[SocialInsights] Error:", err);
+    return null;
+  }
+}
+
 async function fetchMetaAdsInsights(since: string, until: string) {
   const token = process.env.META_ADS_TOKEN;
   const mainAccountId = "act_254697595735216";
@@ -70,6 +155,14 @@ async function fetchMetaAdsInsights(since: string, until: string) {
 }
 
 export const dashboardRouter = router({
+  // ── Social Insights (IG + FB + WhatsApp) ──────────────────────────────────
+  socialInsights: teamProcedure
+    .input(z.object({ startDate: z.number(), endDate: z.number() }))
+    .query(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      return await fetchSocialInsights(input.startDate, input.endDate);
+    }),
+
   // ── Main Overview KPIs ──────────────────────────────────────────────────
   overview: teamProcedure
     .input(z.object({
@@ -633,6 +726,79 @@ export const dashboardRouter = router({
       
       return { products };
     }),
+
+  // ── Weekly Report Data (for email) ────────────────────────────────────────
+  weeklyReportData: teamProcedure.query(async ({ ctx }) => {
+    guardAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const now = Date.now();
+    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
+    
+    // This week's KPIs
+    const [[leadRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM crm_leads WHERE createdAt >= ${weekAgo}`) as any;
+    const [[purchaseRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${weekAgo}`) as any;
+    const [revenueRows] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${weekAgo} GROUP BY product`) as any;
+    
+    // Previous week for comparison
+    const [[prevLeadRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM crm_leads WHERE createdAt >= ${twoWeeksAgo} AND createdAt < ${weekAgo}`) as any;
+    const [[prevPurchaseRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${twoWeeksAgo} AND created_at < ${weekAgo}`) as any;
+    
+    let revenue = 0;
+    const productBreakdown: { product: string; count: number; revenue: number }[] = [];
+    for (const row of (revenueRows as any[])) {
+      const cnt = Number(row.cnt);
+      const rev = cnt * (PRODUCT_PRICES[row.product] ?? 0);
+      revenue += rev;
+      productBreakdown.push({ product: row.product, count: cnt, revenue: rev });
+    }
+    
+    const leads = Number(leadRow?.cnt ?? 0);
+    const purchases = Number(purchaseRow?.cnt ?? 0);
+    const prevLeads = Number(prevLeadRow?.cnt ?? 0);
+    const prevPurchases = Number(prevPurchaseRow?.cnt ?? 0);
+    
+    // Meta Ads data
+    const since = new Date(weekAgo).toISOString().split("T")[0];
+    const until = new Date(now).toISOString().split("T")[0];
+    const metaData = await fetchMetaAdsInsights(since, until);
+    const totalSpend = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.spend, 0);
+    
+    // Top campaigns
+    const topCampaigns = metaData.campaigns
+      .filter(c => c.spend > 0)
+      .sort((a, b) => (b.purchases * 299 - b.spend) - (a.purchases * 299 - a.spend))
+      .slice(0, 5);
+    
+    // Winning (high ROAS) and losing (high spend, no conversions) campaigns
+    const winners = metaData.campaigns.filter(c => c.roas >= 2 && c.purchases > 0);
+    const losers = metaData.campaigns.filter(c => c.spend > 50 && c.purchases === 0 && c.leads < 3);
+    
+    // Social insights
+    const social = await fetchSocialInsights(weekAgo, now);
+    
+    return {
+      period: { start: weekAgo, end: now },
+      kpis: { leads, purchases, revenue, spend: totalSpend, roas: totalSpend > 0 ? Math.round(revenue / totalSpend * 10) / 10 : 0 },
+      comparison: { 
+        leadsChange: prevLeads > 0 ? Math.round((leads - prevLeads) / prevLeads * 100) : 0,
+        purchasesChange: prevPurchases > 0 ? Math.round((purchases - prevPurchases) / prevPurchases * 100) : 0,
+      },
+      productBreakdown,
+      topCampaigns,
+      winners,
+      losers,
+      social,
+    };
+  }),
+
+  // ── Send Weekly Report (manual trigger) ───────────────────────────────────
+  sendWeeklyReport: teamProcedure.mutation(async ({ ctx }) => {
+    guardAdmin(ctx);
+    const { generateAndSendWeeklyReport } = await import('./weeklyReport');
+    return await generateAndSendWeeklyReport();
+  }),
 
   // Social media stats (from Meta API)
   socialStats: teamProcedure.query(async () => {
