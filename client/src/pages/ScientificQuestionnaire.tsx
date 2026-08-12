@@ -405,37 +405,44 @@ export default function ScientificQuestionnaire() {
           {step === "intro" && (
             <motion.div key="intro" {...slideIn}>
               <div className="text-center mb-8">
-                <div className="text-5xl mb-4">🧬</div>
-                <h1 className="text-2xl md:text-3xl font-black text-[#191265] mb-3">
-                  שלום {profile.firstName}! 💛
-                </h1>
-                {dnaLabel && (
-                  <div className="inline-block bg-[#191265] text-[#ffe27c] font-bold px-4 py-2 rounded-full text-sm mb-4">
-                    הפרופיל הזוגי שלך: {dnaLabel}
-                  </div>
-                )}
-                <p className="text-[#555] text-base leading-relaxed max-w-lg mx-auto">
-                  כדי לבצע התאמות מדויקות, נצטרך ממך כמה פרטים, שאלון DNA זוגי ו-15 שאלות מדעיות שפותחו על בסיס מחקרי גוטמן, תיאוריית ההתקשרות ומודל Big Five.
-                </p>
-              </div>
+               <div className="text-5xl mb-4">🧬</div>
+               <h1 className="text-2xl md:text-3xl font-black text-[#191265] mb-3">
+                 שלום {profile.firstName}! 💛
+               </h1>
+               {dnaLabel && (
+                 <div className="inline-block bg-[#191265] text-[#ffe27c] font-bold px-4 py-2 rounded-full text-sm mb-4">
+                   הפרופיל הזוגי שלך: {dnaLabel}
+                 </div>
+               )}
+               <p className="text-[#555] text-base leading-relaxed max-w-lg mx-auto">
+                  {effectiveDnaType
+                    ? "תוצאות ה-DNA שלך נשמרו! נשאר רק השאלון המדעי — שאלות קצרות שיעזרו לי למצוא לך את ההתאמה המושלמת."
+                    : "כדי לבצע התאמות מדויקות, נתחיל בשאלון DNA זוגי קצר שיעזור לי להבין את הדפוסים שלך בזוגיות, ואחריו שאלות מדעיות שפותחו על בסיס מחקרי גוטמן, תיאוריית ההתקשרות ומודל Big Five."
+                  }
+               </p>
+             </div>
 
-              <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
-                <h3 className="font-black text-[#191265] mb-4 text-lg">מה כולל התהליך:</h3>
-                <div className="space-y-3">
-                  {[
-                    { icon: "📋", text: "מילוי פרטים אישיים (2-3 דקות)" },
+             <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
+               <h3 className="font-black text-[#191265] mb-4 text-lg">מה כולל התהליך:</h3>
+               <div className="space-y-3">
+                  {(effectiveDnaType ? [
+                    { icon: "✅", text: "שאלון DNA זוגי — הושלם!" },
+                    { icon: "🔬", text: "שאלות מדעיות להתאמה מדויקת" },
+                    { icon: "💯", text: "אין תשובות נכונות או לא נכונות — ענו בכנות" },
+                    { icon: "⏱️", text: "לוקח כ-10 דקות" },
+                  ] : [
+                    ...(isSkeleton ? [{ icon: "📋", text: "השלמת פרטים אישיים (2-3 דקות)" }] : []),
                     { icon: "🧬", text: "שאלון DNA זוגי — גילוי הפרופיל שלך (5 דקות)" },
-                    { icon: "🔬", text: "15 שאלות מדעיות להתאמה (10 דקות)" },
-                    { icon: "💯", text: "אין תשובות נכונות או לא נכונות: ענה/י בכנות" },
-                    { icon: "🔒", text: "הקישור אישי ולשימוש חד-פעמי בלבד" },
-                  ].map(item => (
-                    <div key={item.text} className="flex items-start gap-3">
-                      <span className="text-xl shrink-0">{item.icon}</span>
-                      <span className="text-[#555] text-sm">{item.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                    { icon: "🔬", text: "שאלות מדעיות להתאמה מדויקת (10 דקות)" },
+                    { icon: "💯", text: "אין תשובות נכונות או לא נכונות — ענו בכנות" },
+                  ]).map(item => (
+                   <div key={item.text} className="flex items-start gap-3">
+                     <span className="text-xl shrink-0">{item.icon}</span>
+                     <span className="text-[#555] text-sm">{item.text}</span>
+                   </div>
+                 ))}
+               </div>
+             </div>
 
               {hasRestoredProgress && (
                 <div className="bg-[#ffe27c]/20 border border-[#ffe27c] rounded-xl p-4 mb-4 text-center">
