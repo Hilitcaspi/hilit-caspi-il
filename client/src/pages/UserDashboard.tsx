@@ -443,7 +443,7 @@ function ProfileSection({ profile }: { profile: any }) {
 // ─── Missing Fields Banner ───────────────────────────────────────────────────
 function getMissingFields(profile: any): string[] {
   const missing: string[] = [];
-  if (!profile.height || profile.height < 100) missing.push("גובה");
+  if (!profile.height || profile.height === 0) missing.push("גובה");
   if (!profile.education) missing.push("השכלה");
   if (!profile.religiosity) missing.push("זהות דתית");
   if (!profile.occupation) missing.push("עיסוק");
@@ -651,15 +651,33 @@ export default function UserDashboard() {
       </div>
 
       {/* Tab Content */}
-      <div className="max-w-2xl mx-auto px-4 py-6 pb-16">
+     <div className="max-w-2xl mx-auto px-4 py-6 pb-16">
+        {/* Premium Plus teaser - visible in all tabs */}
+        <div className="mb-4 border-2 border-dashed border-[#ffe27c]/60 rounded-2xl p-4 text-right bg-gradient-to-r from-[#191265]/5 to-[#ffe27c]/10 animate-pulse" style={{ animationDuration: '3s' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">✨</span>
+            <h4 className="text-[#191265] font-black text-sm">בקרוב — מנוי פלוס!</h4>
+          </div>
+          <p className="text-[#555] text-xs leading-relaxed">
+            בקרוב תוכלו לראות את ההתאמות שמחכות לכם, לקבל יותר התאמות, ולהנות מתכונות בלעדיות. עקבו אחרינו לעדכונים.
+          </p>
+        </div>
         <AnimatePresence mode="wait">
           {/* ── Profile Tab ── */}
           {activeTab === "profile" && (
             <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="space-y-4">
               <MissingFieldsBanner profile={profile} onEditClick={() => {
-                // Scroll to update section and open form
-                document.getElementById('update-profile-section')?.scrollIntoView({ behavior: 'smooth' });
+                // Scroll to update section and click the edit button
+                const section = document.getElementById('update-profile-section');
+                if (section) {
+                  section.scrollIntoView({ behavior: 'smooth' });
+                  // Auto-click the edit button after scroll
+                  setTimeout(() => {
+                    const editBtn = section.querySelector('button');
+                    if (editBtn) editBtn.click();
+                  }, 400);
+                }
               }} />
               <ProfileSection profile={profile} />
               <div id="update-profile-section">
@@ -672,16 +690,6 @@ export default function UserDashboard() {
          {activeTab === "matches" && (
            <motion.div key="matches" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
              className="space-y-4">
-              {/* Premium Plus teaser */}
-              <div className="bg-gradient-to-r from-[#191265]/5 to-[#ffe27c]/10 border border-[#ffe27c]/40 rounded-2xl p-4 text-right">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg">✨</span>
-                  <h4 className="text-[#191265] font-black text-sm">בקרוב — מנוי פלוס!</h4>
-                </div>
-                <p className="text-[#555] text-xs leading-relaxed">
-                  בקרוב תוכלו לראות את ההתאמות שמחכות לכם, לקבל יותר התאמות, ולהנות מתכונות בלעדיות. עקבו אחרינו לעדכונים.
-                </p>
-              </div>
               {myMatches.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#e9e8e8] p-8 text-center">
                   <div className="text-4xl mb-3">🔍</div>

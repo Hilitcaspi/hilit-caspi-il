@@ -445,18 +445,25 @@ export default function ScientificQuestionnaire() {
                 </div>
               )}
               <button
-                onClick={() => setStep("details")}
+                onClick={() => {
+                  // If profile already has basic data (not skeleton), skip details step entirely
+                  if (profile && !isSkeleton) {
+                    setStep(effectiveDnaType ? "quiz" : "dna");
+                  } else {
+                    setStep("details");
+                  }
+                }}
                className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg"
              >
                {hasRestoredProgress ? `המשך משאלה ${currentIndex + 1} ←` : "בואו נתחיל! ←"}
              </button>
-            {/* If profile already has basic data, offer to skip details */}
-            {profile && !isSkeleton && (
+            {/* If skeleton, also show option to skip if they want */}
+            {profile && isSkeleton && (
               <button
                 onClick={() => setStep(effectiveDnaType ? "quiz" : "dna")}
                 className="w-full mt-3 text-[#191265] font-medium text-sm py-3 rounded-2xl border-2 border-[#e9e8e8] hover:border-[#191265] transition-all"
               >
-                הפרטים שלי כבר מעודכנים — דלג/י לשאלון ←
+                דלג/י — אשלים פרטים אחר כך ←
               </button>
             )}
            </motion.div>
@@ -1002,10 +1009,15 @@ export default function ScientificQuestionnaire() {
               </a>
 
               <button
-                onClick={() => navigate(`/my-profile?email=${encodeURIComponent(profile?.email || '')}&token=${token}`)}
-                className="w-full bg-[#191265] text-white font-bold py-4 rounded-2xl text-base hover:bg-[#1800ad] transition-colors mb-4">
-                👤 לאזור האישי שלי
-              </button>
+               onClick={() => navigate(`/my-profile?email=${encodeURIComponent(profile?.email || '')}&token=${token}`)}
+               className="w-full bg-[#191265] text-white font-bold py-4 rounded-2xl text-base hover:bg-[#1800ad] transition-colors mb-4">
+               👤 לאזור האישי שלי
+             </button>
+
+              <a href="https://www.instagram.com/hilitcaspi_relationship/" target="_blank" rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white font-bold py-4 rounded-2xl transition-all duration-300 text-base mb-4 hover:opacity-90">
+                📸 עקבו אחרי באינסטגרם להטבות ותוכן
+              </a>
 
               <button onClick={() => navigate("/")}
                 className="text-[#727272] text-sm hover:text-[#191265] transition-colors underline underline-offset-4">

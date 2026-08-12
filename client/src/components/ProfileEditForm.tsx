@@ -211,8 +211,8 @@ export default function ProfileEditForm({ profile, token, onClose, onSubmitted }
               </div>
               <div>
                 <label className="text-xs text-[#727272] block mb-1">גובה (ס"מ)</label>
-                <input type="number" value={form.height} onChange={e => setForm(f => ({ ...f, height: e.target.value }))}
-                  min={140} max={220}
+               <input type="number" value={form.height} onChange={e => setForm(f => ({ ...f, height: e.target.value }))}
+                  min={100} max={250}
                   className="w-full border border-[#e0e0e0] rounded-xl px-3 py-2.5 text-sm text-right focus:outline-none focus:border-[#191265]" />
               </div>
               <div>
