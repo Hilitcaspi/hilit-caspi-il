@@ -2019,19 +2019,26 @@ export const appRouter = router({
      * Get a single profile by questionnaire token (for the questionnaire page).
      */
     getByQuestionnaireToken: publicProcedure
-      .input(z.object({ token: z.string() }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return null;
-        const [profile] = await db.select().from(singles)
-          .where(eq(singles.questionnaireToken, input.token))
-          .limit(1);
-        if (!profile) return null;
-        // Security: only allow access to questionnaire if payment has been confirmed OR if registered via free token
-        // Free token users are created with isPaid=true (set in registerBasicProfile when freeToken is provided)
-        if (!profile.isPaid) {
-          console.warn(`[Security] Blocked unpaid questionnaire access for single id=${profile.id} email=${profile.email}`);
-          return null;
+     .input(z.object({ token: z.string() }))
+     .query(async ({ input }) => {
+       const db = await getDb();
+       if (!db) return null;
+       const [profile] = await db.select().from(singles)
+         .where(eq(singles.questionnaireToken, input.token))
+         .limit(1);
+       if (!profile) return null;
+       // Security: only allow access to questionnaire if payment has been confirmed OR if registered via free token
+       // Free token users are created with isPaid=true (set in registerBasicProfile when freeToken is provided)
+       if (!profile.isPaid) {
+         console.warn(`[Security] Blocked unpaid questionnaire access for single id=${profile.id} email=${profile.email}`);
+         return null;
+        }
+        // Auto-link DNA type from CRM leads if not already set
+        if (!profile.dnaType) {
+          const linkedDna = await autoLinkDnaType(db, profile.id, profile.email!, profile.phone || undefined, profile.dnaType || undefined);
+          if (linkedDna) {
+            return { ...profile, dnaType: linkedDna };
+          }
         }
         return profile;
       }),
