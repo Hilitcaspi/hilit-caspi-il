@@ -192,6 +192,14 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
       textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות. הוצאה: ₪${Math.round(meta.spend).toLocaleString()}. ROAS: ${roas}x.`,
     });
     
+    // Also send to Shahar Netanel
+    await sendEmail({
+      to: { email: "shaharnat08@gmail.com", name: "שחר נתנאל" },
+      subject: `📊 דוח שבועי: ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות`,
+      htmlContent: html,
+      textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות. הוצאה: ₪${Math.round(meta.spend).toLocaleString()}. ROAS: ${roas}x.`,
+    });
+    
     console.log(`[WeeklyReport] Sent: leads=${leads}, purchases=${purchases}, revenue=₪${revenue}, spend=₪${Math.round(meta.spend)}`);
     return { success: result.success, error: result.error };
   } catch (err) {
