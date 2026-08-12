@@ -445,9 +445,11 @@ export default function ScientificQuestionnaire() {
                 </div>
               )}
               <button
-                onClick={() => {
-                  // If profile already has basic data (not skeleton), skip details step entirely
+               onClick={() => {
+                  // If profile already has basic data (not skeleton), skip details step
                   if (profile && !isSkeleton) {
+                    // If they already have DNA type (came from /dna-quiz), go straight to quiz
+                    // If no DNA type (came from /join directly), they need to fill DNA first
                     setStep(effectiveDnaType ? "quiz" : "dna");
                   } else {
                     setStep("details");

@@ -385,7 +385,7 @@ export default function ProfileEditForm({ profile, token, onClose, onSubmitted }
               {isSubmitting ? "שולח/ת בקשה..." : "שלח/י לאישור הילית ✓"}
             </button>
             {submitMutation.isError && (
-              <p className="text-red-500 text-sm text-center mt-2">שגיאה בשליחה. נסה/י שוב.</p>
+              <p className="text-red-500 text-sm text-center mt-2">שגיאה בשליחה: {submitMutation.error?.message || "נסה/י שוב."}</p>
             )}
           </div>
         </form>
