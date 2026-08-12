@@ -405,44 +405,36 @@ export default function ScientificQuestionnaire() {
           {step === "intro" && (
             <motion.div key="intro" {...slideIn}>
               <div className="text-center mb-8">
-               <div className="text-5xl mb-4">🧬</div>
-               <h1 className="text-2xl md:text-3xl font-black text-[#191265] mb-3">
-                 שלום {profile.firstName}! 💛
-               </h1>
-               {dnaLabel && (
-                 <div className="inline-block bg-[#191265] text-[#ffe27c] font-bold px-4 py-2 rounded-full text-sm mb-4">
-                   הפרופיל הזוגי שלך: {dnaLabel}
-                 </div>
-               )}
-               <p className="text-[#555] text-base leading-relaxed max-w-lg mx-auto">
-                  {effectiveDnaType
-                    ? "תוצאות ה-DNA שלך נשמרו! נשאר רק השאלון המדעי — שאלות קצרות שיעזרו לי למצוא לך את ההתאמה המושלמת."
-                    : "כדי לבצע התאמות מדויקות, נתחיל בשאלון DNA זוגי קצר שיעזור לי להבין את הדפוסים שלך בזוגיות, ואחריו שאלות מדעיות שפותחו על בסיס מחקרי גוטמן, תיאוריית ההתקשרות ומודל Big Five."
-                  }
-               </p>
-             </div>
+              <div className="text-5xl mb-4">🧬</div>
+              <h1 className="text-2xl md:text-3xl font-black text-[#191265] mb-3">
+                שלום {profile.firstName}! 💛
+              </h1>
+              {dnaLabel && (
+                <div className="inline-block bg-[#191265] text-[#ffe27c] font-bold px-4 py-2 rounded-full text-sm mb-4">
+                  הפרופיל הזוגי שלך: {dnaLabel}
+                </div>
+              )}
+              <p className="text-[#555] text-base leading-relaxed max-w-lg mx-auto">
+                  הפרטים שלך ושאלון ה-DNA הושלמו בהצלחה! נשאר רק השאלון המדעי — שאלות קצרות שפותחו על בסיס מחקרי גוטמן, תיאוריית ההתקשרות ומודל Big Five, שיעזרו לי למצוא לך את ההתאמה המושלמת.
+              </p>
+            </div>
 
-             <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
-               <h3 className="font-black text-[#191265] mb-4 text-lg">מה כולל התהליך:</h3>
+            <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
+               <h3 className="font-black text-[#191265] mb-4 text-lg">איפה אנחנו:</h3>
                <div className="space-y-3">
-                  {(effectiveDnaType ? [
-                    { icon: "✅", text: "שאלון DNA זוגי — הושלם!" },
-                    { icon: "🔬", text: "שאלות מדעיות להתאמה מדויקת" },
+                  {[
+                    { icon: "✅", text: "פרטים אישיים — הושלמו" },
+                    { icon: "✅", text: `שאלון DNA זוגי — הושלם${dnaLabel ? ` (${dnaLabel})` : ""}` },
+                    { icon: "🔬", text: "שאלון מדעי להתאמה — ממתין למילוי" },
                     { icon: "💯", text: "אין תשובות נכונות או לא נכונות — ענו בכנות" },
-                    { icon: "⏱️", text: "לוקח כ-10 דקות" },
-                  ] : [
-                    ...(isSkeleton ? [{ icon: "📋", text: "השלמת פרטים אישיים (2-3 דקות)" }] : []),
-                    { icon: "🧬", text: "שאלון DNA זוגי — גילוי הפרופיל שלך (5 דקות)" },
-                    { icon: "🔬", text: "שאלות מדעיות להתאמה מדויקת (10 דקות)" },
-                    { icon: "💯", text: "אין תשובות נכונות או לא נכונות — ענו בכנות" },
-                  ]).map(item => (
-                   <div key={item.text} className="flex items-start gap-3">
-                     <span className="text-xl shrink-0">{item.icon}</span>
-                     <span className="text-[#555] text-sm">{item.text}</span>
-                   </div>
-                 ))}
-               </div>
-             </div>
+                  ].map(item => (
+                  <div key={item.text} className="flex items-start gap-3">
+                    <span className="text-xl shrink-0">{item.icon}</span>
+                    <span className="text-[#555] text-sm">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
               {hasRestoredProgress && (
                 <div className="bg-[#ffe27c]/20 border border-[#ffe27c] rounded-xl p-4 mb-4 text-center">
@@ -452,29 +444,15 @@ export default function ScientificQuestionnaire() {
                 </div>
               )}
               <button
-               onClick={() => {
-                  // If profile already has basic data (not skeleton), skip details step
-                  if (profile && !isSkeleton) {
-                    // If they already have DNA type (came from /dna-quiz), go straight to quiz
-                    // If no DNA type (came from /join directly), they need to fill DNA first
-                    setStep(effectiveDnaType ? "quiz" : "dna");
-                  } else {
-                    setStep("details");
-                  }
+              onClick={() => {
+                  // After payment, always go straight to quiz
+                  // Details and DNA are always completed before payment
+                  setStep("quiz");
                 }}
-               className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg"
-             >
-               {hasRestoredProgress ? `המשך משאלה ${currentIndex + 1} ←` : "בואו נתחיל! ←"}
-             </button>
-            {/* If skeleton, also show option to skip if they want */}
-            {profile && isSkeleton && (
-              <button
-                onClick={() => setStep(effectiveDnaType ? "quiz" : "dna")}
-                className="w-full mt-3 text-[#191265] font-medium text-sm py-3 rounded-2xl border-2 border-[#e9e8e8] hover:border-[#191265] transition-all"
-              >
-                דלג/י — אשלים פרטים אחר כך ←
-              </button>
-            )}
+              className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg"
+            >
+              {hasRestoredProgress ? `המשך משאלה ${currentIndex + 1} ←` : "בואו נתחיל! ←"}
+            </button>
            </motion.div>
          )}
 
