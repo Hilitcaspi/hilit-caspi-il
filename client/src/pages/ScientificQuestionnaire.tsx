@@ -162,6 +162,35 @@ export default function ScientificQuestionnaire() {
   // Detect skeleton record: age=0 or city empty, will need details before quiz
   const isSkeleton = profile && (!profile.age || profile.age === 0 || !profile.city);
 
+  // Pre-fill form fields from profile data when loaded
+  useEffect(() => {
+    if (!profile) return;
+    if (profile.gender) setMissingGender(profile.gender as "female" | "male");
+    if (profile.seekingGender) setSeekingGender(profile.seekingGender as "female" | "male" | "any");
+    if (profile.lastName) setLastName(profile.lastName);
+    if (profile.phone) setPhone(profile.phone);
+    if (profile.city) setMissingCity(profile.city);
+    if (profile.height) setMissingHeight(String(profile.height));
+    if (profile.maritalStatus) setMissingMaritalStatus(profile.maritalStatus as any);
+    if (profile.religiosity) setMissingReligiosity(profile.religiosity as any);
+    if (profile.education) setMissingEducation(profile.education as any);
+    if (profile.occupation) setMissingOccupation(profile.occupation);
+    if (profile.hasKids) { setHasKids(true); if (profile.numKids) setNumKids(String(profile.numKids)); }
+    if (profile.wantsKids) setWantsKids(profile.wantsKids as string);
+    if (profile.about) setMissingAbout(profile.about);
+    if (profile.dnaType) setDnaType(profile.dnaType);
+    if (profile.birthDate) setBirthDate(profile.birthDate as string);
+    if (profile.minAgePreference) setMinAge(String(profile.minAgePreference));
+    if (profile.maxAgePreference) setMaxAge(String(profile.maxAgePreference));
+    if (profile.minHeightPreference) setMinHeight(String(profile.minHeightPreference));
+    if (profile.maxHeightPreference) setMaxHeight(String(profile.maxHeightPreference));
+    if (profile.religiosityPreference) setReligiosityPref(profile.religiosityPreference.split(","));
+    if (profile.acceptsKids !== null && profile.acceptsKids !== undefined) setAcceptsKids(profile.acceptsKids ? "yes" : "no");
+    if (profile.openToPartnerWithKids) setOpenToPartnerWithKids(profile.openToPartnerWithKids);
+    if (profile.locationPreference) setLocationPref(profile.locationPreference);
+    if (profile.partnerDescription) setPartnerDescription(profile.partnerDescription);
+  }, [profile]);
+
   useEffect(() => {
     if (!token || profileError) {
       setStep("invalid");
@@ -417,12 +446,21 @@ export default function ScientificQuestionnaire() {
               )}
               <button
                 onClick={() => setStep("details")}
-                className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg"
+               className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg"
+             >
+               {hasRestoredProgress ? `המשך משאלה ${currentIndex + 1} ←` : "בואו נתחיל! ←"}
+             </button>
+            {/* If profile already has basic data, offer to skip details */}
+            {profile && !isSkeleton && (
+              <button
+                onClick={() => setStep(effectiveDnaType ? "quiz" : "dna")}
+                className="w-full mt-3 text-[#191265] font-medium text-sm py-3 rounded-2xl border-2 border-[#e9e8e8] hover:border-[#191265] transition-all"
               >
-                {hasRestoredProgress ? `המשך משאלה ${currentIndex + 1} ←` : "בואו נתחיל! ←"}
+                הפרטים שלי כבר מעודכנים — דלג/י לשאלון ←
               </button>
-            </motion.div>
-          )}
+            )}
+           </motion.div>
+         )}
 
           {/* ── DETAILS ── */}
           {step === "details" && (

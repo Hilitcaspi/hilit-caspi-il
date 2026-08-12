@@ -2131,17 +2131,17 @@ export const appRouter = router({
     completeQuestionnaire: publicProcedure
       .input(z.object({
         token: z.string(),
-        answers: z.array(z.object({
-          qId: z.string(),
-          myAnswer: z.union([z.number(), z.array(z.number())]),
-          importance: z.union([z.literal(0), z.literal(1), z.literal(2)]),
-        })),
-        // Optional fields for skeleton records (Grow payments without profile form)
-        age: z.number().min(18).max(80).optional(),
+       answers: z.array(z.object({
+         qId: z.string(),
+         myAnswer: z.union([z.number(), z.array(z.number())]),
+         importance: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+       })),
+       // Optional fields for skeleton records (Grow payments without profile form)
+        age: z.number().min(0).max(120).optional(),
         gender: z.enum(["female", "male"]).optional(),
         city: z.string().optional(),
         birthDate: z.string().optional(),
-        height: z.number().min(100).max(250).optional(),
+        height: z.number().min(0).max(250).optional(),
         religiosity: z.enum(["secular", "traditional", "religious", "orthodox", "datlash"]).optional(),
         education: z.enum(["high_school", "vocational", "technician", "student", "bachelor", "master", "phd", "other"]).optional(),
         occupation: z.string().max(150).optional(),
@@ -2195,12 +2195,12 @@ export const appRouter = router({
         {
           const patchData: Record<string, any> = { updatedAt: now };
           // Always update basic identity fields if provided
-          if (input.age && input.age > 0) patchData.age = input.age;
+          if (input.age && input.age >= 18 && input.age <= 120) patchData.age = input.age;
           if (input.gender) patchData.gender = input.gender;
           if (input.city) patchData.city = input.city;
           if (input.birthDate) patchData.birthDate = input.birthDate;
           // Always save personal details from the details step (fixes bug where Grow-paid users lost their data)
-          if (input.height && input.height > 0) patchData.height = input.height;
+          if (input.height && input.height >= 100 && input.height <= 250) patchData.height = input.height;
           if (input.religiosity) patchData.religiosity = input.religiosity;
           if (input.education) patchData.education = input.education;
           if (input.occupation) patchData.occupation = input.occupation;

@@ -497,3 +497,11 @@
 - [x] Deep professional insights (specific to campaigns, not generic)
 - [x] Social media section: engagement vs benchmark, saves vs shares analysis, growth
 - [x] Rebuilt entire Dashboard.tsx from scratch with professional design
+
+## Critical Flow Bugs (Aug 12)
+- [x] FIX: ScientificQuestionnaire asks for personal details again when profile already has them from registration
+- [x] FIX: Age/height validation error crashes questionnaire submission (should skip gracefully)
+- [x] FIX: Missing data fields keep showing after user fills them (persistence bug in personal area)
+- [x] Change homepage hero button from "המדריך החינמי שלי" to "שאלון חינמי" (higher conversion)
+- [x] Add "מנוי פלוס" note in personal area about upcoming premium features
+- [x] Unblock Meital bar Zohar (meitalbz120@gmail.com) in Brevo

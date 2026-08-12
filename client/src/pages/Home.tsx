@@ -351,10 +351,10 @@ export default function Home() {
                 className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl text-center">
                 ♡ פגישת היכרות אישית
               </a>
-              <button onClick={() => scrollTo("guide")}
+              <a href="/dna-quiz"
                 className="border-2 border-white/40 text-white font-semibold text-lg px-8 py-4 rounded-2xl hover:border-[#ffe27c] hover:text-[#ffe27c] transition-all duration-300 text-center">
-                המדריך החינמי שלי
-              </button>
+                🧬 שאלון חינמי
+              </a>
             </div>
 
             {/* Social proof strip */}

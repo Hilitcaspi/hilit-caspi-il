@@ -456,9 +456,12 @@ function getMissingFields(profile: any): string[] {
 
 function MissingFieldsBanner({ profile, onEditClick }: { profile: any; onEditClick: () => void }) {
   const missing = getMissingFields(profile);
-  if (missing.length === 0) return null;
+  // Also check if there's a pending profile update - if so, don't nag them
+  const token = new URLSearchParams(window.location.search).get("token") || "";
+  const pendingUpdate = trpc.profileUpdates.getMyPending.useQuery({ token }, { enabled: !!token });
+  if (missing.length === 0 || pendingUpdate.data) return null;
   return (
-    <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 text-right">
+    <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 text-right" id="missing-fields-banner">
       <div className="flex items-start gap-3">
         <span className="text-2xl">⚠️</span>
         <div className="flex-1">
@@ -666,9 +669,19 @@ export default function UserDashboard() {
           )}
 
           {/* ── Matches Tab ── */}
-          {activeTab === "matches" && (
-            <motion.div key="matches" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="space-y-4">
+         {activeTab === "matches" && (
+           <motion.div key="matches" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+             className="space-y-4">
+              {/* Premium Plus teaser */}
+              <div className="bg-gradient-to-r from-[#191265]/5 to-[#ffe27c]/10 border border-[#ffe27c]/40 rounded-2xl p-4 text-right">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">✨</span>
+                  <h4 className="text-[#191265] font-black text-sm">בקרוב — מנוי פלוס!</h4>
+                </div>
+                <p className="text-[#555] text-xs leading-relaxed">
+                  בקרוב תוכלו לראות את ההתאמות שמחכות לכם, לקבל יותר התאמות, ולהנות מתכונות בלעדיות. עקבו אחרינו לעדכונים.
+                </p>
+              </div>
               {myMatches.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#e9e8e8] p-8 text-center">
                   <div className="text-4xl mb-3">🔍</div>
