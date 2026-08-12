@@ -213,6 +213,14 @@ function DnaCard({ dnaType, gender }: { dnaType: DnaType; gender: "female" | "ma
 // ─── Match Card ───────────────────────────────────────────────────────────────
 function MatchCard({ match }: { match: any }) {
   const statusInfo = STATUS_LABELS[match.status] || STATUS_LABELS.pending;
+  const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
+  const utils = trpc.useUtils();
+  const releaseMutation = trpc.matchmaking.returnToPool.useMutation({
+    onSuccess: () => {
+      utils.singles.getDashboard.invalidate();
+      setShowReleaseConfirm(false);
+    },
+  });
   const expiresIn = match.approvalExpiresAt
     ? Math.max(0, Math.ceil((match.approvalExpiresAt - Date.now()) / (1000 * 60 * 60)))
     : null;
@@ -304,14 +312,45 @@ function MatchCard({ match }: { match: any }) {
                   </a>
                 )}
                 {match.other.phone && (
-                  <a href={`https://wa.me/972${match.other.phone.replace(/^0/, '').replace(/-/g, '')}`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 mt-2 bg-[#25D366] text-white font-bold px-4 py-2 rounded-xl text-sm hover:bg-[#1da851] transition-colors">
-                    💬 שלח/י הודעה בוואטסאפ
-                  </a>
+                 <a href={`https://wa.me/972${match.other.phone.replace(/^0/, '').replace(/-/g, '')}`}
+                   target="_blank" rel="noopener noreferrer"
+                   className="inline-flex items-center gap-2 mt-2 bg-[#25D366] text-white font-bold px-4 py-2 rounded-xl text-sm hover:bg-[#1da851] transition-colors">
+                   💬 שלח/י הודעה בוואטסאפ
+                 </a>
                 )}
               </div>
             </div>
+          </div>
+          {/* Release match section */}
+          <div className="mx-5 mb-4 mt-2 border-t border-[#f0f0f0] pt-4">
+            {!showReleaseConfirm ? (
+              <button
+                onClick={() => setShowReleaseConfirm(true)}
+                className="w-full text-center text-sm text-[#999] hover:text-[#e53935] transition-colors py-2"
+              >
+                לא הסתדר? לחצ/י כאן לשחרור מההתאמה
+              </button>
+            ) : (
+              <div className="bg-[#fff3e0] border border-[#ffcc80] rounded-xl p-4 text-center">
+                <p className="font-bold text-[#e65100] text-sm mb-2">בטוח/ה שרוצה להשתחרר מההתאמה?</p>
+                <p className="text-xs text-[#555] mb-3">לאחר השחרור, שניכם תחזרו למאגר ותוכלו לקבל התאמות חדשות.</p>
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={() => releaseMutation.mutate({ matchId: match.matchId })}
+                    disabled={releaseMutation.isPending}
+                    className="bg-[#e53935] text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-[#c62828] transition-colors disabled:opacity-50"
+                  >
+                    {releaseMutation.isPending ? "משחרר..." : "כן, שחרר אותי"}
+                  </button>
+                  <button
+                    onClick={() => setShowReleaseConfirm(false)}
+                    className="bg-[#f5f5f5] text-[#555] font-bold px-4 py-2 rounded-lg text-sm hover:bg-[#e0e0e0] transition-colors"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -569,8 +608,8 @@ export default function UserDashboard() {
   }
 
   const { profile, matches: myMatches, dnaResult, hasCompletedQuestionnaire, questionnaireToken } = data;
-  const activeMatches = myMatches.filter((m: any) => m.status === "proposed" || m.status === "matched");
-  const historyMatches = myMatches.filter((m: any) => m.status === "rejected" || m.status === "expired" || m.status === "pending");
+  const activeMatches = myMatches.filter((m: any) => (m.status === "proposed" || m.status === "matched") && !m.returnedToPoolAt);
+  const historyMatches = myMatches.filter((m: any) => m.status === "rejected" || m.status === "expired" || m.status === "pending" || m.returnedToPoolAt);
 
   return (
     <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">

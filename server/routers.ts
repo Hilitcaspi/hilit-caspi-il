@@ -2349,29 +2349,29 @@ export const appRouter = router({
             const myConsent = isA ? m.approvedByA : m.approvedByB;
             const theirConsent = isA ? m.approvedByB : m.approvedByA;
             if (m.status === 'matched' && m.approvedByA && m.approvedByB) {
-              const [other] = await db.select({
-                firstName: singles.firstName,
-                age: singles.age,
-                city: singles.city,
-                occupation: singles.occupation,
-                photoUrl: singles.photoUrl,
-                dnaType: singles.dnaType,
-                phone: singles.phone,
-                email: singles.email,
+             const [other] = await db.select({
+               firstName: singles.firstName,
+               age: singles.age,
+               city: singles.city,
+               occupation: singles.occupation,
+               photoUrl: singles.photoUrl,
+               dnaType: singles.dnaType,
+               phone: singles.phone,
+               email: singles.email,
               }).from(singles).where(eq(singles.id, otherId)).limit(1);
-              return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: other || null, contactRevealed: true };
+              return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: other || null, contactRevealed: true, returnedToPoolAt: m.returnedToPoolAt };
             }
             if (m.status === 'proposed') {
-              const [other] = await db.select({
-                firstName: singles.firstName,
-                age: singles.age,
-                city: singles.city,
-                dnaType: singles.dnaType,
-                photoUrl: singles.photoUrl,
+             const [other] = await db.select({
+               firstName: singles.firstName,
+               age: singles.age,
+               city: singles.city,
+               dnaType: singles.dnaType,
+               photoUrl: singles.photoUrl,
               }).from(singles).where(eq(singles.id, otherId)).limit(1);
-              return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: other || null, contactRevealed: false };
+              return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: other || null, contactRevealed: false, returnedToPoolAt: m.returnedToPoolAt };
             }
-            return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: null, contactRevealed: false };
+            return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: null, contactRevealed: false, returnedToPoolAt: m.returnedToPoolAt };
           })
         );
         const [dnaResult] = await db.select().from(dnaQuizResults)
