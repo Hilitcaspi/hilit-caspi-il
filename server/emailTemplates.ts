@@ -1401,7 +1401,7 @@ export function buildMatchProposalEmail(params: {
 
     <p style="color:#444; font-size:15px; line-height:1.8; margin:20px 0;">
       אם ההצעה מעניינת ${isFemale ? "אותך" : "אותך"}, ${isFemale ? "לחצי" : "לחץ"} על "כן, מעניין אותי".
-      אם גם הצד השני יגיד כן, אשלח לכם את הפרטים המלאים של אחד על השני.
+      אם גם הצד השני יאשר, תקבלו את הפרטים המלאים אחד של השני.
       <br><br>
       <strong>אין מחויבות. אין לחץ. רק הזדמנות.</strong>
     </p>
@@ -1499,12 +1499,19 @@ export function buildContactRevealEmail(params: {
 
     <p style="color:#444; font-size:15px; line-height:1.8; margin:20px 0;">
       אני מאחלת לכם פגישה נפלאה! 🤍<br>
-      אם יש שאלות, תמיד אפשר לפנות אלי.
+      אם יש שאלות, תמיד אפשר לפנות אלי בוואטסאפ.
     </p>
 
     <a href="${WHATSAPP_LINK}" style="display:block; background:#25D366; color:#fff !important; font-weight:700; font-size:16px; text-align:center; padding:14px 28px; border-radius:12px; text-decoration:none; margin:16px 0;">
       💬 שלחי לי הודעה בוואטסאפ
     </a>
+
+    <div style="background:#f5f5f5; border-radius:8px; padding:16px 20px; margin:16px 0;">
+      <p style="font-size:13px; color:#666; line-height:1.7; margin:0;">
+        💡 <strong>לא הסתדר?</strong> אפשר לשחרר את ההתאמה בכל שלב דרך <a href="https://hilitcaspi.com/my" style="color:#191265;">האזור האישי</a> שלך (בטאב "התאמות"), או לשלוח לי הודעה בוואטסאפ.
+        לאחר השחרור, שניכם חוזרים למאגר ויכולים לקבל התאמות חדשות.
+      </p>
+    </div>
 
     ${emailSignature()}
   `;
