@@ -87,6 +87,42 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
     const until = new Date(now).toISOString().split("T")[0];
     const meta = await fetchMetaSpend(since, until);
     
+    // Channel breakdown (leads + purchases by source)
+    const CHANNEL_MAP: Record<string, string> = {
+      meta: "Meta Ads", Meta: "Meta Ads", facebook: "Meta Ads", fb: "Meta Ads", facebook_shabek: "Meta Ads",
+      ig: "Instagram", instagram: "Instagram", google: "Google / SEO",
+      brevo: "Email (Newsletter)", email: "Email (Journeys)", whatsapp: "WhatsApp",
+      referral: "הפניה", shahar: "הפניה", customer_service: "שירות לקוחות",
+    };
+    const mapCh = (s: string | null) => s ? (CHANNEL_MAP[s] || s) : "ישיר / לא ידוע";
+    
+    const [chLeadRows] = await db.execute(sql`
+      SELECT COALESCE(utmSource, source, 'direct') as channel, COUNT(*) as cnt
+      FROM crm_leads WHERE createdAt >= ${weekAgo} AND createdAt <= ${now}
+      GROUP BY channel ORDER BY cnt DESC
+    `) as any;
+    const [chPurchRows] = await db.execute(sql`
+      SELECT COALESCE(cl.utmSource, cl.source, 'direct') as channel, pl.product, COUNT(*) as cnt
+      FROM payment_leads pl JOIN crm_leads cl ON cl.email = pl.email
+      WHERE pl.created_at >= ${weekAgo} AND pl.created_at <= ${now}
+      GROUP BY channel, pl.product
+    `) as any;
+    
+    const chData: Record<string, { leads: number; purchases: number; revenue: number }> = {};
+    for (const r of (chLeadRows as any[])) {
+      const ch = mapCh(r.channel);
+      if (!chData[ch]) chData[ch] = { leads: 0, purchases: 0, revenue: 0 };
+      chData[ch].leads += Number(r.cnt);
+    }
+    for (const r of (chPurchRows as any[])) {
+      const ch = mapCh(r.channel);
+      if (!chData[ch]) chData[ch] = { leads: 0, purchases: 0, revenue: 0 };
+      const cnt = Number(r.cnt);
+      chData[ch].purchases += cnt;
+      chData[ch].revenue += cnt * (PRODUCT_PRICES[r.product] ?? 0);
+    }
+    const channelRows = Object.entries(chData).sort((a, b) => b[1].leads - a[1].leads);
+    
     const roas = meta.spend > 0 ? (revenue / meta.spend).toFixed(1) : "N/A";
     const convRate = leads > 0 ? ((purchases / leads) * 100).toFixed(1) : "0";
     
@@ -159,6 +195,16 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
     ${productLines.map(l => `<div style="font-size: 13px; color: #4b5563; padding: 4px 0;">${l}</div>`).join('')}
   </div>` : ''}
   
+  <!-- Channel Breakdown -->
+  ${channelRows.length > 0 ? `
+  <div style="padding: 0 24px 20px;">
+    <h3 style="margin: 0 0 8px; font-size: 14px; color: #374151;">📡 ביצועים לפי ערוץ</h3>
+    <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+      <tr style="background: #f3f4f6;"><th style="padding: 6px; text-align: right;">ערוץ</th><th style="padding: 6px; text-align: center;">לידים</th><th style="padding: 6px; text-align: center;">רכישות</th><th style="padding: 6px; text-align: center;">הכנסות</th></tr>
+      ${channelRows.map(([ch, d]) => `<tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 6px;">${ch}</td><td style="padding: 6px; text-align: center;">${d.leads}</td><td style="padding: 6px; text-align: center; font-weight: bold; color: ${d.purchases > 0 ? '#16a34a' : '#6b7280'};">${d.purchases || '—'}</td><td style="padding: 6px; text-align: center; color: #16a34a;">₪${d.revenue.toLocaleString()}</td></tr>`).join('')}
+    </table>
+  </div>` : ''}
+  
   <!-- Top Campaigns -->
   ${topCampaigns.length > 0 ? `
   <div style="padding: 0 24px 20px;">
@@ -195,6 +241,14 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
     // Also send to Shahar Netanel
     await sendEmail({
       to: { email: "shaharnat08@gmail.com", name: "שחר נתנאל" },
+      subject: `📊 דוח שבועי: ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות`,
+      htmlContent: html,
+      textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות. הוצאה: ₪${Math.round(meta.spend).toLocaleString()}. ROAS: ${roas}x.`,
+    });
+    
+    // Also send to Netaneal (campaign manager)
+    await sendEmail({
+      to: { email: "netaneal@menteshdigital.com", name: "נתנאל" },
       subject: `📊 דוח שבועי: ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות`,
       htmlContent: html,
       textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות. הוצאה: ₪${Math.round(meta.spend).toLocaleString()}. ROAS: ${roas}x.`,

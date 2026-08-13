@@ -250,6 +250,70 @@ export default function Dashboard() {
         )}
 
         {/* ═══ META ADS ═══ */}
+        {/* ═══ CHANNEL BREAKDOWN (Revenue/Spend per channel with comparison) ═══ */}
+        {channels.data && channels.data.length > 0 && (
+          <Card className="border-0 shadow-sm bg-gradient-to-l from-emerald-50 to-white">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2"><BarChart3 size={18} className="text-emerald-600" /><h3 className="font-bold text-gray-900">ביצועים לפי ערוץ — השוואה לחודש שעבר</h3></div>
+              <p className="text-xs text-gray-500 mt-1">לידים, רכישות והכנסות מכל ערוץ לעומת אותה תקופה בחודש שעבר</p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-gray-500 text-xs">
+                      <th className="text-right py-2 font-medium">ערוץ</th>
+                      <th className="text-center py-2 font-medium">לידים</th>
+                      <th className="text-center py-2 font-medium">שינוי</th>
+                      <th className="text-center py-2 font-medium">רכישות</th>
+                      <th className="text-center py-2 font-medium">שינוי</th>
+                      <th className="text-center py-2 font-medium">הכנסות</th>
+                      <th className="text-center py-2 font-medium">שינוי</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {channels.data.map((ch: any) => {
+                      const leadChange = ch.prevLeads > 0 ? Math.round((ch.leads - ch.prevLeads) / ch.prevLeads * 100) : (ch.leads > 0 ? 100 : 0);
+                      const purchaseChange = ch.prevPurchases > 0 ? Math.round((ch.purchases - ch.prevPurchases) / ch.prevPurchases * 100) : (ch.purchases > 0 ? 100 : 0);
+                      const revenueChange = ch.prevRevenue > 0 ? Math.round((ch.revenue - ch.prevRevenue) / ch.prevRevenue * 100) : (ch.revenue > 0 ? 100 : 0);
+                      return (
+                        <tr key={ch.channel} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-2 font-medium text-gray-900">{ch.channel}</td>
+                          <td className="text-center py-2 font-bold">{ch.leads}</td>
+                          <td className={`text-center py-2 text-xs font-medium ${leadChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {leadChange >= 0 ? '↑' : '↓'}{Math.abs(leadChange)}%
+                            <span className="text-gray-400 block text-[10px]">({ch.prevLeads})</span>
+                          </td>
+                          <td className="text-center py-2 font-bold">{ch.purchases}</td>
+                          <td className={`text-center py-2 text-xs font-medium ${purchaseChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {purchaseChange >= 0 ? '↑' : '↓'}{Math.abs(purchaseChange)}%
+                            <span className="text-gray-400 block text-[10px]">({ch.prevPurchases})</span>
+                          </td>
+                          <td className="text-center py-2 font-bold text-emerald-700">₪{ch.revenue.toLocaleString()}</td>
+                          <td className={`text-center py-2 text-xs font-medium ${revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {revenueChange >= 0 ? '↑' : '↓'}{Math.abs(revenueChange)}%
+                            <span className="text-gray-400 block text-[10px]">(₪{ch.prevRevenue.toLocaleString()})</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-t-2 border-gray-300 font-bold">
+                      <td className="py-2">סה"כ</td>
+                      <td className="text-center py-2">{channels.data.reduce((s: number, c: any) => s + c.leads, 0)}</td>
+                      <td className="text-center py-2"></td>
+                      <td className="text-center py-2">{channels.data.reduce((s: number, c: any) => s + c.purchases, 0)}</td>
+                      <td className="text-center py-2"></td>
+                      <td className="text-center py-2 text-emerald-700">₪{channels.data.reduce((s: number, c: any) => s + c.revenue, 0).toLocaleString()}</td>
+                      <td className="text-center py-2"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-500 mt-3 italic">* ההשוואה היא לאותה תקופה (אותו מספר ימים) בחודש שעבר</p>
+            </CardContent>
+          </Card>
+        )}
+
         {metaAds.data && (metaAds.data.campaigns.length > 0 || metaAds.data.boosts.length > 0) && (
           <Card className="border-0 shadow-sm bg-gradient-to-l from-blue-50 to-white">
             <CardHeader className="pb-2">

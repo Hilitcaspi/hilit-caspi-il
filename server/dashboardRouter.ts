@@ -604,6 +604,11 @@ export const dashboardRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { startDate, endDate } = input;
 
+      // Same period last month for comparison
+      const periodLength = endDate - startDate;
+      const sameLastMonthStart = startDate - 30 * 24 * 60 * 60 * 1000;
+      const sameLastMonthEnd = sameLastMonthStart + periodLength;
+
       // Leads by source/campaign
       const [leadRows] = await db.execute(sql`
         SELECT 
@@ -629,6 +634,43 @@ export const dashboardRouter = router({
         GROUP BY channel, campaign, pl.product
         ORDER BY purchases DESC
       `) as any;
+
+      // Previous period leads by channel (same period last month)
+      const [prevLeadRows] = await db.execute(sql`
+        SELECT 
+          COALESCE(utmSource, source, 'direct') as channel,
+          COUNT(*) as leads
+        FROM crm_leads
+        WHERE createdAt >= ${sameLastMonthStart} AND createdAt <= ${sameLastMonthEnd}
+        GROUP BY channel
+      `) as any;
+
+      // Previous period purchases by channel
+      const [prevPurchaseRows] = await db.execute(sql`
+        SELECT 
+          COALESCE(cl.utmSource, cl.source, 'direct') as channel,
+          pl.product,
+          COUNT(*) as purchases
+        FROM payment_leads pl
+        JOIN crm_leads cl ON cl.email = pl.email
+        WHERE pl.created_at >= ${sameLastMonthStart} AND pl.created_at <= ${sameLastMonthEnd}
+        GROUP BY channel, pl.product
+      `) as any;
+
+      // Build previous period channel totals
+      const prevChannelData: Record<string, { leads: number; purchases: number; revenue: number }> = {};
+      for (const row of (prevLeadRows as any[])) {
+        const ch = mapChannel(row.channel);
+        if (!prevChannelData[ch]) prevChannelData[ch] = { leads: 0, purchases: 0, revenue: 0 };
+        prevChannelData[ch].leads += Number(row.leads);
+      }
+      for (const row of (prevPurchaseRows as any[])) {
+        const ch = mapChannel(row.channel);
+        if (!prevChannelData[ch]) prevChannelData[ch] = { leads: 0, purchases: 0, revenue: 0 };
+        const cnt = Number(row.purchases);
+        prevChannelData[ch].purchases += cnt;
+        prevChannelData[ch].revenue += cnt * (PRODUCT_PRICES[row.product] ?? 0);
+      }
 
       // Aggregate by channel
       const channelData: Record<string, { leads: number; purchases: number; revenue: number; campaigns: Record<string, { leads: number; purchases: number; revenue: number }> }> = {};
@@ -659,6 +701,9 @@ export const dashboardRouter = router({
         .map(([channel, data]) => ({
           channel,
           ...data,
+          prevLeads: prevChannelData[channel]?.leads ?? 0,
+          prevPurchases: prevChannelData[channel]?.purchases ?? 0,
+          prevRevenue: prevChannelData[channel]?.revenue ?? 0,
           campaigns: Object.entries(data.campaigns)
             .map(([name, d]) => ({ name, ...d }))
             .sort((a, b) => b.leads - a.leads),
