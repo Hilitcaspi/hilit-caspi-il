@@ -690,6 +690,7 @@ function ChannelBreakdownCard({ channels, metaSpend }: { channels: any[]; metaSp
                 <th className="text-center py-2 font-medium">שינוי</th>
                 <th className="text-center py-2 font-medium">הכנסות</th>
                 <th className="text-center py-2 font-medium">שינוי</th>
+                <th className="text-center py-2 font-medium">הוצאות</th>
                 <th className="text-center py-2 font-medium">המרה</th>
               </tr>
             </thead>
@@ -699,6 +700,7 @@ function ChannelBreakdownCard({ channels, metaSpend }: { channels: any[]; metaSp
                 const purchaseChange = ch.prevPurchases > 0 ? Math.round((ch.purchases - ch.prevPurchases) / ch.prevPurchases * 100) : (ch.purchases > 0 ? 100 : 0);
                 const revenueChange = ch.prevRevenue > 0 ? Math.round((ch.revenue - ch.prevRevenue) / ch.prevRevenue * 100) : (ch.revenue > 0 ? 100 : 0);
                 const convRate = ch.leads > 0 ? ((ch.purchases / ch.leads) * 100).toFixed(1) : "0";
+                const spendChange = ch.prevSpend > 0 ? Math.round((ch.spend - ch.prevSpend) / ch.prevSpend * 100) : (ch.spend > 0 ? 100 : 0);
                 const isExpanded = expanded === ch.channel;
                 return (
                   <Fragment key={ch.channel}>
@@ -722,10 +724,19 @@ function ChannelBreakdownCard({ channels, metaSpend }: { channels: any[]; metaSp
                         <span className="text-gray-400 block text-[10px]">(₪{ch.prevRevenue.toLocaleString()})</span>
                       </td>
                       <td className="text-center py-2 text-xs font-medium text-indigo-600">{convRate}%</td>
+                      <td className="text-center py-2">
+                        {ch.spend > 0 ? (
+                          <span className="font-bold text-red-600">₪{ch.spend.toLocaleString()}
+                            <span className={`block text-[10px] ${spendChange >= 0 ? 'text-red-400' : 'text-green-600'}`}>
+                              {ch.prevSpend > 0 ? `(חודש שעבר: ₪${ch.prevSpend.toLocaleString()})` : ''}
+                            </span>
+                          </span>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={8} className="bg-gray-50 p-3 border-b">
+                        <td colSpan={9} className="bg-gray-50 p-3 border-b">
                           <div className="text-xs space-y-2">
                             <div className="bg-blue-50 rounded-lg p-2 text-blue-800 font-medium">💡 {getInsight(ch)}</div>
                             {ch.campaigns && ch.campaigns.length > 0 && (
@@ -755,6 +766,7 @@ function ChannelBreakdownCard({ channels, metaSpend }: { channels: any[]; metaSp
                 <td className="text-center py-2 text-emerald-700">₪{totalRevenue.toLocaleString()}</td>
                 <td className="text-center py-2"></td>
                 <td className="text-center py-2 text-indigo-600">{totalLeads > 0 ? ((totalPurchases / totalLeads) * 100).toFixed(1) : 0}%</td>
+                <td className="text-center py-2 text-red-600">{metaSpend > 0 ? `₪${Math.round(metaSpend).toLocaleString()}` : '—'}</td>
               </tr>
             </tbody>
           </table>

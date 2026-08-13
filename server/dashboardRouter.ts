@@ -697,10 +697,27 @@ export const dashboardRouter = router({
         channelData[ch].campaigns[camp].revenue += rev;
       }
 
+      // Fetch Meta Ads spend for this period and previous period
+      const sinceStr = new Date(startDate).toISOString().split('T')[0];
+      const untilStr = new Date(endDate).toISOString().split('T')[0];
+      const prevSinceStr = new Date(sameLastMonthStart).toISOString().split('T')[0];
+      const prevUntilStr = new Date(sameLastMonthEnd).toISOString().split('T')[0];
+      
+      let metaSpend = 0;
+      let prevMetaSpend = 0;
+      try {
+        const metaData = await fetchMetaAdsInsights(sinceStr, untilStr);
+        metaSpend = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.spend, 0);
+        const prevMetaData = await fetchMetaAdsInsights(prevSinceStr, prevUntilStr);
+        prevMetaSpend = [...prevMetaData.campaigns, ...prevMetaData.boosts].reduce((s, c) => s + c.spend, 0);
+      } catch (e) { /* ignore meta errors */ }
+
       return Object.entries(channelData)
         .map(([channel, data]) => ({
           channel,
           ...data,
+          spend: channel === "Meta Ads" ? Math.round(metaSpend) : 0,
+          prevSpend: channel === "Meta Ads" ? Math.round(prevMetaSpend) : 0,
           prevLeads: prevChannelData[channel]?.leads ?? 0,
           prevPurchases: prevChannelData[channel]?.purchases ?? 0,
           prevRevenue: prevChannelData[channel]?.revenue ?? 0,
