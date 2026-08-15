@@ -188,6 +188,36 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ═══ CONVERSIONS & SPEND BREAKDOWN ═══ */}
+        {c && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-white rounded-xl p-3 shadow-sm border-t-2 border-t-green-500">
+              <div className="text-[10px] text-gray-500 mb-1">המרה כללית (ליד→רכישה)</div>
+              <div className="text-xl font-bold text-green-600">{c.current.leads > 0 ? (c.current.purchases / c.current.leads * 100).toFixed(1) : 0}%</div>
+              <div className="text-[10px] text-gray-400">ממוצע בתעשייה: 2-5%</div>
+            </div>
+            {metaAds.data && (
+              <>
+                <div className="bg-white rounded-xl p-3 shadow-sm border-t-2 border-t-red-500">
+                  <div className="text-[10px] text-gray-500 mb-1">הוצאות קמפיינים</div>
+                  <div className="text-xl font-bold text-red-600">₪{Math.round((metaAds.data.campaigns || []).reduce((s: number, c: any) => s + (c.spend || 0), 0)).toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-400">{(metaAds.data.campaigns || []).length} קמפיינים פעילים</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 shadow-sm border-t-2 border-t-orange-500">
+                  <div className="text-[10px] text-gray-500 mb-1">הוצאות בוסטים</div>
+                  <div className="text-xl font-bold text-orange-600">₪{Math.round((metaAds.data.boosts || []).reduce((s: number, c: any) => s + (c.spend || 0), 0)).toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-400">{(metaAds.data.boosts || []).length} בוסטים</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 shadow-sm border-t-2 border-t-purple-500">
+                  <div className="text-[10px] text-gray-500 mb-1">סה"כ הוצאות</div>
+                  <div className="text-xl font-bold text-purple-600">₪{Math.round([...(metaAds.data.campaigns || []), ...(metaAds.data.boosts || [])].reduce((s: number, c: any) => s + (c.spend || 0), 0)).toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-400">ROAS: {c.current.revenue > 0 ? (c.current.revenue / Math.max([...(metaAds.data.campaigns || []), ...(metaAds.data.boosts || [])].reduce((s: number, c: any) => s + (c.spend || 0), 0), 1)).toFixed(1) : "∞"}x</div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* ═══ LEAD JOURNEY ATTRIBUTION ═══ */}
         {c && c.journeyAttribution.length > 0 && (
           <Card className="border-0 shadow-sm border-r-4 border-r-blue-500">
