@@ -1191,4 +1191,136 @@ export const dashboardRouter = router({
     }
   }),
 
+  // Database demographics - gender split, age distribution, geographic areas
+  databaseDemographics: teamProcedure
+    .input(z.object({ startDate: z.number().optional(), endDate: z.number().optional() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const now = Date.now();
+      const start = input.startDate || now - 30 * 24 * 60 * 60 * 1000;
+      const end = input.endDate || now;
+      
+      // Previous period for comparison
+      const periodLength = end - start;
+      const prevStart = start - periodLength;
+      const prevEnd = start;
+
+      // Total database stats
+      const totalStats = await db.execute<any[]>(sql`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
+          SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females,
+          AVG(CASE WHEN age > 0 THEN age ELSE NULL END) as avgAge
+        FROM singles WHERE isActive = 1
+      `);
+
+      // Period registrations
+      const periodStats = await db.execute<any[]>(sql`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
+          SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females,
+          AVG(CASE WHEN age > 0 THEN age ELSE NULL END) as avgAge
+        FROM singles WHERE isActive = 1 AND registeredAt >= ${start} AND registeredAt <= ${end}
+      `);
+
+      // Previous period registrations
+      const prevPeriodStats = await db.execute<any[]>(sql`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
+          SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females
+        FROM singles WHERE isActive = 1 AND registeredAt >= ${prevStart} AND registeredAt <= ${prevEnd}
+      `);
+
+      // Age distribution (current period)
+      const ageGroups = await db.execute<any[]>(sql`
+        SELECT 
+          CASE 
+            WHEN age BETWEEN 18 AND 25 THEN '18-25'
+            WHEN age BETWEEN 26 AND 30 THEN '26-30'
+            WHEN age BETWEEN 31 AND 35 THEN '31-35'
+            WHEN age BETWEEN 36 AND 40 THEN '36-40'
+            WHEN age BETWEEN 41 AND 45 THEN '41-45'
+            WHEN age > 45 THEN '46+'
+            ELSE 'לא צוין'
+          END as ageGroup,
+          COUNT(*) as count,
+          SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
+          SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females
+        FROM singles WHERE isActive = 1 AND registeredAt >= ${start} AND registeredAt <= ${end}
+        GROUP BY ageGroup ORDER BY MIN(age)
+      `);
+
+      // Geographic distribution (current period)
+      const areas = await db.execute<any[]>(sql`
+        SELECT city, COUNT(*) as count,
+          SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
+          SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females
+        FROM singles 
+        WHERE isActive = 1 AND city IS NOT NULL AND city != '' AND registeredAt >= ${start} AND registeredAt <= ${end}
+        GROUP BY city ORDER BY count DESC LIMIT 15
+      `);
+
+      // Total age distribution (all time)
+      const totalAgeGroups = await db.execute<any[]>(sql`
+        SELECT 
+          CASE 
+            WHEN age BETWEEN 18 AND 25 THEN '18-25'
+            WHEN age BETWEEN 26 AND 30 THEN '26-30'
+            WHEN age BETWEEN 31 AND 35 THEN '31-35'
+            WHEN age BETWEEN 36 AND 40 THEN '36-40'
+            WHEN age BETWEEN 41 AND 45 THEN '41-45'
+            WHEN age > 45 THEN '46+'
+            ELSE 'לא צוין'
+          END as ageGroup,
+          COUNT(*) as count,
+          SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
+          SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females
+        FROM singles WHERE isActive = 1
+        GROUP BY ageGroup ORDER BY MIN(age)
+      `);
+
+      const t = (totalStats as any[])[0];
+      const p = (periodStats as any[])[0];
+      const pp = (prevPeriodStats as any[])[0];
+
+      // Generate marketing insights
+      const totalMales = Number(t?.males || 0);
+      const totalFemales = Number(t?.females || 0);
+      const ratio = totalMales > 0 ? (totalFemales / totalMales) : 0;
+      const periodMales = Number(p?.males || 0);
+      const periodFemales = Number(p?.females || 0);
+      
+      const insights: string[] = [];
+      if (ratio > 1.3) insights.push(`יש עודף נשים במאגר (${totalFemales} נשים מול ${totalMales} גברים). כדאי לכוון קמפיינים לגברים.`);
+      else if (ratio < 0.7) insights.push(`יש עודף גברים במאגר (${totalMales} גברים מול ${totalFemales} נשים). כדאי לכוון קמפיינים לנשים.`);
+      else insights.push(`המאגר מאוזן יחסית (${totalMales} גברים, ${totalFemales} נשים).`);
+      
+      if (periodMales > 0 && periodFemales > 0) {
+        const periodRatio = periodFemales / periodMales;
+        if (periodRatio > 1.5) insights.push(`בתקופה הנוכחית נרשמו הרבה יותר נשים (${periodFemales}) מגברים (${periodMales}). שקלי להגביר קמפיינים ממוקדי גברים.`);
+        else if (periodRatio < 0.6) insights.push(`בתקופה הנוכחית נרשמו הרבה יותר גברים (${periodMales}) מנשים (${periodFemales}). שקלי להגביר קמפיינים ממוקדי נשים.`);
+      }
+
+      // Find dominant age group
+      const ageArr = (ageGroups as any[]).filter((a: any) => a.ageGroup !== 'לא צוין');
+      if (ageArr.length > 0) {
+        const top = ageArr.sort((a: any, b: any) => Number(b.count) - Number(a.count))[0];
+        insights.push(`קבוצת הגיל הדומיננטית בתקופה: ${top.ageGroup} (${top.count} נרשמים). כדאי לוודא שהקריאייטיב מדבר לקהל הזה.`);
+      }
+
+      return {
+        total: { count: Number(t?.total || 0), males: totalMales, females: totalFemales, avgAge: Math.round(Number(t?.avgAge || 0)) },
+        period: { count: Number(p?.total || 0), males: periodMales, females: periodFemales, avgAge: Math.round(Number(p?.avgAge || 0)) },
+        prevPeriod: { count: Number(pp?.total || 0), males: Number(pp?.males || 0), females: Number(pp?.females || 0) },
+        ageGroups: (ageGroups as any[]).map((a: any) => ({ group: a.ageGroup, count: Number(a.count), males: Number(a.males), females: Number(a.females) })),
+        totalAgeGroups: (totalAgeGroups as any[]).map((a: any) => ({ group: a.ageGroup, count: Number(a.count), males: Number(a.males), females: Number(a.females) })),
+        areas: (areas as any[]).map((a: any) => ({ city: a.city, count: Number(a.count), males: Number(a.males), females: Number(a.females) })),
+        insights,
+      };
+    }),
+
 });

@@ -126,6 +126,7 @@ export default function Dashboard() {
   const metaAds = trpc.dashboard.metaAdsPerformance.useQuery(dateInput);
   const coachingRev = trpc.dashboard.coachingRevenue.useQuery(dateInput);
   const sendReport = trpc.dashboard.sendWeeklyReport.useMutation();
+  const demographics = trpc.dashboard.databaseDemographics.useQuery(dateInput);
 
   const isLoading = comp.isLoading;
   const t = targets.data;
@@ -253,6 +254,80 @@ export default function Dashboard() {
         {/* ═══ CHANNEL BREAKDOWN (Revenue/Spend per channel with comparison) ═══ */}
         {channels.data && channels.data.length > 0 && (
           <ChannelBreakdownCard channels={channels.data} metaSpend={metaAds.data ? [...(metaAds.data.campaigns || []), ...(metaAds.data.boosts || [])].reduce((s: number, c: any) => s + (c.spend || 0), 0) : 0} />
+        )}
+
+        {/* ═══ DATABASE DEMOGRAPHICS ═══ */}
+        {demographics.data && (
+          <Card className="border-0 shadow-sm bg-gradient-to-l from-pink-50 to-white">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-pink-600" />
+                <h3 className="font-bold text-gray-900">דמוגרפיה של המאגר</h3>
+                <Badge className="bg-pink-100 text-pink-700 text-[10px]">{demographics.data.total.count} פעילים</Badge>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">חלוקה לפי מגדר, גיל ואזור — כללי ובתקופה הנבחרת</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="bg-white rounded-lg p-3 border border-blue-100 text-center">
+                  <div className="text-[10px] text-gray-500">גברים (כללי)</div>
+                  <div className="text-lg font-bold text-blue-600">{demographics.data.total.males}</div>
+                  <div className="text-[10px] text-gray-400">{demographics.data.total.count > 0 ? Math.round(demographics.data.total.males / demographics.data.total.count * 100) : 0}%</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-pink-100 text-center">
+                  <div className="text-[10px] text-gray-500">נשים (כללי)</div>
+                  <div className="text-lg font-bold text-pink-600">{demographics.data.total.females}</div>
+                  <div className="text-[10px] text-gray-400">{demographics.data.total.count > 0 ? Math.round(demographics.data.total.females / demographics.data.total.count * 100) : 0}%</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-blue-100 text-center">
+                  <div className="text-[10px] text-gray-500">גברים (תקופה)</div>
+                  <div className="text-lg font-bold text-blue-600">{demographics.data.period.males}</div>
+                  <div className="text-[10px]">{demographics.data.prevPeriod.males > 0 ? <span className={demographics.data.period.males >= demographics.data.prevPeriod.males ? "text-green-600" : "text-red-600"}>{demographics.data.period.males >= demographics.data.prevPeriod.males ? "↑" : "↓"}{Math.abs(Math.round((demographics.data.period.males - demographics.data.prevPeriod.males) / demographics.data.prevPeriod.males * 100))}%</span> : "—"}</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-pink-100 text-center">
+                  <div className="text-[10px] text-gray-500">נשים (תקופה)</div>
+                  <div className="text-lg font-bold text-pink-600">{demographics.data.period.females}</div>
+                  <div className="text-[10px]">{demographics.data.prevPeriod.females > 0 ? <span className={demographics.data.period.females >= demographics.data.prevPeriod.females ? "text-green-600" : "text-red-600"}>{demographics.data.period.females >= demographics.data.prevPeriod.females ? "↑" : "↓"}{Math.abs(Math.round((demographics.data.period.females - demographics.data.prevPeriod.females) / demographics.data.prevPeriod.females * 100))}%</span> : "—"}</div>
+                </div>
+              </div>
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">התפלגות גילאים (תקופה נבחרת)</h4>
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                  {demographics.data.ageGroups.filter((a: any) => a.group !== 'לא צוין').map((ag: any) => (
+                    <div key={ag.group} className="bg-white rounded-lg p-2 border text-center">
+                      <div className="text-xs font-bold text-gray-700">{ag.group}</div>
+                      <div className="text-sm font-bold">{ag.count}</div>
+                      <div className="flex justify-center gap-1 text-[10px]">
+                        <span className="text-blue-500">♂{ag.males}</span>
+                        <span className="text-pink-500">♀{ag.females}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {demographics.data.areas.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">אזורים מובילים (תקופה נבחרת)</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    {demographics.data.areas.slice(0, 10).map((a: any) => (
+                      <div key={a.city} className="bg-white rounded-lg p-2 border text-center text-xs">
+                        <div className="font-semibold">{a.city}</div>
+                        <div className="text-gray-600">{a.count} <span className="text-blue-500">♂{a.males}</span> <span className="text-pink-500">♀{a.females}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {demographics.data.insights.length > 0 && (
+                <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg p-3 border border-pink-200">
+                  <h4 className="text-sm font-semibold text-pink-800 mb-1">💡 תובנות שיווקיות</h4>
+                  {demographics.data.insights.map((ins: string, i: number) => (
+                    <p key={i} className="text-xs text-gray-700 mb-1">{ins}</p>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {metaAds.data && (metaAds.data.campaigns.length > 0 || metaAds.data.boosts.length > 0) && (
