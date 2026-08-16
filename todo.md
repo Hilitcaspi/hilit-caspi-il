@@ -527,3 +527,4 @@
 - [x] Fix topCampaigns procedure: same unified sources and Hebrew names
 - [x] Fix analytics dedup: purchase events now fire once per session (sessionStorage guard) + eventID passed to Meta Pixel for CAPI dedup
 - [x] Fix GA4 attribution: ga4SessionId now fetched from DB and passed to ga4Purchase so purchases are attributed to campaigns (not direct)
+- [x] Add team note to single-session page: session may be with Hilit or one of her trained coaches
