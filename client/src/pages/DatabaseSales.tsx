@@ -48,9 +48,9 @@ const STEPS = [
 ];
 
 const COUPLE_TESTIMONIALS = [
-  { photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp", names: "ליאת ורון", when: "הכירו דרך המאגר, מרץ 2024", text: "אחרי חצי שנה במאגר פגשתי את הבן זוג שלי. הילית ידעה בדיוק מה אני צריכה.", who: "ליאת, 32" },
-  { photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp", names: "מורן ודן", when: "הכירו דרך המאגר, יולי 2023", text: "ניסיתי אפליקציות שנים. המאגר של הילית שונה לגמרי. ההתאמות היו מדויקות.", who: "דן, 37" },
-  { photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp", names: "נועה ואיתי", when: "הכירו דרך המאגר, נובמבר 2023", text: "הפרופיל שלי עבר סינון אמיתי. ידעתי שכל מי שאני פוגשת רציני ומחפש את אותו הדבר.", who: "נועה, 34" },
+  { photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp", names: "רותם ועידו", when: "הכירו דרך המאגר, פברואר 2026", text: "נרשמתי למאגר ותוך חודשיים קיבלתי התאמה שהרגישה נכונה מהרגע הראשון. אנחנו ביחד כבר חצי שנה.", who: "רותם, 31" },
+  { photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp", names: "שי ומיכל", when: "הכירו דרך המאגר, נובמבר 2025", text: "ניסיתי אפליקציות שנים. המאגר של הילית שונה לגמרי. ההתאמות מדויקות כי מישהו באמת בדק את הפרופילים.", who: "שי, 35" },
+  { photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp", names: "אורית ואלון", when: "הכירו דרך המאגר, מאי 2025", text: "הפרופיל שלי עבר סינון אמיתי. ידעתי שכל מי שאני פוגשת רציני ומחפש את אותו הדבר. תוך 3 חודשים מצאתי.", who: "אורית, 36" },
 ];
 
 export default function DatabaseSales() {

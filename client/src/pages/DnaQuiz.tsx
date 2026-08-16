@@ -301,20 +301,20 @@ export default function DnaQuiz() {
     const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
     const TESTIMONIALS = [
       {
-        text: "הבנתי לגמרי מה עצר אותי. תוך 3 חודשים הייתי בזוגיות.",
-        name: "מיכל, 34",
+        text: "נרשמתי למאגר ותוך חודשיים קיבלתי התאמה מדויקת. אנחנו ביחד כבר חצי שנה.",
+        name: "רותם, 31",
         avatar: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp",
         gender: "female"
       },
       {
-        text: "חיפשתי בדיוק את מה שמזיק לי. השינוי היה מידי.",
-        name: "שירה, 29",
+        text: "עברתי תהליך ליווי שבו הבנתי מה באמת חשוב לי. הדברים קרו מהר.",
+        name: "יעל, 33",
         avatar: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp",
         gender: "female"
       },
       {
-        text: "חשבתי שהגיל שלי הוא מכשול. הילית הוכיחה לי שהפך.",
-        name: "נועה, 38",
+        text: "אחרי שנים באפליקציות, המאגר של הילית חיבר אותי למישהו שבחיים לא הייתי פוגשת.",
+        name: "אורית, 36",
         avatar: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp",
         gender: "female"
       },

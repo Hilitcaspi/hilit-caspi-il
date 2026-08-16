@@ -235,9 +235,9 @@ export default function DatabaseLanding() {
             <motion.h2 variants={fadeUp} className="text-center text-3xl font-black text-[#191265] mb-10">הם מצאו. עכשיו תורך.</motion.h2>
             <div className="grid md:grid-cols-3 gap-6">
               {[
-                { img: COUPLE1, names: "ליאת ורון", text: "אחרי חצי שנה במאגר פגשתי את הבן זוג שלי. הילית ידעה בדיוק מה אני צריכה.", who: "ליאת, 32" },
-                { img: COUPLE2, names: "מורן ודן", text: "ניסיתי אפליקציות שנים. המאגר של הילית שונה לגמרי. ההתאמות היו מדויקות.", who: "דן, 37" },
-                { img: COUPLE3, names: "נועה ואיתי", text: "הפרופיל שלי עבר סינון אמיתי. ידעתי שכל מי שאני פוגשת רציני ומחפש את אותו הדבר.", who: "נועה, 34" },
+                { img: COUPLE1, names: "רותם ועידו", text: "נרשמתי למאגר ותוך חודשיים קיבלתי התאמה שהרגישה נכונה מהרגע הראשון. אנחנו ביחד כבר חצי שנה.", who: "רותם, 31" },
+                { img: COUPLE2, names: "שי ומיכל", text: "ניסיתי אפליקציות שנים. המאגר של הילית שונה לגמרי. ההתאמות מדויקות כי מישהו באמת בדק את הפרופילים.", who: "שי, 35" },
+                { img: COUPLE3, names: "אורית ואלון", text: "אחרי שנים באפליקציות הרגשתי שאני בלופ. כאן ההתאמה הייתה של מישהו שבחיים לא הייתי פוגשת לבד.", who: "אורית, 36" },
               ].map(t => (
                 <motion.div key={t.names} variants={fadeUp} className="bg-[#f9f6f0] rounded-2xl overflow-hidden">
                   <img src={t.img} alt={t.names} className="w-full h-44 object-cover" />
