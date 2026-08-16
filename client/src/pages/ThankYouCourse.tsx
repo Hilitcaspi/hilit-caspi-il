@@ -25,9 +25,15 @@ const stagger = {
 
 export default function ThankYouCourse() {
   useEffect(() => {
-    trackPurchase({ value: 249, currency: "ILS", content_name: "קורס המסע" });
+    const dedupKey = "purchase_fired_course";
+    if (sessionStorage.getItem(dedupKey)) return;
+    sessionStorage.setItem(dedupKey, "1");
+    const urlParams = new URLSearchParams(window.location.search);
+    const txId = urlParams.get("transactionId") || urlParams.get("trxId") || `client-course-${Date.now()}`;
+    const eventID = `grow-${txId}`;
+    trackPurchase({ value: 249, currency: "ILS", content_name: "קורס המסע", eventID });
     track({ eventType: "purchase", page: "/thank-you/course", metadata: { product: "course", value: 249 } });
-    gaPurchase("course");
+    gaPurchase("course", txId);
   }, []);
 
   return (

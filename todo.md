@@ -525,3 +525,5 @@
 - [x] Fix demographics section not showing: registeredAt→createdAt column name, fix db.execute destructuring pattern
 - [x] Fix journey attribution table: unified sources (mapChannel), Hebrew campaign names (translateCampaign), fixed conversion rate (was >100% due to bad JOIN)
 - [x] Fix topCampaigns procedure: same unified sources and Hebrew names
+- [x] Fix analytics dedup: purchase events now fire once per session (sessionStorage guard) + eventID passed to Meta Pixel for CAPI dedup
+- [x] Fix GA4 attribution: ga4SessionId now fetched from DB and passed to ga4Purchase so purchases are attributed to campaigns (not direct)

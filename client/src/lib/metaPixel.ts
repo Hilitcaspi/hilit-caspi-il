@@ -30,14 +30,20 @@ export function trackLead(params?: { content_name?: string; value?: number; curr
   }
 }
 
-export function trackPurchase(params: { value: number; currency?: string; content_name?: string }) {
+export function trackPurchase(params: { value: number; currency?: string; content_name?: string; eventID?: string }) {
   if (typeof window !== "undefined" && window.fbq) {
-    window.fbq("track", "Purchase", {
+    const eventData = {
       value: params.value,
       currency: params.currency || "ILS",
       content_name: params.content_name,
       ...hiddenUtmFields(),
-    });
+    };
+    if (params.eventID) {
+      // Pass eventID for deduplication with server-side CAPI event
+      window.fbq("track", "Purchase", eventData, { eventID: params.eventID });
+    } else {
+      window.fbq("track", "Purchase", eventData);
+    }
   }
 }
 

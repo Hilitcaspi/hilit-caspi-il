@@ -15,9 +15,15 @@ const INSTAGRAM_URL = "https://www.instagram.com/hilitcaspi_relationship";
 
 export default function ThankYouCoaching() {
   useEffect(() => {
-    trackPurchase({ value: 2900, currency: "ILS", content_name: "ליווי אישי 8 פגישות" });
+    const dedupKey = "purchase_fired_coaching";
+    if (sessionStorage.getItem(dedupKey)) return;
+    sessionStorage.setItem(dedupKey, "1");
+    const urlParams = new URLSearchParams(window.location.search);
+    const txId = urlParams.get("transactionId") || urlParams.get("trxId") || `client-coaching-${Date.now()}`;
+    const eventID = `grow-${txId}`;
+    trackPurchase({ value: 2900, currency: "ILS", content_name: "ליווי אישי 8 פגישות", eventID });
     track({ eventType: "purchase", page: "/thank-you/coaching", metadata: { product: "coaching", value: 2900 } });
-    gaPurchase("coaching");
+    gaPurchase("coaching", txId);
   }, []);
 
   return (

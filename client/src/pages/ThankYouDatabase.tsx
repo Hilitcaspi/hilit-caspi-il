@@ -22,9 +22,17 @@ export default function ThankYouDatabase() {
   const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
-    trackPurchase({ value: 299, currency: "ILS", content_name: "מאגר רווקים" });
+    // Deduplication: only fire purchase events once per session (prevents double-counting on refresh)
+    const dedupKey = "purchase_fired_database";
+    if (sessionStorage.getItem(dedupKey)) return;
+    sessionStorage.setItem(dedupKey, "1");
+    // Use URL params from Grow redirect if available, otherwise generate a predictable ID
+    const params = new URLSearchParams(window.location.search);
+    const txId = params.get("transactionId") || params.get("trxId") || `client-database-${Date.now()}`;
+    const eventID = `grow-${txId}`;
+    trackPurchase({ value: 299, currency: "ILS", content_name: "מאגר רווקים", eventID });
     track({ eventType: "purchase", page: "/thank-you/database", metadata: { product: "database", value: 299 } });
-    gaPurchase("database");
+    gaPurchase("database", txId);
   }, []);
 
   const getLinkMutation = trpc.singles.getQuestionnaireLink.useMutation({

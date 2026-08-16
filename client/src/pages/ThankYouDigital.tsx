@@ -27,9 +27,20 @@ export default function ThankYouDigital() {
   const [guideToken, setGuideToken] = useState<string | null>(null);
 
   useEffect(() => {
-    trackPurchase({ value: 149, currency: "ILS", content_name: "מדריך לבחור נכון" });
+    const dedupKey = "purchase_fired_guide";
+    if (sessionStorage.getItem(dedupKey)) {
+      // Already fired in this session — skip to avoid double-counting
+      const token = sessionStorage.getItem("guide_token");
+      if (token) setGuideToken(token);
+      return;
+    }
+    sessionStorage.setItem(dedupKey, "1");
+    const urlParams = new URLSearchParams(window.location.search);
+    const txId = urlParams.get("transactionId") || urlParams.get("trxId") || `client-guide-${Date.now()}`;
+    const eventID = `grow-${txId}`;
+    trackPurchase({ value: 149, currency: "ILS", content_name: "מדריך לבחור נכון", eventID });
     track({ eventType: "purchase", page: "/thank-you/guide", metadata: { product: "guide", value: 149 } });
-    gaPurchase("guide");
+    gaPurchase("guide", txId);
     const token = sessionStorage.getItem("guide_token");
     if (token) {
       setGuideToken(token);

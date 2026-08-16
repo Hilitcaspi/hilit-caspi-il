@@ -456,6 +456,7 @@ export async function handleGrowWebhook(body: any): Promise<void> {
   // (Grow does not forward UTM params in the webhook, but we save them when the user initiates payment)
   // Always fetch from DB to get ga4ClientId; also fill UTM if not in webhook
   let storedGa4ClientId: string | undefined;
+  let storedGa4SessionId: string | undefined;
   if (email) {
     try {
       const db = await getDb();
@@ -466,6 +467,7 @@ export async function handleGrowWebhook(body: any): Promise<void> {
           utmCampaign: crmLeads.utmCampaign,
           utmContent: crmLeads.utmContent,
           ga4ClientId: crmLeads.ga4ClientId,
+          ga4SessionId: crmLeads.ga4SessionId,
         }).from(crmLeads).where(eq(crmLeads.email, email)).limit(1);
         if (crmRow?.utmSource && !utm.utmSource) {
           utm = {
@@ -479,6 +481,10 @@ export async function handleGrowWebhook(body: any): Promise<void> {
         if (crmRow?.ga4ClientId) {
           storedGa4ClientId = crmRow.ga4ClientId;
           console.log(`[GrowWebhook] ga4ClientId from DB: ${storedGa4ClientId}`);
+        }
+        if (crmRow?.ga4SessionId) {
+          storedGa4SessionId = crmRow.ga4SessionId;
+          console.log(`[GrowWebhook] ga4SessionId from DB: ${storedGa4SessionId}`);
         }
       }
     } catch (e) {
@@ -638,7 +644,7 @@ export async function handleGrowWebhook(body: any): Promise<void> {
     if (GA4_KEYS.includes(product as GA4Key)) {
       // Prefer the real browser client_id (from _ga cookie) for accurate DebugView stitching
       const ga4ClientId = storedGa4ClientId || clientIdFromEmail(email);
-      ga4Purchase(ga4ClientId, product as GA4Key, transactionId || undefined, utm).catch(() => {});
+      ga4Purchase(ga4ClientId, product as GA4Key, transactionId || undefined, utm, storedGa4SessionId).catch(() => {});
     }
 
     // Fire Meta Conversions API Purchase event (server-side, deduplicates with browser pixel)

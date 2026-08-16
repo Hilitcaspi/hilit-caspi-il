@@ -17,9 +17,15 @@ const WHATSAPP_SUPPORT_URL = "https://wa.me/972552442334?text=" + encodeURICompo
 
 export default function ThankYouBundle() {
   useEffect(() => {
-    trackPurchase({ value: 349, currency: "ILS", content_name: "חבילת טו באב - מאגר + מדריך" });
+    const dedupKey = "purchase_fired_bundle";
+    if (sessionStorage.getItem(dedupKey)) return;
+    sessionStorage.setItem(dedupKey, "1");
+    const urlParams = new URLSearchParams(window.location.search);
+    const txId = urlParams.get("transactionId") || urlParams.get("trxId") || `client-bundle-${Date.now()}`;
+    const eventID = `grow-${txId}`;
+    trackPurchase({ value: 349, currency: "ILS", content_name: "חבילת טו באב - מאגר + מדריך", eventID });
     track({ eventType: "purchase", page: "/thank-you/bundle", metadata: { product: "bundle_tubav", value: 349 } });
-    gaPurchase("bundle_tubav");
+    gaPurchase("bundle_tubav", txId);
   }, []);
 
   return (
