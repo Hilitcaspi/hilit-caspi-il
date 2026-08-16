@@ -128,6 +128,8 @@ export default function Dashboard() {
   const sendReport = trpc.dashboard.sendWeeklyReport.useMutation();
   const demographics = trpc.dashboard.databaseDemographics.useQuery(dateInput);
 
+  const dailyFunnel = trpc.dashboard.dailyLeadFunnel.useQuery(dateInput);
+
   const isLoading = comp.isLoading;
   const t = targets.data;
   const c = comp.data;
@@ -457,6 +459,91 @@ export default function Dashboard() {
         )}
 
         {/* ═══ EMAIL ENGAGEMENT ═══ */}
+        {/* ═══ DAILY LEAD FUNNEL ═══ */}
+        {dailyFunnel.data && dailyFunnel.data.days.length > 0 && (
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900">📊 משפך יומי: ליד → רכישה</h3>
+                {dailyFunnel.data.totals && (
+                  <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">
+                    המרה: {dailyFunnel.data.totals.avgConversionRate}% | ממוצע: {dailyFunnel.data.totals.avgDailyLeads} לידים/יום → {dailyFunnel.data.totals.avgDailyPurchases} רכישות/יום
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Totals summary */}
+              {dailyFunnel.data.totals && (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <div className="text-xl font-bold text-blue-600">{dailyFunnel.data.totals.totalCampaign}</div>
+                    <div className="text-[10px] text-gray-500">לידים מקמפיין</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3 text-center">
+                    <div className="text-xl font-bold text-green-600">{dailyFunnel.data.totals.totalPurchases}</div>
+                    <div className="text-[10px] text-gray-500">רכישות מאגר</div>
+                  </div>
+                  <div className="bg-amber-50 rounded-lg p-3 text-center">
+                    <div className="text-xl font-bold text-amber-600">{dailyFunnel.data.totals.avgConversionRate}%</div>
+                    <div className="text-[10px] text-gray-500">המרה</div>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-3 text-center">
+                    <div className="text-xl font-bold text-purple-600">{dailyFunnel.data.totals.totalSpend > 0 ? '₪' + Math.round(dailyFunnel.data.totals.totalSpend).toLocaleString() : '—'}</div>
+                    <div className="text-[10px] text-gray-500">הוצאות מטא</div>
+                  </div>
+                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                    <div className="text-xl font-bold text-emerald-600">₪{dailyFunnel.data.totals.totalRevenue.toLocaleString()}</div>
+                    <div className="text-[10px] text-gray-500">הכנסות</div>
+                  </div>
+                </div>
+              )}
+              {/* Daily table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-gray-500 text-[11px]">
+                      <th className="py-2 text-right font-medium">תאריך</th>
+                      <th className="py-2 text-center font-medium">לידים כולל</th>
+                      <th className="py-2 text-center font-medium">לידים קמפיין</th>
+                      <th className="py-2 text-center font-medium">רכישות כולל</th>
+                      <th className="py-2 text-center font-medium">רכישות מאגר</th>
+                      <th className="py-2 text-center font-medium">המרה</th>
+                      <th className="py-2 text-center font-medium">הכנסות</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyFunnel.data.days.map((day, i) => (
+                      <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-2 text-right font-medium text-gray-700">{new Date(day.date).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}</td>
+                        <td className="py-2 text-center text-gray-600">{day.totalLeads}</td>
+                        <td className="py-2 text-center font-semibold text-blue-600">{day.campaignLeads}</td>
+                        <td className="py-2 text-center text-gray-600">{day.totalPurchases}</td>
+                        <td className="py-2 text-center font-semibold text-green-600">{day.databasePurchases}</td>
+                        <td className="py-2 text-center">
+                          <span className={`font-bold ${day.conversionRate >= 15 ? 'text-green-600' : day.conversionRate >= 10 ? 'text-amber-600' : 'text-red-500'}`}>
+                            {day.conversionRate}%
+                          </span>
+                        </td>
+                        <td className="py-2 text-center text-emerald-600 font-medium">₪{day.revenue.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Insights */}
+              {dailyFunnel.data.insights.length > 0 && (
+                <div className="mt-4 bg-gradient-to-l from-blue-50 to-indigo-50 rounded-lg p-3">
+                  <div className="text-[11px] text-gray-700 space-y-1">
+                    {dailyFunnel.data.insights.map((insight, i) => (
+                      <p key={i}>💡 {insight}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
         {emailEngagement.data && emailEngagement.data.totals.sent > 0 && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">

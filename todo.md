@@ -529,3 +529,4 @@
 - [x] Fix GA4 attribution: ga4SessionId now fetched from DB and passed to ga4Purchase so purchases are attributed to campaigns (not direct)
 - [x] Add team note to single-session page: session may be with Hilit or one of her trained coaches
 - [x] Update all success stories across site pages with fresh 2025/2026 dates and new names (database + coaching stories)
+- [x] Add daily lead funnel table to dashboard (leads/day, campaign leads, purchases, revenue, conversion rate, best hours/days insights)

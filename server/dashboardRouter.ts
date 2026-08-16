@@ -1417,4 +1417,165 @@ export const dashboardRouter = router({
       };
     }),
 
+    dailyLeadFunnel: teamProcedure.input(z.object({
+      startDate: z.number(),
+      endDate: z.number(),
+    })).query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { days: [], totals: null, insights: [] };
+      const { startDate, endDate } = input;
+
+      // Daily leads with campaign breakdown
+      const [dailyLeads] = await db.execute(sql.raw(`
+        SELECT 
+          DATE(FROM_UNIXTIME(createdAt/1000)) as day,
+          COUNT(*) as total_leads,
+          SUM(CASE WHEN source = 'dna_quiz' AND (utmSource IS NULL OR utmSource IN ('meta','Meta','fb')) THEN 1 ELSE 0 END) as campaign_leads,
+          SUM(CASE WHEN utmCampaign LIKE '%cold%' OR utmCampaign LIKE '%lead_cold%' THEN 1 ELSE 0 END) as cold_campaign,
+          SUM(CASE WHEN utmCampaign LIKE '%hot%' OR utmCampaign LIKE '%warm%' OR utmCampaign LIKE '%shabek%' OR utmCampaign LIKE '%database%' THEN 1 ELSE 0 END) as warm_campaign,
+          HOUR(FROM_UNIXTIME(createdAt/1000)) as hour_of_day
+        FROM crm_leads 
+        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}
+        GROUP BY day
+        ORDER BY day DESC
+      `)) as any;
+
+      // Daily purchases
+      const [dailyPurchases] = await db.execute(sql.raw(`
+        SELECT 
+          DATE(FROM_UNIXTIME(created_at/1000)) as day,
+          COUNT(*) as total_purchases,
+          SUM(CASE WHEN product = 'database' THEN 1 ELSE 0 END) as database_purchases
+        FROM payment_leads 
+        WHERE created_at >= ${startDate} AND created_at <= ${endDate}
+        GROUP BY day
+        ORDER BY day DESC
+      `)) as any;
+
+      // Hourly distribution for insights
+      const [hourlyLeads] = await db.execute(sql.raw(`
+        SELECT 
+          HOUR(FROM_UNIXTIME(createdAt/1000)) as hour_of_day,
+          COUNT(*) as leads
+        FROM crm_leads 
+        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate} AND source = 'dna_quiz'
+        GROUP BY hour_of_day
+        ORDER BY leads DESC
+      `)) as any;
+
+      // Day of week distribution
+      const [dowLeads] = await db.execute(sql.raw(`
+        SELECT 
+          DAYOFWEEK(FROM_UNIXTIME(createdAt/1000)) as dow,
+          COUNT(*) as leads
+        FROM crm_leads 
+        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate} AND source = 'dna_quiz'
+        GROUP BY dow
+        ORDER BY leads DESC
+      `)) as any;
+
+      // Hourly purchases for conversion insights
+      const [hourlyPurchases] = await db.execute(sql.raw(`
+        SELECT 
+          HOUR(FROM_UNIXTIME(created_at/1000)) as hour_of_day,
+          COUNT(*) as purchases
+        FROM payment_leads 
+        WHERE created_at >= ${startDate} AND created_at <= ${endDate} AND product = 'database'
+        GROUP BY hour_of_day
+        ORDER BY purchases DESC
+      `)) as any;
+
+      // Build purchase map
+      const purchaseMap: Record<string, { total: number; database: number }> = {};
+      (dailyPurchases as any[]).forEach((p: any) => {
+        const dayKey = String(p.day).substring(0, 10);
+        purchaseMap[dayKey] = { total: Number(p.total_purchases), database: Number(p.database_purchases) };
+      });
+
+      // Build days array
+      const days = (dailyLeads as any[]).map((l: any) => {
+        const dayKey = String(l.day).substring(0, 10);
+        const purch = purchaseMap[dayKey] || { total: 0, database: 0 };
+        return {
+          date: dayKey,
+          totalLeads: Number(l.total_leads),
+          campaignLeads: Number(l.campaign_leads),
+          coldCampaign: Number(l.cold_campaign),
+          warmCampaign: Number(l.warm_campaign),
+          totalPurchases: purch.total,
+          databasePurchases: purch.database,
+          revenue: purch.database * 299 + (purch.total - purch.database) * 200, // approximate
+          conversionRate: Number(l.campaign_leads) > 0 ? Number(((purch.database / Number(l.campaign_leads)) * 100).toFixed(1)) : 0,
+        };
+      });
+
+      // Totals
+      const totalLeads = days.reduce((s, d) => s + d.totalLeads, 0);
+      const totalCampaign = days.reduce((s, d) => s + d.campaignLeads, 0);
+      const totalPurch = days.reduce((s, d) => s + d.databasePurchases, 0);
+      const totalRevenue = days.reduce((s, d) => s + d.revenue, 0);
+
+      // Insights
+      const insights: string[] = [];
+      
+      // Best hours
+      const topHours = (hourlyPurchases as any[]).slice(0, 3);
+      if (topHours.length > 0) {
+        insights.push(`שעות שיא לרכישות: ${topHours.map((h: any) => h.hour_of_day + ':00').join(', ')}`);
+      }
+      
+      // Best days of week
+      const dayNames = ['', 'ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+      const topDays = (dowLeads as any[]).slice(0, 3);
+      if (topDays.length > 0) {
+        insights.push(`ימים חזקים ללידים: ${topDays.map((d: any) => dayNames[d.dow] || d.dow).join(', ')}`);
+      }
+
+      // Conversion insight
+      const avgConv = totalCampaign > 0 ? ((totalPurch / totalCampaign) * 100).toFixed(1) : '0';
+      insights.push(`המרה ממוצעת: ${avgConv}% (${totalPurch} רכישות מ-${totalCampaign} לידים)`);
+      insights.push(`ממוצע יומי: ${Math.round(totalCampaign / Math.max(days.length, 1))} לידים, ${Math.round(totalPurch / Math.max(days.length, 1))} רכישות`);
+
+      // Best conversion day
+      const bestDay = [...days].sort((a, b) => b.conversionRate - a.conversionRate)[0];
+      if (bestDay && bestDay.conversionRate > 0) {
+        insights.push(`יום עם ההמרה הגבוהה ביותר: ${new Date(bestDay.date).toLocaleDateString('he-IL')} (${bestDay.conversionRate}%)`);
+      }
+
+      // Try to get Meta spend for the period
+      let totalSpend = 0;
+      try {
+        const metaToken = process.env.META_ADS_TOKEN;
+        if (metaToken) {
+          const startDateStr = new Date(startDate).toISOString().split('T')[0];
+          const endDateStr = new Date(endDate).toISOString().split('T')[0];
+          const res = await fetch(
+            `https://graph.facebook.com/v21.0/act_1169aborede/insights?fields=spend&time_range={"since":"${startDateStr}","until":"${endDateStr}"}&level=account&access_token=${metaToken}`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data.data?.[0]?.spend) {
+              totalSpend = parseFloat(data.data[0].spend);
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+
+      return {
+        days,
+        totals: {
+          totalLeads,
+          totalCampaign,
+          totalPurchases: totalPurch,
+          totalRevenue,
+          totalSpend,
+          roas: totalSpend > 0 ? Number((totalRevenue / totalSpend).toFixed(1)) : 0,
+          avgConversionRate: Number(avgConv),
+          avgDailyLeads: Math.round(totalCampaign / Math.max(days.length, 1)),
+          avgDailyPurchases: Math.round(totalPurch / Math.max(days.length, 1)),
+        },
+        insights,
+      };
+    }),
+
 });
