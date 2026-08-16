@@ -522,3 +522,4 @@
 - [x] Separate Instagram organic (bio, story, reel, post) as "Instagram (אורגני)"
 - [x] Update weekly report to use same channel classification logic
 - [x] Update Dashboard.tsx frontend insights to match new channel names
+- [x] Fix demographics section not showing: registeredAt→createdAt column name, fix db.execute destructuring pattern

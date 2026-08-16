@@ -1247,36 +1247,36 @@ export const dashboardRouter = router({
       const prevEnd = start;
 
       // Total database stats
-      const totalStats = await db.execute<any[]>(sql`
+      const [totalStats] = await db.execute(sql`
         SELECT 
           COUNT(*) as total,
           SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
           SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females,
           AVG(CASE WHEN age > 0 THEN age ELSE NULL END) as avgAge
         FROM singles WHERE isActive = 1
-      `);
+      `) as any;
 
       // Period registrations
-      const periodStats = await db.execute<any[]>(sql`
+      const [periodStats] = await db.execute(sql`
         SELECT 
           COUNT(*) as total,
           SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
           SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females,
           AVG(CASE WHEN age > 0 THEN age ELSE NULL END) as avgAge
-        FROM singles WHERE isActive = 1 AND registeredAt >= ${start} AND registeredAt <= ${end}
-      `);
+        FROM singles WHERE isActive = 1 AND createdAt >= ${start} AND createdAt <= ${end}
+      `) as any;
 
       // Previous period registrations
-      const prevPeriodStats = await db.execute<any[]>(sql`
+      const [prevPeriodStats] = await db.execute(sql`
         SELECT 
           COUNT(*) as total,
           SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
           SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females
-        FROM singles WHERE isActive = 1 AND registeredAt >= ${prevStart} AND registeredAt <= ${prevEnd}
-      `);
+        FROM singles WHERE isActive = 1 AND createdAt >= ${prevStart} AND createdAt <= ${prevEnd}
+      `) as any;
 
       // Age distribution (current period)
-      const ageGroups = await db.execute<any[]>(sql`
+      const [ageGroups] = await db.execute(sql`
         SELECT 
           CASE 
             WHEN age BETWEEN 18 AND 25 THEN '18-25'
@@ -1290,22 +1290,22 @@ export const dashboardRouter = router({
           COUNT(*) as count,
           SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
           SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females
-        FROM singles WHERE isActive = 1 AND registeredAt >= ${start} AND registeredAt <= ${end}
+        FROM singles WHERE isActive = 1 AND createdAt >= ${start} AND createdAt <= ${end}
         GROUP BY ageGroup ORDER BY MIN(age)
-      `);
+      `) as any;
 
       // Geographic distribution (current period)
-      const areas = await db.execute<any[]>(sql`
+      const [areas] = await db.execute(sql`
         SELECT city, COUNT(*) as count,
           SUM(CASE WHEN gender = 'male' THEN 1 ELSE 0 END) as males,
           SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females
         FROM singles 
-        WHERE isActive = 1 AND city IS NOT NULL AND city != '' AND registeredAt >= ${start} AND registeredAt <= ${end}
+        WHERE isActive = 1 AND city IS NOT NULL AND city != '' AND createdAt >= ${start} AND createdAt <= ${end}
         GROUP BY city ORDER BY count DESC LIMIT 15
-      `);
+      `) as any;
 
       // Total age distribution (all time)
-      const totalAgeGroups = await db.execute<any[]>(sql`
+      const [totalAgeGroups] = await db.execute(sql`
         SELECT 
           CASE 
             WHEN age BETWEEN 18 AND 25 THEN '18-25'
@@ -1321,11 +1321,11 @@ export const dashboardRouter = router({
           SUM(CASE WHEN gender = 'female' THEN 1 ELSE 0 END) as females
         FROM singles WHERE isActive = 1
         GROUP BY ageGroup ORDER BY MIN(age)
-      `);
+      `) as any;
 
-      const t = (totalStats as any[])[0];
-      const p = (periodStats as any[])[0];
-      const pp = (prevPeriodStats as any[])[0];
+      const t = (totalStats as any)[0];
+      const p = (periodStats as any)[0];
+      const pp = (prevPeriodStats as any)[0];
 
       // Generate marketing insights
       const totalMales = Number(t?.males || 0);
