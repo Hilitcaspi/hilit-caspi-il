@@ -8,7 +8,7 @@ import { Link } from "wouter";
 
 const BUSINESS_ADDRESS = "ארלוזרוב 82, תל אביב";
 const BUSINESS_EMAIL = "hilitcaspi@gmail.com";
-const BUSINESS_PHONE = "054-453-0975";
+const BUSINESS_PHONE = "055-244-2334";
 
 export default function TermsSingleSession() {
   return (

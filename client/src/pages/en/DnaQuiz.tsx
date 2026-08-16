@@ -148,7 +148,7 @@ const DNA_INFO: Record<DnaType, {
 };
 
 // ── WhatsApp link ────────────────────────────────────────────────────────────
-const WA_LINK = "https://wa.me/972544530975?text=Hi%20Hilit%2C%20I%20just%20completed%20the%20DNA%20quiz%20and%20would%20love%20to%20learn%20more%20about%20the%20matchmaking%20database.";
+const WA_LINK = "https://wa.me/972552442334?text=Hi%20Hilit%2C%20I%20just%20completed%20the%20DNA%20quiz%20and%20would%20love%20to%20learn%20more%20about%20the%20matchmaking%20database.";
 
 // ── Main component ───────────────────────────────────────────────────────────
 export default function EnDnaQuiz() {

@@ -8,8 +8,8 @@ import { Link } from "wouter";
 
 const BUSINESS_ADDRESS = "ארלוזרוב 82, תל אביב";
 const BUSINESS_EMAIL = "hilitcaspi@gmail.com";
-const BUSINESS_PHONE = "054-453-0975";
-const WHATSAPP = "https://wa.me/972544530975";
+const BUSINESS_PHONE = "055-244-2334";
+const WHATSAPP = "https://wa.me/972552442334";
 
 export default function TermsDatabase() {
   return (

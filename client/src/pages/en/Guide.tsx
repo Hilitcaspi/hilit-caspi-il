@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 
-const WA_LINK = "https://wa.me/972544530975?text=Hi%20Hilit%2C%20I%27m%20interested%20in%20your%20services.";
+const WA_LINK = "https://wa.me/972552442334?text=Hi%20Hilit%2C%20I%27m%20interested%20in%20your%20services.";
 
 // Countdown timer component
 function CountdownTimer() {

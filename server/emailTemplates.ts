@@ -2232,7 +2232,7 @@ const EN_GUIDE_DOWNLOAD_URL = "https://matchbyhilit.com/api/guide/download";
 const EN_COURSE_URL = "https://matchbyhilit.com/course";
 const EN_DATABASE_URL = "https://matchbyhilit.com/database";
 const EN_DNA_URL = "https://matchbyhilit.com/dna-quiz";
-const EN_WA_DIRECT = "https://wa.me/972544530975?text=Hi%20Hilit%2C%20I%20downloaded%20your%20guide";
+const EN_WA_DIRECT = "https://wa.me/972552442334?text=Hi%20Hilit%2C%20I%20downloaded%20your%20guide";
 
 function enBaseTemplate(body: string, recipientEmail?: string, leadId?: number): string {
   const unsubUrl = recipientEmail

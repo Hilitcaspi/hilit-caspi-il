@@ -505,3 +505,11 @@
 - [x] Change homepage hero button from "המדריך החינמי שלי" to "שאלון חינמי" (higher conversion)
 - [x] Add "מנוי פלוס" note in personal area about upcoming premium features
 - [x] Unblock Meital bar Zohar (meitalbz120@gmail.com) in Brevo
+
+## Personal Phone Number Removal (Aug 16)
+- [x] Replace personal phone (054-453-0975 / 972544530975) with business number (055-244-2334 / 972552442334) in all 5 Terms pages (Database, Coaching, Course, Guide, SingleSession)
+- [x] Replace personal phone in all English site pages (About, Coaching, DatabaseSales, DnaQuiz, Guide, Home, Register, Session)
+- [x] Replace personal phone in English email template (EN_WA_DIRECT in emailTemplates.ts)
+- [x] Replace personal phone in English questionnaire email (routers.ts line 2001)
+- [x] Fix 13 processing emails in production DB that still had the old WhatsApp link
+- [x] Verified: joni.ts and paymentFailureAlert.ts keep personal number (internal notifications to Hilit only, not customer-facing)

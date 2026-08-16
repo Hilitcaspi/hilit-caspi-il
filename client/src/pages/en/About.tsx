@@ -11,7 +11,7 @@ import { Link } from "wouter";
 const ABOUT_IMG   = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-about_1da3754a.jpg";
 const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
 const PODCAST_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-podcast_32b046c8.png";
-const WA_LINK = "https://wa.me/972544530975?text=Hi%20Hilit%2C%20I%27m%20interested%20in%20your%20services.";
+const WA_LINK = "https://wa.me/972552442334?text=Hi%20Hilit%2C%20I%27m%20interested%20in%20your%20services.";
 const IG_LINK = "https://www.instagram.com/match.by.hilit/";
 
 const fadeUp = {
