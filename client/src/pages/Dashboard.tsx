@@ -750,7 +750,7 @@ function ChannelBreakdownCard({ channels, metaSpend }: { channels: any[]; metaSp
     const leadChange = ch.prevLeads > 0 ? Math.round((ch.leads - ch.prevLeads) / ch.prevLeads * 100) : 0;
     const purchaseChange = ch.prevPurchases > 0 ? Math.round((ch.purchases - ch.prevPurchases) / ch.prevPurchases * 100) : 0;
     
-    if (ch.channel === "Meta Ads") {
+    if (ch.channel.includes("Meta Ads")) {
       if (ch.purchases > ch.prevPurchases * 1.5) return `ביצועים מצוינים! עלייה של ${purchaseChange}% ברכישות. המרה ${convRate}% (חודש שעבר: ${prevConvRate}%). כדאי להגדיל תקציב.`;
       if (ch.leads > ch.prevLeads && ch.purchases <= ch.prevPurchases) return `יותר לידים אבל פחות רכישות — בדקי את איכות הלידים ואת המסעות. המרה ירדה מ-${prevConvRate}% ל-${convRate}%.`;
       return `המרה: ${convRate}%. ${ch.purchases} רכישות מ-${ch.leads} לידים.`;
@@ -766,8 +766,8 @@ function ChannelBreakdownCard({ channels, metaSpend }: { channels: any[]; metaSp
     if (ch.channel.includes("Google")) {
       return `תנועה אורגנית: ${ch.leads} לידים. ${ch.purchases > 0 ? `${ch.purchases} רכישות — SEO עובד!` : 'אין רכישות ישירות — כדאי לשפר landing pages.'}`;
     }
-    if (ch.channel.includes("dna")) {
-      return `שאלון DNA: ${ch.leads} מילאו, ${ch.purchases} רכשו מאגר (המרה ${convRate}%). ${Number(convRate) < 1 ? 'כדאי לשפר את המסע אחרי ה-DNA.' : 'המרה סבירה.'}`;
+    if (ch.channel.includes("אורגני")) {
+      return `תנועה אורגנית מאינסטגרם (ביו, סטורי, פוסטים): ${ch.leads} לידים → ${ch.purchases} רכישות (${convRate}%).`;
     }
     return `${ch.leads} לידים → ${ch.purchases} רכישות. המרה: ${convRate}%.`;
   };

@@ -16,14 +16,25 @@ const PRODUCT_PRICES: Record<string, number> = {
   bundle_tubav: 349,
 };
 
-const CHANNEL_MAP: Record<string, string> = {
-  meta: "Meta Ads",
-  Meta: "Meta Ads",
-  facebook: "Meta Ads",
-  fb: "Meta Ads",
-  facebook_shabek: "Meta Ads",
-  ig: "Instagram",
-  instagram: "Instagram",
+/**
+ * Channel classification logic:
+ * - "Meta Ads (ממומן)" = any paid campaign (meta, fb, ig with medium=paid, or campaign IDs as source)
+ * - "Instagram (אורגני)" = instagram with bio/story/reel/organic medium (not paid)
+ * - "dna_quiz" leads with NO utm = came from the lead campaign funnel (Meta Ads)
+ * - Other channels remain as-is
+ */
+
+// Sources that are ALWAYS Meta Ads regardless of medium
+const META_PAID_SOURCES = new Set(["meta", "Meta", "facebook", "fb", "facebook_shabek"]);
+
+// Sources that could be organic or paid depending on medium
+const INSTAGRAM_SOURCES = new Set(["ig", "instagram"]);
+
+// Organic Instagram mediums (not paid)
+const IG_ORGANIC_MEDIUMS = new Set(["bio", "story", "reel", "organic", "post", "link"]);
+
+// Other channel mappings
+const OTHER_CHANNEL_MAP: Record<string, string> = {
   google: "Google / SEO",
   brevo: "Email (Newsletter)",
   email: "Email (Journeys)",
@@ -31,11 +42,36 @@ const CHANNEL_MAP: Record<string, string> = {
   referral: "הפניה",
   shahar: "הפניה",
   customer_service: "שירות לקוחות",
+  guide_form: "מדריך חינמי",
+  meta_lead_guide: "Meta Ads (ממומן)",
+  meta_lead_call: "Meta Ads (ממומן)",
+  meta_lead_dna: "Meta Ads (ממומן)",
 };
 
-function mapChannel(utmSource: string | null): string {
+function mapChannel(utmSource: string | null, utmMedium?: string | null): string {
   if (!utmSource) return "ישיר / לא ידוע";
-  return CHANNEL_MAP[utmSource] || utmSource;
+  
+  // Meta paid sources — always Meta Ads
+  if (META_PAID_SOURCES.has(utmSource)) return "Meta Ads (ממומן)";
+  
+  // Instagram sources — check if paid or organic
+  if (INSTAGRAM_SOURCES.has(utmSource)) {
+    if (utmMedium === "paid") return "Meta Ads (ממומן)";
+    // If medium contains campaign-like patterns (ad set names, etc.), it's paid
+    if (utmMedium && (utmMedium.includes("shabek") || utmMedium.includes("קר") || utmMedium.includes("חם"))) return "Meta Ads (ממומן)";
+    return "Instagram (אורגני)";
+  }
+  
+  // dna_quiz with no UTM — these are leads from the Meta lead campaign funnel
+  if (utmSource === "dna_quiz") return "Meta Ads (ממומן)";
+  
+  // Numeric source IDs (like 120248699100040673) are Meta campaign/ad set IDs
+  if (/^\d{10,}$/.test(utmSource)) return "Meta Ads (ממומן)";
+  
+  // Other known channels
+  if (OTHER_CHANNEL_MAP[utmSource]) return OTHER_CHANNEL_MAP[utmSource];
+  
+  return utmSource;
 }
 
 function guardAdmin(ctx: any) {
@@ -613,11 +649,12 @@ export const dashboardRouter = router({
       const [leadRows] = await db.execute(sql`
         SELECT 
           COALESCE(utmSource, source, 'direct') as channel,
+          utmMedium as medium,
           utmCampaign as campaign,
           COUNT(*) as leads
         FROM crm_leads
         WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}
-        GROUP BY channel, campaign
+        GROUP BY channel, medium, campaign
         ORDER BY leads DESC
       `) as any;
 
@@ -625,13 +662,14 @@ export const dashboardRouter = router({
       const [purchaseRows] = await db.execute(sql`
         SELECT 
           COALESCE(cl.utmSource, cl.source, 'direct') as channel,
+          cl.utmMedium as medium,
           cl.utmCampaign as campaign,
           pl.product,
           COUNT(*) as purchases
         FROM payment_leads pl
         JOIN crm_leads cl ON cl.email = pl.email
         WHERE pl.created_at >= ${startDate} AND pl.created_at <= ${endDate}
-        GROUP BY channel, campaign, pl.product
+        GROUP BY channel, medium, campaign, pl.product
         ORDER BY purchases DESC
       `) as any;
 
@@ -639,33 +677,35 @@ export const dashboardRouter = router({
       const [prevLeadRows] = await db.execute(sql`
         SELECT 
           COALESCE(utmSource, source, 'direct') as channel,
+          utmMedium as medium,
           COUNT(*) as leads
         FROM crm_leads
         WHERE createdAt >= ${sameLastMonthStart} AND createdAt <= ${sameLastMonthEnd}
-        GROUP BY channel
+        GROUP BY channel, medium
       `) as any;
 
       // Previous period purchases by channel
       const [prevPurchaseRows] = await db.execute(sql`
         SELECT 
           COALESCE(cl.utmSource, cl.source, 'direct') as channel,
+          cl.utmMedium as medium,
           pl.product,
           COUNT(*) as purchases
         FROM payment_leads pl
         JOIN crm_leads cl ON cl.email = pl.email
         WHERE pl.created_at >= ${sameLastMonthStart} AND pl.created_at <= ${sameLastMonthEnd}
-        GROUP BY channel, pl.product
+        GROUP BY channel, medium, pl.product
       `) as any;
 
       // Build previous period channel totals
       const prevChannelData: Record<string, { leads: number; purchases: number; revenue: number }> = {};
       for (const row of (prevLeadRows as any[])) {
-        const ch = mapChannel(row.channel);
+        const ch = mapChannel(row.channel, row.medium);
         if (!prevChannelData[ch]) prevChannelData[ch] = { leads: 0, purchases: 0, revenue: 0 };
         prevChannelData[ch].leads += Number(row.leads);
       }
       for (const row of (prevPurchaseRows as any[])) {
-        const ch = mapChannel(row.channel);
+        const ch = mapChannel(row.channel, row.medium);
         if (!prevChannelData[ch]) prevChannelData[ch] = { leads: 0, purchases: 0, revenue: 0 };
         const cnt = Number(row.purchases);
         prevChannelData[ch].purchases += cnt;
@@ -676,7 +716,7 @@ export const dashboardRouter = router({
       const channelData: Record<string, { leads: number; purchases: number; revenue: number; campaigns: Record<string, { leads: number; purchases: number; revenue: number }> }> = {};
 
       for (const row of (leadRows as any[])) {
-        const ch = mapChannel(row.channel);
+        const ch = mapChannel(row.channel, row.medium);
         if (!channelData[ch]) channelData[ch] = { leads: 0, purchases: 0, revenue: 0, campaigns: {} };
         channelData[ch].leads += Number(row.leads);
         const camp = row.campaign || "(ללא קמפיין)";
@@ -685,7 +725,7 @@ export const dashboardRouter = router({
       }
 
       for (const row of (purchaseRows as any[])) {
-        const ch = mapChannel(row.channel);
+        const ch = mapChannel(row.channel, row.medium);
         if (!channelData[ch]) channelData[ch] = { leads: 0, purchases: 0, revenue: 0, campaigns: {} };
         const cnt = Number(row.purchases);
         const rev = cnt * (PRODUCT_PRICES[row.product] ?? 0);
@@ -716,8 +756,8 @@ export const dashboardRouter = router({
         .map(([channel, data]) => ({
           channel,
           ...data,
-          spend: channel === "Meta Ads" ? Math.round(metaSpend) : 0,
-          prevSpend: channel === "Meta Ads" ? Math.round(prevMetaSpend) : 0,
+          spend: channel === "Meta Ads (ממומן)" ? Math.round(metaSpend) : 0,
+          prevSpend: channel === "Meta Ads (ממומן)" ? Math.round(prevMetaSpend) : 0,
           prevLeads: prevChannelData[channel]?.leads ?? 0,
           prevPurchases: prevChannelData[channel]?.purchases ?? 0,
           prevRevenue: prevChannelData[channel]?.revenue ?? 0,

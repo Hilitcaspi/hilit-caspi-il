@@ -88,34 +88,46 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
     const meta = await fetchMetaSpend(since, until);
     
     // Channel breakdown (leads + purchases by source)
-    const CHANNEL_MAP: Record<string, string> = {
-      meta: "Meta Ads", Meta: "Meta Ads", facebook: "Meta Ads", fb: "Meta Ads", facebook_shabek: "Meta Ads",
-      ig: "Instagram", instagram: "Instagram", google: "Google / SEO",
-      brevo: "Email (Newsletter)", email: "Email (Journeys)", whatsapp: "WhatsApp",
-      referral: "הפניה", shahar: "הפניה", customer_service: "שירות לקוחות",
+    // Use same logic as dashboard: paid sources → Meta Ads, IG organic separate, dna_quiz → Meta Ads
+    const META_PAID = new Set(["meta", "Meta", "facebook", "fb", "facebook_shabek", "meta_lead_guide", "meta_lead_call", "meta_lead_dna"]);
+    const IG_SOURCES = new Set(["ig", "instagram"]);
+    const OTHER_MAP: Record<string, string> = {
+      google: "Google / SEO", brevo: "Email (Newsletter)", email: "Email (Journeys)",
+      whatsapp: "WhatsApp", referral: "הפניה", shahar: "הפניה",
+      customer_service: "שירות לקוחות", guide_form: "מדריך חינמי",
     };
-    const mapCh = (s: string | null) => s ? (CHANNEL_MAP[s] || s) : "ישיר / לא ידוע";
+    const mapCh = (s: string | null, medium?: string | null) => {
+      if (!s) return "ישיר / לא ידוע";
+      if (META_PAID.has(s)) return "Meta Ads (ממומן)";
+      if (IG_SOURCES.has(s)) {
+        if (medium === "paid" || (medium && (medium.includes("shabek") || medium.includes("קר") || medium.includes("חם")))) return "Meta Ads (ממומן)";
+        return "Instagram (אורגני)";
+      }
+      if (s === "dna_quiz") return "Meta Ads (ממומן)";
+      if (/^\d{10,}$/.test(s)) return "Meta Ads (ממומן)";
+      return OTHER_MAP[s] || s;
+    };
     
     const [chLeadRows] = await db.execute(sql`
-      SELECT COALESCE(utmSource, source, 'direct') as channel, COUNT(*) as cnt
+      SELECT COALESCE(utmSource, source, 'direct') as channel, utmMedium as medium, COUNT(*) as cnt
       FROM crm_leads WHERE createdAt >= ${weekAgo} AND createdAt <= ${now}
-      GROUP BY channel ORDER BY cnt DESC
+      GROUP BY channel, medium ORDER BY cnt DESC
     `) as any;
     const [chPurchRows] = await db.execute(sql`
-      SELECT COALESCE(cl.utmSource, cl.source, 'direct') as channel, pl.product, COUNT(*) as cnt
+      SELECT COALESCE(cl.utmSource, cl.source, 'direct') as channel, cl.utmMedium as medium, pl.product, COUNT(*) as cnt
       FROM payment_leads pl JOIN crm_leads cl ON cl.email = pl.email
       WHERE pl.created_at >= ${weekAgo} AND pl.created_at <= ${now}
-      GROUP BY channel, pl.product
+      GROUP BY channel, medium, pl.product
     `) as any;
     
     const chData: Record<string, { leads: number; purchases: number; revenue: number }> = {};
     for (const r of (chLeadRows as any[])) {
-      const ch = mapCh(r.channel);
+      const ch = mapCh(r.channel, r.medium);
       if (!chData[ch]) chData[ch] = { leads: 0, purchases: 0, revenue: 0 };
       chData[ch].leads += Number(r.cnt);
     }
     for (const r of (chPurchRows as any[])) {
-      const ch = mapCh(r.channel);
+      const ch = mapCh(r.channel, r.medium);
       if (!chData[ch]) chData[ch] = { leads: 0, purchases: 0, revenue: 0 };
       const cnt = Number(r.cnt);
       chData[ch].purchases += cnt;

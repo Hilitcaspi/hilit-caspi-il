@@ -513,3 +513,12 @@
 - [x] Replace personal phone in English questionnaire email (routers.ts line 2001)
 - [x] Fix 13 processing emails in production DB that still had the old WhatsApp link
 - [x] Verified: joni.ts and paymentFailureAlert.ts keep personal number (internal notifications to Hilit only, not customer-facing)
+
+## Dashboard Channel Breakdown Fix (Aug 16)
+- [x] Merge dna_quiz leads (from campaign funnel) into "Meta Ads (ממומן)" channel
+- [x] Merge Instagram paid (utm_medium=paid or shabek/campaign patterns) into "Meta Ads (ממומן)"
+- [x] Merge numeric campaign IDs (Meta ad set IDs) into "Meta Ads (ממומן)"
+- [x] Merge meta_lead_guide, meta_lead_call, meta_lead_dna into "Meta Ads (ממומן)"
+- [x] Separate Instagram organic (bio, story, reel, post) as "Instagram (אורגני)"
+- [x] Update weekly report to use same channel classification logic
+- [x] Update Dashboard.tsx frontend insights to match new channel names
