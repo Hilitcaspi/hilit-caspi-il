@@ -530,7 +530,7 @@
 - [x] Add team note to single-session page: session may be with Hilit or one of her trained coaches
 - [x] Update all success stories across site pages with fresh 2025/2026 dates and new names (database + coaching stories)
 - [x] Add daily lead funnel table to dashboard (leads/day, campaign leads, purchases, revenue, conversion rate, best hours/days insights)
-- [ ] Add questionnaire completion badge to match cards in CRM
+- [x] Add questionnaire completion badge to match cards in CRM
 - [x] Add questionnaire completion badge to match cards in CRM
 - [x] Add daily Meta spend column to funnel table
 - [x] Add daily WhatsApp report (leads/purchases/conversion) to 0544530975
