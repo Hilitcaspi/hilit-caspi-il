@@ -1426,86 +1426,90 @@ export const dashboardRouter = router({
       const { startDate, endDate } = input;
 
       // Daily leads with campaign breakdown
-      const [dailyLeads] = await db.execute(sql.raw(`
-        SELECT 
-          DATE(FROM_UNIXTIME(createdAt/1000)) as day,
-          COUNT(*) as total_leads,
-          SUM(CASE WHEN source = 'dna_quiz' AND (utmSource IS NULL OR utmSource IN ('meta','Meta','fb')) THEN 1 ELSE 0 END) as campaign_leads,
-          SUM(CASE WHEN utmCampaign LIKE '%cold%' OR utmCampaign LIKE '%lead_cold%' THEN 1 ELSE 0 END) as cold_campaign,
-          SUM(CASE WHEN utmCampaign LIKE '%hot%' OR utmCampaign LIKE '%warm%' OR utmCampaign LIKE '%shabek%' OR utmCampaign LIKE '%database%' THEN 1 ELSE 0 END) as warm_campaign,
-          HOUR(FROM_UNIXTIME(createdAt/1000)) as hour_of_day
+      // Simple daily total leads
+      const [dailyLeadsTotal] = await db.execute(sql`
+        SELECT DATE(FROM_UNIXTIME(createdAt/1000)) as day, COUNT(*) as total_leads
         FROM crm_leads 
         WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}
-        GROUP BY day
-        ORDER BY day DESC
-      `)) as any;
+        GROUP BY day ORDER BY day DESC
+      `) as any;
+
+      // Campaign leads (dna_quiz source = campaign leads)
+      const [dailyCampaignLeads] = await db.execute(sql`
+        SELECT DATE(FROM_UNIXTIME(createdAt/1000)) as day, COUNT(*) as campaign_leads
+        FROM crm_leads 
+        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}
+          AND source = 'dna_quiz'
+        GROUP BY day ORDER BY day DESC
+      `) as any;
 
       // Daily purchases
-      const [dailyPurchases] = await db.execute(sql.raw(`
-        SELECT 
-          DATE(FROM_UNIXTIME(created_at/1000)) as day,
-          COUNT(*) as total_purchases,
-          SUM(CASE WHEN product = 'database' THEN 1 ELSE 0 END) as database_purchases
+      const [dailyPurchases] = await db.execute(sql`
+        SELECT DATE(FROM_UNIXTIME(created_at/1000)) as day, COUNT(*) as total_purchases
         FROM payment_leads 
         WHERE created_at >= ${startDate} AND created_at <= ${endDate}
-        GROUP BY day
-        ORDER BY day DESC
-      `)) as any;
+        GROUP BY day ORDER BY day DESC
+      `) as any;
 
-      // Hourly distribution for insights
-      const [hourlyLeads] = await db.execute(sql.raw(`
-        SELECT 
-          HOUR(FROM_UNIXTIME(createdAt/1000)) as hour_of_day,
-          COUNT(*) as leads
-        FROM crm_leads 
-        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate} AND source = 'dna_quiz'
-        GROUP BY hour_of_day
-        ORDER BY leads DESC
-      `)) as any;
-
-      // Day of week distribution
-      const [dowLeads] = await db.execute(sql.raw(`
-        SELECT 
-          DAYOFWEEK(FROM_UNIXTIME(createdAt/1000)) as dow,
-          COUNT(*) as leads
-        FROM crm_leads 
-        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate} AND source = 'dna_quiz'
-        GROUP BY dow
-        ORDER BY leads DESC
-      `)) as any;
-
-      // Hourly purchases for conversion insights
-      const [hourlyPurchases] = await db.execute(sql.raw(`
-        SELECT 
-          HOUR(FROM_UNIXTIME(created_at/1000)) as hour_of_day,
-          COUNT(*) as purchases
+      // Database purchases only
+      const [dailyDbPurchases] = await db.execute(sql`
+        SELECT DATE(FROM_UNIXTIME(created_at/1000)) as day, COUNT(*) as db_purchases
         FROM payment_leads 
         WHERE created_at >= ${startDate} AND created_at <= ${endDate} AND product = 'database'
-        GROUP BY hour_of_day
-        ORDER BY purchases DESC
-      `)) as any;
+        GROUP BY day ORDER BY day DESC
+      `) as any;
+
+      // Hourly distribution for insights
+      const [hourlyLeads] = await db.execute(sql`
+        SELECT HOUR(FROM_UNIXTIME(createdAt/1000)) as hour_of_day, COUNT(*) as leads
+        FROM crm_leads 
+        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}
+          AND source = 'dna_quiz'
+        GROUP BY hour_of_day ORDER BY leads DESC
+      `) as any;
+
+      // Day of week distribution
+      const [dowLeads] = await db.execute(sql`
+        SELECT DAYOFWEEK(FROM_UNIXTIME(createdAt/1000)) as dow, COUNT(*) as leads
+        FROM crm_leads 
+        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}
+          AND source = 'dna_quiz'
+        GROUP BY dow ORDER BY leads DESC
+      `) as any;
+
+      // Hourly purchases for conversion insights
+      const [hourlyPurchases] = await db.execute(sql`
+        SELECT HOUR(FROM_UNIXTIME(created_at/1000)) as hour_of_day, COUNT(*) as purchases
+        FROM payment_leads 
+        WHERE created_at >= ${startDate} AND created_at <= ${endDate}
+          AND product = 'database'
+        GROUP BY hour_of_day ORDER BY purchases DESC
+      `) as any;
 
       // Build purchase map
-      const purchaseMap: Record<string, { total: number; database: number }> = {};
-      (dailyPurchases as any[]).forEach((p: any) => {
-        const dayKey = String(p.day).substring(0, 10);
-        purchaseMap[dayKey] = { total: Number(p.total_purchases), database: Number(p.database_purchases) };
-      });
+      const purchaseMap: Record<string, number> = {};
+      (dailyPurchases as any[]).forEach((p: any) => { purchaseMap[String(p.day).substring(0, 10)] = Number(p.total_purchases); });
+      const dbPurchaseMap: Record<string, number> = {};
+      (dailyDbPurchases as any[]).forEach((p: any) => { dbPurchaseMap[String(p.day).substring(0, 10)] = Number(p.db_purchases); });
+      const campaignMap: Record<string, number> = {};
+      (dailyCampaignLeads as any[]).forEach((l: any) => { campaignMap[String(l.day).substring(0, 10)] = Number(l.campaign_leads); });
 
       // Build days array
-      const days = (dailyLeads as any[]).map((l: any) => {
+      const days = (dailyLeadsTotal as any[]).map((l: any) => {
         const dayKey = String(l.day).substring(0, 10);
-        const purch = purchaseMap[dayKey] || { total: 0, database: 0 };
+        const totalPurch = purchaseMap[dayKey] || 0;
+        const dbPurch = dbPurchaseMap[dayKey] || 0;
+        const campLeads = campaignMap[dayKey] || 0;
         return {
           date: dayKey,
           totalLeads: Number(l.total_leads),
-          campaignLeads: Number(l.campaign_leads),
-          coldCampaign: Number(l.cold_campaign),
-          warmCampaign: Number(l.warm_campaign),
-          totalPurchases: purch.total,
-          databasePurchases: purch.database,
-          revenue: purch.database * 299 + (purch.total - purch.database) * 200, // approximate
-          conversionRate: Number(l.campaign_leads) > 0 ? Number(((purch.database / Number(l.campaign_leads)) * 100).toFixed(1)) : 0,
+          campaignLeads: campLeads,
+          coldCampaign: 0,
+          warmCampaign: 0,
+          totalPurchases: totalPurch,
+          databasePurchases: dbPurch,
+          revenue: dbPurch * 299 + (totalPurch - dbPurch) * 200,
+          conversionRate: campLeads > 0 ? Number(((dbPurch / campLeads) * 100).toFixed(1)) : 0,
         };
       });
 

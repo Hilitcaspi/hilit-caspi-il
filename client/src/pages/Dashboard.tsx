@@ -193,6 +193,12 @@ export default function Dashboard() {
             </div>
 
             {/* Daily trend chart */}
+            {!dailyTrend.data && dailyTrend.isLoading && (
+              <Card className="border-0 shadow-sm p-4">
+                <h3 className="text-sm font-bold text-gray-700 mb-3">📈 מגמה יומית — לידים ורכישות</h3>
+                <Skeleton className="h-32 w-full rounded-lg" />
+              </Card>
+            )}
             {dailyTrend.data && dailyTrend.data.leads.length > 0 && (
               <div className="bg-white rounded-xl p-4 shadow-sm">
                 <h3 className="text-sm font-bold text-gray-700 mb-3">📈 מגמה יומית — לידים ורכישות</h3>
@@ -222,6 +228,12 @@ export default function Dashboard() {
         {/* ═══════════════════════════════════════════════════════════════════════
             SECTION 2: CHANNEL BREAKDOWN — VISUAL
         ═══════════════════════════════════════════════════════════════════════ */}
+        {!channels.data && channels.isLoading && (
+          <Card className="border-0 shadow-sm p-6">
+            <h3 className="font-bold text-gray-900 mb-4">📊 ערוצי שיווק</h3>
+            <Skeleton className="h-48 w-full rounded-lg" />
+          </Card>
+        )}
         {channels.data && channels.data.length > 0 && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
@@ -301,6 +313,13 @@ export default function Dashboard() {
         {/* ═══════════════════════════════════════════════════════════════════════
             SECTION 3: DAILY LEAD FUNNEL — CHART + TABLE
         ═══════════════════════════════════════════════════════════════════════ */}
+        {!dailyFunnel.data && dailyFunnel.isLoading && (
+          <Card className="border-0 shadow-sm p-6">
+            <h3 className="font-bold text-gray-900 mb-4">🎯 משפך יומי: ליד → רכישה</h3>
+            <div className="text-sm text-gray-500 mb-3">טוען נתונים...</div>
+            <Skeleton className="h-64 w-full rounded-lg" />
+          </Card>
+        )}
         {dailyFunnel.data && dailyFunnel.data.days.length > 0 && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
@@ -403,6 +422,12 @@ export default function Dashboard() {
         {/* ═══════════════════════════════════════════════════════════════════════
             SECTION 4: DEMOGRAPHICS — VISUAL
         ═══════════════════════════════════════════════════════════════════════ */}
+        {!demographics.data && demographics.isLoading && (
+          <Card className="border-0 shadow-sm p-6">
+            <h3 className="font-bold text-gray-900 mb-4">👥 דמוגרפיה — מי במאגר?</h3>
+            <Skeleton className="h-48 w-full rounded-lg" />
+          </Card>
+        )}
         {demographics.data && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
