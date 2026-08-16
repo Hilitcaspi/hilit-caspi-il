@@ -4239,10 +4239,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             locationPreference: singles.locationPreference, smokingStatus: singles.smokingStatus,
             subscriptionStartedAt: singles.subscriptionStartedAt, subscriptionRenewsAt: singles.subscriptionRenewsAt,
             email: singles.email, isActive: singles.isActive,
-            isCoachingClient: singles.isCoachingClient, isNotBasic: singles.isNotBasic, updatedAt: singles.updatedAt,
+            isCoachingClient: singles.isCoachingClient, isNotBasic: singles.isNotBasic, updatedAt: singles.updatedAt, questionnaireCompletedAt: singles.questionnaireCompletedAt,
           })
             .from(singles).where(inArray(singles.id, singleIds))
-        : [];
+        : [] as any[];
       const singleMap = new Map(singleRows.map(s => [s.id, s]));
 
       return allMatches.map(m => {
@@ -4312,6 +4312,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           singleBIsNotBasic: b?.isNotBasic,
           singleAUpdatedAt: a?.updatedAt,
           singleBUpdatedAt: b?.updatedAt,
+          singleAQuestionnaireCompleted: !!a?.questionnaireCompletedAt,
+          singleBQuestionnaireCompleted: !!b?.questionnaireCompletedAt,
         };
       });
     }),

@@ -1505,6 +1505,8 @@ export default function CRMMatchmaking() {
                         <span className="text-sm font-semibold text-[#191265]">
                           {match.singleAName} + {match.singleBName}
                         </span>
+                        {!(match as any).singleAQuestionnaireCompleted && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-semibold">⚠️ {match.singleAName?.split(" ")[0]} ללא שאלון</span>}
+                        {!(match as any).singleBQuestionnaireCompleted && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-semibold">⚠️ {match.singleBName?.split(" ")[0]} ללא שאלון</span>}
                       </div>
                       {/* Per-side status row — visible without expanding */}
                       {(match.status === "proposed" || match.status === "expired" || match.status === "rejected") && (statusA || statusB) && (
