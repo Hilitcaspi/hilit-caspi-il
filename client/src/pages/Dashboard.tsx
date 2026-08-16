@@ -320,7 +320,12 @@ export default function Dashboard() {
             <Skeleton className="h-64 w-full rounded-lg" />
           </Card>
         )}
-        {dailyFunnel.data && dailyFunnel.data.days.length > 0 && (
+        {dailyFunnel.data && dailyFunnel.data.days.length > 0 && (() => {
+          const days = dailyFunnel.data.days;
+          const totals = dailyFunnel.data.totals;
+          const maxLeads = Math.max(...days.map(d => d.campaignLeads), 1);
+          const maxPurchases = Math.max(...days.map(d => d.databasePurchases), 1);
+          return (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -328,82 +333,93 @@ export default function Dashboard() {
                   <Target size={18} className="text-blue-600" />
                   <h3 className="font-bold text-gray-900">משפך יומי: ליד → רכישה</h3>
                 </div>
-                {dailyFunnel.data.totals && (
+                {totals && (
                   <div className="text-[11px] text-gray-500">
-                    ממוצע: <span className="font-bold text-blue-600">{dailyFunnel.data.totals.avgDailyLeads}</span> לידים/יום →
-                    <span className="font-bold text-green-600"> {dailyFunnel.data.totals.avgDailyPurchases}</span> רכישות/יום =
-                    <span className="font-bold text-amber-600"> {dailyFunnel.data.totals.avgConversionRate}%</span>
+                    ממוצע: <span className="font-bold text-blue-600">{totals.avgDailyLeads}</span> לידים/יום →
+                    <span className="font-bold text-green-600"> {totals.avgDailyPurchases}</span> רכישות/יום =
+                    <span className="font-bold text-amber-600"> {totals.avgConversionRate}%</span>
                   </div>
                 )}
               </div>
             </CardHeader>
             <CardContent>
-              {/* Visual chart */}
-              <div className="mb-4 bg-gray-50 rounded-xl p-4">
-                <div className="text-[10px] text-gray-500 mb-2 font-medium">לידים מקמפיין (כחול) vs רכישות מאגר (ירוק)</div>
-                <div className="flex items-end gap-[4px] h-20">
-                  {dailyFunnel.data.days.map((day, i) => {
-                    const maxLeads = Math.max(...dailyFunnel.data!.days.map(d => d.campaignLeads), 1);
-                    return (
-                      <div key={i} className="flex-1 min-w-[8px] group relative flex flex-col items-center gap-[1px]">
-                        <div className="absolute -top-7 bg-gray-800 text-white text-[8px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10 pointer-events-none">
-                          {new Date(day.date).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}: {day.campaignLeads}→{day.databasePurchases} ({day.conversionRate}%)
-                        </div>
-                        <div className="w-full bg-blue-300 rounded-t-sm" style={{ height: `${(day.campaignLeads / maxLeads) * 100}%`, minHeight: day.campaignLeads > 0 ? '3px' : '0' }} />
-                        <div className="w-full bg-green-400 rounded-b-sm" style={{ height: `${(day.databasePurchases / maxLeads) * 100}%`, minHeight: day.databasePurchases > 0 ? '3px' : '0' }} />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Summary cards */}
-              {dailyFunnel.data.totals && (
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <div className="text-xl font-bold text-blue-600">{dailyFunnel.data.totals.totalCampaign}</div>
-                    <div className="text-[10px] text-gray-500">לידים מקמפיין</div>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-3 text-center">
-                    <div className="text-xl font-bold text-green-600">{dailyFunnel.data.totals.totalPurchases}</div>
-                    <div className="text-[10px] text-gray-500">רכישות מאגר</div>
-                  </div>
-                  <div className="bg-amber-50 rounded-lg p-3 text-center">
-                    <div className="text-xl font-bold text-amber-600">{dailyFunnel.data.totals.avgConversionRate}%</div>
-                    <div className="text-[10px] text-gray-500">המרה</div>
-                  </div>
-                  <div className="bg-purple-50 rounded-lg p-3 text-center">
-                    <div className="text-xl font-bold text-purple-600">{dailyFunnel.data.totals.totalSpend > 0 ? '₪' + Math.round(dailyFunnel.data.totals.totalSpend).toLocaleString() : '—'}</div>
-                    <div className="text-[10px] text-gray-500">הוצאות מטא</div>
-                  </div>
-                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                    <div className="text-xl font-bold text-emerald-600">₪{dailyFunnel.data.totals.totalRevenue.toLocaleString()}</div>
-                    <div className="text-[10px] text-gray-500">הכנסות</div>
-                  </div>
-                </div>
+              {totals && (
+               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+                 <div className="bg-blue-50 rounded-lg p-3 text-center">
+                   <div className="text-xl font-bold text-blue-600">{totals.totalCampaign}</div>
+                   <div className="text-[10px] text-gray-500">לידים מקמפיין</div>
+                    {(totals as any).leadsChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).leadsChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).leadsChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).leadsChange)}% מחודש שעבר</div>}
+                 </div>
+                 <div className="bg-green-50 rounded-lg p-3 text-center">
+                   <div className="text-xl font-bold text-green-600">{totals.totalPurchases}</div>
+                   <div className="text-[10px] text-gray-500">רכישות מאגר</div>
+                    {(totals as any).purchChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).purchChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).purchChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).purchChange)}% מחודש שעבר</div>}
+                 </div>
+                 <div className="bg-amber-50 rounded-lg p-3 text-center">
+                   <div className="text-xl font-bold text-amber-600">{totals.avgConversionRate}%</div>
+                   <div className="text-[10px] text-gray-500">המרה</div>
+                 </div>
+                 <div className="bg-purple-50 rounded-lg p-3 text-center">
+                   <div className="text-xl font-bold text-purple-600">{totals.totalSpend > 0 ? '₪' + Math.round(totals.totalSpend).toLocaleString() : '—'}</div>
+                   <div className="text-[10px] text-gray-500">הוצאות מטא</div>
+                 </div>
+                 <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                   <div className="text-xl font-bold text-emerald-600">₪{totals.totalRevenue.toLocaleString()}</div>
+                   <div className="text-[10px] text-gray-500">הכנסות</div>
+                    {(totals as any).revenueChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).revenueChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).revenueChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).revenueChange)}% מחודש שעבר</div>}
+                 </div>
+               </div>
               )}
 
-              {/* Daily table */}
+              {/* Daily table with inline bar chart */}
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead><tr className="border-b text-gray-500 text-[10px]">
-                    <th className="py-1.5 text-right font-medium">תאריך</th>
-                    <th className="py-1.5 text-center font-medium">לידים</th>
-                    <th className="py-1.5 text-center font-medium">רכישות</th>
-                    <th className="py-1.5 text-center font-medium">המרה</th>
-                    <th className="py-1.5 text-center font-medium">הכנסות</th>
+                  <thead><tr className="border-b-2 border-gray-200 text-gray-600 text-[11px]">
+                   <th className="py-2 text-right font-semibold">תאריך</th>
+                   <th className="py-2 text-center font-semibold">לידים</th>
+                   <th className="py-2 text-center font-semibold w-28">גרף</th>
+                   <th className="py-2 text-center font-semibold">רכישות</th>
+                   <th className="py-2 text-center font-semibold">המרה</th>
+                    <th className="py-2 text-center font-semibold">הוצאות</th>
+                   <th className="py-2 text-center font-semibold">הכנסות</th>
                   </tr></thead>
                   <tbody>
-                    {dailyFunnel.data.days.map((day, i) => (
-                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="py-1.5 text-right text-gray-700 font-medium">{new Date(day.date).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' })}</td>
-                        <td className="py-1.5 text-center"><span className="text-blue-600 font-semibold">{day.campaignLeads}</span> <span className="text-gray-400">({day.totalLeads})</span></td>
-                        <td className="py-1.5 text-center"><span className="text-green-600 font-semibold">{day.databasePurchases}</span></td>
-                        <td className="py-1.5 text-center"><span className={`font-bold ${day.conversionRate >= 15 ? 'text-green-600' : day.conversionRate >= 8 ? 'text-amber-600' : 'text-red-500'}`}>{day.conversionRate}%</span></td>
-                        <td className="py-1.5 text-center text-emerald-600 font-medium">₪{day.revenue.toLocaleString()}</td>
+                    {days.map((day, i) => {
+                      const leadsWidth = (day.campaignLeads / maxLeads) * 100;
+                      const purchWidth = (day.databasePurchases / maxPurchases) * 100;
+                      const dayName = new Date(day.date).toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'numeric' });
+                      return (
+                      <tr key={i} className="border-b border-gray-100 hover:bg-blue-50/30 transition-colors">
+                        <td className="py-2 text-right text-gray-700 font-medium">{dayName}</td>
+                        <td className="py-2 text-center"><span className="text-blue-600 font-bold">{day.campaignLeads}</span> <span className="text-gray-400 text-[10px]">({day.totalLeads})</span></td>
+                        <td className="py-2 px-1">
+                          <div className="flex flex-col gap-[2px]">
+                            <div className="h-[6px] bg-blue-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${leadsWidth}%` }} /></div>
+                            <div className="h-[6px] bg-green-200 rounded-full overflow-hidden"><div className="h-full bg-green-500 rounded-full" style={{ width: `${purchWidth}%` }} /></div>
+                          </div>
+                        </td>
+                        <td className="py-2 text-center"><span className="text-green-600 font-bold">{day.databasePurchases}</span></td>
+                        <td className="py-2 text-center"><span className={`font-bold px-1.5 py-0.5 rounded text-[11px] ${day.conversionRate >= 15 ? 'bg-green-100 text-green-700' : day.conversionRate >= 8 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>{day.conversionRate}%</span></td>
+                        <td className="py-2 text-center text-purple-600 font-medium">{(day as any).spend > 0 ? '₪' + (day as any).spend : '—'}</td>
+                        <td className="py-2 text-center text-emerald-600 font-semibold">₪{day.revenue.toLocaleString()}</td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
+                  {totals && (
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-300 bg-gray-50 font-bold text-[11px]">
+                      <td className="py-2 text-right">סה״כ</td>
+                      <td className="py-2 text-center text-blue-700">{totals.totalCampaign}</td>
+                      <td></td>
+                      <td className="py-2 text-center text-green-700">{totals.totalPurchases}</td>
+                      <td className="py-2 text-center text-amber-700">{totals.avgConversionRate}%</td>
+                      <td className="py-2 text-center text-purple-700">{totals.totalSpend > 0 ? '₪' + Math.round(totals.totalSpend).toLocaleString() : '—'}</td>
+                      <td className="py-2 text-center text-emerald-700">₪{totals.totalRevenue.toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
+                  )}
                 </table>
               </div>
 
@@ -417,7 +433,8 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
-        )}
+          );
+        })()}
 
         {/* ═══════════════════════════════════════════════════════════════════════
             SECTION 4: DEMOGRAPHICS — VISUAL

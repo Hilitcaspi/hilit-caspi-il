@@ -1548,22 +1548,59 @@ export const dashboardRouter = router({
 
       // Try to get Meta spend for the period
       let totalSpend = 0;
+      let dailySpendMap: Record<string, number> = {};
+      let prevTotalLeads = 0;
+      let prevTotalPurch = 0;
+      let prevTotalRevenue = 0;
       try {
         const metaToken = process.env.META_ADS_TOKEN;
         if (metaToken) {
           const startDateStr = new Date(startDate).toISOString().split('T')[0];
           const endDateStr = new Date(endDate).toISOString().split('T')[0];
-          const res = await fetch(
-            `https://graph.facebook.com/v21.0/act_1169aborede/insights?fields=spend&time_range={"since":"${startDateStr}","until":"${endDateStr}"}&level=account&access_token=${metaToken}`
-          );
-          if (res.ok) {
-            const data = await res.json();
-            if (data.data?.[0]?.spend) {
-              totalSpend = parseFloat(data.data[0].spend);
-            }
+          const mainAccountId = "act_254697595735216";
+          const boostsAccountId = "act_3841144459522772";
+          // Fetch daily spend from both accounts
+          const [mainRes, boostRes] = await Promise.all([
+            fetch(`https://graph.facebook.com/v19.0/${mainAccountId}/insights?fields=spend&time_range={"since":"${startDateStr}","until":"${endDateStr}"}&time_increment=1&limit=60&access_token=${metaToken}`).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
+            fetch(`https://graph.facebook.com/v19.0/${boostsAccountId}/insights?fields=spend&time_range={"since":"${startDateStr}","until":"${endDateStr}"}&time_increment=1&limit=60&access_token=${metaToken}`).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
+          ]);
+          for (const row of (mainRes.data || [])) {
+            const day = row.date_start;
+            dailySpendMap[day] = (dailySpendMap[day] || 0) + parseFloat(row.spend || 0);
+            totalSpend += parseFloat(row.spend || 0);
+          }
+          for (const row of (boostRes.data || [])) {
+            const day = row.date_start;
+            dailySpendMap[day] = (dailySpendMap[day] || 0) + parseFloat(row.spend || 0);
+            totalSpend += parseFloat(row.spend || 0);
           }
         }
       } catch (e) { /* ignore */ }
+
+      // Fetch previous period for comparison
+      try {
+        const periodLength = endDate - startDate;
+        const prevStart = startDate - periodLength;
+        const prevEnd = startDate;
+        const [prevLeadRows] = await db.execute(sql`
+          SELECT COUNT(*) as cnt FROM crm_leads
+          WHERE createdAt >= ${prevStart} AND createdAt <= ${prevEnd} AND source = 'dna_quiz'
+        `) as any;
+        const [prevPurchRows] = await db.execute(sql`
+          SELECT COUNT(*) as cnt, SUM(CASE WHEN product = 'database' THEN 1 ELSE 0 END) as db_cnt
+          FROM payment_leads WHERE created_at >= ${prevStart} AND created_at <= ${prevEnd}
+        `) as any;
+        prevTotalLeads = Number((prevLeadRows as any[])[0]?.cnt || 0);
+        const prevDbPurch = Number((prevPurchRows as any[])[0]?.db_cnt || 0);
+        const prevTotal = Number((prevPurchRows as any[])[0]?.cnt || 0);
+        prevTotalPurch = prevDbPurch;
+        prevTotalRevenue = prevDbPurch * 299 + (prevTotal - prevDbPurch) * 200;
+      } catch (e) { /* ignore */ }
+
+      // Add spend to each day
+      for (const day of days) {
+        (day as any).spend = Math.round(dailySpendMap[day.date] || 0);
+      }
 
       return {
         days,
@@ -1577,6 +1614,12 @@ export const dashboardRouter = router({
           avgConversionRate: Number(avgConv),
           avgDailyLeads: Math.round(totalCampaign / Math.max(days.length, 1)),
           avgDailyPurchases: Math.round(totalPurch / Math.max(days.length, 1)),
+          prevTotalLeads,
+          prevTotalPurch,
+          prevTotalRevenue,
+          leadsChange: prevTotalLeads > 0 ? Number((((totalCampaign - prevTotalLeads) / prevTotalLeads) * 100).toFixed(0)) : 0,
+          purchChange: prevTotalPurch > 0 ? Number((((totalPurch - prevTotalPurch) / prevTotalPurch) * 100).toFixed(0)) : 0,
+          revenueChange: prevTotalRevenue > 0 ? Number((((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100).toFixed(0)) : 0,
         },
         insights,
       };
