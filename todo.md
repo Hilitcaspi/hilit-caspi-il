@@ -534,3 +534,4 @@
 - [x] Add questionnaire completion badge to match cards in CRM
 - [x] Add daily Meta spend column to funnel table
 - [x] Add daily WhatsApp report (leads/purchases/conversion) to 0544530975
+- [x] Dashboard redesign: reorder sections, add charts/graphs, make more visual and professional
