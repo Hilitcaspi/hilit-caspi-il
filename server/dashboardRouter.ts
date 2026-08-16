@@ -74,6 +74,64 @@ function mapChannel(utmSource: string | null, utmMedium?: string | null): string
   return utmSource;
 }
 
+// Campaign name translations for readable display
+const CAMPAIGN_NAMES: Record<string, string> = {
+  database: "מאגר רווקים",
+  "dna-quiz": "שאלון DNA",
+  dna_quiz: "שאלון DNA",
+  database_purchase: "מכירת מאגר ישירה",
+  shabek_women: "שבק נשים",
+  shabek_men: "שבק גברים",
+  shabek: "שבק",
+  lead_cold_measure: "לידים קרים",
+  lead_cold_120: "לידים קרים (120)",
+  home: "עמוד הבית",
+  shahar_referral: "הפניה — שחר",
+  database_abandon: "נטישת עגלה",
+  tubav_cold_asc: "טו באב קר",
+  tubav_5retargeting: "טו באב ריטרגטינג",
+  tubav_retargeting: "טו באב ריטרגטינג",
+  tubav_july2026: "טו באב יולי 2026",
+  tubav_july26: "טו באב יולי 2026",
+};
+
+function translateCampaign(campaign: string | null): string {
+  if (!campaign) return "ישיר / ללא קמפיין";
+  // Check direct translation
+  if (CAMPAIGN_NAMES[campaign]) return CAMPAIGN_NAMES[campaign];
+  // Check if it contains known patterns
+  if (campaign.includes("shabek") && campaign.includes("גברים")) return "שבק — גברים + נשים + יום הולדת";
+  if (campaign.includes("Purchase") && campaign.includes("DNA")) return "מכירות — שאלון DNA";
+  // Return as-is if no translation
+  return campaign;
+}
+
+function aggregateJourneyAttribution(rows: any[]): Array<{ campaign: string; source: string; leads: number; converted: number; conversionRate: number }> {
+  // Aggregate by unified channel + translated campaign
+  const agg: Record<string, { leads: number; converted: number }> = {};
+  for (const r of rows) {
+    const channel = mapChannel(r.source, r.medium);
+    const campaign = translateCampaign(r.campaign);
+    const key = `${campaign}|||${channel}`;
+    if (!agg[key]) agg[key] = { leads: 0, converted: 0 };
+    agg[key].leads += Number(r.totalLeads);
+    agg[key].converted += Number(r.converted);
+  }
+  return Object.entries(agg)
+    .map(([key, data]) => {
+      const [campaign, source] = key.split("|||");
+      return {
+        campaign,
+        source,
+        leads: data.leads,
+        converted: data.converted,
+        conversionRate: data.leads > 0 ? Math.round(data.converted / data.leads * 1000) / 10 : 0,
+      };
+    })
+    .sort((a, b) => b.converted - a.converted || b.leads - a.leads)
+    .slice(0, 15);
+}
+
 function guardAdmin(ctx: any) {
   if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
   if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -529,15 +587,16 @@ export const dashboardRouter = router({
         SELECT 
           cl.utmCampaign as campaign,
           cl.utmSource as source,
+          cl.utmMedium as medium,
           COUNT(DISTINCT cl.id) as totalLeads,
-          COUNT(DISTINCT pl.id) as converted
+          COUNT(DISTINCT CASE WHEN pl.id IS NOT NULL THEN cl.email END) as converted
         FROM crm_leads cl
-        LEFT JOIN payment_leads pl ON pl.email = cl.email AND pl.created_at >= ${startDate}
+        LEFT JOIN payment_leads pl ON pl.email = cl.email AND pl.product = 'database' AND pl.created_at >= cl.createdAt
         WHERE cl.createdAt >= ${startDate} AND cl.createdAt <= ${endDate}
-        GROUP BY cl.utmCampaign, cl.utmSource
+        GROUP BY cl.utmCampaign, cl.utmSource, cl.utmMedium
         HAVING totalLeads > 2
         ORDER BY converted DESC, totalLeads DESC
-        LIMIT 15
+        LIMIT 30
       `) as any;
       
       const leads = Number(curr?.leads ?? 0);
@@ -562,13 +621,7 @@ export const dashboardRouter = router({
           dna: pctChange(dna, prevDna),
         },
         productSales,
-        journeyAttribution: (journeyAttribution as any[]).map((r: any) => ({
-          campaign: r.campaign || 'ישיר',
-          source: r.source || 'direct',
-          leads: Number(r.totalLeads),
-          converted: Number(r.converted),
-          conversionRate: Number(r.totalLeads) > 0 ? Math.round(Number(r.converted) / Number(r.totalLeads) * 1000) / 10 : 0,
-        })),
+        journeyAttribution: aggregateJourneyAttribution(journeyAttribution as any[]),
         // Industry benchmarks
         benchmarks: {
           emailOpenRate: 21.5,    // Email marketing industry avg
@@ -954,6 +1007,7 @@ export const dashboardRouter = router({
         SELECT 
           cl.utmCampaign as campaign,
           COALESCE(cl.utmSource, 'unknown') as source,
+          cl.utmMedium as medium,
           COUNT(DISTINCT cl.id) as leads,
           COUNT(DISTINCT CASE WHEN pl.email IS NOT NULL THEN cl.id END) as purchases,
           GROUP_CONCAT(DISTINCT pl.product) as products
@@ -961,7 +1015,7 @@ export const dashboardRouter = router({
         LEFT JOIN payment_leads pl ON pl.email = cl.email AND pl.created_at >= ${startDate}
         WHERE cl.createdAt >= ${startDate} AND cl.createdAt <= ${endDate}
           AND cl.utmCampaign IS NOT NULL AND cl.utmCampaign != ''
-        GROUP BY cl.utmCampaign, cl.utmSource
+        GROUP BY cl.utmCampaign, cl.utmSource, cl.utmMedium
         ORDER BY leads DESC
         LIMIT 20
       `) as any;
@@ -976,8 +1030,8 @@ export const dashboardRouter = router({
         }
         // Better: calculate actual revenue
         return {
-          campaign: r.campaign,
-          source: mapChannel(r.source),
+          campaign: translateCampaign(r.campaign),
+          source: mapChannel(r.source, r.medium),
           leads: Number(r.leads),
           purchases,
           conversionRate: Number(r.leads) > 0 ? Math.round(purchases / Number(r.leads) * 100 * 10) / 10 : 0,
