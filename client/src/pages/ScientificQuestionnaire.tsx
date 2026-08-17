@@ -414,18 +414,21 @@ export default function ScientificQuestionnaire() {
                   הפרופיל הזוגי שלך: {dnaLabel}
                 </div>
               )}
-              <p className="text-[#555] text-base leading-relaxed max-w-lg mx-auto">
-                  הפרטים שלך ושאלון ה-DNA הושלמו בהצלחה! נשאר רק השאלון המדעי — שאלות קצרות שפותחו על בסיס מחקרי גוטמן, תיאוריית ההתקשרות ומודל Big Five, שיעזרו לי למצוא לך את ההתאמה המושלמת.
-              </p>
+             <p className="text-[#555] text-base leading-relaxed max-w-lg mx-auto">
+                  {isSkeleton
+                    ? "כדי שנוכל למצוא לך את ההתאמה המושלמת, נצטרך קודם כמה פרטים אישיים ואז שאלון מדעי קצר."
+                    : "הפרטים שלך ושאלון ה-DNA הושלמו בהצלחה! נשאר רק השאלון המדעי — שאלות קצרות שפותחו על בסיס מחקרי גוטמן, תיאוריית ההתקשרות ומודל Big Five, שיעזרו לי למצוא לך את ההתאמה המושלמת."
+                  }
+             </p>
             </div>
 
             <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
                <h3 className="font-black text-[#191265] mb-4 text-lg">איפה אנחנו:</h3>
-               <div className="space-y-3">
-                  {[
-                    { icon: "✅", text: "פרטים אישיים — הושלמו" },
-                    { icon: "✅", text: `שאלון DNA זוגי — הושלם${dnaLabel ? ` (${dnaLabel})` : ""}` },
-                    { icon: "🔬", text: "שאלון מדעי להתאמה — ממתין למילוי" },
+              <div className="space-y-3">
+                 {[
+                    { icon: isSkeleton ? "📝" : "✅", text: isSkeleton ? "פרטים אישיים — ממתין למילוי" : "פרטים אישיים — הושלמו" },
+                    { icon: effectiveDnaType ? "✅" : "🧬", text: effectiveDnaType ? `שאלון DNA זוגי — הושלם${dnaLabel ? ` (${dnaLabel})` : ""}` : "שאלון DNA זוגי — ממתין" },
+                    { icon: "🔬", text: "שאלון מדעי להתאמה — ממתין" },
                     { icon: "💯", text: "אין תשובות נכונות או לא נכונות — ענו בכנות" },
                   ].map(item => (
                   <div key={item.text} className="flex items-start gap-3">
@@ -444,12 +447,15 @@ export default function ScientificQuestionnaire() {
                 </div>
               )}
               <button
-              onClick={() => {
-                  // After payment, always go straight to quiz
-                  // Details and DNA are always completed before payment
-                  setStep("quiz");
+             onClick={() => {
+                  // If profile is skeleton (created by Grow webhook without filling form first), go to details
+                  if (isSkeleton) {
+                    setStep("details");
+                  } else {
+                    setStep("quiz");
+                  }
                 }}
-              className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg"
+             className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-[#ffd84a] transition-all duration-300 hover:scale-[1.02] shadow-lg"
             >
               {hasRestoredProgress ? `המשך משאלה ${currentIndex + 1} ←` : "בואו נתחיל! ←"}
             </button>
