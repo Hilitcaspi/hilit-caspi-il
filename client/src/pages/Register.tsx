@@ -557,12 +557,27 @@ export default function Register() {
     // Fire Meta Pixel
     trackCompleteRegistration({ content_name: "מאגר רווקים" });
     gaSignUp("database");
-    // Save profile in background (non-blocking)
+    // Save profile - MUST succeed to prevent skeleton profiles
     const payload = buildRegisterPayload();
-    registerBasicMutation.mutateAsync(payload).catch(err => {
-      console.error("[Payment] Failed to save profile (non-blocking):", err);
-      setGrowOpened(true);
-    });
+    // Save payload to localStorage as backup in case the request fails
+    try { localStorage.setItem('pending_profile_payload', JSON.stringify(payload)); } catch {}
+    // Try up to 3 times with delay
+    let success = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await registerBasicMutation.mutateAsync(payload);
+        success = true;
+        try { localStorage.removeItem('pending_profile_payload'); } catch {}
+        break;
+      } catch (err) {
+        console.error(`[Payment] registerBasicProfile attempt ${attempt}/3 failed:`, err);
+        if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
+      }
+    }
+    if (!success) {
+      console.error("[Payment] All 3 attempts failed - profile data saved in localStorage for recovery");
+    }
+    setGrowOpened(true);
   };
 
   const quizAnswersJson = JSON.stringify(Object.values(quizAnswers));

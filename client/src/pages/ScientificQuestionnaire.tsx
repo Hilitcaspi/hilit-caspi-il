@@ -162,6 +162,31 @@ export default function ScientificQuestionnaire() {
   // Detect skeleton record: age=0 or city empty, will need details before quiz
   const isSkeleton = profile && (!profile.age || profile.age === 0 || !profile.city);
 
+  // Recovery: if profile is skeleton but localStorage has saved profile data from failed registerBasicProfile,
+  // auto-submit it to recover the lost data
+  const recoverMutation = trpc.singles.registerBasicProfile.useMutation();
+  useEffect(() => {
+    if (!isSkeleton || !profile) return;
+    try {
+      const saved = localStorage.getItem('pending_profile_payload');
+      if (saved) {
+        const payload = JSON.parse(saved);
+        // Verify it's for the same email
+        if (payload.email && payload.email.toLowerCase() === profile.email?.toLowerCase()) {
+          console.log("[Recovery] Found saved profile data, attempting to recover...");
+          recoverMutation.mutateAsync(payload).then(() => {
+            console.log("[Recovery] Profile data recovered successfully!");
+            localStorage.removeItem('pending_profile_payload');
+            // Reload to get fresh profile
+            window.location.reload();
+          }).catch(err => {
+            console.error("[Recovery] Failed to recover profile:", err);
+          });
+        }
+      }
+    } catch {}
+  }, [isSkeleton, profile]);
+
   // Pre-fill form fields from profile data when loaded
   useEffect(() => {
     if (!profile) return;
