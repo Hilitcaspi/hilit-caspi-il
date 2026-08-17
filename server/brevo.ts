@@ -77,6 +77,13 @@ export async function sendEmail({
   textContent?: string;
 }): Promise<{ messageId?: string; success: boolean; error?: string }> {
   try {
+    // Hardcoded blocklist - these contacts must NEVER receive any email
+    const BLOCKED_EMAILS = ['eli.fribert1@gmail.com'];
+    if (BLOCKED_EMAILS.includes(to.email.toLowerCase().trim())) {
+      console.log(`[Brevo] BLOCKED: ${to.email} is on the permanent blocklist`);
+      return { success: true, messageId: 'blocked' };
+    }
+
     const body = {
       sender: SENDER,
       to: [to],
