@@ -84,6 +84,10 @@ export default function Dashboard() {
   const siteTraffic = trpc.dashboard.siteTraffic.useQuery(dateInput);
   const dailyTrend = trpc.dashboard.dailyTrend.useQuery(dateInput);
   const sendReport = trpc.dashboard.sendWeeklyReport.useMutation();
+  const sendCompletionSms = trpc.dashboard.sendCompletionSms.useMutation({
+    onSuccess: (data: any) => { alert(`נשלחו ${data.sent} SMS מתוך ${data.total} (${data.failed} נכשלו)`); },
+    onError: (err: any) => { alert("שגיאה: " + err.message); },
+  });
 
   const isLoading = comp.isLoading;
   const t = targets.data;
@@ -120,6 +124,11 @@ export default function Dashboard() {
               className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white/10 text-white/80 hover:bg-white/20 transition flex items-center gap-1 mr-2"
               disabled={sendReport.isPending}>
               <Send size={10} />{sendReport.isPending ? "..." : "דוח"}
+            </button>
+            <button onClick={() => { if (confirm("לשלוח SMS השלמת פרטים לכל מי שחסר?")) sendCompletionSms.mutate(); }}
+              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-500/80 text-white hover:bg-amber-500 transition flex items-center gap-1"
+              disabled={sendCompletionSms.isPending}>
+              📱 {sendCompletionSms.isPending ? "שולח..." : "SMS השלמה"}
             </button>
           </div>
         </div>

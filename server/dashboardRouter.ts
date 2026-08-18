@@ -5,6 +5,8 @@ import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { sendEmail } from "./brevo";
 
+import { sendSMS } from "./vibrate";
+import crypto from "crypto";
 // Product prices for revenue calculation
 const PRODUCT_PRICES: Record<string, number> = {
   database: 299,
@@ -1117,7 +1119,7 @@ export const dashboardRouter = router({
     .query(async ({ ctx, input }) => {
       guardAdmin(ctx);
       const db = await getDb();
-      const { startDate, endDate } = input;
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [rows] = await db.execute(sql`
         SELECT email, name, product, sum, created_at, utmSource, utmMedium, utmCampaign
@@ -1142,7 +1144,7 @@ export const dashboardRouter = router({
     .input(z.object({ startDate: z.number(), endDate: z.number() }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { products: [] };
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { startDate, endDate } = input;
       
       // Get leads per product
@@ -1193,7 +1195,7 @@ export const dashboardRouter = router({
   weeklyReportData: teamProcedure.query(async ({ ctx }) => {
     guardAdmin(ctx);
     const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const now = Date.now();
     const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
     const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
@@ -1290,7 +1292,7 @@ export const dashboardRouter = router({
     .input(z.object({ startDate: z.number().optional(), endDate: z.number().optional() }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return null;
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const now = Date.now();
       const start = input.startDate || now - 30 * 24 * 60 * 60 * 1000;
       const end = input.endDate || now;
@@ -1422,7 +1424,7 @@ export const dashboardRouter = router({
       endDate: z.number(),
     })).query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { days: [], totals: null, insights: [] };
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { startDate, endDate } = input;
 
       // Daily leads with campaign breakdown
@@ -1621,8 +1623,43 @@ export const dashboardRouter = router({
           purchChange: prevTotalPurch > 0 ? Number((((totalPurch - prevTotalPurch) / prevTotalPurch) * 100).toFixed(0)) : 0,
           revenueChange: prevTotalRevenue > 0 ? Number((((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100).toFixed(0)) : 0,
         },
-        insights,
-      };
+       insights,
+     };
+   }),
+
+  sendCompletionSms: teamProcedure
+    .mutation(async ({ ctx }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [skeletons] = await db.execute(sql.raw(`
+        SELECT id, firstName, lastName, email, phone, age, city, height,
+               education, occupation, photoUrl, about, aboutMe, questionnaireCompletedAt
+        FROM singles
+        WHERE isActive = 1 AND (age = 0 OR age IS NULL OR city = '' OR city IS NULL)
+        AND phone IS NOT NULL AND phone != ''
+        ORDER BY createdAt DESC
+      `)) as any;
+      let sent = 0;
+      let failed = 0;
+      const results: Array<{ name: string; phone: string; status: string }> = [];
+      for (const s of skeletons) {
+        const token = crypto.createHash('sha256')
+          .update(s.email + 'questionnaire-salt-2024')
+          .digest('hex');
+        const link = `hilitcaspi.com/join/questionnaire?token=${token}`;
+        const message = `היי ${s.firstName}! כאן הילית מהמאגר.\nשמנו לב שחסרים לנו כמה פרטים כדי שנוכל למצוא לך את ההתאמה המושלמת.\nזה לוקח דקה:\n${link}`;
+        const ok = await sendSMS(s.phone, message);
+        if (ok) {
+          sent++;
+          results.push({ name: `${s.firstName} ${s.lastName || ''}`, phone: s.phone, status: 'sent' });
+        } else {
+          failed++;
+          results.push({ name: `${s.firstName} ${s.lastName || ''}`, phone: s.phone, status: 'failed' });
+        }
+        await new Promise(r => setTimeout(r, 500));
+      }
+      return { total: skeletons.length, sent, failed, results };
     }),
 
 });
