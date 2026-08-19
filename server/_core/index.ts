@@ -97,7 +97,7 @@ async function startServer() {
   //   /api/wa/bio         → from Instagram bio link
   //   /api/wa/instagram   → from Instagram stories/posts
   {
-    const WA_GROUP_URL = "https://chat.whatsapp.com/BnMGRXh6ibqFpV8xFFxkS9?mode=gi_t";
+    const WA_GROUP_URL = "https://chat.whatsapp.com/ELMG4HvgZUMKjez9t0a8O5?s=cl&p=i&ilr=0";
     const WA_SOURCES = ["site", "email", "thankyou", "bio", "instagram"] as const;
     for (const src of WA_SOURCES) {
       app.get(`/api/wa/${src}`, async (req, res) => {
