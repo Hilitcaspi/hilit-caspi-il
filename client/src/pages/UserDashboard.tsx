@@ -613,6 +613,7 @@ export default function UserDashboard() {
   const REMOVED_PROFILES: Record<string, string> = {
     'eli.fribert1@gmail.com': '',
     'michalbs5921@gmail.com': 'פעילות אחרונה שבוצעה בפרופיל זה: 20/6/26',
+    'tomy.23@gmail.com': '',
   };
   const removedMsg = REMOVED_PROFILES[(profile.email || '').toLowerCase()];
   if (removedMsg !== undefined) {
