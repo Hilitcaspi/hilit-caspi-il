@@ -1120,11 +1120,10 @@ export const dashboardRouter = router({
       guardAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [rows] = await db.execute(sql`
         SELECT email, name, product, sum, created_at, utmSource, utmMedium, utmCampaign
         FROM payment_leads
-        WHERE created_at >= ${startDate} AND created_at <= ${endDate} AND (CAST(sum AS UNSIGNED) >= 400)
+        WHERE created_at >= ${input.startDate} AND created_at <= ${input.endDate} AND (CAST(sum AS UNSIGNED) >= 400)
         ORDER BY created_at DESC
       `) as any;
       const sessions = (rows as any[]).filter((r: any) => Number(r.sum) >= 400 && Number(r.sum) < 1500);
