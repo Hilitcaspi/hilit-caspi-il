@@ -608,6 +608,25 @@ export default function UserDashboard() {
   }
 
   const { profile, matches: myMatches, dnaResult, hasCompletedQuestionnaire, questionnaireToken } = data;
+
+  // Blocked/removed users see a "profile removed" message
+  const REMOVED_PROFILES: Record<string, string> = {
+    'eli.fribert1@gmail.com': '',
+    'michalbs5921@gmail.com': 'פעילות אחרונה שבוצעה בפרופיל זה: 20/6/26',
+  };
+  const removedMsg = REMOVED_PROFILES[(profile.email || '').toLowerCase()];
+  if (removedMsg !== undefined) {
+    return (
+      <div className="min-h-screen bg-[#f0eadc] flex items-center justify-center px-4" dir="rtl">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="text-5xl mb-4">🚫</div>
+          <h2 className="text-xl font-black text-[#191265] mb-3">הפרופיל לא פעיל והוסר מהמערכת</h2>
+          {removedMsg && <p className="text-[#727272] text-sm mb-4">{removedMsg}</p>}
+        </div>
+      </div>
+    );
+  }
+
   const activeMatches = myMatches.filter((m: any) => (m.status === "proposed" || m.status === "matched") && !m.returnedToPoolAt);
   const historyMatches = myMatches.filter((m: any) => m.status === "rejected" || m.status === "expired" || m.status === "pending" || m.returnedToPoolAt);
 

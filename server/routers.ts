@@ -2400,6 +2400,7 @@ export const appRouter = router({
             isActive: profile.isActive,
             questionnaireCompletedAt: profile.questionnaireCompletedAt,
             createdAt: profile.createdAt,
+            email: profile.email,
           },
           matches: enrichedMatches,
           dnaResult: dnaResult ? { dnaType: dnaResult.dnaType, scores: dnaResult.scores, createdAt: dnaResult.createdAt } : null,
