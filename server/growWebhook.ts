@@ -36,7 +36,7 @@ import { getDb } from "./db";
 import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
-
+import { sendSMS } from "./vibrate";
 import { startJourney } from "./automation";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
@@ -329,6 +329,40 @@ async function handleDatabase(email: string, name: string, phone: string, transa
   const joinUrl = `${SITE_BASE}/join/questionnaire?token=${singleRecord.questionnaireToken}`;
 
   await notifyOwner({ title: "תשלום מאגר חדש! 💛", content: `${name} (${email}) שילם דמי רישום למאגר ב-299 ₪. Transaction: ${transactionId || 'N/A'}` });
+
+  // Check for incomplete profile and alert Hilit immediately
+  setImmediate(async () => {
+    try {
+      const db2 = await getDb();
+      if (!db2) return;
+      const [profile] = await db2.select().from(singles).where(eq(singles.id, singleRecord!.id)).limit(1);
+      if (!profile) return;
+      const missing: string[] = [];
+      if (!profile.age || profile.age === 0) missing.push("גיל");
+      if (!profile.city) missing.push("עיר");
+      if (!profile.height || profile.height === 0) missing.push("גובה");
+      if (!profile.about) missing.push("על עצמי");
+      if (!profile.partnerDescription) missing.push("מחפש בבן/בת זוג");
+      if (!profile.photoUrl) missing.push("תמונה");
+      if (!profile.dnaType) missing.push("שאלון DNA");
+      if (!profile.questionnaireCompletedAt) missing.push("שאלון מדעי");
+      if (!profile.occupation) missing.push("תעסוקה");
+      if (!profile.religiosity) missing.push("דת");
+      if (missing.length > 0) {
+        const alertMsg = `⚠️ נרשם/ה חדש/ה עם פרטים חסרים!\n${name} (${email})\nחסר: ${missing.join(", ")}`;
+        // SMS to Hilit
+        sendSMS("0544530975", alertMsg).catch(() => {});
+        // Email to Hilit
+        sendEmail({
+          to: { email: "hilitcaspi@gmail.com", name: "הילית כספי" },
+          subject: `⚠️ פרטים חסרים: ${name}`,
+          htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;padding:20px;"><h2 style="color:#c00;">⚠️ נרשם/ה חדש/ה עם פרטים חסרים</h2><p><strong>${name}</strong> (${email})</p><p><strong>חסר:</strong> ${missing.join(", ")}</p><p>כניסה ל-CRM: <a href="https://hilitcaspi.com/crm">לחצי כאן</a></p></div>`,
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.error("[GrowWebhook] Incomplete profile alert failed:", e);
+    }
+  });
 
   // Send personal join link email
   sendEmail({

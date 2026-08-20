@@ -137,6 +137,7 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
     firstName: single.firstName || '',
     lastName: single.lastName || '',
     gender: single.gender || '',
+    seekingGender: single.seekingGender || '',
     age: single.age || '',
     city: single.city || '',
     phone: single.phone || '',
@@ -170,6 +171,7 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
     if (form.firstName && form.firstName !== single.firstName) payload.firstName = form.firstName;
     if (form.lastName !== (single.lastName || '')) payload.lastName = form.lastName;
     if (form.gender && form.gender !== single.gender) payload.gender = form.gender;
+    if (form.seekingGender && form.seekingGender !== (single.seekingGender || '')) payload.seekingGender = form.seekingGender;
     if (form.age && Number(form.age) !== single.age) payload.age = Number(form.age);
     if (form.city !== (single.city || '')) payload.city = form.city;
     if (form.phone !== (single.phone || '')) payload.phone = form.phone;
@@ -216,6 +218,7 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
             <div><label className={labelCls}>שם פרטי</label><input className={inputCls} value={form.firstName} onChange={e => set('firstName', e.target.value)} /></div>
             <div><label className={labelCls}>שם משפחה</label><input className={inputCls} value={form.lastName} onChange={e => set('lastName', e.target.value)} /></div>
             <div><label className={labelCls}>מגדר</label><select className={selectCls} value={form.gender} onChange={e => set('gender', e.target.value)}><option value="">בחר</option><option value="male">גבר</option><option value="female">אישה</option></select></div>
+            <div><label className={labelCls}>מחפש/ת</label><select className={selectCls} value={form.seekingGender} onChange={e => set('seekingGender', e.target.value)}><option value="">בחר</option><option value="male">גבר</option><option value="female">אישה</option><option value="any">לא משנה</option></select></div>
             <div><label className={labelCls}>גיל</label><input type="number" className={inputCls} value={form.age} onChange={e => set('age', e.target.value)} min={18} max={120} /></div>
             <div><label className={labelCls}>עיר</label><input className={inputCls} value={form.city} onChange={e => set('city', e.target.value)} /></div>
             <div><label className={labelCls}>גובה (ס"מ)</label><input type="number" className={inputCls} value={form.height} onChange={e => set('height', e.target.value)} min={100} max={250} /></div>

@@ -4944,6 +4944,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         phone: z.string().optional(),
         email: z.string().email().optional(),
         gender: z.enum(["male", "female"]).optional(),
+        seekingGender: z.enum(["male", "female", "any"]).optional(),
         height: z.number().min(100).max(250).optional(),
         education: z.enum(["high_school", "vocational", "technician", "student", "bachelor", "master", "phd", "other"]).optional(),
         religiosity: z.enum(["secular", "traditional", "religious", "orthodox", "datlash"]).optional(),

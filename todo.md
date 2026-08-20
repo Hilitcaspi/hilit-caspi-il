@@ -498,6 +498,14 @@
 - [x] Social media section: engagement vs benchmark, saves vs shares analysis, growth
 - [x] Rebuilt entire Dashboard.tsx from scratch with professional design
 
+## Instant Alert for Incomplete Profiles (Aug 20)
+- [x] Send SMS + email to Hilit immediately when a new user registers with any missing profile details
+- [x] Alert should specify which fields are missing
+- [x] Alert should fire for any missing field (age, city, height, aboutMe, partnerDescription, photo, etc.)
+
+## CRM Edit: Add seekingGender Option (Aug 20)
+- [x] Add seekingGender (מחפש גבר/אישה) to the CRM profile edit modal
+
 ## Critical Flow Bugs (Aug 12)
 - [x] FIX: ScientificQuestionnaire asks for personal details again when profile already has them from registration
 - [x] FIX: Age/height validation error crashes questionnaire submission (should skip gracefully)
