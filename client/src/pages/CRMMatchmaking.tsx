@@ -2888,7 +2888,7 @@ export default function CRMMatchmaking() {
   );
 }
 // ── MissingDataTab ────────────────────────────────────────────────────────────────────────────────
-function MissingDataTab() {
+function MissingDataTab() { 
   const { data: rows = [], isLoading, refetch } = trpc.admin.getMissingData.useQuery();
   const patchMutation = trpc.admin.patchMissingData.useMutation({
     onSuccess: () => { toast.success("נשמר!"); refetch(); },
@@ -2898,6 +2898,8 @@ function MissingDataTab() {
   // Local edit state: id -> { age, city, gender }
     const [edits, setEdits] = useState<Record<number, Record<string, string>>>({});
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [filterSeverity, setFilterSeverity] = useState<"all" | "critical" | "medium" | "low">("all");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const getEdit = (id: number, field: string, fallback: string) =>
     edits[id]?.[field] ?? fallback;
   const setField = (id: number, field: string, value: string) =>
@@ -2926,28 +2928,52 @@ function MissingDataTab() {
 
   if (isLoading) return <div className="text-center py-12 text-[#727272]">טוען...</div>;
 
+  // Sort by severity (most missing first)
+  const sortedRows = [...rows].sort((a: any, b: any) => (b.missingFields?.length || 0) - (a.missingFields?.length || 0));
+  const filteredRows = sortedRows.filter((row: any) => {
+    const count = row.missingFields?.length || 0;
+    if (filterSeverity === "critical") return count >= 5;
+    if (filterSeverity === "medium") return count >= 3 && count < 5;
+    if (filterSeverity === "low") return count >= 1 && count < 3;
+    return true;
+  });
+
+  const criticalCount = sortedRows.filter((r: any) => (r.missingFields?.length || 0) >= 5).length;
+  const mediumCount = sortedRows.filter((r: any) => { const c = r.missingFields?.length || 0; return c >= 3 && c < 5; }).length;
+  const lowCount = sortedRows.filter((r: any) => { const c = r.missingFields?.length || 0; return c >= 1 && c < 3; }).length;
+
   return (
     <div className="space-y-3">
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
         <p className="text-sm text-amber-800 font-semibold">⚠️ {rows.length} רווקים עם פרטים חסרים בפרופיל</p>
-        <p className="text-xs text-amber-600 mt-1">פרטים חסרים משפיעים על איכות ההתאמות. ניתן לעדכן כאן או לשלוח להם קישור לעדכון פרופיל</p>
+        <p className="text-xs text-amber-600 mt-1">ניתן לעדכן ישירות, לשלוח הודעה, או להתקשר</p>
+        <div className="flex gap-2 mt-2 flex-wrap">
+          <button onClick={() => setFilterSeverity("all")} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterSeverity === "all" ? "bg-amber-600 text-white" : "bg-amber-100 text-amber-700"}`}>הכל ({rows.length})</button>
+          <button onClick={() => setFilterSeverity("critical")} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterSeverity === "critical" ? "bg-red-600 text-white" : "bg-red-100 text-red-700"}`}>🔴 קריטי 5+ ({criticalCount})</button>
+          <button onClick={() => setFilterSeverity("medium")} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterSeverity === "medium" ? "bg-orange-600 text-white" : "bg-orange-100 text-orange-700"}`}>🟠 בינוני 3-4 ({mediumCount})</button>
+          <button onClick={() => setFilterSeverity("low")} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterSeverity === "low" ? "bg-yellow-600 text-white" : "bg-yellow-100 text-yellow-700"}`}>🟡 קל 1-2 ({lowCount})</button>
+        </div>
       </div>
-      {rows.length === 0 && (
+      {filteredRows.length === 0 && (
         <div className="bg-white rounded-xl p-8 text-center text-[#727272]">
           <div className="text-4xl mb-2">✅</div>
           <p>אין רשומות חסרות נתונים!</p>
         </div>
       )}
-      {rows.map((row: any) => (
-        <div key={row.id} className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-red-400">
+      {filteredRows.map((row: any) => {
+        const missingCount = row.missingFields?.length || 0;
+        const borderColor = missingCount >= 5 ? "border-red-500" : missingCount >= 3 ? "border-orange-400" : "border-yellow-400";
+        const completionLink = `https://hilitcaspi.com/join/questionnaire?token=${row.questionnaireToken || ''}`;
+        const smsText = `היי ${row.firstName}, חסרים לנו כמה פרטים בפרופיל שלך במאגר של הילית כספי. השלימו כאן: ${completionLink}`;
+        const waLink = row.phone ? `https://wa.me/972${row.phone?.replace(/^0/, '')}?text=${encodeURIComponent(smsText)}` : '';
+        return (
+        <div key={row.id} className={`bg-white rounded-xl p-4 shadow-sm border-r-4 ${borderColor}`}>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <span className="font-bold text-[#191265]">{row.firstName} {row.lastName}</span>
-                <Badge className={`text-xs ${row.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                  {row.isActive ? "פעיל" : "לא פעיל"}
-                </Badge>
-                {row.questionnaireCompletedAt ? <Badge className="text-xs bg-blue-100 text-blue-700">✓ שאלון</Badge> : <Badge className="text-xs bg-orange-100 text-orange-700">⏳ לא מילא שאלון</Badge>}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${missingCount >= 5 ? "bg-red-100 text-red-700" : missingCount >= 3 ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700"}`}>{missingCount} חוסרים</span>
+                {row.questionnaireCompletedAt ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">✓ שאלון</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold">⏳ ללא שאלון</span>}
               </div>
               {/* Missing fields badges */}
               {row.missingFields && row.missingFields.length > 0 && (
@@ -2957,12 +2983,26 @@ function MissingDataTab() {
                   ))}
                 </div>
               )}
-              <div className="text-xs text-[#727272] mb-3 flex flex-wrap gap-2">
-                {row.email && <span>✉️ {row.email}</span>}
-                {row.phone && <span>📞 {row.phone}</span>}
+              {/* Contact buttons */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {row.phone && (
+                  <a href={`tel:${row.phone}`} className="text-[10px] px-2 py-1 rounded-lg bg-green-100 text-green-700 font-semibold hover:bg-green-200 transition-colors">📞 {row.phone}</a>
+                )}
+                {row.phone && (
+                  <a href={waLink} target="_blank" rel="noopener" className="text-[10px] px-2 py-1 rounded-lg bg-[#dcf8c6] text-green-800 font-semibold hover:bg-[#c5f0a5] transition-colors">💬 WhatsApp</a>
+                )}
+                {row.email && (
+                  <a href={`mailto:${row.email}?subject=השלמת פרטים במאגר&body=${encodeURIComponent(smsText)}`} className="text-[10px] px-2 py-1 rounded-lg bg-blue-100 text-blue-700 font-semibold hover:bg-blue-200 transition-colors">✉️ מייל</a>
+                )}
+                <button onClick={() => { navigator.clipboard.writeText(smsText); toast.success("הודעה הועתקה!"); }} className="text-[10px] px-2 py-1 rounded-lg bg-purple-100 text-purple-700 font-semibold hover:bg-purple-200 transition-colors">📋 העתק הודעה</button>
+                <button onClick={() => { navigator.clipboard.writeText(completionLink); toast.success("קישור הועתק!"); }} className="text-[10px] px-2 py-1 rounded-lg bg-indigo-100 text-indigo-700 font-semibold hover:bg-indigo-200 transition-colors">🔗 העתק קישור</button>
               </div>
-              {/* Edit fields */}
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 items-end">
+              {/* Expandable edit section */}
+              <button onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} className="text-xs text-[#191265] underline mb-2">
+                {expandedId === row.id ? "🔼 סגור עריכה" : "🔽 פתח לעריכה ישירה"}
+              </button>
+              {expandedId === row.id && (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 items-end mt-2">
                 <div>
                   <label className="block text-[10px] text-[#727272] mb-0.5">מגדר</label>
                   <select value={getEdit(row.id, "gender", row.gender || "")} onChange={e => setField(row.id, "gender", e.target.value)}
@@ -3034,6 +3074,7 @@ function MissingDataTab() {
                   </button>
                 </div>
               </div>
+              )}
               {/* Full edit modal for this person */}
               {editingId === row.id && (
                 <EditSingleModal
@@ -3046,7 +3087,8 @@ function MissingDataTab() {
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

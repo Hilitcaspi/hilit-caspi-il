@@ -2789,6 +2789,8 @@ export const appRouter = router({
         isActive: singles.isActive,
         isPaid: singles.isPaid,
         questionnaireCompletedAt: singles.questionnaireCompletedAt,
+        questionnaireToken: singles.questionnaireToken,
+        createdAt: singles.createdAt,
       })
         .from(singles)
         .where(
@@ -2806,6 +2808,9 @@ export const appRouter = router({
               eq(singles.occupation, ""),
               isNull(singles.about),
               eq(singles.about, ""),
+              isNull(singles.photoUrl),
+              eq(singles.photoUrl, ""),
+              isNull(singles.questionnaireCompletedAt),
             )
           )
         )
@@ -2820,8 +2825,9 @@ export const appRouter = router({
           (!r.religiosity) ? "זהות דתית" : null,
           (!r.education) ? "השכלה" : null,
           (!r.occupation || r.occupation === "") ? "עיסוק" : null,
-          (!r.about || r.about === "") ? "אודות" : null,
+          (!r.about || r.about === "" || r.about === "על עצמי") ? "על עצמי" : null,
           (!r.photoUrl) ? "תמונה" : null,
+          (!r.questionnaireCompletedAt) ? "שאלון מדעי" : null,
         ].filter(Boolean) as string[],
       }));
     }),
