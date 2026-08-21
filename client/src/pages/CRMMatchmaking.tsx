@@ -2974,6 +2974,7 @@ function MissingDataTab() {
                 <span className="font-bold text-[#191265]">{row.firstName} {row.lastName}</span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${missingCount >= 5 ? "bg-red-100 text-red-700" : missingCount >= 3 ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700"}`}>{missingCount} חוסרים</span>
                 {row.questionnaireCompletedAt ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">✓ שאלון</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold">⏳ ללא שאלון</span>}
+                {row.createdAt && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-semibold">📅 {new Date(row.createdAt).toLocaleDateString('he-IL')}</span>}
               </div>
               {/* Missing fields badges */}
               {row.missingFields && row.missingFields.length > 0 && (
