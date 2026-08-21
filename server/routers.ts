@@ -4971,6 +4971,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         maxAgePreference: z.number().optional(),
         partnerDescription: z.string().optional(),
         acceptsKids: z.boolean().optional(),
+        birthDate: z.string().optional(), // YYYY-MM-DD
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -4980,6 +4981,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const patch: Record<string, any> = { updatedAt: Date.now() };
         for (const [key, val] of Object.entries(fields)) {
           if (val !== undefined) patch[key] = val;
+        }
+        // Auto-calculate age from birthDate
+        if (input.birthDate) {
+          const bd = new Date(input.birthDate);
+          const today = new Date();
+          let age = today.getFullYear() - bd.getFullYear();
+          const monthDiff = today.getMonth() - bd.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bd.getDate())) age--;
+          patch.age = age;
         }
         await db.update(singles).set(patch).where(eq(singles.id, id));
         return { success: true };

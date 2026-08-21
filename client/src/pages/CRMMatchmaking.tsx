@@ -139,6 +139,7 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
     gender: single.gender || '',
     seekingGender: single.seekingGender || '',
     age: single.age || '',
+    birthDate: single.birthDate || '',
     city: single.city || '',
     phone: single.phone || '',
     email: single.email || '',
@@ -196,6 +197,7 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
     if (form.about !== (single.about || single.aboutMe || '')) payload.about = form.about;
     if (form.partnerDescription !== (single.partnerDescription || '')) payload.partnerDescription = form.partnerDescription;
     if (form.acceptsKids !== (single.acceptsKids ?? false)) payload.acceptsKids = form.acceptsKids;
+    if (form.birthDate && form.birthDate !== (single.birthDate || '')) payload.birthDate = form.birthDate;
     onSave(payload);
   };
 
@@ -220,6 +222,7 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
             <div><label className={labelCls}>מגדר</label><select className={selectCls} value={form.gender} onChange={e => set('gender', e.target.value)}><option value="">בחר</option><option value="male">גבר</option><option value="female">אישה</option></select></div>
             <div><label className={labelCls}>מחפש/ת</label><select className={selectCls} value={form.seekingGender} onChange={e => set('seekingGender', e.target.value)}><option value="">בחר</option><option value="male">גבר</option><option value="female">אישה</option><option value="any">לא משנה</option></select></div>
             <div><label className={labelCls}>גיל</label><input type="number" className={inputCls} value={form.age} onChange={e => set('age', e.target.value)} min={18} max={120} /></div>
+            <div><label className={labelCls}>תאריך לידה</label><input type="date" className={inputCls} value={form.birthDate} onChange={e => { set('birthDate', e.target.value); if (e.target.value) { const bd = new Date(e.target.value); const today = new Date(); let age = today.getFullYear() - bd.getFullYear(); const md = today.getMonth() - bd.getMonth(); if (md < 0 || (md === 0 && today.getDate() < bd.getDate())) age--; set('age', String(age)); } }} /></div>
             <div><label className={labelCls}>עיר</label><input className={inputCls} value={form.city} onChange={e => set('city', e.target.value)} /></div>
             <div><label className={labelCls}>גובה (ס"מ)</label><input type="number" className={inputCls} value={form.height} onChange={e => set('height', e.target.value)} min={100} max={250} /></div>
             <div><label className={labelCls}>טלפון</label><input className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
