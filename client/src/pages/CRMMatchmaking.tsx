@@ -543,6 +543,7 @@ export default function CRMMatchmaking() {
     hasKids?: boolean | null; numKids?: number | null; wantsKids?: string | null;
     wantsChildren?: string | null; about?: string | null; aboutMe?: string | null; partnerDescription?: string | null;
     height?: number | null; religiosity?: string | null; education?: string | null;
+    questionnaireCompletedAt?: number | null; questionnaireToken?: string | null;
   }>;
 
   const typedMatches = pendingMatches as Array<{
@@ -1102,6 +1103,68 @@ export default function CRMMatchmaking() {
                         {single.dnaType && <div><span className="font-semibold text-[#191265]">DNA:</span> {DNA_LABELS[single.dnaType] || single.dnaType}</div>}
                       </div>
                     </div>
+
+                    {/* Profile Completeness Indicators */}
+                    {(() => {
+                      const missing: string[] = [];
+                      if (!single.age || single.age === 0) missing.push("גיל");
+                      if (!single.height || single.height === 0) missing.push("גובה");
+                      if (!single.photoUrl) missing.push("תמונה");
+                      if (!single.dnaType) missing.push("DNA");
+                      if (!single.about && !(single as any).aboutMe) missing.push("על עצמי");
+                      if (!single.partnerDescription) missing.push("מחפש/ת");
+                      if (!single.occupation) missing.push("תעסוקה");
+                      if (!single.religiosity) missing.push("דת");
+                      if (!single.city) missing.push("עיר");
+                      
+                      const qStatus = (single as any).questionnaireCompletedAt 
+                        ? "full" 
+                        : "none";
+                      
+                      const isComplete = missing.length === 0 && qStatus === "full";
+                      
+                      return (
+                        <div className="mt-3 flex flex-wrap gap-1.5 items-center">
+                          {/* Overall profile status */}
+                          {isComplete ? (
+                            <span className="text-[10px] px-2 py-1 rounded-full font-semibold bg-green-100 text-green-700">✅ פרופיל מלא</span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-1 rounded-full font-semibold bg-red-100 text-red-700">⚠️ פרופיל חסר</span>
+                          )}
+                          
+                          {/* Questionnaire status */}
+                          {qStatus === "full" ? (
+                            <span className="text-[10px] px-2 py-1 rounded-full font-semibold bg-green-100 text-green-700">🔬 שאלון מדעי מלא</span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-1 rounded-full font-semibold bg-orange-100 text-orange-700">🔬 שאלון מדעי לא מולא</span>
+                          )}
+                          
+                          {/* Missing fields */}
+                          {missing.length > 0 && (
+                            <span className="text-[10px] px-2 py-1 rounded-full font-semibold bg-yellow-100 text-yellow-800" title={`חסר: ${missing.join(", ")}`}>
+                              📋 חסר: {missing.join(", ")}
+                            </span>
+                          )}
+                          
+                          {/* Send completion request button */}
+                          {(!isComplete && single.phone) && (
+                            <button
+                              onClick={() => {
+                                const token = (single as any).questionnaireToken;
+                                const link = token ? `https://hilitcaspi.com/join/questionnaire?token=${token}` : `https://hilitcaspi.com/my-profile?email=${single.email}`;
+                                const msg = `היי ${single.firstName}, חסרים לנו כמה פרטים בפרופיל שלך במאגר של הילית כספי כדי שנוכל למצוא לך התאמות מדויקות. השלימו כאן: ${link}`;
+                                navigator.clipboard.writeText(msg);
+                                alert("הודעת השלמה הועתקה ללוח! אפשר להדביק בוואטסאפ");
+                              }}
+                              className="text-[10px] px-2 py-1 rounded-full font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                            >
+                              📩 העתק הודעת השלמה
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {(single.about || single.aboutMe) && (
                       <div className="mt-2 text-sm">
                         <span className="font-semibold text-[#191265]">על עצמי:</span>

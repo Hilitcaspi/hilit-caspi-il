@@ -506,6 +506,12 @@
 ## CRM Edit: Add seekingGender Option (Aug 20)
 - [x] Add seekingGender (מחפש גבר/אישה) to the CRM profile edit modal
 
+## Profile Completeness Indicators in CRM (Aug 21)
+- [x] Add questionnaire status badge (full/not filled) to each profile card
+- [x] Add overall profile completeness badge (complete/missing)
+- [x] Show which specific fields are missing
+- [x] Add "copy completion message" button for incomplete profiles
+
 ## Critical Flow Bugs (Aug 12)
 - [x] FIX: ScientificQuestionnaire asks for personal details again when profile already has them from registration
 - [x] FIX: Age/height validation error crashes questionnaire submission (should skip gracefully)
