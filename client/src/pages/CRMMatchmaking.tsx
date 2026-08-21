@@ -1034,6 +1034,15 @@ export default function CRMMatchmaking() {
                     >
                       {selectedSingle === single.id ? "סגור" : "פרטים"}
                     </button>
+                    {/* Profile completeness mini indicator */}
+                    {(() => {
+                      const hasMissing = !single.age || single.age === 0 || !single.height || !single.photoUrl || !single.dnaType || (!single.about && !(single as any).aboutMe) || !single.partnerDescription || !single.occupation || !single.religiosity || !single.city || !(single as any).questionnaireCompletedAt;
+                      return hasMissing ? (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-red-100 text-red-600" title="פרטים חסרים">🔴</span>
+                      ) : (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-green-100 text-green-600" title="פרופיל מלא">🟢</span>
+                      );
+                    })()}
                   </div>
                 </div>
                 {selectedSingle === single.id && (
