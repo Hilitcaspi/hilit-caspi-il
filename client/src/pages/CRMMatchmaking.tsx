@@ -2900,6 +2900,7 @@ function MissingDataTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [filterSeverity, setFilterSeverity] = useState<"all" | "critical" | "medium" | "low">("all");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const getEdit = (id: number, field: string, fallback: string) =>
     edits[id]?.[field] ?? fallback;
   const setField = (id: number, field: string, value: string) =>
@@ -2930,7 +2931,12 @@ function MissingDataTab() {
 
   // Sort by severity (most missing first)
   const sortedRows = [...rows].sort((a: any, b: any) => (b.missingFields?.length || 0) - (a.missingFields?.length || 0));
-  const filteredRows = sortedRows.filter((row: any) => {
+  const searchedRows = sortedRows.filter((row: any) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    return (row.firstName || '').toLowerCase().includes(q) || (row.lastName || '').toLowerCase().includes(q) || (row.email || '').toLowerCase().includes(q) || (row.phone || '').includes(q);
+  });
+  const filteredRows = searchedRows.filter((row: any) => {
     const count = row.missingFields?.length || 0;
     if (filterSeverity === "critical") return count >= 5;
     if (filterSeverity === "medium") return count >= 3 && count < 5;
@@ -2953,6 +2959,13 @@ function MissingDataTab() {
           <button onClick={() => setFilterSeverity("medium")} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterSeverity === "medium" ? "bg-orange-600 text-white" : "bg-orange-100 text-orange-700"}`}>🟠 בינוני 3-4 ({mediumCount})</button>
           <button onClick={() => setFilterSeverity("low")} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterSeverity === "low" ? "bg-yellow-600 text-white" : "bg-yellow-100 text-yellow-700"}`}>🟡 קל 1-2 ({lowCount})</button>
         </div>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="🔍 חיפוש לפי שם, מייל או טלפון..."
+          className="w-full mt-2 border border-amber-200 rounded-lg px-3 py-2 text-sm text-[#191265] focus:outline-none focus:border-[#191265] bg-white"
+        />
       </div>
       {filteredRows.length === 0 && (
         <div className="bg-white rounded-xl p-8 text-center text-[#727272]">
