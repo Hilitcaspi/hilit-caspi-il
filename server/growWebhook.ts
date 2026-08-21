@@ -330,8 +330,9 @@ async function handleDatabase(email: string, name: string, phone: string, transa
 
   await notifyOwner({ title: "תשלום מאגר חדש! 💛", content: `${name} (${email}) שילם דמי רישום למאגר ב-299 ₪. Transaction: ${transactionId || 'N/A'}` });
 
-  // Check for incomplete profile and alert Hilit immediately
-  setImmediate(async () => {
+  // Check for incomplete profile after 24 hours (give user time to complete questionnaires)
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+  setTimeout(async () => {
     try {
       const db2 = await getDb();
       if (!db2) return;
@@ -360,9 +361,9 @@ async function handleDatabase(email: string, name: string, phone: string, transa
         }).catch(() => {});
       }
     } catch (e) {
-      console.error("[GrowWebhook] Incomplete profile alert failed:", e);
+      console.error("[GrowWebhook] 24h incomplete profile alert failed:", e);
     }
-  });
+  }, TWENTY_FOUR_HOURS);
 
   // Send personal join link email
   sendEmail({
