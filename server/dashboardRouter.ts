@@ -15,8 +15,8 @@ const PRODUCT_PRICES: Record<string, number> = {
   guide: 149,
   course: 249,
   session: 500,
-  coaching: 2900,
-  coaching_mas: 2900,
+  coaching: 2960,
+  coaching_mas: 4200,
   bundle_tubav: 349,
 };
 
@@ -272,9 +272,11 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
   const [purchaseRows] = await db.execute(sql`
     SELECT product,
            COUNT(*) AS purchases,
-           SUM(CAST(COALESCE(sum, 0) AS DECIMAL(12,2))) AS revenue
-    FROM payment_leads
-    WHERE created_at >= ${startDate} AND created_at <= ${endDate}
+           SUM(amount_agorot) / 100 AS revenue,
+           SUM(CASE WHEN amount_source = 'grow' THEN 1 ELSE 0 END) AS actualPurchases,
+           SUM(CASE WHEN amount_source = 'estimated' THEN 1 ELSE 0 END) AS estimatedPurchases
+    FROM completed_payments
+    WHERE paid_at >= ${startDate} AND paid_at <= ${endDate}
     GROUP BY product
     ORDER BY revenue DESC
   `) as any;
@@ -283,7 +285,10 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
     product: String(row.product || "unknown"),
     purchases: Number(row.purchases || 0),
     revenue: Number(row.revenue || 0),
+    actualPurchases: Number(row.actualPurchases || 0),
+    estimatedPurchases: Number(row.estimatedPurchases || 0),
   }));
+  const estimatedTransactionCount = products.reduce((sum, product) => sum + product.estimatedPurchases, 0);
   const since = new Date(startDate).toISOString().slice(0, 10);
   const until = new Date(endDate).toISOString().slice(0, 10);
   const meta = await fetchMetaAdsInsights(since, until);
@@ -303,13 +308,16 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
     ...summary,
     expenses: expenseRows.sort((a, b) => b.expenseDate - a.expenseDate),
     dataQuality: {
-      revenueBasis: "payment_leads.sum",
+      revenueBasis: "completed_payments: סכום Grow בפועל, עם אומדן מסומן לעסקאות היסטוריות",
       metaBasis: process.env.META_ADS_TOKEN ? "Meta Ads API" : "unavailable",
       manualExpenseCount: expenseRows.length,
-      isComplete: expenseRows.length > 0,
-      warning: expenseRows.length > 0
-        ? "הדוח כולל הכנסה בפועל, Meta והוצאות שהוזנו ידנית. יש לוודא שכל הוצאות החודש הוזנו."
-        : "טרם הוזנו הוצאות שכר, ספקים, סליקה, תוכנות ומסים; הרווח המוצג חלקי ואינו רווח חשבונאי סופי.",
+      estimatedTransactionCount,
+      isComplete: expenseRows.length > 0 && estimatedTransactionCount === 0,
+      warning: estimatedTransactionCount > 0
+        ? `${estimatedTransactionCount} עסקאות היסטוריות מחושבות לפי מחירון ולא לפי סכום Grow. עסקאות חדשות נשמרות מעתה בסכום ששולם בפועל.`
+        : expenseRows.length > 0
+          ? "הדוח כולל הכנסה בפועל, Meta והוצאות שהוזנו ידנית. יש לוודא שכל הוצאות החודש הוזנו."
+          : "טרם הוזנו הוצאות שכר, ספקים, סליקה, תוכנות ומסים; הרווח המוצג חלקי ואינו רווח חשבונאי סופי.",
     },
   };
 }

@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
 import OperationsSection from "@/components/OperationsSection";
+import MarketingMessageLibrary from "@/components/MarketingMessageLibrary";
+import OutcomeSegmentsSection from "@/components/OutcomeSegmentsSection";
 
 type ChartPoint = { label: string; value: number; color?: string };
 
@@ -171,6 +173,7 @@ export default function MatchmakingDashboard() {
     dailySignups,
     dailyMatches,
     meta,
+    outcomeSegments,
   } = data;
 
   const kpiCards = [
@@ -272,6 +275,12 @@ export default function MatchmakingDashboard() {
           </div>
         </article>
       </section>
+
+      <OutcomeSegmentsSection
+        bySource={outcomeSegments?.bySource || []}
+        byProduct={outcomeSegments?.byProduct || []}
+        bySegment={outcomeSegments?.bySegment || []}
+      />
 
       <section className="grid grid-cols-1 xl:grid-cols-[1.25fr_0.75fr] gap-4">
         <article className="bg-white rounded-2xl p-5 shadow-sm border border-[#e9e8e8]">
@@ -385,6 +394,17 @@ export default function MatchmakingDashboard() {
       <PlusPilotAdminSection />
 
       <OperationsSection />
+
+      <MarketingMessageLibrary
+        totalActive={kpis.totalActive}
+        femaleRate={balance.femaleRate}
+        maleRate={balance.maleRate}
+        profileCompletenessRate={quality.completeRate}
+        scientificRate={quality.scientificRate}
+        coverageRate={kpis.coverageRate}
+        medianDaysToFirstMatch={kpis.medianDaysToFirstMatch}
+        updatedAt={meta.calculatedAt}
+      />
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <article className="bg-white rounded-2xl p-5 shadow-sm border border-[#e9e8e8]">

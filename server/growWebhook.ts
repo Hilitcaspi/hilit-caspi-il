@@ -33,7 +33,7 @@
 import crypto from "crypto";
 import { and, eq, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency } from "../drizzle/schema";
+import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency, completedPayments } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
 import { sendSMS } from "./vibrate";
@@ -649,6 +649,33 @@ export async function handleGrowWebhook(body: any): Promise<void> {
       case "database": await handleDatabase(email, name, phone, transactionId); break;
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
+    }
+
+    // Persist the actual amount paid as the P&L revenue source of truth.
+    // The idempotency guard above prevents Grow's dual delivery from duplicating revenue.
+    if (sum > 0) {
+      try {
+        const db = await getDb();
+        if (db) {
+          const normalizedTransaction = transactionId || `grow-${email}-${product}-${Date.now()}`;
+          const dedupeKey = `${email}|${product}|${normalizedTransaction}`;
+          await db.insert(completedPayments).values({
+            transactionId: normalizedTransaction,
+            dedupeKey,
+            email,
+            product,
+            amountAgorot: Math.round(sum * 100),
+            amountSource: "grow",
+            paidAt: Date.now(),
+            createdAt: Date.now(),
+          }).onDuplicateKeyUpdate({ set: {
+            amountAgorot: Math.round(sum * 100),
+            amountSource: "grow",
+          }});
+        }
+      } catch (amountErr) {
+        console.error(`[GrowWebhook] Failed to persist completed payment amount for ${email}:`, amountErr);
+      }
     }
 
     // Save UTM attribution to crmLeads if we have any UTM data

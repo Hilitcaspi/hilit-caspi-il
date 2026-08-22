@@ -7,7 +7,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents } from "../drizzle/schema";
+import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
 import { operationsRouter } from "./operationsRouter";
@@ -25,6 +25,7 @@ import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as
 import { sendEmail } from "./brevo";
 import { sendSMS, buildMatchSmsMessage } from "./vibrate";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
+import { calculateOutcomeSegments } from "./matchmakingSegments";
 import {
   parseMatchOutcomeNotes,
   setAdminOutcome,
@@ -5309,7 +5310,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const now = Date.now();
         const from = input.from || 0;
         const to = input.to || now;
-        const [allSingles, allMatches] = await Promise.all([
+        const [allSingles, allMatches, leadAttribution, purchaseHistory] = await Promise.all([
           db.select({
             id: singles.id,
             firstName: singles.firstName,
@@ -5332,6 +5333,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             isPaid: singles.isPaid,
             isSeed: singles.isSeed,
             subscriptionRenewsAt: singles.subscriptionRenewsAt,
+            registrationSource: singles.registrationSource,
+            utmSource: singles.utmSource,
+            utmCampaign: singles.utmCampaign,
           }).from(singles).where(eq(singles.isSeed, false)),
           db.select({
             id: matches.id,
@@ -5348,9 +5352,75 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             returnedToPoolAt: matches.returnedToPoolAt,
             matchDetailStatus: matches.matchDetailStatus,
           }).from(matches),
+          db.select({
+            singleId: crmLeads.singleId,
+            email: crmLeads.email,
+            source: crmLeads.source,
+            product: crmLeads.product,
+            utmSource: crmLeads.utmSource,
+            utmCampaign: crmLeads.utmCampaign,
+          }).from(crmLeads),
+          db.select({ email: paymentLeads.email, product: paymentLeads.product }).from(paymentLeads),
         ]);
 
-        return calculateMatchmakingMetrics(allSingles as any, allMatches as any, { from, to, now });
+        const metrics = calculateMatchmakingMetrics(allSingles as any, allMatches as any, { from, to, now });
+        const leadBySingle = new Map<number, any>();
+        const leadByEmail = new Map<string, any>();
+        for (const lead of leadAttribution) {
+          if (lead.singleId) leadBySingle.set(lead.singleId, lead);
+          if (lead.email) leadByEmail.set(lead.email.toLowerCase(), lead);
+        }
+        const productsByEmail = new Map<string, Set<string>>();
+        for (const purchase of purchaseHistory) {
+          const key = (purchase.email || "").toLowerCase();
+          if (!key) continue;
+          if (!productsByEmail.has(key)) productsByEmail.set(key, new Set());
+          productsByEmail.get(key)!.add(purchase.product || "database");
+        }
+        const sourceLabels: Record<string, string> = {
+          meta: "Meta Ads",
+          facebook: "Meta Ads",
+          instagram: "Instagram",
+          email: "מייל",
+          referral: "הפניה",
+          organic: "אורגני",
+          direct: "ישיר",
+          dna_quiz: "שאלון DNA",
+          podcast: "פודקאסט",
+        };
+        const religiosityLabels: Record<string, string> = {
+          secular: "חילוני/ת",
+          traditional: "מסורתי/ת",
+          religious: "דתי/ה",
+          orthodox: "חרדי/ת",
+          datlash: "דתל״ש/ית",
+        };
+        const segmentedSingles = allSingles
+          .filter(single => single.isActive && single.isPaid)
+          .map(single => {
+            const email = (single.email || "").toLowerCase();
+            const lead = leadBySingle.get(single.id) || leadByEmail.get(email);
+            const rawSource = String(single.utmSource || lead?.utmSource || single.registrationSource || lead?.source || "לא ידוע").toLowerCase();
+            const sourceKey = rawSource.includes("facebook") || rawSource.includes("meta") ? "meta" : rawSource;
+            const products = productsByEmail.get(email) || new Set<string>(["database"]);
+            const productLabel = products.has("coaching") || products.has("coaching_mas")
+              ? "מאגר + ליווי"
+              : products.has("course")
+                ? "מאגר + קורס"
+                : products.has("guide")
+                  ? "מאגר + מדריך"
+                  : "מאגר בלבד";
+            return {
+              ...single,
+              sourceLabel: sourceLabels[sourceKey] || rawSource || "לא ידוע",
+              productLabel,
+              religiosity: religiosityLabels[single.religiosity || ""] || single.religiosity || "לא ידוע",
+            };
+          });
+        return {
+          ...metrics,
+          outcomeSegments: calculateOutcomeSegments(segmentedSingles, allMatches as any),
+        };
       }),
   }),
 

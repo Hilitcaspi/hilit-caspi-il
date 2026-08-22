@@ -9,7 +9,8 @@
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "vitest run",
+    "test": "vitest run --exclude server/brevo.test.ts --exclude server/growPayment.live.test.ts --exclude server/growProxy.test.ts --exclude server/integrations.live.test.ts",
+    "test:live": "vitest run server/brevo.test.ts server/growPayment.live.test.ts server/growProxy.test.ts server/integrations.live.test.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

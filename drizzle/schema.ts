@@ -687,6 +687,28 @@ export type PaymentLead = typeof paymentLeads.$inferSelect;
 export type InsertPaymentLead = typeof paymentLeads.$inferInsert;
 
 /**
+ * Completed payments are the accounting source of truth for P&L revenue.
+ * New rows are written from Grow with the actual paid amount. Historical rows
+ * can be backfilled from product prices and remain explicitly marked estimated.
+ */
+export const completedPayments = mysqlTable("completed_payments", {
+  id: int("id").primaryKey().autoincrement(),
+  transactionId: varchar("transaction_id", { length: 200 }).notNull(),
+  dedupeKey: varchar("dedupe_key", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  product: varchar("product", { length: 50 }).notNull(),
+  amountAgorot: int("amount_agorot").notNull(),
+  amountSource: mysqlEnum("amount_source", ["grow", "estimated"]).notNull().default("grow"),
+  paidAt: bigint("paid_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  transactionIdx: uniqueIndex("completed_payment_transaction_idx").on(t.transactionId),
+  dedupeIdx: uniqueIndex("completed_payment_dedupe_idx").on(t.dedupeKey),
+}));
+export type CompletedPayment = typeof completedPayments.$inferSelect;
+export type InsertCompletedPayment = typeof completedPayments.$inferInsert;
+
+/**
  * Business expenses entered by the team for the monthly P&L.
  * Amounts are stored in agorot to avoid floating-point rounding.
  * Meta Ads spend is fetched live and is not duplicated in this table.
