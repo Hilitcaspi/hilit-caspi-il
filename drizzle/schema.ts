@@ -718,6 +718,30 @@ export type BusinessExpense = typeof businessExpenses.$inferSelect;
 export type InsertBusinessExpense = typeof businessExpenses.$inferInsert;
 
 /**
+ * Database Plus pilot lifecycle. One row per single keeps the waitlist,
+ * eligibility, invitation, conversion and retention funnel auditable.
+ */
+export const plusPilotMembers = mysqlTable("plus_pilot_members", {
+  id: int("id").primaryKey().autoincrement(),
+  singleId: int("single_id").notNull().unique(),
+  status: mysqlEnum("status", ["waitlist", "eligible", "invited", "active", "declined", "churned"]).default("waitlist").notNull(),
+  eligibilityScore: int("eligibility_score"),
+  eligibilityReasons: text("eligibility_reasons"),
+  source: varchar("source", { length: 100 }).default("personal_area").notNull(),
+  pilotCohort: varchar("pilot_cohort", { length: 100 }),
+  pilotPriceAgorot: int("pilot_price_agorot"),
+  waitlistedAt: bigint("waitlisted_at", { mode: "number" }).notNull(),
+  invitedAt: bigint("invited_at", { mode: "number" }),
+  activatedAt: bigint("activated_at", { mode: "number" }),
+  endedAt: bigint("ended_at", { mode: "number" }),
+  lastEngagedAt: bigint("last_engaged_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type PlusPilotMember = typeof plusPilotMembers.$inferSelect;
+export type InsertPlusPilotMember = typeof plusPilotMembers.$inferInsert;
+
+/**
  * Webhook idempotency - ensures each Grow transactionId is processed exactly once.
  * Grow sends the webhook twice (server notification + payment confirmation).
  * Using a unique constraint on transactionId makes the INSERT atomic and race-condition-safe.

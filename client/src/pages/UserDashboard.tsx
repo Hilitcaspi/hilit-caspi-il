@@ -10,6 +10,86 @@ import DatabaseExpectations from "@/components/DatabaseExpectations";
 import { trpc } from "@/lib/trpc";
 import { motion, AnimatePresence } from "framer-motion";
 
+function PlusPilotCard({ email, token }: { email: string; token: string }) {
+  const utils = trpc.useUtils();
+  const statusQuery = trpc.plusPilot.getMyStatus.useQuery(
+    { email, token },
+    { enabled: Boolean(email && token), retry: false },
+  );
+  const joinWaitlist = trpc.plusPilot.joinWaitlist.useMutation({
+    onSuccess: () => utils.plusPilot.getMyStatus.invalidate({ email, token }),
+  });
+
+  if (statusQuery.isLoading) {
+    return <div className="mb-4 h-32 rounded-2xl bg-white/60 animate-pulse border border-[#e9e8e8]" />;
+  }
+  if (!statusQuery.data) return null;
+
+  const { status, eligibility, benefits } = statusQuery.data;
+  const registered = (status as string) !== "none";
+  const statusLabel: Record<string, string> = {
+    waitlist: "ברשימת ההמתנה",
+    eligible: "מתאים/ה לפיילוט",
+    invited: "הוזמנת לפיילוט",
+    active: "Plus פעיל",
+    declined: "ההזמנה לא מומשה",
+    churned: "הפיילוט הסתיים",
+  };
+
+  return (
+    <section className="mb-4 overflow-hidden rounded-2xl border border-[#e3cf74] bg-gradient-to-br from-white to-[#fff8da] text-right shadow-sm">
+      <div className="p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-bold text-[#8b7420]">פיילוט מוגבל לחברי המאגר</p>
+            <h4 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h4>
+            <p className="mt-1 max-w-xl text-xs leading-6 text-[#555]">
+              יותר שקיפות, בקרה ועדכון העדפות — בלי חשיפת זהות לפני אישור הדדי ובלי הבטחה לכמות או לתדירות קבועה של התאמות.
+            </p>
+          </div>
+          {registered && (
+            <span className="rounded-full bg-[#191265] px-3 py-1.5 text-[11px] font-black text-white">
+              {statusLabel[status] || status}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          {benefits.map((benefit: string) => (
+            <div key={benefit} className="rounded-xl border border-[#eadf9e] bg-white/80 p-3 text-[11px] leading-5 text-[#555]">
+              <span className="ml-1 font-black text-[#191265]">✓</span>{benefit}
+            </div>
+          ))}
+        </div>
+
+        {status === "active" && (
+          <div className="mt-4 rounded-xl bg-[#191265] p-4 text-white">
+            <p className="text-xs text-white/70">מועמדים שנמצאים כרגע בבדיקה אנונימית</p>
+            <p className="mt-1 text-3xl font-black text-[#ffe27c]">{eligibility.potentialMatchesUnderReview}</p>
+            <p className="mt-1 text-[11px] leading-5 text-white/60">המספר מציג אפשרויות בבדיקה בלבד ואינו מבטיח שתישלח הצעה.</p>
+          </div>
+        )}
+
+        {!registered && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadf9e] pt-4">
+            <p className="text-[11px] leading-5 text-[#6b6250]">
+              ההצטרפות לרשימה אינה רכישה ואינה יוצרת התחייבות. נזמין קבוצה קטנה ונמדוד תוצאות לפני פתיחה רחבה.
+            </p>
+            <button
+              type="button"
+              onClick={() => joinWaitlist.mutate({ email, token, source: "personal_area" })}
+              disabled={joinWaitlist.isPending}
+              className="rounded-xl bg-[#191265] px-5 py-2.5 text-xs font-black text-white transition-colors hover:bg-[#1800ad] disabled:opacity-50"
+            >
+              {joinWaitlist.isPending ? "מצרף/ת..." : "רוצה להצטרף לרשימת ההמתנה"}
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DnaType = "leader" | "romantic" | "free_spirit" | "anchor";
 
@@ -713,16 +793,7 @@ export default function UserDashboard() {
       {/* Tab Content */}
 	     <div className="max-w-2xl mx-auto px-4 py-6 pb-16">
 	        <DatabaseExpectations compact showStats={false} className="mb-4" />
-	        {/* Premium Plus teaser - visible in all tabs */}
-        <div className="mb-4 border-2 border-dashed border-[#ffe27c]/60 rounded-2xl p-4 text-right bg-gradient-to-r from-[#191265]/5 to-[#ffe27c]/10 animate-pulse" style={{ animationDuration: '3s' }}>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">✨</span>
-            <h4 className="text-[#191265] font-black text-sm">בקרוב — מנוי פלוס!</h4>
-          </div>
-          <p className="text-[#555] text-xs leading-relaxed">
-            בקרוב תוכלו לראות יותר מידע על ההתאמות שמחכות לכם, לקבל כלי מעקב ועדכונים מתקדמים, ולהנות מתכונות בלעדיות. עקבו אחרינו לעדכונים.
-          </p>
-        </div>
+	        <PlusPilotCard email={email} token={token} />
         <AnimatePresence mode="wait">
           {/* ── Profile Tab ── */}
           {activeTab === "profile" && (
