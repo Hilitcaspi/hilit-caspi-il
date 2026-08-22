@@ -289,7 +289,9 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard">("singles");
+  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard">(() =>
+    new URLSearchParams(window.location.search).get("tab") === "dashboard" ? "dashboard" : "singles"
+  );
   // Filter-search tab state
   const [filterGender, setFilterGender] = useState("");
   const [filterMinAge, setFilterMinAge] = useState("");
