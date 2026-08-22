@@ -47,6 +47,7 @@ const CourseView = lazy(() => import("@/pages/CourseView"));
 const SingleSessionSales = lazy(() => import("@/pages/SingleSessionSales"));
 const ThankYouSession = lazy(() => import("@/pages/ThankYouSession"));
 const MatchRespond = lazy(() => import("@/pages/MatchRespond"));
+const MatchOutcomeFeedback = lazy(() => import("@/pages/MatchOutcomeFeedback"));
 const MatchOwnerApprove = lazy(() => import("@/pages/MatchOwnerApprove"));
 const CRMMatchmaking = lazy(() => import("@/pages/CRMMatchmaking"));
 const ScientificQuestionnaire = lazy(() => import("@/pages/ScientificQuestionnaire"));
@@ -203,6 +204,7 @@ function UsRouter() {
           <Route path={"/crm/blog"} component={BlogAdmin} />
           <Route path={"/crm"} component={CRM} />
           <Route path={"/match/respond"} component={MatchRespond} />
+          <Route path={"/match/outcome"} component={MatchOutcomeFeedback} />
           <Route path={"/match/owner-approve"} component={MatchOwnerApprove} />
           <Route path={"/team/login"} component={TeamLogin} />
           <Route path={"/404"} component={NotFound} />
@@ -260,6 +262,7 @@ function HeRouter() {
           <Route path={"/terms/single-session"} component={TermsSingleSession} />
           <Route path={"/thank-you/session"} component={ThankYouSession} />
           <Route path={"/match/respond"} component={MatchRespond} />
+          <Route path={"/match/outcome"} component={MatchOutcomeFeedback} />
           <Route path={"/match/return-to-pool"} component={lazy(() => import("./pages/MatchReturnToPool"))} />
           <Route path={"/match/owner-approve"} component={MatchOwnerApprove} />
           <Route path={"/live/thank-you"} component={LiveEventThankYou} />

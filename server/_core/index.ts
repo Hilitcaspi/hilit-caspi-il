@@ -645,6 +645,40 @@ async function startServer() {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCHEDULED TASK: Database 90-day customer journey
+  // Runs daily via Manus Heartbeat. The job is idempotent through email_log.
+  // ═══════════════════════════════════════════════════════════════════════════
+  app.post("/api/scheduled/database-90-day-journey", express.json(), async (req, res) => {
+    try {
+      let isAuthorized = false;
+      const cronHeader = req.headers["x-manus-cron-task-uid"];
+      if (cronHeader) {
+        isAuthorized = true;
+      } else {
+        try {
+          const user = await sdk.authenticateRequest(req as any);
+          if (user && (user.role === "admin" || (user as any).isCron)) isAuthorized = true;
+        } catch { /* invalid session */ }
+      }
+      if (!isAuthorized) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+      const { processDatabase90DayJourney } = await import("../database90DayJourney");
+      const result = await processDatabase90DayJourney({ limit: 100 });
+      console.log("[Database90DayJourney]", result);
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      console.error("[Database90DayJourney] Error:", err);
+      void sendErrorAlert({ source: "express:database-90-day-journey", error: err, context: { route: req.path } });
+      res.status(500).json({
+        error: String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+        context: { url: req.originalUrl, taskUid: req.headers["x-manus-cron-task-uid"] || null },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // ─── Team Member Login (form POST with redirect — Chrome mobile fallback) ──
   app.post("/api/team/login-form", async (req, res) => {
     try {

@@ -350,11 +350,11 @@ export default function Quiz() {
                 <p className="text-[#727272] mb-6 leading-relaxed">
                   במאגר הרווקים הבלעדי שלי יש מאות רווקים שעברו סינון קפדני.
                   <br />
-                  <strong className="text-[#191265]">אני אמצא לך 3 התאמות מדויקות - בהתאם לסוג האישיות שלך.</strong>
+                  <strong className="text-[#191265]">הפרופיל והשאלון שלך ישמשו לאיתור התאמות הדדיות ורלוונטיות — לא להצעות אקראיות.</strong>
                 </p>
                 <div className="bg-[#f0eadc] rounded-2xl p-5 mb-6 text-right">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-[#191265] font-bold">גישה למאגר + 3 התאמות אישיות</span>
+                    <span className="text-[#191265] font-bold">גישה למאגר ותהליך התאמה מקצועי</span>
                     <span className="text-[#191265] font-black text-xl">₪299</span>
                   </div>
                   <div className="flex justify-between items-center mb-2">
@@ -362,7 +362,7 @@ export default function Quiz() {
                     <span className="text-green-600 text-sm font-medium">כלול</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-[#727272] text-sm">ליווי אישי מהילית</span>
+                    <span className="text-[#727272] text-sm">בדיקת התאמות ושיקול דעת מקצועי</span>
                     <span className="text-green-600 text-sm font-medium">כלול</span>
                   </div>
                 </div>

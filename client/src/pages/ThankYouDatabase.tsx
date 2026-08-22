@@ -11,6 +11,7 @@ import { trackPurchase } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import { gaPurchase } from "@/lib/ga";
 import { trpc } from "@/lib/trpc";
+import DatabaseExpectations from "@/components/DatabaseExpectations";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, שילמתי כניסה למאגר הרווקים באתר ואשמח לעזרה");
 const INSTAGRAM_URL = "https://www.instagram.com/hilitcaspi_relationship";
@@ -111,6 +112,15 @@ export default function ThankYouDatabase() {
           <p className="text-[#727272] text-lg leading-relaxed mb-6">
             ברוכים הבאים למאגר הרווקים של הילית כספי.
           </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.32, duration: 0.6 }}
+          className="mb-6"
+        >
+          <DatabaseExpectations compact showStats={false} />
         </motion.div>
 
         {/* Direct questionnaire CTA */}
@@ -243,7 +253,7 @@ export default function ThankYouDatabase() {
               </div>
             ))}
           </div>
-          <p className="text-[#727272] text-xs mt-4 text-center">זמן ממוצע עד לחיבור הראשון: 2-4 שבועות</p>
+          <p className="text-[#727272] text-xs mt-4 text-center">הזמן להצעה ראשונה משתנה לפי ההתאמה ההדדית למאפיינים ולהעדפות של שני הצדדים.</p>
         </motion.div>
 
         {/* CTA buttons */}

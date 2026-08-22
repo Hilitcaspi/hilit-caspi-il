@@ -319,6 +319,7 @@ export default function CRMMatchmaking() {
   const [inviteNote, setInviteNote] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [hilitsNotes, setHilitsNotes] = useState<Record<number, string>>({}); // matchId -> personal note
+  const [outcomeNotes, setOutcomeNotes] = useState<Record<number, string>>({});
   const [expandedMatch, setExpandedMatch] = useState<number | null>(null);
   const [singlesSearch, setSinglesSearch] = useState("");
   // Compatibility check state
@@ -485,6 +486,15 @@ export default function CRMMatchmaking() {
     onError: () => toast.error('שגיאה בעדכון'),
   });
 
+  const updateMatchOutcome = (trpc.matchmaking as any).updateMatchOutcome.useMutation({
+    onSuccess: (_: unknown, vars: { matchId: number }) => {
+      refetchMatches();
+      setOutcomeNotes(prev => { const next = { ...prev }; delete next[vars.matchId]; return next; });
+      toast.success("התוצאה נשמרה ואומתה");
+    },
+    onError: () => toast.error("שגיאה בשמירת התוצאה"),
+  });
+
   const sendMatchReminder = (trpc.matchmaking as any).sendMatchReminder.useMutation({
     onSuccess: () => toast.success("תזכורת נשלחה במייל! 📧"),
     onError: (err: any) => toast.error(err?.message || "שגיאה בשליחת תזכורת"),
@@ -554,6 +564,7 @@ export default function CRMMatchmaking() {
   const typedMatches = pendingMatches as Array<{
     id: number; singleAId: number; singleBId: number; score?: number | null;
     status: string; proposedAt?: number | null; createdAt: Date | number;
+    approvalTokenA?: string | null; approvalTokenB?: string | null;
     approvedByA: boolean; approvedByB: boolean;
     tokenAUsedAt?: number | null; tokenBUsedAt?: number | null;
     emailAOpenedAt?: number | null; emailBOpenedAt?: number | null;
@@ -593,6 +604,12 @@ export default function CRMMatchmaking() {
     singleAEmail?: string | null; singleBEmail?: string | null;
     singleAIsActive?: boolean | null; singleBIsActive?: boolean | null;
     returnedToPoolAt?: number | null;
+    outcomeFeedback?: {
+      participantA?: { status: string; rating?: number | null; comment?: string | null; testimonialText?: string | null; publicityScope: string; submittedAt: number } | null;
+      participantB?: { status: string; rating?: number | null; comment?: string | null; testimonialText?: string | null; publicityScope: string; submittedAt: number } | null;
+      adminNote?: string | null;
+      adminVerifiedAt?: number | null;
+    };
   }>;
 
   const typedTokens = (tokens as unknown) as Array<{
@@ -1963,7 +1980,7 @@ export default function CRMMatchmaking() {
                         <div className="space-y-3 mb-3">
                           {/* Detail status dropdown */}
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-semibold text-[#191265]">📊 סטאטוס:</span>
+                            <span className="text-xs font-semibold text-[#191265]">סטטוס תוצאה:</span>
                             <select
                               value={match.matchDetailStatus || ''}
                               onChange={(e) => {
@@ -1979,6 +1996,70 @@ export default function CRMMatchmaking() {
                               <option value="together">❤️ ביחד</option>
                               <option value="ended">🚫 לא הצליח</option>
                             </select>
+                            {match.outcomeFeedback?.adminVerifiedAt ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">מאומת</span>
+                            ) : (
+                              <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800">דורש אימות</span>
+                            )}
+                          </div>
+                          {(match.outcomeFeedback?.participantA || match.outcomeFeedback?.participantB) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {([
+                                { side: "A", name: match.singleAName, feedback: match.outcomeFeedback?.participantA },
+                                { side: "B", name: match.singleBName, feedback: match.outcomeFeedback?.participantB },
+                              ] as const).map(item => item.feedback ? (
+                                <div key={item.side} className="rounded-xl border border-[#e9e8e8] bg-white p-3 text-xs">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <strong className="text-[#191265]">דיווח: {item.name?.split(" ")[0]}</strong>
+                                    <span className="text-[#727272]">{new Date(item.feedback.submittedAt).toLocaleDateString("he-IL")}</span>
+                                  </div>
+                                  <p className="mt-1 text-[#444]">סטטוס: {({ not_contacted: "לא נוצר קשר", talking: "מדברים", date_scheduled: "נקבעה פגישה", met: "נפגשו", continuing: "ממשיכים", ended: "לא המשיך", relationship: "בזוגיות" } as Record<string, string>)[item.feedback.status] || item.feedback.status}</p>
+                                  {item.feedback.rating ? <p className="mt-1 text-[#444]">דירוג התאמה: {item.feedback.rating}/5</p> : null}
+                                  {item.feedback.comment ? <p className="mt-1 text-[#727272] leading-5">{item.feedback.comment}</p> : null}
+                                  {item.feedback.publicityScope !== "none" ? (
+                                    <p className="mt-2 rounded-lg bg-emerald-50 px-2 py-1 font-bold text-emerald-800">הסכמה לפרסום: {({ anonymous: "בעילום שם", first_name: "שם פרטי", full_name: "שם מלא", photo: "שם ותמונה" } as Record<string, string>)[item.feedback.publicityScope] || item.feedback.publicityScope}</p>
+                                  ) : (
+                                    <p className="mt-2 rounded-lg bg-gray-100 px-2 py-1 text-gray-600">אין הסכמה לפרסום</p>
+                                  )}
+                                </div>
+                              ) : null)}
+                            </div>
+                          )}
+                          <div className="rounded-xl border border-[#e9e8e8] bg-[#faf9f6] p-3">
+                            <label className="block text-[11px] font-bold text-[#191265] mb-1">הערת אימות פנימית</label>
+                            <textarea
+                              value={outcomeNotes[match.id] ?? match.outcomeFeedback?.adminNote ?? ""}
+                              onChange={event => setOutcomeNotes(prev => ({ ...prev, [match.id]: event.target.value }))}
+                              rows={2}
+                              className="w-full rounded-lg border border-[#ddd] bg-white px-3 py-2 text-xs"
+                              placeholder="למשל: שוחחתי עם שני הצדדים ואישרתי שהם ממשיכים יחד"
+                            />
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => updateMatchOutcome.mutate({ matchId: match.id, status: match.matchDetailStatus || null, adminNote: outcomeNotes[match.id] ?? match.outcomeFeedback?.adminNote ?? null, verified: true })}
+                                disabled={updateMatchOutcome.isPending}
+                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                שמירה ואימות
+                              </button>
+                              {match.outcomeFeedback?.adminVerifiedAt && (
+                                <button
+                                  type="button"
+                                  onClick={() => updateMatchOutcome.mutate({ matchId: match.id, status: match.matchDetailStatus || null, adminNote: outcomeNotes[match.id] ?? match.outcomeFeedback?.adminNote ?? null, verified: false })}
+                                  disabled={updateMatchOutcome.isPending}
+                                  className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-800"
+                                >
+                                  ביטול אימות
+                                </button>
+                              )}
+                              {match.approvalTokenA && (
+                                <button type="button" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/match/outcome?token=${match.approvalTokenA}`); toast.success(`קישור משוב הועתק עבור ${match.singleAName?.split(" ")[0]}`); }} className="rounded-lg border border-[#c9c4ef] bg-white px-3 py-1.5 text-xs font-bold text-[#191265]">העתק קישור ל־{match.singleAName?.split(" ")[0]}</button>
+                              )}
+                              {match.approvalTokenB && (
+                                <button type="button" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/match/outcome?token=${match.approvalTokenB}`); toast.success(`קישור משוב הועתק עבור ${match.singleBName?.split(" ")[0]}`); }} className="rounded-lg border border-[#c9c4ef] bg-white px-3 py-1.5 text-xs font-bold text-[#191265]">העתק קישור ל־{match.singleBName?.split(" ")[0]}</button>
+                              )}
+                            </div>
                           </div>
                           {/* Follow-up emails sent info */}
                           {(match.matchWeekFollowupSentAt || match.matchMonthFollowupSentAt) && (

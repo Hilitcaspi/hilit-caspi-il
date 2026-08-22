@@ -10,6 +10,7 @@ import { trackViewContent } from "@/lib/metaPixel";
 import { gaViewItem } from "@/lib/ga";
 import { motion, useInView } from "framer-motion";
 import { Link, useSearch } from "wouter";
+import DatabaseExpectations from "@/components/DatabaseExpectations";
 
 const CASUAL_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-casual_dac3228f.jpg";
 const DNA_QUIZ_URL = "/dna-quiz";
@@ -45,12 +46,6 @@ const STEPS = [
   { num: 3, title: "כניסה למאגר", desc: "תשלום חד-פעמי. אין דמי חבר חודשיים, אין הפתעות. משלמים פעם אחת ונכנסים." },
   { num: 4, title: "האלגוריתם עובד", desc: "האלגוריתם סורק את כל המאגר ומחפש התאמות מעל 80% על בסיס כל הממדים. רק ההתאמות הגבוהות ביותר מגיעות אליי לבדיקה אישית." },
   { num: 5, title: "אישור הדדי", desc: "שניכם מקבלים מייל ומחליטים בנפרד אם להתקדם לפגישה. רק אם שניכם אמרתם כן, הפרטים נחשפים. אם אחד מכם לא מעוניין, לא קורה כלום, וממשיכים הלאה עד שמגיעה ההתאמה הבאה." },
-];
-
-const COUPLE_TESTIMONIALS = [
-  { photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp", names: "רותם ועידו", when: "הכירו דרך המאגר, פברואר 2026", text: "נרשמתי למאגר ותוך חודשיים קיבלתי התאמה שהרגישה נכונה מהרגע הראשון. אנחנו ביחד כבר חצי שנה.", who: "רותם, 31" },
-  { photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp", names: "שי ומיכל", when: "הכירו דרך המאגר, נובמבר 2025", text: "ניסיתי אפליקציות שנים. המאגר של הילית שונה לגמרי. ההתאמות מדויקות כי מישהו באמת בדק את הפרופילים.", who: "שי, 35" },
-  { photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp", names: "אורית ואלון", when: "הכירו דרך המאגר, מאי 2025", text: "הפרופיל שלי עבר סינון אמיתי. ידעתי שכל מי שאני פוגשת רציני ומחפש את אותו הדבר. תוך 3 חודשים מצאתי.", who: "אורית, 36" },
 ];
 
 export default function DatabaseSales() {
@@ -246,10 +241,16 @@ export default function DatabaseSales() {
               ))}
             </div>
             <motion.p variants={fadeUp} className="text-center text-[#727272] text-xs mt-10 max-w-xl mx-auto leading-relaxed">
-              ממוצע 7-14 ימים מרגע ההצטרפות ועד להתאמה הראשונה (כשהאלגוריתם מזהה התאמה מתאימה)
+              זמן ההמתנה משתנה מאדם לאדם ותלוי בהתאמה הדדית למאפיינים ולהעדפות של שני הצדדים.
             </motion.p>
           </div>
         </AnimatedSection>
+      </section>
+
+      <section className="py-10 px-6 bg-[#f0eadc]">
+        <div className="max-w-3xl mx-auto">
+          <DatabaseExpectations showStats />
+        </div>
       </section>
 
       {/* ── WHO'S IN THE DATABASE ── */}
@@ -288,31 +289,25 @@ export default function DatabaseSales() {
         </AnimatedSection>
       </section>
 
-      {/* ── TESTIMONIALS ── */}
+      {/* ── VERIFIED OUTCOMES ── */}
       <section className="py-20 px-6 bg-white">
         <AnimatedSection>
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-10">
-              <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">סיפורי הצלחה אמיתיים</motion.p>
-              <motion.h2 variants={fadeUp} className="text-3xl font-black text-[#191265] mb-2">הם הכירו דרך המאגר.</motion.h2>
-              <motion.p variants={fadeUp} className="text-[#727272] text-base">סיפורים אמיתיים. לא שיווק.</motion.p>
+              <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">תוצאות, לא רק הרשמות</motion.p>
+              <motion.h2 variants={fadeUp} className="text-3xl font-black text-[#191265] mb-2">אנחנו מודדים את הדרך עד הקשר.</motion.h2>
+              <motion.p variants={fadeUp} className="text-[#727272] text-base max-w-2xl mx-auto leading-relaxed">כל הצעה, אישור הדדי, שיחה, פגישה והמשכיות נכנסים למעקב. כך אפשר לשפר את ההתאמות ולפרסם רק תוצאות שנבדקו ואושרו.</motion.p>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
-              {COUPLE_TESTIMONIALS.map((t) => (
-                <motion.div key={t.names} variants={fadeUp} className="bg-white rounded-2xl overflow-hidden shadow-md border border-[#e9e8e8]">
-                  <div className="relative h-52 overflow-hidden">
-                    <img src={t.photo} alt={t.names} className="w-full h-full object-cover object-[center_20%]" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#191265]/75 to-transparent" />
-                    <div className="absolute bottom-3 right-3">
-                      <div className="text-white font-black text-sm">{t.names}</div>
-                      <div className="text-[#ffe27c] text-xs">{t.when}</div>
-                    </div>
-                  </div>
-                  <div className="p-5 text-right">
-                    <div className="text-[#ffe27c] text-sm mb-2">★★★★★</div>
-                    <p className="text-[#727272] text-sm leading-relaxed mb-2">"{t.text}"</p>
-                    <p className="text-[#191265] text-xs font-semibold">{t.who}</p>
-                  </div>
+              {[
+                { num: "1", title: "הצעה ואישור", text: "אנחנו מודדים אם ההצעה נפתחה, האם כל צד אישר והאם נחשפו פרטים." },
+                { num: "2", title: "שיחה ופגישה", text: "המעקב בודק אם נוצר קשר, אם נקבעה פגישה ומה קרה לאחריה." },
+                { num: "3", title: "המשכיות וזוגיות", text: "תוצאה מפורסמת רק לאחר אימות והסכמה מפורשת לשימוש בשם, בציטוט או בתמונה." },
+              ].map((item) => (
+                <motion.div key={item.num} variants={fadeUp} className="bg-[#f8f6f0] rounded-2xl p-6 border border-[#e9e8e8] text-right">
+                  <div className="w-10 h-10 rounded-full bg-[#191265] text-[#ffe27c] font-black flex items-center justify-center mb-4">{item.num}</div>
+                  <h3 className="font-black text-[#191265] mb-2">{item.title}</h3>
+                  <p className="text-[#727272] text-sm leading-relaxed">{item.text}</p>
                 </motion.div>
               ))}
             </div>
@@ -328,7 +323,7 @@ export default function DatabaseSales() {
               מוכנים שאמצא אתכם?
             </motion.h2>
             <motion.p variants={fadeUp} className="text-white/65 text-lg mb-8 leading-relaxed max-w-lg mx-auto">
-              ממלאים שאלון DNA, יוצרים פרופיל, ואני עושה את השאר. תשלום חד-פעמי, ללא דמי חבר חודשיים, ללא התחייבות.
+              ממלאים שאלון DNA, יוצרים פרופיל, והמערכת ואני בודקות התאמות רלוונטיות. תשלום חד-פעמי, ללא דמי חבר חודשיים.
             </motion.p>
             <motion.div variants={fadeUp}>
               <Link href="/join?source=database">
@@ -337,8 +332,8 @@ export default function DatabaseSales() {
                 </span>
               </Link>
             </motion.div>
-            <motion.p variants={fadeUp} className="text-white/35 text-xs mt-5 max-w-lg mx-auto leading-relaxed">
-              ממוצע 7-14 ימים מרגע ההצטרפות ועד להתאמה הראשונה (כשהאלגוריתם מזהה התאמה מתאימה)
+            <motion.p variants={fadeUp} className="text-white/50 text-xs mt-5 max-w-lg mx-auto leading-relaxed">
+              אין התחייבות למספר התאמות או לתדירות קבועה. כל הצעה נשלחת רק לאחר שנמצאה התאמה הדדית ורלוונטית.
             </motion.p>
           </div>
         </AnimatedSection>

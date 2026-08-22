@@ -14,6 +14,7 @@ import { useLocation, useSearch } from "wouter";
 import { MATCH_QUESTIONS, IMPORTANCE_LABELS, CHAPTER2_QUESTION_IDS, PARENTS_ONLY_QUESTION_IDS, type MatchAnswer } from "@/lib/matchmakingQuestions";
 import EmbeddedDnaQuiz from "@/components/EmbeddedDnaQuiz";
 import GrowWallet from "@/components/GrowWallet";
+import DatabaseExpectations from "@/components/DatabaseExpectations";
 
 type Step = "profile" | "dna_select" | "compatibility_quiz" | "free_token_verify" | "payment" | "uploading" | "uploading_error" | "done";
 
@@ -1321,7 +1322,7 @@ export default function Register() {
                   {[
                     "הפרופיל שלך נשמר במאגר הבלעדי של הילית",
                     "כל התאמה נבחרת על ידי הילית אישית, לא רק על ידי אלגוריתם",
-                    "הילית תצור איתך קשר ברגע שתהיה התאמה",
+                    "כשתימצא התאמה רלוונטית, תישלח אליך הצעה במייל וב-SMS",
                     "שילוב של טכנולוגיה מתקדמת ואישור אישי של כל התאמה",
                   ].map(item => (
                     <div key={item} className="flex items-start gap-3">
@@ -1335,6 +1336,8 @@ export default function Register() {
                   <span className="text-[#ffe27c] font-black text-3xl">₪299 <span className="text-white/40 line-through text-xl font-normal">₪499</span></span>
                 </div>
               </div>
+
+              <DatabaseExpectations compact showStats className="mb-6" />
 
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 {!growOpened ? (
@@ -1524,7 +1527,7 @@ export default function Register() {
               <p className="text-[#727272] text-lg leading-relaxed mb-8 max-w-md mx-auto">
                 הפרופיל שלך נשמר בהצלחה ועכשיו הוא בידיים שלי.
                 <br /><br />
-<span className="text-[#727272] text-sm">ממוצע 7-14 ימים מרגע ההצטרפות ועד להתאמה הראשונה, כשהאלגוריתם מזהה התאמה מתאימה.</span>
+	<span className="text-[#727272] text-sm">זמן ההמתנה משתנה מאדם לאדם. התאמה תישלח במייל וב־SMS כאשר תימצא התאמה הדדית ורלוונטית.</span>
               </p>
 
               {/* Questionnaire button - shown for free token users who have the token */}

@@ -859,7 +859,16 @@ export async function processMatchedPairFollowUps(): Promise<number> {
       const isWeekFollowup = !match.matchWeekFollowupSentAt;
       const returnUrl = `${SITE_BASE}/match/return-to-pool?matchId=${match.id}`;
 
-      const buildEmail = (firstName: string, matchFirstName: string, recipientEmail: string) => {
+      const buildEmail = (firstName: string, matchFirstName: string, recipientEmail: string, feedbackToken: string | null) => {
+        const outcomeUrl = feedbackToken ? `${SITE_BASE}/match/outcome?token=${encodeURIComponent(feedbackToken)}` : null;
+        const feedbackButton = outcomeUrl ? `
+          <p style="text-align:center;margin:24px 0;">
+            <a href="${outcomeUrl}" style="display:inline-block;background:#ffe27c;color:#191265;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;">
+              עדכון קצר על ההתאמה
+            </a>
+          </p>
+          <p style="color:#777;font-size:13px;text-align:center;line-height:1.6;">העדכון נשמר במערכת בלבד. שום דבר לא יתפרסם ללא בחירה ואישור מפורשים.</p>
+        ` : "";
         if (isWeekFollowup) {
           return {
             subject: `${firstName}, איך הולך עם ${matchFirstName}? 💛`,
@@ -869,6 +878,7 @@ export async function processMatchedPairFollowUps(): Promise<number> {
                 <p>עבר שבוע מאז שהתחברתם עם ${matchFirstName}.</p>
                 <p>אני מקווה שהפגישה הייתה מיוחדת!</p>
                 <p>אם ההתאמה הצליחה ואתם ממשיכים יחד - אשמח לשמוע! 🎉</p>
+                ${feedbackButton}
                 <p>אם לא יצא לכם להתקדם ואתם רוצים לחזור למאגר, לחצו כאן:</p>
                 <p style="text-align:center;">
                   <a href="${returnUrl}" style="background:#191265;color:#ffe27c;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;">
@@ -885,6 +895,7 @@ export async function processMatchedPairFollowUps(): Promise<number> {
               <div dir="rtl" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#191265;">
                 <h2>היי ${firstName} 💛</h2>
                 <p>עבר חודש מאז שהתאמתם עם ${matchFirstName}.</p>
+                ${feedbackButton}
                 <p>אם ההתאמה לא הצליחה ואתם רוצים לחזור למאגר ולקבל התאמות חדשות, לחצו כאן:</p>
                 <p style="text-align:center;">
                   <a href="${returnUrl}" style="background:#191265;color:#ffe27c;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;">
@@ -901,7 +912,7 @@ export async function processMatchedPairFollowUps(): Promise<number> {
       let emailsSent = 0;
 
       if (singleA.email) {
-        const tpl = buildEmail(singleA.firstName, singleB.firstName, singleA.email);
+        const tpl = buildEmail(singleA.firstName, singleB.firstName, singleA.email, match.approvalTokenA);
         const res = await sendEmail({
           to: { email: singleA.email, name: singleA.firstName },
           subject: tpl.subject,
@@ -911,7 +922,7 @@ export async function processMatchedPairFollowUps(): Promise<number> {
       }
 
       if (singleB.email) {
-        const tpl = buildEmail(singleB.firstName, singleA.firstName, singleB.email);
+        const tpl = buildEmail(singleB.firstName, singleA.firstName, singleB.email, match.approvalTokenB);
         const res = await sendEmail({
           to: { email: singleB.email, name: singleB.firstName },
           subject: tpl.subject,

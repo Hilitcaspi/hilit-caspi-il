@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import ProfileEditForm from "@/components/ProfileEditForm";
+import DatabaseExpectations from "@/components/DatabaseExpectations";
 import { trpc } from "@/lib/trpc";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -710,15 +711,16 @@ export default function UserDashboard() {
       </div>
 
       {/* Tab Content */}
-     <div className="max-w-2xl mx-auto px-4 py-6 pb-16">
-        {/* Premium Plus teaser - visible in all tabs */}
+	     <div className="max-w-2xl mx-auto px-4 py-6 pb-16">
+	        <DatabaseExpectations compact showStats={false} className="mb-4" />
+	        {/* Premium Plus teaser - visible in all tabs */}
         <div className="mb-4 border-2 border-dashed border-[#ffe27c]/60 rounded-2xl p-4 text-right bg-gradient-to-r from-[#191265]/5 to-[#ffe27c]/10 animate-pulse" style={{ animationDuration: '3s' }}>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg">✨</span>
             <h4 className="text-[#191265] font-black text-sm">בקרוב — מנוי פלוס!</h4>
           </div>
           <p className="text-[#555] text-xs leading-relaxed">
-            בקרוב תוכלו לראות את ההתאמות שמחכות לכם, לקבל יותר התאמות, ולהנות מתכונות בלעדיות. עקבו אחרינו לעדכונים.
+            בקרוב תוכלו לראות יותר מידע על ההתאמות שמחכות לכם, לקבל כלי מעקב ועדכונים מתקדמים, ולהנות מתכונות בלעדיות. עקבו אחרינו לעדכונים.
           </p>
         </div>
         <AnimatePresence mode="wait">
@@ -754,7 +756,7 @@ export default function UserDashboard() {
                   <div className="text-4xl mb-3">🔍</div>
                   <h3 className="font-black text-[#191265] mb-2">הילית מחפשת עבורך</h3>
                   <p className="text-[#727272] text-sm leading-relaxed">
-                    ברגע שתמצא התאמה מתאימה, תקבל/י מייל עם פרטי ההצעה.
+                    התאמות נשלחות כשנמצאת התאמה הדדית ורלוונטית — לא לפי מכסה או לוח זמנים קבוע. ברגע שתימצא התאמה מתאימה, יישלחו מייל ו-SMS עם פרטי ההצעה.
                     {!hasCompletedQuestionnaire && " השלם/י את השאלון המדעי כדי לשפר את ההתאמות."}
                   </p>
                   {!hasCompletedQuestionnaire && questionnaireToken && (

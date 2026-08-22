@@ -23,6 +23,14 @@ import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as
 import { sendEmail } from "./brevo";
 import { sendSMS, buildMatchSmsMessage } from "./vibrate";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
+import {
+  parseMatchOutcomeNotes,
+  setAdminOutcome,
+  setLegacyMatchNote,
+  setParticipantFeedback,
+  PARTICIPANT_OUTCOME_STATUSES,
+  PUBLICITY_SCOPES,
+} from "./matchOutcome";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -4258,6 +4266,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const b = singleMap.get(m.singleBId);
         return {
           ...m,
+          outcomeFeedback: parseMatchOutcomeNotes(m.notes),
           singleAName: a ? `${a.firstName} ${a.lastName || ""}`.trim() : undefined,
           singleBName: b ? `${b.firstName} ${b.lastName || ""}`.trim() : undefined,
           singleAGender: a?.gender,
@@ -4723,8 +4732,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const now = Date.now();
+        const [current] = await db.select({ notes: matches.notes }).from(matches).where(eq(matches.id, input.matchId)).limit(1);
         // Set status to rejected + returnedToPoolAt so both people are freed from the match
-        await db.update(matches).set({ status: "rejected", returnedToPoolAt: now, updatedAt: now, notes: "שוחרר ידנית" }).where(eq(matches.id, input.matchId));
+        await db.update(matches).set({ status: "rejected", returnedToPoolAt: now, updatedAt: now, notes: setLegacyMatchNote(current?.notes, "שוחרר ידנית") }).where(eq(matches.id, input.matchId));
         return { success: true };
       }),
     /**
@@ -4737,9 +4747,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [current] = await db.select({ notes: matches.notes }).from(matches).where(eq(matches.id, input.matchId)).limit(1);
         await db.update(matches).set({
           status: "rejected",
-          notes: "נשלחה בעבר",
+          notes: setLegacyMatchNote(current?.notes, "נשלחה בעבר"),
           updatedAt: Date.now()
         }).where(eq(matches.id, input.matchId));
         return { success: true };
@@ -5013,6 +5024,123 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }),
 
     /**
+     * Participant: load the outcome feedback form using the private match token.
+     * Only first names and lifecycle data are returned; no contact details are exposed.
+     */
+    getOutcomeFeedback: publicProcedure
+      .input(z.object({ token: z.string().min(16).max(128) }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        const [match] = await db.select().from(matches)
+          .where(or(eq(matches.approvalTokenA, input.token), eq(matches.approvalTokenB, input.token)))
+          .limit(1);
+
+        if (!match || (!match.matchedAt && !match.contactRevealedAt)) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "ההתאמה לא נמצאה" });
+        }
+
+        const side: "A" | "B" = match.approvalTokenA === input.token ? "A" : "B";
+        const participantId = side === "A" ? match.singleAId : match.singleBId;
+        const partnerId = side === "A" ? match.singleBId : match.singleAId;
+        const people = await db.select({ id: singles.id, firstName: singles.firstName })
+          .from(singles)
+          .where(inArray(singles.id, [participantId, partnerId]));
+        const peopleMap = new Map(people.map(person => [person.id, person.firstName]));
+        const outcome = parseMatchOutcomeNotes(match.notes);
+
+        return {
+          matchId: match.id,
+          firstName: peopleMap.get(participantId) || "",
+          partnerFirstName: peopleMap.get(partnerId) || "",
+          matchedAt: match.matchedAt || match.contactRevealedAt,
+          existingFeedback: side === "A" ? outcome.participantA || null : outcome.participantB || null,
+        };
+      }),
+
+    /**
+     * Participant: report what happened after contact details were revealed.
+     * Publicity consent is explicit, scoped and versioned. It is never inferred.
+     */
+    submitOutcomeFeedback: publicProcedure
+      .input(z.object({
+        token: z.string().min(16).max(128),
+        status: z.enum(PARTICIPANT_OUTCOME_STATUSES),
+        rating: z.number().int().min(1).max(5).nullable().optional(),
+        comment: z.string().trim().max(2000).nullable().optional(),
+        testimonialText: z.string().trim().max(1500).nullable().optional(),
+        publicityScope: z.enum(PUBLICITY_SCOPES).default("none"),
+        consentToFollowUp: z.boolean().default(true),
+        consentConfirmed: z.boolean().default(false),
+      }).superRefine((value, ctx) => {
+        if (value.publicityScope !== "none" && !value.consentConfirmed) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["consentConfirmed"],
+            message: "יש לאשר במפורש את תנאי הפרסום",
+          });
+        }
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        const [match] = await db.select().from(matches)
+          .where(or(eq(matches.approvalTokenA, input.token), eq(matches.approvalTokenB, input.token)))
+          .limit(1);
+
+        if (!match || (!match.matchedAt && !match.contactRevealedAt)) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "ההתאמה לא נמצאה" });
+        }
+
+        const side: "A" | "B" = match.approvalTokenA === input.token ? "A" : "B";
+        const now = Date.now();
+        const publicityAllowed = input.publicityScope !== "none" && input.consentConfirmed;
+        const notes = setParticipantFeedback(match.notes, side, {
+          status: input.status,
+          rating: input.rating ?? null,
+          comment: input.comment || null,
+          testimonialText: input.testimonialText || null,
+          publicityScope: publicityAllowed ? input.publicityScope : "none",
+          consentToFollowUp: input.consentToFollowUp,
+          consentConfirmed: publicityAllowed,
+          consentTextVersion: publicityAllowed ? "2026-08-22-v1" : null,
+          consentAt: publicityAllowed ? now : null,
+          submittedAt: now,
+          source: "participant_portal",
+        });
+
+        await db.update(matches).set({ notes, updatedAt: now }).where(eq(matches.id, match.id));
+        return { success: true };
+      }),
+
+    /** Admin: verify the reported outcome before it is counted as a confirmed result. */
+    updateMatchOutcome: teamProcedure
+      .input(z.object({
+        matchId: z.number(),
+        status: z.enum(["talking", "dating", "met", "together", "ended"]).nullable(),
+        adminNote: z.string().trim().max(1000).nullable().optional(),
+        verified: z.boolean(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+        if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [match] = await db.select({ id: matches.id, notes: matches.notes }).from(matches)
+          .where(eq(matches.id, input.matchId)).limit(1);
+        if (!match) throw new TRPCError({ code: "NOT_FOUND" });
+
+        await db.update(matches).set({
+          matchDetailStatus: input.status,
+          notes: setAdminOutcome(match.notes, input.adminNote, input.verified),
+          updatedAt: Date.now(),
+        }).where(eq(matches.id, input.matchId));
+        return { success: true };
+      }),
+
+    /**
      * Admin: deactivate a single (remove from database/pool).
      */
     deactivateSingle: teamProcedure
@@ -5125,6 +5253,49 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         return { notes: row?.adminNotes || "" };
       }),
     // ── Dashboard: comprehensive matchmaking analytics ──────────────────────
+    getPublicTrustStats: publicProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const activeSingles = await db.select({
+        id: singles.id,
+        firstName: singles.firstName,
+        lastName: singles.lastName,
+        email: singles.email,
+        phone: singles.phone,
+        gender: singles.gender,
+        age: singles.age,
+        city: singles.city,
+        height: singles.height,
+        occupation: singles.occupation,
+        religiosity: singles.religiosity,
+        about: singles.about,
+        partnerDescription: singles.partnerDescription,
+        photoUrl: singles.photoUrl,
+        dnaType: singles.dnaType,
+        questionnaireCompletedAt: singles.questionnaireCompletedAt,
+        createdAt: singles.createdAt,
+        isActive: singles.isActive,
+        isPaid: singles.isPaid,
+        isSeed: singles.isSeed,
+        subscriptionRenewsAt: singles.subscriptionRenewsAt,
+      }).from(singles).where(and(
+        eq(singles.isActive, true),
+        eq(singles.isPaid, true),
+        eq(singles.isSeed, false),
+      ));
+
+      const metrics = calculateMatchmakingMetrics(activeSingles as any, [], { now: Date.now() });
+      return {
+        femaleRate: metrics.balance.femaleRate,
+        maleRate: metrics.balance.maleRate,
+        profileCompletenessRate: metrics.quality.completeRate,
+        scientificRate: metrics.quality.scientificRate,
+        photoRate: metrics.quality.photoRate,
+        updatedAt: metrics.meta.calculatedAt,
+      };
+    }),
+
     getDashboardData: teamProcedure
       .input(z.object({ from: z.number().optional(), to: z.number().optional() }))
       .query(async ({ ctx, input }) => {
