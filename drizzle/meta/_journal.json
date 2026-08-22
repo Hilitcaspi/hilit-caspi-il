@@ -50,6 +50,13 @@
       "when": 1785842699795,
       "tag": "0006_old_wolfsbane",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787421701986,
+      "tag": "0007_mean_captain_stacy",
+      "breakpoints": true
     }
   ]
 }

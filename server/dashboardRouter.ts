@@ -2,8 +2,10 @@ import { z } from "zod";
 import { router, teamProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
-import { sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { businessExpenses } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
+import { calculatePnlSummary } from "./businessFinance";
 
 import { sendSMS } from "./vibrate";
 import crypto from "crypto";
@@ -250,7 +252,121 @@ async function fetchMetaAdsInsights(since: string, until: string) {
   return { campaigns: parseInsights(campaignData), boosts: parseInsights(boostData) };
 }
 
+const BUSINESS_EXPENSE_CATEGORIES = [
+  "processing",
+  "refund",
+  "payroll",
+  "contractor",
+  "software",
+  "office",
+  "content",
+  "event",
+  "tax",
+  "other",
+] as const;
+
+async function calculateProfitAndLossPeriod(startDate: number, endDate: number) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+  const [purchaseRows] = await db.execute(sql`
+    SELECT product,
+           COUNT(*) AS purchases,
+           SUM(CAST(COALESCE(sum, 0) AS DECIMAL(12,2))) AS revenue
+    FROM payment_leads
+    WHERE created_at >= ${startDate} AND created_at <= ${endDate}
+    GROUP BY product
+    ORDER BY revenue DESC
+  `) as any;
+
+  const products = (purchaseRows as any[]).map(row => ({
+    product: String(row.product || "unknown"),
+    purchases: Number(row.purchases || 0),
+    revenue: Number(row.revenue || 0),
+  }));
+  const since = new Date(startDate).toISOString().slice(0, 10);
+  const until = new Date(endDate).toISOString().slice(0, 10);
+  const meta = await fetchMetaAdsInsights(since, until);
+  const metaSpend = [...(meta.campaigns || []), ...(meta.boosts || [])]
+    .reduce((sum, campaign) => sum + Number(campaign.spend || 0), 0);
+
+  const expenseRows = await db.select().from(businessExpenses).where(and(
+    gte(businessExpenses.expenseDate, startDate),
+    lte(businessExpenses.expenseDate, endDate),
+  ));
+  const summary = calculatePnlSummary(products, metaSpend, expenseRows, BUSINESS_EXPENSE_CATEGORIES);
+
+  return {
+    startDate,
+    endDate,
+    products,
+    ...summary,
+    expenses: expenseRows.sort((a, b) => b.expenseDate - a.expenseDate),
+    dataQuality: {
+      revenueBasis: "payment_leads.sum",
+      metaBasis: process.env.META_ADS_TOKEN ? "Meta Ads API" : "unavailable",
+      manualExpenseCount: expenseRows.length,
+      isComplete: expenseRows.length > 0,
+      warning: expenseRows.length > 0
+        ? "הדוח כולל הכנסה בפועל, Meta והוצאות שהוזנו ידנית. יש לוודא שכל הוצאות החודש הוזנו."
+        : "טרם הוזנו הוצאות שכר, ספקים, סליקה, תוכנות ומסים; הרווח המוצג חלקי ואינו רווח חשבונאי סופי.",
+    },
+  };
+}
+
 export const dashboardRouter = router({
+  profitAndLoss: teamProcedure
+    .input(z.object({ startDate: z.number(), endDate: z.number() }))
+    .query(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const periodLength = Math.max(1, input.endDate - input.startDate);
+      const previousEnd = input.startDate - 1;
+      const previousStart = previousEnd - periodLength;
+      const [current, previous] = await Promise.all([
+        calculateProfitAndLossPeriod(input.startDate, input.endDate),
+        calculateProfitAndLossPeriod(previousStart, previousEnd),
+      ]);
+      return { current, previous };
+    }),
+
+  addBusinessExpense: teamProcedure
+    .input(z.object({
+      expenseDate: z.number(),
+      category: z.enum(BUSINESS_EXPENSE_CATEGORIES),
+      description: z.string().trim().min(2).max(255),
+      vendor: z.string().trim().max(150).nullable().optional(),
+      amountShekels: z.number().positive().max(10_000_000),
+      notes: z.string().trim().max(2000).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const now = Date.now();
+      await db.insert(businessExpenses).values({
+        expenseDate: input.expenseDate,
+        category: input.category,
+        description: input.description,
+        vendor: input.vendor || null,
+        amountAgorot: Math.round(input.amountShekels * 100),
+        notes: input.notes || null,
+        createdBy: ctx.user?.email || ctx.teamMember?.email || "team",
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { success: true };
+    }),
+
+  deleteBusinessExpense: teamProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(businessExpenses).where(eq(businessExpenses.id, input.id));
+      return { success: true };
+    }),
+
   // ── Monthly Targets ───────────────────────────────────────────────────────
   monthlyTargets: teamProcedure.query(async ({ ctx }) => {
     guardAdmin(ctx);

@@ -687,6 +687,37 @@ export type PaymentLead = typeof paymentLeads.$inferSelect;
 export type InsertPaymentLead = typeof paymentLeads.$inferInsert;
 
 /**
+ * Business expenses entered by the team for the monthly P&L.
+ * Amounts are stored in agorot to avoid floating-point rounding.
+ * Meta Ads spend is fetched live and is not duplicated in this table.
+ */
+export const businessExpenses = mysqlTable("business_expenses", {
+  id: int("id").primaryKey().autoincrement(),
+  expenseDate: bigint("expense_date", { mode: "number" }).notNull(),
+  category: mysqlEnum("category", [
+    "processing",
+    "refund",
+    "payroll",
+    "contractor",
+    "software",
+    "office",
+    "content",
+    "event",
+    "tax",
+    "other",
+  ]).notNull(),
+  description: varchar("description", { length: 255 }).notNull(),
+  vendor: varchar("vendor", { length: 150 }),
+  amountAgorot: int("amount_agorot").notNull(),
+  notes: text("notes"),
+  createdBy: varchar("created_by", { length: 200 }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type BusinessExpense = typeof businessExpenses.$inferSelect;
+export type InsertBusinessExpense = typeof businessExpenses.$inferInsert;
+
+/**
  * Webhook idempotency - ensures each Grow transactionId is processed exactly once.
  * Grow sends the webhook twice (server notification + payment confirmation).
  * Using a unique constraint on transactionId makes the INSERT atomic and race-condition-safe.

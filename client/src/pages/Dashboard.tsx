@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProfitAndLossSection } from "@/components/ProfitAndLossSection";
 import {
   TrendingUp, Users, DollarSign, Mail, MousePointerClick,
   ChevronDown, ChevronUp, ArrowLeft, BarChart3,
@@ -233,6 +234,8 @@ export default function Dashboard() {
             )}
           </>
         )}
+
+        <ProfitAndLossSection startDate={startDate} endDate={endDate} />
 
         {/* ═══════════════════════════════════════════════════════════════════════
             SECTION 2: CHANNEL BREAKDOWN — VISUAL

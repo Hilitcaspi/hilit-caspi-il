@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDatabase90DayEmail, DATABASE_90_DAY_LAUNCH_AT, DATABASE_90_DAY_STAGES } from "./database90DayJourney";
+import { buildDatabase90DayEmail, DATABASE_90_DAY_LAUNCH_AT, DATABASE_90_DAY_STAGES, selectDatabaseUpsellOffer } from "./database90DayJourney";
 
 const single = {
   id: 42,
@@ -13,6 +13,8 @@ const stats = {
   proposals: 2,
   mutualApprovals: 1,
   meetings: 1,
+  endedMatches: 0,
+  positiveOutcomes: 0,
   latestOutcomeUrl: "https://hilitcaspi.com/match/outcome?token=feedback-token",
 };
 
@@ -51,5 +53,22 @@ describe("database 90-day journey", () => {
     expect(email.htmlBody).toContain("1</strong> אישורים הדדיים");
     expect(email.htmlBody).toContain(stats.latestOutcomeUrl);
     expect(email.htmlBody).toContain("שום דבר לא יפורסם ללא הסכמה מפורשת");
+  });
+
+  it("chooses an offer from behavior rather than sending one generic upsell", () => {
+    expect(selectDatabaseUpsellOffer(14, { ...stats, proposals: 0 }, [])).toBe("community");
+    expect(selectDatabaseUpsellOffer(30, { ...stats, proposals: 3, mutualApprovals: 0 }, [])).toBe("single_session");
+    expect(selectDatabaseUpsellOffer(60, { ...stats, endedMatches: 1 }, [])).toBe("coaching");
+  });
+
+  it("does not upsell when the profile is incomplete or a positive outcome exists", () => {
+    expect(selectDatabaseUpsellOffer(60, stats, ["תמונה"])).toBe("none");
+    expect(selectDatabaseUpsellOffer(90, { ...stats, positiveOutcomes: 1 }, [])).toBe("none");
+  });
+
+  it("explains that a paid session is not a purchased match", () => {
+    const email = buildDatabase90DayEmail(4, single, { ...stats, mutualApprovals: 0 }, []);
+    expect(email.htmlBody).toContain("אינה רכישה של התאמה");
+    expect(email.htmlBody).toContain("behavioral_upsell");
   });
 });
