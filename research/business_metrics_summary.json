@@ -1,0 +1,332 @@
+{
+  "asOf": "2026-08-22",
+  "basis": "Revenue inferred from payment_leads counts multiplied by current list-price mapping in dashboardRouter.ts; discounts/refunds/payment fees/payroll/overhead are not captured.",
+  "monthSummary": {
+    "2026-06": {
+      "purchases": 2,
+      "inferredRevenue": 598,
+      "products": {
+        "database": {
+          "purchases": 2,
+          "price": 299,
+          "inferredRevenue": 598
+        }
+      },
+      "metaSpend": 12266.15,
+      "metaImpressions": 439849,
+      "metaClicks": 21701,
+      "metaAccounts": [
+        "act_254697595735216",
+        "act_3841144459522772"
+      ],
+      "leads": 2525,
+      "leadSources": {
+        "dna_quiz": 2406,
+        "direct": 101,
+        "guide_form": 18
+      },
+      "cohortLeads": 2525,
+      "cohortConvertedEmails": 50,
+      "cohortConversionRate": 0.019801980198019802,
+      "blendedLeadToPurchaseRate": 0.0007920792079207921,
+      "inferredROAS": 0.04875205341529331,
+      "inferredCAC": 6133.075,
+      "blendedCPL": 4.857881188118812
+    },
+    "2026-07": {
+      "purchases": 363,
+      "inferredRevenue": 113391,
+      "products": {
+        "bundle_tubav": {
+          "purchases": 91,
+          "price": 349,
+          "inferredRevenue": 31759
+        },
+        "course": {
+          "purchases": 1,
+          "price": 249,
+          "inferredRevenue": 249
+        },
+        "database": {
+          "purchases": 264,
+          "price": 299,
+          "inferredRevenue": 78936
+        },
+        "guide": {
+          "purchases": 3,
+          "price": 149,
+          "inferredRevenue": 447
+        },
+        "session": {
+          "purchases": 4,
+          "price": 500,
+          "inferredRevenue": 2000
+        }
+      },
+      "metaSpend": 16177.310000000001,
+      "metaImpressions": 461380,
+      "metaClicks": 21963,
+      "metaAccounts": [
+        "act_254697595735216",
+        "act_3841144459522772"
+      ],
+      "leads": 2285,
+      "leadSources": {
+        "dna_quiz": 2120,
+        "direct": 149,
+        "guide_form": 16
+      },
+      "cohortLeads": 2285,
+      "cohortConvertedEmails": 225,
+      "cohortConversionRate": 0.09846827133479212,
+      "blendedLeadToPurchaseRate": 0.1588621444201313,
+      "inferredROAS": 7.009261737581835,
+      "inferredCAC": 44.56559228650138,
+      "blendedCPL": 7.079785557986871
+    },
+    "2026-08": {
+      "purchases": 275,
+      "inferredRevenue": 85684,
+      "products": {
+        "bundle_tubav": {
+          "purchases": 3,
+          "price": 349,
+          "inferredRevenue": 1047
+        },
+        "coaching": {
+          "purchases": 1,
+          "price": 2900,
+          "inferredRevenue": 2900
+        },
+        "course": {
+          "purchases": 3,
+          "price": 249,
+          "inferredRevenue": 747
+        },
+        "database": {
+          "purchases": 255,
+          "price": 299,
+          "inferredRevenue": 76245
+        },
+        "guide": {
+          "purchases": 5,
+          "price": 149,
+          "inferredRevenue": 745
+        },
+        "session": {
+          "purchases": 8,
+          "price": 500,
+          "inferredRevenue": 4000
+        }
+      },
+      "metaSpend": 10773.810000000001,
+      "metaImpressions": 337958,
+      "metaClicks": 19592,
+      "metaAccounts": [
+        "act_254697595735216",
+        "act_3841144459522772"
+      ],
+      "leads": 2179,
+      "leadSources": {
+        "dna_quiz": 2096,
+        "direct": 69,
+        "guide_form": 14
+      },
+      "cohortLeads": 2179,
+      "cohortConvertedEmails": 149,
+      "cohortConversionRate": 0.06837999082147775,
+      "blendedLeadToPurchaseRate": 0.12620468104635155,
+      "inferredROAS": 7.952989703735261,
+      "inferredCAC": 39.17749090909091,
+      "blendedCPL": 4.944382744378156
+    },
+    "2026-04": {
+      "purchases": 0,
+      "inferredRevenue": 0,
+      "products": {},
+      "metaSpend": 5014.410000000001,
+      "metaImpressions": 341203,
+      "metaClicks": 14953,
+      "metaAccounts": [
+        "act_254697595735216",
+        "act_3841144459522772"
+      ],
+      "leads": 668,
+      "leadSources": {
+        "dna_quiz": 505,
+        "meta_lead_guide": 118,
+        "direct": 35,
+        "guide_form": 10
+      },
+      "cohortLeads": 668,
+      "cohortConvertedEmails": 15,
+      "cohortConversionRate": 0.02245508982035928,
+      "blendedLeadToPurchaseRate": 0,
+      "inferredROAS": 0,
+      "inferredCAC": null,
+      "blendedCPL": 7.506601796407187
+    },
+    "2026-05": {
+      "purchases": 0,
+      "inferredRevenue": 0,
+      "products": {},
+      "metaSpend": 15037.140000000001,
+      "metaImpressions": 1082441,
+      "metaClicks": 62172,
+      "metaAccounts": [
+        "act_254697595735216",
+        "act_3841144459522772"
+      ],
+      "leads": 1308,
+      "leadSources": {
+        "dna_quiz": 1189,
+        "direct": 99,
+        "guide_form": 20
+      },
+      "cohortLeads": 1308,
+      "cohortConvertedEmails": 28,
+      "cohortConversionRate": 0.021406727828746176,
+      "blendedLeadToPurchaseRate": 0,
+      "inferredROAS": 0,
+      "inferredCAC": null,
+      "blendedCPL": 11.496284403669726
+    }
+  },
+  "totals": {
+    "purchases": 640,
+    "inferredRevenue": 199673,
+    "metaSpend": 59268.82000000001,
+    "leads": 8965,
+    "inferredROAS": 3.3689383389107457,
+    "inferredCAC": 92.60753125000001,
+    "blendedCPL": 6.61113441160067
+  },
+  "weeklyPurchases": [
+    {
+      "week": "2026-W25",
+      "purchases": 2
+    },
+    {
+      "week": "2026-W27",
+      "purchases": 20
+    },
+    {
+      "week": "2026-W28",
+      "purchases": 98
+    },
+    {
+      "week": "2026-W29",
+      "purchases": 93
+    },
+    {
+      "week": "2026-W30",
+      "purchases": 87
+    },
+    {
+      "week": "2026-W31",
+      "purchases": 83
+    },
+    {
+      "week": "2026-W32",
+      "purchases": 72
+    },
+    {
+      "week": "2026-W33",
+      "purchases": 109
+    },
+    {
+      "week": "2026-W34",
+      "purchases": 76
+    }
+  ],
+  "weeklyLeads": [
+    {
+      "week": "2026-W16",
+      "leads": 18
+    },
+    {
+      "week": "2026-W17",
+      "leads": 303
+    },
+    {
+      "week": "2026-W18",
+      "leads": 604
+    },
+    {
+      "week": "2026-W19",
+      "leads": 370
+    },
+    {
+      "week": "2026-W20",
+      "leads": 320
+    },
+    {
+      "week": "2026-W21",
+      "leads": 200
+    },
+    {
+      "week": "2026-W22",
+      "leads": 161
+    },
+    {
+      "week": "2026-W23",
+      "leads": 405
+    },
+    {
+      "week": "2026-W24",
+      "leads": 569
+    },
+    {
+      "week": "2026-W25",
+      "leads": 714
+    },
+    {
+      "week": "2026-W26",
+      "leads": 698
+    },
+    {
+      "week": "2026-W27",
+      "leads": 617
+    },
+    {
+      "week": "2026-W28",
+      "leads": 766
+    },
+    {
+      "week": "2026-W29",
+      "leads": 531
+    },
+    {
+      "week": "2026-W30",
+      "leads": 309
+    },
+    {
+      "week": "2026-W31",
+      "leads": 370
+    },
+    {
+      "week": "2026-W32",
+      "leads": 647
+    },
+    {
+      "week": "2026-W33",
+      "leads": 771
+    },
+    {
+      "week": "2026-W34",
+      "leads": 592
+    }
+  ],
+  "singlesSnapshot": {
+    "total": 1186,
+    "active": 1149,
+    "paid": 1171,
+    "activeWomen": 632,
+    "activeMen": 517,
+    "scientificComplete": 1078,
+    "withPhoto": 1079,
+    "womenShare": 0.5500435161009574,
+    "scientificCompletionRate": 0.938207136640557,
+    "photoCompletionRate": 0.939077458659704
+  }
+}
