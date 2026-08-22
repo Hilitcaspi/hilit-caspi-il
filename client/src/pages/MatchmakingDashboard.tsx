@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
+import OperationsSection from "@/components/OperationsSection";
 
 type ChartPoint = { label: string; value: number; color?: string };
 
@@ -382,6 +383,8 @@ export default function MatchmakingDashboard() {
       </section>
 
       <PlusPilotAdminSection />
+
+      <OperationsSection />
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <article className="bg-white rounded-2xl p-5 shadow-sm border border-[#e9e8e8]">

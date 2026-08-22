@@ -741,6 +741,47 @@ export const plusPilotMembers = mysqlTable("plus_pilot_members", {
 export type PlusPilotMember = typeof plusPilotMembers.$inferSelect;
 export type InsertPlusPilotMember = typeof plusPilotMembers.$inferInsert;
 
+/** Team operations tasks for matching, follow-up, calls and outcome collection. */
+export const crmTeamTasks = mysqlTable("crm_team_tasks", {
+  id: int("id").primaryKey().autoincrement(),
+  singleId: int("single_id"),
+  matchId: int("match_id"),
+  crmLeadId: int("crm_lead_id"),
+  assignedTeamMemberId: int("assigned_team_member_id"),
+  taskType: mysqlEnum("task_type", ["match_review", "followup", "call", "feedback", "profile", "plus", "partner", "event", "other"]).default("other").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  priority: mysqlEnum("priority", ["low", "normal", "high", "urgent"]).default("normal").notNull(),
+  status: mysqlEnum("status", ["todo", "in_progress", "done", "cancelled"]).default("todo").notNull(),
+  dueAt: bigint("due_at", { mode: "number" }),
+  completedAt: bigint("completed_at", { mode: "number" }),
+  createdBy: varchar("created_by", { length: 200 }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type CrmTeamTask = typeof crmTeamTasks.$inferSelect;
+export type InsertCrmTeamTask = typeof crmTeamTasks.$inferInsert;
+
+/** Partner, organization and event sources measured through dedicated UTM codes. */
+export const partnerSources = mysqlTable("partner_sources", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 200 }).notNull(),
+  type: mysqlEnum("type", ["partner", "event", "organization", "referrer"]).notNull(),
+  code: varchar("code", { length: 100 }).notNull().unique(),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
+  contactName: varchar("contact_name", { length: 150 }),
+  contactEmail: varchar("contact_email", { length: 320 }),
+  contactPhone: varchar("contact_phone", { length: 30 }),
+  commissionType: mysqlEnum("commission_type", ["none", "fixed", "percentage"]).default("none").notNull(),
+  commissionValue: int("commission_value").default(0).notNull(),
+  eventDate: bigint("event_date", { mode: "number" }),
+  notes: text("notes"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type PartnerSource = typeof partnerSources.$inferSelect;
+export type InsertPartnerSource = typeof partnerSources.$inferInsert;
+
 /**
  * Webhook idempotency - ensures each Grow transactionId is processed exactly once.
  * Grow sends the webhook twice (server notification + payment confirmation).

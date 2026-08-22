@@ -10,6 +10,7 @@ import { getDb } from "./db";
 import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
+import { operationsRouter } from "./operationsRouter";
 import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
 import type { ScoreBreakdown as FullScoreBreakdown } from "./compatibility";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
@@ -569,6 +570,7 @@ export const appRouter = router({
   system: systemRouter,
   dashboard: dashboardRouter,
   plusPilot: plusPilotRouter,
+  operations: operationsRouter,
 
   auth: router({
     me: publicProcedure.query(opts => {
