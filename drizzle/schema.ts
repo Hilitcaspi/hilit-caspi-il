@@ -8,6 +8,7 @@ import {
   varchar,
   boolean,
   float,
+  index,
 } from "drizzle-orm/mysql-core";
 
 /**
@@ -738,6 +739,32 @@ export const businessExpenses = mysqlTable("business_expenses", {
 });
 export type BusinessExpense = typeof businessExpenses.$inferSelect;
 export type InsertBusinessExpense = typeof businessExpenses.$inferInsert;
+
+/**
+ * Recurring monthly finance items used by the P&L for costs and revenue that
+ * do not pass through the website payment flow. Values are inclusive of VAT
+ * and stored in agorot. Meta spend stays live and must not be duplicated here.
+ */
+export const businessRecurringItems = mysqlTable("business_recurring_items", {
+  id: int("id").primaryKey().autoincrement(),
+  itemType: mysqlEnum("item_type", ["income", "expense"]).notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  description: varchar("description", { length: 255 }).notNull(),
+  vendor: varchar("vendor", { length: 150 }),
+  amountAgorot: int("amount_agorot").notNull(),
+  validFrom: bigint("valid_from", { mode: "number" }).notNull(),
+  validTo: bigint("valid_to", { mode: "number" }),
+  isActive: boolean("is_active").notNull().default(true),
+  includesVat: boolean("includes_vat").notNull().default(true),
+  notes: text("notes"),
+  createdBy: varchar("created_by", { length: 200 }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  activeIdx: index("business_recurring_active_idx").on(t.isActive, t.itemType),
+}));
+export type BusinessRecurringItem = typeof businessRecurringItems.$inferSelect;
+export type InsertBusinessRecurringItem = typeof businessRecurringItems.$inferInsert;
 
 /**
  * Database Plus pilot lifecycle. One row per single keeps the waitlist,

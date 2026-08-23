@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePnlSummary } from "./businessFinance";
+import { calculatePnlSummary, prorateMonthlyAmountAgorot } from "./businessFinance";
 
 const categories = ["processing", "refund", "payroll", "other"] as const;
 
@@ -41,5 +41,37 @@ describe("business finance", () => {
     expect(active.unitEconomics.marketingCac).toBe(50);
     expect(active.unitEconomics.returnOnAdSpend).toBe(5.98);
     expect(active.unitEconomics.contributionPerPurchase).toBe(239);
+  });
+
+  it("includes recurring off-site income and costs without distorting website unit economics", () => {
+    const result = calculatePnlSummary(
+      [{ product: "database", purchases: 10, revenue: 2990 }],
+      500,
+      [],
+      categories,
+      [
+        { itemType: "income", category: "external_coaching", amountAgorot: 1_000_000 },
+        { itemType: "expense", category: "external_coaching_cost", amountAgorot: 200_000 },
+        { itemType: "expense", category: "payroll", amountAgorot: 500_000 },
+      ],
+    );
+
+    expect(result.productRevenue).toBe(2990);
+    expect(result.manualRevenue).toBe(10_000);
+    expect(result.grossRevenue).toBe(12_990);
+    expect(result.recurringExpenses).toBe(7000);
+    expect(result.operatingProfit).toBe(5490);
+    expect(result.unitEconomics.averageRevenuePerPurchase).toBe(299);
+    expect(result.unitEconomics.returnOnAdSpend).toBe(5.98);
+  });
+
+  it("prorates monthly recurring items to the selected period", () => {
+    const augustStart = Date.UTC(2026, 7, 1);
+    const augustEnd = Date.UTC(2026, 7, 31, 23, 59, 59, 999);
+    const firstHalfEnd = Date.UTC(2026, 7, 15, 23, 59, 59, 999);
+
+    expect(prorateMonthlyAmountAgorot(500_000, augustStart, augustEnd, augustStart)).toBe(500_000);
+    expect(prorateMonthlyAmountAgorot(500_000, augustStart, firstHalfEnd, augustStart)).toBe(241_935);
+    expect(prorateMonthlyAmountAgorot(500_000, augustStart, augustEnd, Date.UTC(2026, 8, 1))).toBe(0);
   });
 });

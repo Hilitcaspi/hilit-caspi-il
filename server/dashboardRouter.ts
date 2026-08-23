@@ -2,10 +2,10 @@ import { z } from "zod";
 import { router, teamProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
-import { businessExpenses } from "../drizzle/schema";
+import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { businessExpenses, businessRecurringItems } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
-import { calculatePnlSummary } from "./businessFinance";
+import { calculatePnlSummary, prorateMonthlyAmountAgorot } from "./businessFinance";
 
 import { sendSMS } from "./vibrate";
 import crypto from "crypto";
@@ -299,7 +299,29 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
     gte(businessExpenses.expenseDate, startDate),
     lte(businessExpenses.expenseDate, endDate),
   ));
-  const summary = calculatePnlSummary(products, metaSpend, expenseRows, BUSINESS_EXPENSE_CATEGORIES);
+  const recurringRows = await db.select().from(businessRecurringItems).where(and(
+    eq(businessRecurringItems.isActive, true),
+    lte(businessRecurringItems.validFrom, endDate),
+    or(isNull(businessRecurringItems.validTo), gte(businessRecurringItems.validTo, startDate)),
+  ));
+  const recognizedRecurringItems = recurringRows.map(item => ({
+    itemType: item.itemType,
+    category: item.category,
+    amountAgorot: prorateMonthlyAmountAgorot(
+      item.amountAgorot,
+      startDate,
+      endDate,
+      item.validFrom,
+      item.validTo,
+    ),
+  }));
+  const summary = calculatePnlSummary(
+    products,
+    metaSpend,
+    expenseRows,
+    BUSINESS_EXPENSE_CATEGORIES,
+    recognizedRecurringItems,
+  );
 
   return {
     startDate,
@@ -307,16 +329,27 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
     products,
     ...summary,
     expenses: expenseRows.sort((a, b) => b.expenseDate - a.expenseDate),
+    recurringItems: recurringRows.map(item => ({
+      ...item,
+      recognizedAmountAgorot: prorateMonthlyAmountAgorot(
+        item.amountAgorot,
+        startDate,
+        endDate,
+        item.validFrom,
+        item.validTo,
+      ),
+    })),
     dataQuality: {
       revenueBasis: "completed_payments: סכום Grow בפועל, עם אומדן מסומן לעסקאות היסטוריות",
       metaBasis: process.env.META_ADS_TOKEN ? "Meta Ads API" : "unavailable",
       manualExpenseCount: expenseRows.length,
+      recurringItemCount: recurringRows.length,
       estimatedTransactionCount,
-      isComplete: expenseRows.length > 0 && estimatedTransactionCount === 0,
+      isComplete: (expenseRows.length > 0 || recurringRows.length > 0) && estimatedTransactionCount === 0,
       warning: estimatedTransactionCount > 0
         ? `${estimatedTransactionCount} עסקאות היסטוריות מחושבות לפי מחירון ולא לפי סכום Grow. עסקאות חדשות נשמרות מעתה בסכום ששולם בפועל.`
-        : expenseRows.length > 0
-          ? "הדוח כולל הכנסה בפועל, Meta והוצאות שהוזנו ידנית. יש לוודא שכל הוצאות החודש הוזנו."
+        : (expenseRows.length > 0 || recurringRows.length > 0)
+          ? "הדוח כולל הכנסה בפועל, Meta, סעיפים חודשיים והוצאות חד־פעמיות שהוזנו."
           : "טרם הוזנו הוצאות שכר, ספקים, סליקה, תוכנות ומסים; הרווח המוצג חלקי ואינו רווח חשבונאי סופי.",
     },
   };
@@ -372,6 +405,53 @@ export const dashboardRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(businessExpenses).where(eq(businessExpenses.id, input.id));
+      return { success: true };
+    }),
+
+  addBusinessRecurringItem: teamProcedure
+    .input(z.object({
+      itemType: z.enum(["income", "expense"]),
+      category: z.string().trim().min(2).max(50),
+      description: z.string().trim().min(2).max(255),
+      vendor: z.string().trim().max(150).nullable().optional(),
+      amountShekels: z.number().positive().max(10_000_000),
+      validFrom: z.number(),
+      validTo: z.number().nullable().optional(),
+      includesVat: z.boolean().default(true),
+      notes: z.string().trim().max(2000).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const now = Date.now();
+      await db.insert(businessRecurringItems).values({
+        itemType: input.itemType,
+        category: input.category,
+        description: input.description,
+        vendor: input.vendor || null,
+        amountAgorot: Math.round(input.amountShekels * 100),
+        validFrom: input.validFrom,
+        validTo: input.validTo || null,
+        isActive: true,
+        includesVat: input.includesVat,
+        notes: input.notes || null,
+        createdBy: ctx.user?.email || ctx.teamMember?.email || "team",
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { success: true };
+    }),
+
+  deactivateBusinessRecurringItem: teamProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(businessRecurringItems)
+        .set({ isActive: false, validTo: Date.now(), updatedAt: Date.now() })
+        .where(eq(businessRecurringItems.id, input.id));
       return { success: true };
     }),
 
