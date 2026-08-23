@@ -63,26 +63,27 @@ const COACHING: UpsellOffer = {
 
 const EXCLUDED_PREFIXES = [
   "/crm", "/admin", "/team", "/terms", "/match", "/my-profile", "/unsubscribe",
-  "/join/questionnaire", "/join/complete", "/upload-photo", "/course/view", "/guide/view", "/guide/access",
-  "/database-plus", "/thank-you/plus",
+  "/join", "/upload-photo", "/course/view", "/guide/view", "/guide/access",
+  "/database", "/maagar", "/dna-quiz", "/thank-you/database",
+  "/database-plus", "/thank-you/plus", "/lead",
 ];
 
 export function selectSmartUpsell(path: string, purchases: PurchaseFlags): UpsellOffer | null {
   if (EXCLUDED_PREFIXES.some(prefix => path.startsWith(prefix))) return null;
 
   if (path.startsWith("/thank-you/session")) return purchases.coaching ? DATABASE : COACHING;
-  if (path.startsWith("/thank-you/database")) return SESSION;
   if (path.startsWith("/thank-you/course")) return purchases.session ? DATABASE : SESSION;
   if (path.startsWith("/thank-you/digital") || path.startsWith("/thank-you/bundle")) return purchases.course ? SESSION : COURSE;
   if (path.startsWith("/thank-you/coaching")) return purchases.database ? null : DATABASE;
+  if (path.startsWith("/live/thank-you")) return purchases.session ? COURSE : SESSION;
 
   if (path.startsWith("/single-session")) return purchases.coaching ? DATABASE : COACHING;
   if (path.startsWith("/coaching")) return purchases.database ? null : DATABASE;
   if (path.startsWith("/course")) return purchases.session ? DATABASE : SESSION;
   if (path.startsWith("/guide")) return purchases.course ? SESSION : COURSE;
-  if (path.startsWith("/database") || path.startsWith("/maagar") || path === "/join") return SESSION;
+  if (path.startsWith("/live") || path.startsWith("/tu-bav")) return purchases.session ? COURSE : SESSION;
 
-  if (path === "/" || path.startsWith("/dna-quiz") || path.startsWith("/blog") || path.startsWith("/signs") || path.startsWith("/brain") || path.startsWith("/lamekabel")) {
+  if (path === "/" || path.startsWith("/blog") || path.startsWith("/signs") || path.startsWith("/brain") || path.startsWith("/lamekabel")) {
     if (!purchases.database) return DATABASE;
     if (!purchases.session) return SESSION;
     if (!purchases.course) return COURSE;

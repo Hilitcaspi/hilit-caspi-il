@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSessionJourneyEmail, DATABASE_SESSION_JOURNEY_LAUNCH_AT, isEligibleForSessionJourney, selectNextSessionJourneyStage, selectSessionJourneyStage } from "./databaseSessionJourney";
+import { buildSessionJourneyEmail, DATABASE_SESSION_JOURNEY_LAUNCH_AT, isEligibleForSessionJourney, isSeptemberFollowupEnabled, SEPTEMBER_FOLLOWUP_EXPIRES_AT, selectNextSessionJourneyStage, selectSessionJourneyStage } from "./databaseSessionJourney";
 
 const DAY = 24 * 60 * 60 * 1000;
 const single = { firstName: "נועה", email: "noa@example.com" } as any;
@@ -35,5 +35,22 @@ describe("database session journey", () => {
     expect(plus.htmlBody).toContain("coupon=PLUS50");
     expect(regular.htmlBody).toContain("מחיר הפגישה: 500 ש״ח");
     expect(regular.htmlBody).not.toContain("coupon=PLUS50");
+  });
+
+  it("keeps the September follow-up disabled until explicit approval and stops it after expiry", () => {
+    expect(isSeptemberFollowupEnabled(SEPTEMBER_FOLLOWUP_EXPIRES_AT - DAY, false)).toBe(false);
+    expect(isSeptemberFollowupEnabled(SEPTEMBER_FOLLOWUP_EXPIRES_AT - DAY, true)).toBe(true);
+    expect(isSeptemberFollowupEnabled(SEPTEMBER_FOLLOWUP_EXPIRES_AT + 1, true)).toBe(false);
+  });
+
+  it("links the approved second-stage offer only to the separate September page", () => {
+    const message = buildSessionJourneyEmail(2, single, false, {
+      now: SEPTEMBER_FOLLOWUP_EXPIRES_AT - DAY,
+      septemberOfferEnabled: true,
+    });
+    expect(message.subject).toContain("שלוש דרכים להתקדם בספטמבר");
+    expect(message.htmlBody).toContain("/september?utm_source=database");
+    expect(message.htmlBody).not.toContain("/database?");
+    expect(message.htmlBody).not.toContain("/join");
   });
 });

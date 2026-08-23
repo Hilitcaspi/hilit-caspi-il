@@ -29,4 +29,9 @@ describe("PLUS50 coupon policy", () => {
     expect(computeCouponPrice(500, { discountPercent: 10 })).toBe(450);
     expect(computeCouponPrice(500, { discountAmount: 50 })).toBe(450);
   });
+
+  it("calculates the September 50 percent offer for digital products", () => {
+    expect(computeCouponPrice(149, { discountPercent: 50 })).toBe(75);
+    expect(computeCouponPrice(249, { discountPercent: 50 })).toBe(125);
+  });
 });

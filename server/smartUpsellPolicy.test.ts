@@ -8,12 +8,26 @@ describe("smart upsell policy", () => {
     expect(selectSmartUpsell("/my-profile", {})).toBeNull();
   });
 
-  it("moves a database buyer to a personal session", () => {
-    expect(selectSmartUpsell("/thank-you/database", { database: true })?.id).toBe("intro_session");
+  it("keeps the complete database funnel free of upsells", () => {
+    expect(selectSmartUpsell("/database", {})).toBeNull();
+    expect(selectSmartUpsell("/maagar", {})).toBeNull();
+    expect(selectSmartUpsell("/dna-quiz", {})).toBeNull();
+    expect(selectSmartUpsell("/join", {})).toBeNull();
+    expect(selectSmartUpsell("/join/questionnaire", {})).toBeNull();
+    expect(selectSmartUpsell("/join/complete", {})).toBeNull();
+    expect(selectSmartUpsell("/thank-you/database", { database: true })).toBeNull();
   });
 
   it("moves a session buyer to coaching", () => {
     expect(selectSmartUpsell("/thank-you/session", { session: true })?.id).toBe("personal_coaching");
+  });
+
+  it("adds relevant upsells to public content and product pages outside the database funnel", () => {
+    expect(selectSmartUpsell("/guide-free", {})?.id).toBe("relationship_course");
+    expect(selectSmartUpsell("/live", {})?.id).toBe("intro_session");
+    expect(selectSmartUpsell("/live/thank-you", { session: true })?.id).toBe("relationship_course");
+    expect(selectSmartUpsell("/tu-bav", {})?.id).toBe("intro_session");
+    expect(selectSmartUpsell("/lead", {})).toBeNull();
   });
 
   it("does not sell a purchased homepage product again", () => {
