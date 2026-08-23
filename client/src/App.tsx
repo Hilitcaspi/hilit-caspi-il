@@ -263,7 +263,7 @@ function HeRouter() {
           <Route path={"/database-plus"} component={DatabasePlusSales} />
           <Route path={"/terms/plus"} component={TermsPlus} />
           <Route path={"/thank-you/plus"} component={ThankYouPlus} />
-          <Route path={"/september"} component={SeptemberOffers} />
+          <Route path="/september" component={SeptemberOffers} />
           <Route path={"/thank-you/course"} component={ThankYouCourse} />
           <Route path={"/course-sales"} component={CourseSales} />
           <Route path={"/course/view"} component={CourseView} />
