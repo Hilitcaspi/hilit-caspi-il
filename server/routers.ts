@@ -23,7 +23,8 @@ import { startJourney, getJourneyKey } from "./automation";
 import { ga4GenerateLead, ga4SignUp, clientIdFromEmail } from "./_core/ga4";
 import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as buildMatchProposalEmailTemplate, buildContactRevealEmail as buildContactRevealEmailTemplate, buildMatchRejectionAckEmail, buildOwnerMatchApprovalEmail, buildConsolationEmail, WOMEN_MATCHMAKING_EMAIL_1, MEN_MATCHMAKING_EMAIL_1, DNA_PROFILES, buildMatchFollowUpEmail } from "./emailTemplates";
 import { sendEmail } from "./brevo";
-import { sendSMS, buildMatchSmsMessage } from "./vibrate";
+import { sendSMS } from "./vibrate";
+import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
 import { calculateOutcomeSegments } from "./matchmakingSegments";
 import {
@@ -2653,21 +2654,12 @@ export const appRouter = router({
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
 
-        // Send SMS notifications via Vibrate
-        const smsMsgA = buildMatchSmsMessage(singleA.firstName, singleB.firstName, score);
-        const smsMsgB = buildMatchSmsMessage(singleB.firstName, singleA.firstName, score);
-        const waNow = Date.now();
-        await db.update(matches).set({ waSentAt: waNow }).where(eq(matches.id, matchId));
-        if (singleA.phone) {
-          sendSMS(singleA.phone, smsMsgA).catch(err =>
-            console.error("[SMS] Failed to send to singleA:", err)
-          );
-        }
-        if (singleB.phone) {
-          sendSMS(singleB.phone, smsMsgB).catch(err =>
-            console.error("[SMS] Failed to send to singleB:", err)
-          );
-        }
+        await sendInitialMatchWhatsAppsOnce(db, {
+          matchId,
+          score,
+          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName },
+          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName },
+        });
 
         return { success: true, matchId, score };
       }),
@@ -3860,21 +3852,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
 
-        // Send SMS notifications via Vibrate
-        const smsMsgA2 = buildMatchSmsMessage(singleA.firstName, singleB.firstName, score);
-        const smsMsgB2 = buildMatchSmsMessage(singleB.firstName, singleA.firstName, score);
-        const waNow2 = Date.now();
-        await db.update(matches).set({ waSentAt: waNow2 }).where(eq(matches.id, input.matchId));
-        if (singleA.phone) {
-          sendSMS(singleA.phone, smsMsgA2).catch(err =>
-            console.error("[SMS] Failed to send to singleA:", err)
-          );
-        }
-        if (singleB.phone) {
-          sendSMS(singleB.phone, smsMsgB2).catch(err =>
-            console.error("[SMS] Failed to send to singleB:", err)
-          );
-        }
+        await sendInitialMatchWhatsAppsOnce(db, {
+          matchId: input.matchId,
+          score,
+          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName },
+          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName },
+        });
 
         return { success: true, sentTo: [singleA.email, singleB.email] };
       }),
@@ -3961,21 +3944,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
         await notifyOwner({ title: "✅ התאמה נשלחה!", content: `ההצעה ל-${singleA.firstName} ו-${singleB.firstName} נשלחה בהצלחה.` });
-        // Send SMS notifications via Vibrate
-        const smsMsgA3 = buildMatchSmsMessage(singleA.firstName, singleB.firstName, score);
-        const smsMsgB3 = buildMatchSmsMessage(singleB.firstName, singleA.firstName, score);
-        const waNow3 = Date.now();
-        await db.update(matches).set({ waSentAt: waNow3 }).where(eq(matches.id, match.id));
-        if (singleA.phone) {
-          sendSMS(singleA.phone, smsMsgA3).catch(err =>
-            console.error("[SMS] Failed to send to singleA:", err)
-          );
-        }
-        if (singleB.phone) {
-          sendSMS(singleB.phone, smsMsgB3).catch(err =>
-            console.error("[SMS] Failed to send to singleB:", err)
-          );
-        }
+        await sendInitialMatchWhatsAppsOnce(db, {
+          matchId: match.id,
+          score,
+          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName },
+          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName },
+        });
         return { success: true, action: "approved", sentTo: [singleA.email, singleB.email] };
       }),
 

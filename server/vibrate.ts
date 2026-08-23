@@ -2,7 +2,8 @@
  * SMS Integration via Vibrate API
  * https://www.vibrate.co.il
  *
- * Sends SMS notifications to users when match proposals are sent.
+ * Sends operational SMS messages that still use the Vibrate channel.
+ * Initial match proposals are sent through the Make WhatsApp webhook instead.
  * Fire-and-forget pattern — never throws, never blocks the main flow.
  */
 
@@ -72,11 +73,4 @@ export async function sendSMS(phone: string, message: string): Promise<boolean> 
     console.error(`[Vibrate] Error sending SMS:`, err);
     return false;
   }
-}
-
-/**
- * Build the match notification SMS message
- */
-export function buildMatchSmsMessage(firstName: string, matchFirstName: string, score: number): string {
-  return `היי ${firstName}\n\nשלחתי לך מייל עם התאמה של ${score}% מיוחדת שבחרתי עבורך, ${matchFirstName} מחכה לתשובתך!\n\nכדאי לבדוק את תיבת המייל (גם ספאם והשיווק) וללחוץ על הקישור.\n\nהילית 💛`;
 }

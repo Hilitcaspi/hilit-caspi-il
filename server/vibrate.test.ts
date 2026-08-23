@@ -86,17 +86,6 @@ describe("Vibrate SMS Service", () => {
     expect(result).toBe(false);
   });
 
-  it("should build correct match SMS message", async () => {
-    const { buildMatchSmsMessage } = await import("./vibrate");
-    
-    const msg = buildMatchSmsMessage("דנה", "עידו", 85);
-    expect(msg).toContain("היי דנה");
-    expect(msg).toContain("85%");
-    expect(msg).toContain("עידו");
-    expect(msg).toContain("הילית 💛");
-    expect(msg).toContain("ספאם");
-  });
-
   it("should skip sending when API key is not set", async () => {
     // Temporarily remove the key
     const originalKey = process.env.VIBRATE_API_KEY;
