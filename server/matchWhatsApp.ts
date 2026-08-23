@@ -1,6 +1,14 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { matches } from "../drizzle/schema";
 import type { getDb } from "./db";
+import {
+  buildMakeWhatsAppPayload,
+  normalizeWhatsAppPhone,
+  postWhatsAppWebhook,
+  type MakeWhatsAppPayload,
+} from "./whatsappWebhook";
+
+export { normalizeWhatsAppPhone } from "./whatsappWebhook";
 
 type AppDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type MatchSide = "A" | "B";
@@ -12,25 +20,14 @@ export type MatchWhatsAppRecipient = {
   matchFirstName: string;
 };
 
-export type MatchWhatsAppPayload = {
+export type MatchWhatsAppPayload = MakeWhatsAppPayload & {
   event: "match_proposal_sent";
-  channel: "whatsapp";
-  idempotencyKey: string;
   matchId: number;
   recipientSide: MatchSide;
-  phone: string;
-  message: string;
   recipientName: string;
   matchFirstName: string;
   score: number;
 };
-
-export function normalizeWhatsAppPhone(phone: string): string | null {
-  let normalized = phone.replace(/\D/g, "");
-  if (normalized.startsWith("05")) normalized = `972${normalized.slice(1)}`;
-  if (normalized.startsWith("5") && normalized.length === 9) normalized = `972${normalized}`;
-  return /^9725\d{8}$/.test(normalized) ? normalized : null;
-}
 
 export function buildMatchWhatsAppMessage(firstName: string, matchFirstName: string, score: number): string {
   return `היי ${firstName}\n\nשלחתי לך מייל עם התאמה של ${score}% מיוחדת שבחרתי עבורך, ${matchFirstName} מחכה לתשובתך!\n\nכדאי לבדוק את תיבת המייל (גם ספאם והשיווק) וללחוץ על הקישור.\n\nהילית 💛`;
@@ -41,20 +38,20 @@ export function buildMatchWhatsAppPayload(input: {
   score: number;
   recipient: MatchWhatsAppRecipient;
 }): MatchWhatsAppPayload | null {
-  const phone = input.recipient.phone ? normalizeWhatsAppPhone(input.recipient.phone) : null;
-  if (!phone) return null;
-  return {
+  if (!input.recipient.phone) return null;
+  return buildMakeWhatsAppPayload({
     event: "match_proposal_sent",
-    channel: "whatsapp",
     idempotencyKey: `match-${input.matchId}-${input.recipient.side}`,
-    matchId: input.matchId,
-    recipientSide: input.recipient.side,
-    phone,
+    phone: input.recipient.phone,
     message: buildMatchWhatsAppMessage(input.recipient.firstName, input.recipient.matchFirstName, input.score),
-    recipientName: input.recipient.firstName,
-    matchFirstName: input.recipient.matchFirstName,
-    score: input.score,
-  };
+    metadata: {
+      matchId: input.matchId,
+      recipientSide: input.recipient.side,
+      recipientName: input.recipient.firstName,
+      matchFirstName: input.recipient.matchFirstName,
+      score: input.score,
+    },
+  }) as MatchWhatsAppPayload | null;
 }
 
 export function didClaimMatchWhatsApp(result: unknown): boolean {
@@ -62,35 +59,7 @@ export function didClaimMatchWhatsApp(result: unknown): boolean {
   return Number((header as { affectedRows?: number } | undefined)?.affectedRows ?? 0) > 0;
 }
 
-export async function postMatchWhatsAppWebhook(
-  payload: MatchWhatsAppPayload,
-  fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
-  const webhookUrl = process.env.MATCH_WHATSAPP_WEBHOOK_URL;
-  if (!webhookUrl) {
-    console.warn("[MatchWhatsApp] MATCH_WHATSAPP_WEBHOOK_URL is not configured");
-    return false;
-  }
-
-  try {
-    const response = await fetchImpl(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) {
-      const responseText = await response.text().catch(() => "");
-      console.error(`[MatchWhatsApp] Make webhook rejected ${payload.idempotencyKey}: ${response.status} ${responseText.slice(0, 160)}`);
-      return false;
-    }
-    console.log(`[MatchWhatsApp] Make webhook accepted ${payload.idempotencyKey} for ${payload.phone.slice(0, 5)}****${payload.phone.slice(-2)}`);
-    return true;
-  } catch (error) {
-    console.error(`[MatchWhatsApp] Make webhook failed for ${payload.idempotencyKey}:`, error);
-    return false;
-  }
-}
+export const postMatchWhatsAppWebhook = postWhatsAppWebhook;
 
 export async function sendInitialMatchWhatsAppsOnce(
   db: AppDb,

@@ -14,7 +14,7 @@
 import { getDb } from "./db";
 import { singles, matches, matchmakingAnswers } from "../drizzle/schema";
 import { eq, and, isNotNull, lt } from "drizzle-orm";
-import { sendSMS } from "./vibrate";
+import { sendWhatsAppViaMake } from "./whatsappWebhook";
 import {
   computeFullScore,
   scoreOpenText,
@@ -371,14 +371,26 @@ export async function expireStaleMatches(): Promise<number> {
       db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1).then(r => r[0]),
     ]);
 
-    // Send SMS notification to parties who did not respond
-    const expiredSms = (firstName: string) =>
-      `היי ${firstName}, ההתאמה שנשלחה אלייך פגה תוקף כי לא הגבת בתוך 48 שעות. להבא, כשתקבלי התאמה חדשה, חשוב להגיב בתוך 48 שעות כדי לשמור אותה פעילה. אם יש שאלות, אני כאן. הילית`;
+    // Send WhatsApp notification to parties who did not respond
+    const expiredMessage = (firstName: string) =>
+      `היי ${firstName}, ההתאמה האחרונה פגה לאחר שלא התקבלה תשובה בתוך 48 שעות. בהתאמה הבאה חשוב להשיב בתוך 48 שעות כדי לשמור אותה פעילה. אם יש שאלות, אני כאן. הילית`;
     if (!match.approvedByA && singleA?.phone) {
-      sendSMS(singleA.phone, expiredSms(singleA.firstName)).catch(() => {});
+      sendWhatsAppViaMake({
+        event: "match_expired",
+        idempotencyKey: `match-expired-${match.id}-A`,
+        phone: singleA.phone,
+        message: expiredMessage(singleA.firstName),
+        metadata: { matchId: match.id, recipientSide: "A" },
+      }).catch(() => {});
     }
     if (!match.approvedByB && singleB?.phone) {
-      sendSMS(singleB.phone, expiredSms(singleB.firstName)).catch(() => {});
+      sendWhatsAppViaMake({
+        event: "match_expired",
+        idempotencyKey: `match-expired-${match.id}-B`,
+        phone: singleB.phone,
+        message: expiredMessage(singleB.firstName),
+        metadata: { matchId: match.id, recipientSide: "B" },
+      }).catch(() => {});
     }
 
     // If one party said yes but the other didn't respond, send consolation to the one who said yes

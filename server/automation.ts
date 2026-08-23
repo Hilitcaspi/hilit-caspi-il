@@ -14,7 +14,7 @@ import { getDb, resetDb } from "./db";
 import { emailLog, crmLeads, productAccessTokens, matches, singles } from "../drizzle/schema";
 import { and, eq, lt, gt, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { sendEmail, addContactToList } from "./brevo";
-import { sendSMS } from "./vibrate";
+import { sendWhatsAppViaMake } from "./whatsappWebhook";
 import { EMAIL_SEQUENCES, renderTemplate, DNA_PROFILES, type JourneyKey, buildMatchFollowUpEmail } from "./emailTemplates";
 import crypto from "crypto";
 
@@ -685,14 +685,26 @@ export async function processMatchFollowUps(): Promise<number> {
           .set({ followUpSentAt: Date.now() })
           .where(eq(matches.id, match.id));
         sent += emailsSent;
-        // Send SMS reminders alongside follow-up emails
-        const followUpSms = (firstName: string, matchName: string) =>
-          `היי ${firstName}, שלחתי לך מייל עם התאמה מיוחדת שמחכה לתשובתך. ${matchName} כבר הגיב בחיוב! כדאי לבדוק את תיבת המייל (גם ספאם ושיווק) וללחוץ על הקישור. הילית`;
+        // Send WhatsApp reminders alongside follow-up emails
+        const followUpMessage = (firstName: string, matchName: string) =>
+          `היי ${firstName}, שלחתי לך מייל עם התאמה מיוחדת שמחכה לתשובתך. כבר התקבלה תשובה חיובית מהצד השני. כדאי לבדוק את תיבת המייל (גם ספאם ושיווק) וללחוץ על הקישור. הילית`;
         if (!match.approvedByA && singleA?.phone) {
-          sendSMS(singleA.phone, followUpSms(singleA.firstName, singleB.firstName)).catch(() => {});
+          sendWhatsAppViaMake({
+            event: "match_follow_up",
+            idempotencyKey: `match-follow-up-${match.id}-A`,
+            phone: singleA.phone,
+            message: followUpMessage(singleA.firstName, singleB.firstName),
+            metadata: { matchId: match.id, recipientSide: "A" },
+          }).catch(() => {});
         }
         if (!match.approvedByB && singleB?.phone) {
-          sendSMS(singleB.phone, followUpSms(singleB.firstName, singleA.firstName)).catch(() => {});
+          sendWhatsAppViaMake({
+            event: "match_follow_up",
+            idempotencyKey: `match-follow-up-${match.id}-B`,
+            phone: singleB.phone,
+            message: followUpMessage(singleB.firstName, singleA.firstName),
+            metadata: { matchId: match.id, recipientSide: "B" },
+          }).catch(() => {});
         }
       }
     } catch (err) {

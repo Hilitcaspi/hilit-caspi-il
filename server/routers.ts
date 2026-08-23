@@ -23,7 +23,7 @@ import { startJourney, getJourneyKey } from "./automation";
 import { ga4GenerateLead, ga4SignUp, clientIdFromEmail } from "./_core/ga4";
 import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as buildMatchProposalEmailTemplate, buildContactRevealEmail as buildContactRevealEmailTemplate, buildMatchRejectionAckEmail, buildOwnerMatchApprovalEmail, buildConsolationEmail, WOMEN_MATCHMAKING_EMAIL_1, MEN_MATCHMAKING_EMAIL_1, DNA_PROFILES, buildMatchFollowUpEmail } from "./emailTemplates";
 import { sendEmail } from "./brevo";
-import { sendSMS } from "./vibrate";
+import { sendWhatsAppViaMake } from "./whatsappWebhook";
 import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
 import { calculateOutcomeSegments } from "./matchmakingSegments";
@@ -2965,7 +2965,12 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const phone = input.phone || "0552442334";
-        const ok = await sendSMS(phone, "בדיקת מערכת SMS מהילית כספי - הכל עובד!");
+        const ok = await sendWhatsAppViaMake({
+          event: "system_test",
+          idempotencyKey: `system-test-${Date.now()}`,
+          phone,
+          message: "בדיקת מערכת WhatsApp מהילית כספי - הכל עובד!",
+        });
         return { success: ok, phone };
       }),
 

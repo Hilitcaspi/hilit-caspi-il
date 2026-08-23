@@ -686,6 +686,36 @@ async function startServer() {
     }
   });
 
+  app.post("/api/scheduled/incomplete-profile-alerts", express.json(), async (req, res) => {
+    try {
+      let isAuthorized = false;
+      const cronHeader = req.headers["x-manus-cron-task-uid"];
+      if (cronHeader) {
+        isAuthorized = true;
+      } else {
+        try {
+          const user = await sdk.authenticateRequest(req as any);
+          if (user && (user.role === "admin" || (user as any).isCron)) isAuthorized = true;
+        } catch { /* invalid session */ }
+      }
+      if (!isAuthorized) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+      const { processIncompleteProfileAlerts } = await import("../incompleteProfileAlerts");
+      const result = await processIncompleteProfileAlerts({ limit: 100 });
+      console.log("[IncompleteProfileAlerts]", result);
+      res.json({ ok: true, result });
+    } catch (err) {
+      console.error("[IncompleteProfileAlerts] Error:", err);
+      void sendErrorAlert({ source: "express:incomplete-profile-alerts", error: err, context: { route: req.path } });
+      res.status(500).json({
+        error: String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+        context: { url: req.originalUrl, taskUid: req.headers["x-manus-cron-task-uid"] || null },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // Daily Plus commitment monitor. Creates one team task when an active paid
   // member enters the final seven days of a billing cycle below the 2/2 target.
   app.post("/api/scheduled/plus-commitments", express.json(), async (req, res) => {

@@ -7,7 +7,7 @@ import { businessExpenses, businessRecurringItems } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { calculatePnlSummary, prorateMonthlyAmountAgorot } from "./businessFinance";
 
-import { sendSMS } from "./vibrate";
+import { sendWhatsAppViaMake } from "./whatsappWebhook";
 import crypto from "crypto";
 // Product prices for revenue calculation
 const PRODUCT_PRICES: Record<string, number> = {
@@ -1845,6 +1845,7 @@ export const dashboardRouter = router({
       `)) as any;
       let sent = 0;
       let failed = 0;
+      const batchId = Date.now();
       const results: Array<{ name: string; phone: string; status: string }> = [];
       for (const s of skeletons) {
         const token = crypto.createHash('sha256')
@@ -1852,7 +1853,13 @@ export const dashboardRouter = router({
           .digest('hex');
         const link = `hilitcaspi.com/join/questionnaire?token=${token}`;
         const message = `היי ${s.firstName}! כאן הילית מהמאגר.\nשמנו לב שחסרים לנו כמה פרטים כדי שנוכל למצוא לך את ההתאמה המושלמת.\nזה לוקח דקה:\n${link}`;
-        const ok = await sendSMS(s.phone, message);
+        const ok = await sendWhatsAppViaMake({
+          event: "profile_completion_request",
+          idempotencyKey: `profile-completion-${batchId}-${s.id}`,
+          phone: s.phone,
+          message,
+          metadata: { singleId: s.id, batchId },
+        });
         if (ok) {
           sent++;
           results.push({ name: `${s.firstName} ${s.lastName || ''}`, phone: s.phone, status: 'sent' });
