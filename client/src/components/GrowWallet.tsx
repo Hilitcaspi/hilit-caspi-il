@@ -144,6 +144,7 @@ interface GrowWalletProps {
   prefillName?: string;
   prefillEmail?: string;
   prefillPhone?: string;
+  prefillCoupon?: string;
   onSuccess?: (response: any) => void;
   onFailure?: (response: any) => void;
   termsPath?: string;
@@ -158,6 +159,7 @@ export default function GrowWallet({
   prefillName,
   prefillEmail,
   prefillPhone,
+  prefillCoupon,
   onSuccess,
   onFailure,
   termsPath,
@@ -170,7 +172,7 @@ export default function GrowWallet({
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const instanceId = useId();
-  const [couponCode, setCouponCode] = useState("");
+  const [couponCode, setCouponCode] = useState(prefillCoupon || "");
   const [couponApplied, setCouponApplied] = useState<{ code: string; discountPercent?: number; discountAmount?: number; fixedPrice?: number } | null>(null);
   const [couponError, setCouponError] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
@@ -179,6 +181,27 @@ export default function GrowWallet({
   const saveLeadMutation = trpc.coupons.saveLead.useMutation();
   const createProcessMutation = trpc.payment.createProcess.useMutation();
   const reportFailureMutation = trpc.payment.reportFailure.useMutation();
+  const autoCouponKeyRef = useRef("");
+
+  useEffect(() => {
+    const requestedCode = prefillCoupon?.trim().toUpperCase();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!requestedCode || !normalizedEmail) return;
+    const attemptKey = `${requestedCode}:${product}:${normalizedEmail}`;
+    if (autoCouponKeyRef.current === attemptKey) return;
+    autoCouponKeyRef.current = attemptKey;
+    setCouponCode(requestedCode);
+    setCouponError("");
+    validateCouponMutation.mutateAsync({ code: requestedCode, product, email: normalizedEmail })
+      .then(result => {
+        if (result.valid) {
+          setCouponApplied({ code: result.code, discountPercent: result.discountPercent, discountAmount: result.discountAmount, fixedPrice: result.fixedPrice });
+        } else {
+          setCouponError((result as any).error || "קוד קופון לא תקין");
+        }
+      })
+      .catch(() => setCouponError("לא ניתן היה לאמת את ההטבה. אפשר לנסות שוב."));
+  }, [prefillCoupon, email, product]);
 
   // Track processToken from createProcess so we can include it in failure reports
   const lastProcessTokenRef = useRef<string | null>(null);
@@ -211,7 +234,7 @@ export default function GrowWallet({
     setCouponError("");
     setCouponLoading(true);
     try {
-      const result = await validateCouponMutation.mutateAsync({ code: couponCode.trim(), product });
+      const result = await validateCouponMutation.mutateAsync({ code: couponCode.trim(), product, email: email.trim() || undefined });
       if (result.valid) {
         setCouponApplied({ code: result.code, discountPercent: result.discountPercent, discountAmount: result.discountAmount, fixedPrice: result.fixedPrice });
         const label = result.fixedPrice ? `מחיר מיוחד: ₪${result.fixedPrice}` : result.discountPercent ? `${result.discountPercent}% הנחה` : result.discountAmount ? `₪${result.discountAmount} הנחה` : "הנחה";

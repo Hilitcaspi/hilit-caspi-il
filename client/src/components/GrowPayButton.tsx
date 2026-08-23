@@ -69,6 +69,7 @@ export default function GrowPayButton({
       const result = await validateCouponMutation.mutateAsync({
         code: couponCode.trim(),
         product,
+        email: email.trim() || undefined,
       });
       if (result.valid) {
         setCouponApplied({

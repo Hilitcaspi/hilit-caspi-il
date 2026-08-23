@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import ContextualUpsell from "@/components/ContextualUpsell";
 
 // Eagerly loaded (critical path)
 import Home from "@/pages/Home";
@@ -309,6 +310,7 @@ function HeRouter() {
           <Route component={NotFound} />
         </Switch>
       </Suspense>
+      <ContextualUpsell />
     </>
   );
 }

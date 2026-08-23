@@ -663,10 +663,17 @@ async function startServer() {
       }
       if (!isAuthorized) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-      const { processDatabase90DayJourney } = await import("../database90DayJourney");
-      const result = await processDatabase90DayJourney({ limit: 100 });
-      console.log("[Database90DayJourney]", result);
-      res.json({ ok: true, ...result });
+      const [{ processDatabase90DayJourney }, { processDatabaseSessionJourney }] = await Promise.all([
+        import("../database90DayJourney"),
+        import("../databaseSessionJourney"),
+      ]);
+      const [journey90Day, sessionUpsell] = await Promise.all([
+        processDatabase90DayJourney({ limit: 100 }),
+        processDatabaseSessionJourney({ limit: 30 }),
+      ]);
+      console.log("[Database90DayJourney]", journey90Day);
+      console.log("[DatabaseSessionJourney]", sessionUpsell);
+      res.json({ ok: true, journey90Day, sessionUpsell });
     } catch (err) {
       console.error("[Database90DayJourney] Error:", err);
       void sendErrorAlert({ source: "express:database-90-day-journey", error: err, context: { route: req.path } });

@@ -88,6 +88,18 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
           </div>
         )}
 
+        {status === "active" && (pilot as any)?.billingStatus === "active" && (
+          <div className="mt-4 grid gap-3 rounded-xl border border-[#eadf9e] bg-white/90 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+            <div>
+              <p className="text-xs font-black text-[#191265]">הטבות לחברי Plus</p>
+              <p className="mt-1 text-[11px] leading-5 text-[#666]">פגישת היכרות ב־450 ש״ח במקום 500 ש״ח, ו־50 ש״ח הנחה על המדריך, הקורס וחבילות הליווי עם PLUS50. ההטבה מאומתת לפי מייל המנוי.</p>
+            </div>
+            <a href={`/single-session?coupon=PLUS50&email=${encodeURIComponent(email)}`} className="rounded-xl bg-[#ffe27c] px-4 py-3 text-center text-xs font-black text-[#191265]">
+              לפגישת היכרות ב־450 ₪
+            </a>
+          </div>
+        )}
+
         {status === "active" && (
           <div className="mt-4 rounded-xl border border-[#eadf9e] bg-white/80 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-xs">רוצה שנציג אותך בסושיאל?</strong><span className="text-[10px] text-[#777]">אופציונלי בלבד · ללא פרטי קשר</span></div>

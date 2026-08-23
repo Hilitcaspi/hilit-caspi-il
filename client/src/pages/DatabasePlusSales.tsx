@@ -72,7 +72,7 @@ export default function DatabasePlusSales() {
           <div className="mx-auto mt-8 flex max-w-xl flex-col items-center justify-center gap-3 rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur sm:flex-row">
             <div className="text-center">
               <div className="text-5xl font-black text-[#ffe27c]">99 ₪</div>
-              <div className="mt-1 text-sm text-white/70">לחודש · בנוסף לדמי ההצטרפות למאגר</div>
+              <div className="mt-1 text-sm text-white/70">לחודש · ללא תקופה קבועה · בנוסף לדמי ההצטרפות למאגר</div>
             </div>
             <div className="hidden h-14 w-px bg-white/20 sm:block" />
             <div className="text-sm font-bold leading-7 text-white/85">אפשר לבטל בכל עת<br />החברות הרגילה במאגר נשארת</div>
@@ -100,6 +100,7 @@ export default function DatabasePlusSales() {
               "שליחה חוזרת של אותו אדם אינה נספרת פעמיים.",
               "הצעה יכולה להיות גם מתחת ל־80% לאחר בדיקה אנושית, כל עוד היא עומדת בתנאי הסף החשובים של שני הצדדים.",
               "לא נשלח אדם שסותר תנאי סף מהותיים רק כדי להשלים מכסה.",
+              "אם חסרה הצעה בסוף המחזור, היא נשארת התחייבות שירות ומועברת למחזור הבא.",
               "אישור הדדי, דייט או זוגיות אינם בשליטתנו ולכן אינם מובטחים.",
             ].map(item => (
               <div key={item} className="flex items-start gap-3 rounded-2xl bg-white p-4 text-sm leading-6 shadow-sm">
@@ -133,7 +134,7 @@ export default function DatabasePlusSales() {
           <div className="mt-5 space-y-3 text-sm">
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
               <Checkbox checked={renewalAccepted} onCheckedChange={value => setRenewalAccepted(Boolean(value))} />
-              <span>הבנתי שזהו חיוב חודשי מתחדש של 99 ש״ח עד לביטול, ושניתן לבטל בכל עת.</span>
+              <span>הבנתי שזהו חיוב חודשי מתחדש של 99 ש״ח ללא מספר חודשים קבוע, עד לביטול, ושניתן לבטל בכל עת.</span>
             </label>
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
               <Checkbox checked={termsAccepted} onCheckedChange={value => setTermsAccepted(Boolean(value))} />

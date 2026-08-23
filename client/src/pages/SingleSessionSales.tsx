@@ -14,8 +14,6 @@ import GrowWallet from "@/components/GrowWallet";
 
 const HERO_IMG    = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-hero_30e4b53c.png";
 const ABOUT_IMG   = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-about_1da3754a.jpg";
-const COUPLE1     = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp";
-const COUPLE2     = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp";
 
 const WHATSAPP_URL      = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, אני מעוניין/ת לקבוע פגישה אישית חד-פעמית. אשמח לפרטים נוספים.");
 
@@ -41,17 +39,9 @@ const WHAT_HAPPENS = [
   { icon: "💰", title: "ניתן לקיזוז", desc: "אם תחליט/י להמשיך לתהליך ליווי מלא, ₪500 יקוזזו מהמחיר הכולל." },
 ];
 
-const TESTIMONIALS = [
-  {
-    photo: COUPLE1,
-    text: "הגעתי לפגישה אחת כדי לבדוק. יצאתי עם הבנה שלא הייתה לי אחרי שנים. הצוות של הילית רואה דברים שאתה לא רואה בעצמך.",
-    who: "עמית, 39",
-  },
-  {
-    photo: COUPLE2,
-    text: "שעה אחת שינתה לי את הגישה לדייטינג. הבנתי מה אני מחפשת ולמה לא מצאתי. שלושה חודשים אחר כך אני בזוגיות.",
-    who: "דנה, 34",
-  },
+const SESSION_VALUE_POINTS = [
+  { title: "היכרות עמוקה יותר", text: "הפגישה מאפשרת לצוות לקבל תמונה מלאה יותר עליך, מעבר למה שאפשר להבין מהפרופיל בלבד." },
+  { title: "כיוון אישי ומעשי", text: "ממפים את הדפוסים, ההעדפות והחסמים שלך ומגדירים את הצעד הבא שמתאים למצבך." },
 ];
 
 const SESSION_FLOW = [
@@ -63,6 +53,9 @@ const SESSION_FLOW = [
 
 export default function SingleSessionSales() {
   const [scrolled, setScrolled] = useState(false);
+  const query = new URLSearchParams(window.location.search);
+  const plusCoupon = query.get("coupon")?.toUpperCase() === "PLUS50" ? "PLUS50" : undefined;
+  const plusEmail = query.get("email") || undefined;
 
   useEffect(() => {
     gaViewItem("session");
@@ -83,7 +76,7 @@ export default function SingleSessionSales() {
           <Link href="/"><span className="text-white font-bold text-lg cursor-pointer hover:text-[#ffe27c] transition-colors">הילית כספי</span></Link>
           <button onClick={() => document.getElementById('session-wallet-hero')?.scrollIntoView({behavior:'smooth'})}
             className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105">
-            קביעת פגישה ₪500
+            {plusCoupon ? "פגישת Plus ₪450" : "קביעת פגישה ₪500"}
           </button>
         </div>
       </nav>
@@ -115,7 +108,8 @@ export default function SingleSessionSales() {
 
             {/* Pricing */}
             <div className="flex items-baseline gap-3 mb-4">
-              <span className="text-[#ffe27c] font-black text-3xl">₪500</span>
+              {plusCoupon && <span className="text-white/45 text-lg line-through">₪500</span>}
+              <span className="text-[#ffe27c] font-black text-3xl">{plusCoupon ? "₪450" : "₪500"}</span>
               <span className="text-white/50 text-base">לפגישה אחת של 60 דקות</span>
             </div>
 
@@ -132,10 +126,17 @@ export default function SingleSessionSales() {
             </p>
 
             <div id="session-wallet-hero" className="mt-2">
+              {plusCoupon && (
+                <div className="mb-3 rounded-xl border border-[#ffe27c]/60 bg-[#ffe27c]/15 px-4 py-3 text-sm font-bold text-[#ffe27c]">
+                  הטבת Plus: 50 ש״ח הנחה. הקופון יאומת לפי מייל המנוי.
+                </div>
+              )}
               <GrowWallet
                 product="session"
                 buttonLabel="קביעת פגישה עכשיו"
                 termsPath="/terms/single-session"
+                prefillEmail={plusEmail}
+                prefillCoupon={plusCoupon}
                 onSuccess={() => { window.location.href = "/thank-you/session"; }}
               />
             </div>
@@ -234,7 +235,7 @@ export default function SingleSessionSales() {
               </p>
               <div className="flex flex-wrap gap-4">
                 {[
-                  { n: "5,000+", l: "רווקים במאגר" },
+                  { n: "1,100+", l: "חברים פעילים במאגר" },
                   { n: "500+", l: "אנשים שליוויתי" },
                   { n: "200K+", l: "האזנות לפודקאסט" },
                 ].map(({ n, l }) => (
@@ -249,20 +250,17 @@ export default function SingleSessionSales() {
         </AnimatedSection>
       </section>
 
-      {/* Testimonials */}
+      {/* Session value */}
       <section className="py-20 px-6 bg-[#191265]">
         <AnimatedSection>
           <div className="max-w-4xl mx-auto">
-            <motion.p variants={fadeUp} className="text-[#ffe27c] font-semibold text-sm uppercase tracking-widest text-center mb-3">מה אומרים</motion.p>
-            <motion.h2 variants={fadeUp} className="text-3xl font-black text-white text-center mb-10">אחרי פגישה אחת</motion.h2>
+            <motion.p variants={fadeUp} className="text-[#ffe27c] font-semibold text-sm uppercase tracking-widest text-center mb-3">הערך של הפגישה</motion.p>
+            <motion.h2 variants={fadeUp} className="text-3xl font-black text-white text-center mb-10">מה הפגישה מאפשרת לנו לעשות יחד</motion.h2>
             <div className="grid md:grid-cols-2 gap-6">
-              {TESTIMONIALS.map((t) => (
-                <motion.div key={t.who} variants={fadeUp} className="bg-white/10 border border-white/10 rounded-2xl p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <img src={t.photo} alt={t.who} className="w-12 h-12 rounded-full object-cover border-2 border-[#ffe27c]" />
-                    <span className="text-white font-bold text-sm">{t.who}</span>
-                  </div>
-                  <p className="text-white/75 text-sm leading-relaxed italic">"{t.text}"</p>
+              {SESSION_VALUE_POINTS.map((point) => (
+                <motion.div key={point.title} variants={fadeUp} className="bg-white/10 border border-white/10 rounded-2xl p-6">
+                  <h3 className="text-[#ffe27c] font-black text-lg mb-3">{point.title}</h3>
+                  <p className="text-white/75 text-sm leading-relaxed">{point.text}</p>
                 </motion.div>
               ))}
             </div>
@@ -308,8 +306,10 @@ export default function SingleSessionSales() {
             <motion.div variants={fadeUp}>
               <GrowWallet
                 product="session"
-                buttonLabel="קביעת פגישה עכשיו ₪500"
+                buttonLabel={plusCoupon ? "קביעת פגישת Plus עכשיו ₪450" : "קביעת פגישה עכשיו ₪500"}
                 termsPath="/terms/single-session"
+                prefillEmail={plusEmail}
+                prefillCoupon={plusCoupon}
                 onSuccess={() => { window.location.href = "/thank-you/session"; }}
               />
             </motion.div>
