@@ -35,6 +35,7 @@ const PAGE_CODES: Record<string, string> = {
   coaching_mas: import.meta.env.VITE_GROW_PAGE_CODE_COACHING_MAS || PROD_PAGE_CODE,
   session:      import.meta.env.VITE_GROW_PAGE_CODE_SESSION  || PROD_PAGE_CODE,
   bundle_tubav: import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
+  plus:         import.meta.env.VITE_GROW_PAGE_CODE_PLUS || "",
 };
 
 const PRODUCT_CONFIGS: Record<string, { description: string; sum: number; paymentNum?: number; maxPaymentNum?: number }> = {
@@ -45,6 +46,7 @@ const PRODUCT_CONFIGS: Record<string, { description: string; sum: number; paymen
   coaching_mas: { description: "ליווי אישי - תהליך המסע (12 פגישות) עם הילית כספי", sum: 4200, maxPaymentNum: 10 },
   session:      { description: "פגישה בודדת עם הילית כספי", sum: 500, paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון", sum: 349, paymentNum: 1 },
+  plus:         { description: "Database Plus - מנוי חודשי", sum: 99 },
 };
 
 const SITE_BASE = window.location.origin;
@@ -136,7 +138,7 @@ declare global {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface GrowWalletProps {
-  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav";
+  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "plus";
   buttonLabel?: string;
   buttonClassName?: string;
   prefillName?: string;
@@ -145,6 +147,7 @@ interface GrowWalletProps {
   onSuccess?: (response: any) => void;
   onFailure?: (response: any) => void;
   termsPath?: string;
+  personalToken?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -158,6 +161,7 @@ export default function GrowWallet({
   onSuccess,
   onFailure,
   termsPath,
+  personalToken,
 }: GrowWalletProps) {
   const [name, setName] = useState(prefillName || "");
   const [email, setEmail] = useState(prefillEmail || "");
@@ -395,7 +399,7 @@ export default function GrowWallet({
 
       logStep("4_createProcess_start");
       const result = await createProcessMutation.mutateAsync({
-        product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session",
+        product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "plus",
         fullName,
         email: userEmail,
         phone: userPhone || undefined,
@@ -405,6 +409,7 @@ export default function GrowWallet({
         utmCampaign,
         utmContent,
         ga4ClientId,
+        personalToken,
       });
 
       // Save processToken for failure reporting (if SDK payment fails later)

@@ -4,6 +4,7 @@
  */
 import { useState } from "react";
 import MatchmakingDashboard from "./MatchmakingDashboard";
+import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -289,9 +290,10 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard">(() =>
-    new URLSearchParams(window.location.search).get("tab") === "dashboard" ? "dashboard" : "singles"
-  );
+  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "plus">(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    return requestedTab === "dashboard" || requestedTab === "plus" ? requestedTab : "singles";
+  });
   // Filter-search tab state
   const [filterGender, setFilterGender] = useState("");
   const [filterMinAge, setFilterMinAge] = useState("");
@@ -559,6 +561,7 @@ export default function CRMMatchmaking() {
     wantsChildren?: string | null; about?: string | null; aboutMe?: string | null; partnerDescription?: string | null;
     height?: number | null; religiosity?: string | null; education?: string | null;
     questionnaireCompletedAt?: number | null; questionnaireToken?: string | null;
+    plusStatus?: string | null; plusBillingStatus?: string | null; plusPremiumSupport?: boolean;
   }>;
 
   const typedMatches = pendingMatches as Array<{
@@ -894,6 +897,7 @@ export default function CRMMatchmaking() {
             { id: "compatibility" as const, label: "בדיקת התאמה 🔍", icon: <Zap size={14} /> },
             { id: "filter_search" as const, label: "חיפוש מתקדם 🔎", icon: <Search size={14} /> },
             { id: "inactive" as const, label: "לא פעילים", icon: <span>🚫</span> },
+            { id: "plus" as const, label: "חברי PLUS", icon: <span className="font-black text-[#8b7420]">＋</span> },
             { id: "dashboard" as const, label: "דאשבורד 📊", icon: <BarChart3 size={14} /> },
           ].map(tab => (
             <button
@@ -1016,6 +1020,11 @@ export default function CRMMatchmaking() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
+                    {single.plusStatus === "active" && single.plusBillingStatus === "active" && (
+                      <span className="rounded-full bg-[#191265] px-2.5 py-1 text-[10px] font-black tracking-wide text-[#ffe27c] shadow-sm" title="חבר/ת Database Plus פעיל/ה">
+                        PLUS
+                      </span>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleCoachingClient.mutate({ id: single.id }); }}
                       disabled={toggleCoachingClient.isPending}
@@ -2968,6 +2977,9 @@ export default function CRMMatchmaking() {
         )}
         {activeTab === "dashboard" && (
           <MatchmakingDashboard />
+        )}
+        {activeTab === "plus" && (
+          <PlusPilotAdminSection />
         )}
       </div>
     </div>

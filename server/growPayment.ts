@@ -55,6 +55,8 @@ const PAGE_CODES: Record<string, string> = {
   coaching_mas: process.env.GROW_PAGE_CODE_COACHING_MAS || PROD_PAGE_CODE,
   session:      process.env.GROW_PAGE_CODE_SESSION      || PROD_PAGE_CODE,
   bundle_tubav: process.env.GROW_PAGE_CODE_DATABASE   || PROD_PAGE_CODE,
+  // No fallback by design: Plus requires a dedicated recurring-payment page.
+  plus:         process.env.GROW_PAGE_CODE_PLUS || "",
 };
 
 const SITE_BASE = "https://hilitcaspi.com";
@@ -75,6 +77,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   coaching_mas: { description: "ליווי אישי - תהליך המסע (12 פגישות) עם הילית כספי", sum: 4200, maxPaymentNum: 10 },
   session:      { description: "פגישת היכרות עם הילית כספי",                          sum: 500,  paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון",            sum: 349,  paymentNum: 1 },
+  plus:         { description: "Database Plus - מנוי חודשי",                         sum: 99 },
 };
 
 // ─── createPaymentProcess ─────────────────────────────────────────────────────
@@ -85,6 +88,8 @@ export interface CreatePaymentInput {
   phone?: string;
   /** Override price (e.g. coupon) */
   sum?: number;
+  /** Personal questionnaire token used only to return a Plus member to their account. */
+  personalToken?: string;
 }
 
 export interface CreatePaymentResult {
@@ -98,6 +103,9 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   if (!config) throw new Error(`Unknown product: ${input.product}`);
 
   const pageCode = PAGE_CODES[input.product];
+  if (!pageCode) {
+    throw new Error("Database Plus recurring payment is not configured yet");
+  }
   const sum = input.sum ?? config.sum;
 
   const params = new URLSearchParams();
@@ -113,9 +121,15 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     coaching_mas: "/thank-you/coaching",
     session:      "/thank-you/session",
     bundle_tubav: "/thank-you/bundle",
+    plus:         "/thank-you/plus",
   };
   const successPath = SUCCESS_PATHS[input.product] || "/thank-you/digital";
-  params.append("successUrl", `${SITE_BASE}${successPath}`);
+  const successUrl = new URL(`${SITE_BASE}${successPath}`);
+  if (input.product === "plus") {
+    successUrl.searchParams.set("email", input.email);
+    if (input.personalToken) successUrl.searchParams.set("token", input.personalToken);
+  }
+  params.append("successUrl", successUrl.toString());
   params.append("cancelUrl", `${SITE_BASE}`);
   params.append("notifyUrl", `${SITE_BASE}/api/grow/webhook`);
   params.append("pageField[fullName]", input.fullName);

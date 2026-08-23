@@ -679,6 +679,29 @@ async function startServer() {
     }
   });
 
+  // Daily Plus commitment monitor. Creates one team task when an active paid
+  // member enters the final seven days of a billing cycle below the 2/2 target.
+  app.post("/api/scheduled/plus-commitments", express.json(), async (req, res) => {
+    try {
+      let isAuthorized = Boolean(req.headers["x-manus-cron-task-uid"]);
+      if (!isAuthorized) {
+        try {
+          const user = await sdk.authenticateRequest(req as any);
+          if (user && (user.role === "admin" || (user as any).isCron)) isAuthorized = true;
+        } catch { /* invalid session */ }
+      }
+      if (!isAuthorized) { res.status(401).json({ error: "Unauthorized" }); return; }
+      const { runPlusCommitmentMonitor } = await import("../plusSubscription");
+      const result = await runPlusCommitmentMonitor();
+      console.log("[PlusCommitmentMonitor]", result);
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      console.error("[PlusCommitmentMonitor] Error:", err);
+      void sendErrorAlert({ source: "express:plus-commitments", error: err, context: { route: req.path } });
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // ─── Team Member Login (form POST with redirect — Chrome mobile fallback) ──
   app.post("/api/team/login-form", async (req, res) => {
     try {

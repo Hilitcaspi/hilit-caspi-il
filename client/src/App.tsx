@@ -63,6 +63,9 @@ const TermsSingleSession = lazy(() => import("@/pages/TermsSingleSession"));
 const TuBavBundle = lazy(() => import("@/pages/TuBavBundle"));
 const ThankYouBundle = lazy(() => import("@/pages/ThankYouBundle"));
 const TeamLogin = lazy(() => import("@/pages/TeamLogin"));
+const DatabasePlusSales = lazy(() => import("@/pages/DatabasePlusSales"));
+const TermsPlus = lazy(() => import("@/pages/TermsPlus"));
+const ThankYouPlus = lazy(() => import("@/pages/ThankYouPlus"));
 
 // US English (EN) pages
 const EnHome = lazy(() => import("@/pages/en/Home"));
@@ -255,6 +258,9 @@ function HeRouter() {
           <Route path={"/database"} component={DatabaseSales} />
           <Route path={"/maagar"} component={DatabaseLanding} />
           <Route path={"/terms/database"} component={TermsDatabase} />
+          <Route path={"/database-plus"} component={DatabasePlusSales} />
+          <Route path={"/terms/plus"} component={TermsPlus} />
+          <Route path={"/thank-you/plus"} component={ThankYouPlus} />
           <Route path={"/thank-you/course"} component={ThankYouCourse} />
           <Route path={"/course-sales"} component={CourseSales} />
           <Route path={"/course/view"} component={CourseView} />

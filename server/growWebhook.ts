@@ -33,7 +33,7 @@
 import crypto from "crypto";
 import { and, eq, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency, completedPayments } from "../drizzle/schema";
+import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusPaymentEvents } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
 import { sendSMS } from "./vibrate";
@@ -80,6 +80,7 @@ function detectProductByAmount(sum: number): string | null {
 // Fallback: detect by description
 function detectProductByDesc(desc: string): string | null {
   const d = (desc || "").toLowerCase();
+  if (d.includes("database plus") || d.includes("מאגר פלוס") || d.includes("database+")) return "plus";
   // IMPORTANT: bundle_tubav MUST be checked before guide/database because its description contains both "מדריך" and "מאגר"
   if (d.includes("חבילת טו באב") || d.includes("bundle_tubav") || (d.includes("מאגר") && d.includes("מדריך"))) return "bundle_tubav";
   if (d.includes("המסע") && (d.includes("ליווי") || d.includes("12"))) return "coaching_mas";
@@ -437,6 +438,79 @@ async function handleBundleTuBav(email: string, name: string, phone: string, tra
   console.log(`[GrowWebhook] Bundle Tu B'Av completed for ${email} (database + guide)`);
 }
 
+async function handlePlus(email: string, name: string, transactionId: string, sum: number, data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [single] = await db.select().from(singles).where(eq(singles.email, email)).limit(1);
+  if (!single || !single.isActive || !single.isPaid) {
+    throw new Error(`Plus payment received for non-active database member: ${email}`);
+  }
+
+  const { addOneBillingMonth } = await import("./plusSubscription");
+  const now = Date.now();
+  const cycleEnd = addOneBillingMonth(now);
+  const providerSubscriptionId = String(
+    data.subscriptionId || data.recurringPaymentId || data.paymentLinkProcessToken || "",
+  ).slice(0, 200) || null;
+  const [existing] = await db.select().from(plusPilotMembers)
+    .where(eq(plusPilotMembers.singleId, single.id)).limit(1);
+
+  const memberValues = {
+    status: "active" as const,
+    billingStatus: "active" as const,
+    pilotPriceAgorot: Math.round(sum * 100) || 9900,
+    monthlyMatchTarget: 2,
+    billingCycleStartedAt: now,
+    billingCycleEndsAt: cycleEnd,
+    nextBillingAt: cycleEnd,
+    providerSubscriptionId,
+    lastPaymentTransactionId: transactionId || null,
+    lastPaymentAt: now,
+    premiumSupportEnabled: true,
+    activatedAt: existing?.activatedAt || now,
+    endedAt: null,
+    cancelledAt: null,
+    lastEngagedAt: now,
+    updatedAt: now,
+  };
+
+  if (existing) {
+    await db.update(plusPilotMembers).set(memberValues).where(eq(plusPilotMembers.id, existing.id));
+  } else {
+    await db.insert(plusPilotMembers).values({
+      singleId: single.id,
+      source: "grow_recurring",
+      waitlistedAt: now,
+      createdAt: now,
+      ...memberValues,
+    });
+  }
+
+  const [member] = await db.select().from(plusPilotMembers)
+    .where(eq(plusPilotMembers.singleId, single.id)).limit(1);
+  if (member) {
+    await db.insert(plusPaymentEvents).values({
+      plusMemberId: member.id,
+      singleId: single.id,
+      eventType: existing?.billingStatus === "active" ? "payment_succeeded" : "subscription_started",
+      amountAgorot: Math.round(sum * 100) || 9900,
+      providerTransactionId: transactionId || null,
+      providerSubscriptionId,
+      billingPeriodStartedAt: now,
+      billingPeriodEndsAt: cycleEnd,
+      createdAt: now,
+    });
+  }
+
+  const personalUrl = `${SITE_BASE}/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken || "")}`;
+  await sendEmail({
+    to: { email, name },
+    subject: "Database Plus שלך פעיל",
+    htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">ברוכים הבאים ל־Database Plus</h2><p style="line-height:1.8">המנוי שלך פעיל. במחזור הנוכחי נשלח לפחות שתי הצעות התאמה חדשות שנבדקו. באזור האישי ניתן לראות את מונה 0/2–2/2 ולפנות לערוץ השירות בעדיפות.</p><p style="line-height:1.8;font-size:13px;color:#666">ההבטחה היא להצעות שנבדקו ונשלחו; אישור הדדי, דייט או זוגיות אינם מובטחים.</p><p style="text-align:center;margin:28px 0"><a href="${personalUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">כניסה לאזור האישי</a></p></div>`,
+  });
+  await notifyOwner({ title: "מנוי Database Plus חדש", content: `${name} (${email}) הפעיל/ה Plus ב־${sum} ש״ח לחודש.` });
+}
+
 // ─── UTM extraction helper ────────────────────────────────────────────────────
 // Grow passes back any extra query params from the payment URL in the webhook body.
 // We look for utm_source / utm_medium / utm_campaign / utm_content in multiple places:
@@ -552,9 +626,26 @@ export async function handleGrowWebhook(body: any): Promise<void> {
       product = descProduct;
     }
   }
-  // 3. If still no product or product is "database" but sum=349, override to bundle_tubav
+  // 3. A 99₪ charge is ambiguous with the historical live event. If this email
+  // has a pending Plus checkout, prefer Plus; otherwise use the amount fallback.
+  if (!product && sum >= 85 && sum <= 115 && email) {
+    try {
+      const db = await getDb();
+      if (db) {
+        const [pendingPlus] = await db.select({ id: plusPilotMembers.id })
+          .from(plusPilotMembers)
+          .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
+          .where(and(eq(singles.email, email), eq(plusPilotMembers.billingStatus, "pending")))
+          .limit(1);
+        if (pendingPlus) product = "plus";
+      }
+    } catch (error) {
+      console.warn("[GrowWebhook] Plus pending lookup failed", error);
+    }
+  }
+  // 4. If still no product, detect by amount.
   if (!product) product = detectProductByAmount(sum);
-  // 4. Final override: if processToken matched "database" or "guide" but sum is 349 (bundle price), it's actually bundle_tubav
+  // 5. Final override: if processToken matched "database" or "guide" but sum is 349 (bundle price), it's actually bundle_tubav
   // The bundle uses the DATABASE pageCode, but Grow may return a processToken that matches guide hash.
   if ((product === "database" || product === "guide") && sum === 349) {
     console.log(`[GrowWebhook] Overriding product from ${product} to bundle_tubav based on sum=349`);
@@ -649,6 +740,7 @@ export async function handleGrowWebhook(body: any): Promise<void> {
       case "database": await handleDatabase(email, name, phone, transactionId); break;
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
+      case "plus": await handlePlus(email, name, transactionId, sum, data); break;
     }
 
     // Persist the actual amount paid as the P&L revenue source of truth.

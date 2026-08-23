@@ -774,11 +774,26 @@ export const plusPilotMembers = mysqlTable("plus_pilot_members", {
   id: int("id").primaryKey().autoincrement(),
   singleId: int("single_id").notNull().unique(),
   status: mysqlEnum("status", ["waitlist", "eligible", "invited", "active", "declined", "churned"]).default("waitlist").notNull(),
+  billingStatus: mysqlEnum("billing_status", ["not_configured", "pending", "active", "past_due", "cancelled", "ended"]).default("not_configured").notNull(),
   eligibilityScore: int("eligibility_score"),
   eligibilityReasons: text("eligibility_reasons"),
   source: varchar("source", { length: 100 }).default("personal_area").notNull(),
   pilotCohort: varchar("pilot_cohort", { length: 100 }),
   pilotPriceAgorot: int("pilot_price_agorot"),
+  monthlyMatchTarget: int("monthly_match_target").default(2).notNull(),
+  billingCycleStartedAt: bigint("billing_cycle_started_at", { mode: "number" }),
+  billingCycleEndsAt: bigint("billing_cycle_ends_at", { mode: "number" }),
+  nextBillingAt: bigint("next_billing_at", { mode: "number" }),
+  cancelledAt: bigint("cancelled_at", { mode: "number" }),
+  providerSubscriptionId: varchar("provider_subscription_id", { length: 200 }),
+  lastPaymentTransactionId: varchar("last_payment_transaction_id", { length: 200 }),
+  lastPaymentAt: bigint("last_payment_at", { mode: "number" }),
+  premiumSupportEnabled: boolean("premium_support_enabled").default(false).notNull(),
+  socialExposureConsent: mysqlEnum("social_exposure_consent", ["not_asked", "declined", "approved"]).default("not_asked").notNull(),
+  socialConsentAt: bigint("social_consent_at", { mode: "number" }),
+  socialPhotoApproved: boolean("social_photo_approved").default(false).notNull(),
+  socialCopyApproved: boolean("social_copy_approved").default(false).notNull(),
+  socialApprovedText: text("social_approved_text"),
   waitlistedAt: bigint("waitlisted_at", { mode: "number" }).notNull(),
   invitedAt: bigint("invited_at", { mode: "number" }),
   activatedAt: bigint("activated_at", { mode: "number" }),
@@ -789,6 +804,26 @@ export const plusPilotMembers = mysqlTable("plus_pilot_members", {
 });
 export type PlusPilotMember = typeof plusPilotMembers.$inferSelect;
 export type InsertPlusPilotMember = typeof plusPilotMembers.$inferInsert;
+
+/** Auditable lifecycle of Plus recurring billing. One event per provider transaction/status change. */
+export const plusPaymentEvents = mysqlTable("plus_payment_events", {
+  id: int("id").primaryKey().autoincrement(),
+  plusMemberId: int("plus_member_id").notNull(),
+  singleId: int("single_id").notNull(),
+  eventType: mysqlEnum("event_type", ["subscription_started", "payment_succeeded", "payment_failed", "subscription_cancelled", "subscription_ended"]).notNull(),
+  amountAgorot: int("amount_agorot").default(9900).notNull(),
+  providerTransactionId: varchar("provider_transaction_id", { length: 200 }),
+  providerSubscriptionId: varchar("provider_subscription_id", { length: 200 }),
+  billingPeriodStartedAt: bigint("billing_period_started_at", { mode: "number" }),
+  billingPeriodEndsAt: bigint("billing_period_ends_at", { mode: "number" }),
+  failureReason: text("failure_reason"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  memberCreatedIdx: index("plus_payment_member_created_idx").on(t.plusMemberId, t.createdAt),
+  providerTransactionIdx: index("plus_payment_provider_tx_idx").on(t.providerTransactionId),
+}));
+export type PlusPaymentEvent = typeof plusPaymentEvents.$inferSelect;
+export type InsertPlusPaymentEvent = typeof plusPaymentEvents.$inferInsert;
 
 /** Team operations tasks for matching, follow-up, calls and outcome collection. */
 export const crmTeamTasks = mysqlTable("crm_team_tasks", {

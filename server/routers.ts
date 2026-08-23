@@ -7,7 +7,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads } from "../drizzle/schema";
+import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
 import { operationsRouter } from "./operationsRouter";
@@ -2677,9 +2677,24 @@ export const appRouter = router({
       const db = await getDb();
       if (!db) return [];
       // Exclude seed/demo data - only show real registrations
-      return db.select().from(singles)
+      const [singleRows, plusRows] = await Promise.all([
+        db.select().from(singles)
         .where(eq(singles.isSeed, false))
-        .orderBy(desc(singles.createdAt));
+          .orderBy(desc(singles.createdAt)),
+        db.select({
+          singleId: plusPilotMembers.singleId,
+          status: plusPilotMembers.status,
+          billingStatus: plusPilotMembers.billingStatus,
+          premiumSupportEnabled: plusPilotMembers.premiumSupportEnabled,
+        }).from(plusPilotMembers),
+      ]);
+      const plusBySingle = new Map(plusRows.map(row => [row.singleId, row]));
+      return singleRows.map(single => ({
+        ...single,
+        plusStatus: plusBySingle.get(single.id)?.status ?? null,
+        plusBillingStatus: plusBySingle.get(single.id)?.billingStatus ?? null,
+        plusPremiumSupport: plusBySingle.get(single.id)?.premiumSupportEnabled ?? false,
+      }));
     }),
 
     getAllLeads: teamProcedure.query(async ({ ctx }) => {
@@ -6762,7 +6777,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
   payment: router({
     createProcess: publicProcedure
       .input(z.object({
-        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav"]),
+        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "plus"]),
         fullName: z.string().min(2),
         email: z.string().email(),
         phone: z.string().optional(),
@@ -6777,14 +6792,67 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         ga4ClientId: z.string().max(100).optional(),
         // GA4 session_id from _ga_ZH1CYQCTMN cookie — required for campaign_details UTM attribution
         ga4SessionId: z.string().max(50).optional(),
+        personalToken: z.string().min(16).max(200).optional(),
       }))
       .mutation(async ({ input }) => {
         const { createPaymentProcess, PRODUCT_CONFIGS } = await import("./growPayment");
         const db = await getDb();
 
+        if (input.product === "plus") {
+          if (!process.env.GROW_PAGE_CODE_PLUS?.trim()) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "מסך החיוב החודשי עדיין לא הופעל" });
+          }
+          if (!db || !input.personalToken) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "נדרש קישור אישי תקין להצטרפות ל־Plus" });
+          }
+          const normalizedEmail = input.email.trim().toLowerCase();
+          const [single] = await db.select().from(singles).where(and(
+            eq(singles.email, normalizedEmail),
+            eq(singles.questionnaireToken, input.personalToken),
+          )).limit(1);
+          if (!single || !single.isActive || !single.isPaid) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Plus זמין לחברים פעילים במאגר עם קישור אישי" });
+          }
+          const memberMatches = await db.select({
+            id: matches.id,
+            singleAId: matches.singleAId,
+            singleBId: matches.singleBId,
+            proposedAt: matches.proposedAt,
+            status: matches.status,
+            matchDetailStatus: matches.matchDetailStatus,
+            returnedToPoolAt: matches.returnedToPoolAt,
+          }).from(matches).where(or(eq(matches.singleAId, single.id), eq(matches.singleBId, single.id)));
+          const { assessPlusEligibility } = await import("./plusPilotRouter");
+          const eligibility = assessPlusEligibility(single, memberMatches);
+          if (!eligibility.eligible) {
+            throw new TRPCError({ code: "FORBIDDEN", message: eligibility.blockers[0] || "הפרופיל אינו זכאי כרגע ל־Plus" });
+          }
+          const now = Date.now();
+          await db.insert(plusPilotMembers).values({
+            singleId: single.id,
+            status: "eligible",
+            billingStatus: "pending",
+            monthlyMatchTarget: 2,
+            premiumSupportEnabled: false,
+            eligibilityScore: eligibility.score,
+            eligibilityReasons: JSON.stringify({ reasons: eligibility.reasons, blockers: eligibility.blockers }),
+            source: "plus_checkout",
+            waitlistedAt: now,
+            lastEngagedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          }).onDuplicateKeyUpdate({ set: {
+            billingStatus: "pending",
+            eligibilityScore: eligibility.score,
+            eligibilityReasons: JSON.stringify({ reasons: eligibility.reasons, blockers: eligibility.blockers }),
+            lastEngagedAt: now,
+            updatedAt: now,
+          }});
+        }
+
         // Server-side coupon validation — never trust client-supplied price
         let finalSum: number | undefined = undefined;
-        if (input.couponCode && db) {
+        if (input.couponCode && db && input.product !== "plus") {
           const { discountCodes } = await import("../drizzle/schema");
           const [code] = await db.select().from(discountCodes)
             .where(eq(discountCodes.code, input.couponCode.toUpperCase()))

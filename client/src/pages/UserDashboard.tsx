@@ -12,11 +12,20 @@ import { motion, AnimatePresence } from "framer-motion";
 
 function PlusPilotCard({ email, token }: { email: string; token: string }) {
   const utils = trpc.useUtils();
+  const [socialText, setSocialText] = useState("");
+  const [photoApproved, setPhotoApproved] = useState(false);
+  const [copyApproved, setCopyApproved] = useState(false);
   const statusQuery = trpc.plusPilot.getMyStatus.useQuery(
     { email, token },
     { enabled: Boolean(email && token), retry: false },
   );
   const joinWaitlist = trpc.plusPilot.joinWaitlist.useMutation({
+    onSuccess: () => utils.plusPilot.getMyStatus.invalidate({ email, token }),
+  });
+  const updateSocialConsent = trpc.plusPilot.updateSocialExposureConsent.useMutation({
+    onSuccess: () => utils.plusPilot.getMyStatus.invalidate({ email, token }),
+  });
+  const cancelPlus = trpc.plusPilot.requestCancellation.useMutation({
     onSuccess: () => utils.plusPilot.getMyStatus.invalidate({ email, token }),
   });
 
@@ -25,8 +34,9 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
   }
   if (!statusQuery.data) return null;
 
-  const { status, eligibility, benefits } = statusQuery.data;
+  const { status, pilot, eligibility, benefits, cycleProgress } = statusQuery.data;
   const registered = (status as string) !== "none";
+  const checkoutUrl = `/database-plus?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
   const statusLabel: Record<string, string> = {
     waitlist: "ברשימת ההמתנה",
     eligible: "מתאים/ה לפיילוט",
@@ -41,10 +51,10 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
       <div className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-bold text-[#8b7420]">פיילוט מוגבל לחברי המאגר</p>
+            <p className="text-[11px] font-bold text-[#8b7420]">שירות פרימיום לחברים פעילים במאגר</p>
             <h4 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h4>
             <p className="mt-1 max-w-xl text-xs leading-6 text-[#555]">
-              יותר שקיפות, בקרה ועדכון העדפות — בלי חשיפת זהות לפני אישור הדדי ובלי הבטחה לכמות או לתדירות קבועה של התאמות.
+              99 ש״ח לחודש, ביטול בכל עת, עם לפחות שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב אישי.
             </p>
           </div>
           {registered && (
@@ -62,18 +72,72 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
           ))}
         </div>
 
+        {status === "active" && cycleProgress && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div className="rounded-xl bg-[#191265] p-4 text-white">
+              <div className="flex items-center justify-between gap-3">
+                <div><p className="text-xs text-white/70">הצעות שנשלחו במחזור הנוכחי</p><p className="mt-1 text-3xl font-black text-[#ffe27c]">{cycleProgress.delivered}/{cycleProgress.target}</p></div>
+                <div className="text-left text-[11px] leading-5 text-white/65">נותרו {cycleProgress.daysRemaining} ימים<br />עד {new Date(cycleProgress.cycleEnd).toLocaleDateString("he-IL")}</div>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-[#ffe27c]" style={{ width: `${cycleProgress.progressPercent}%` }} /></div>
+              <p className="mt-2 text-[10px] leading-5 text-white/60">נספרות רק הצעות חדשות שנבדקו ונשלחו בפועל. אישור הדדי, דייט או זוגיות אינם מובטחים.</p>
+            </div>
+            <a href="https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%9C%D7%A7%D7%95%D7%97%2F%D7%AA%20Database%20Plus%20%D7%95%D7%99%D7%A9%20%D7%9C%D7%99%20%D7%A9%D7%90%D7%9C%D7%94" target="_blank" rel="noreferrer" className="flex min-h-24 items-center justify-center rounded-xl border border-[#eadf9e] bg-white px-5 text-center text-xs font-black text-[#191265]">
+              שירות Plus אישי<br />בוואטסאפ העסקי
+            </a>
+          </div>
+        )}
+
         {status === "active" && (
-          <div className="mt-4 rounded-xl bg-[#191265] p-4 text-white">
-            <p className="text-xs text-white/70">מועמדים שנמצאים כרגע בבדיקה אנונימית</p>
-            <p className="mt-1 text-3xl font-black text-[#ffe27c]">{eligibility.potentialMatchesUnderReview}</p>
-            <p className="mt-1 text-[11px] leading-5 text-white/60">המספר מציג אפשרויות בבדיקה בלבד ואינו מבטיח שתישלח הצעה.</p>
+          <div className="mt-4 rounded-xl border border-[#eadf9e] bg-white/80 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-xs">רוצה שנציג אותך בסושיאל?</strong><span className="text-[10px] text-[#777]">אופציונלי בלבד · ללא פרטי קשר</span></div>
+            {(pilot as any)?.socialExposureConsent === "approved" ? (
+              <p className="mt-2 text-xs font-bold text-emerald-700">ההסכמה שלך נשמרה. הפרסום יבוצע רק לפי הטקסט והתמונה שאישרת.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                <textarea value={socialText} onChange={event => setSocialText(event.target.value)} placeholder="הטקסט המדויק שאני מאשר/ת לפרסום" className="min-h-20 w-full rounded-xl border p-3 text-xs" />
+                <label className="flex items-start gap-2 text-[11px]"><input type="checkbox" checked={photoApproved} onChange={event => setPhotoApproved(event.target.checked)} />אני מאשר/ת להשתמש בתמונת הפרופיל שלי בפרסום זה</label>
+                <label className="flex items-start gap-2 text-[11px]"><input type="checkbox" checked={copyApproved} onChange={event => setCopyApproved(event.target.checked)} />קראתי ואישרתי את הטקסט שהוזן למעלה</label>
+                <button type="button" disabled={!photoApproved || !copyApproved || !socialText.trim() || updateSocialConsent.isPending} onClick={() => updateSocialConsent.mutate({ email, token, consent: "approved", photoApproved, copyApproved, approvedText: socialText })} className="rounded-xl bg-[#191265] px-4 py-2 text-[11px] font-black text-white disabled:opacity-40">שמירת הסכמה מפורשת</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {status === "active" && (pilot as any)?.billingStatus === "active" && (
+          <details className="mt-4 rounded-xl border border-[#e6dfcc] bg-white/70 p-4 text-[11px] text-[#666]">
+            <summary className="cursor-pointer font-bold text-[#191265]">ניהול וביטול המנוי</summary>
+            <p className="mt-2 leading-5">אפשר לבטל בכל עת. הטבות Plus נשארות עד סוף המחזור הנוכחי והחברות הרגילה במאגר אינה נפגעת.</p>
+            <button
+              type="button"
+              disabled={cancelPlus.isPending}
+              onClick={() => {
+                if (window.confirm("לבטל את חידוש Database Plus?")) {
+                  cancelPlus.mutate({ email, token });
+                }
+              }}
+              className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 font-bold text-red-700 disabled:opacity-50"
+            >
+              {cancelPlus.isPending ? "שולח/ת בקשה..." : "ביטול החידוש הבא"}
+            </button>
+          </details>
+        )}
+
+        {status === "active" && (pilot as any)?.billingStatus === "cancelled" && (
+          <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">בקשת הביטול התקבלה. Plus נשאר פעיל עד סוף המחזור הנוכחי ולא יתחדש לאחר מכן.</p>
+        )}
+
+        {(status === "eligible" || status === "invited") && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadf9e] pt-4">
+            <p className="text-[11px] leading-5 text-[#6b6250]">הצטרפות חודשית אופציונלית, בנוסף לחברות הרגילה במאגר.</p>
+            <a href={checkoutUrl} className="rounded-xl bg-[#191265] px-5 py-2.5 text-xs font-black text-white">לפרטים ולמסך התשלום</a>
           </div>
         )}
 
         {!registered && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadf9e] pt-4">
             <p className="text-[11px] leading-5 text-[#6b6250]">
-              ההצטרפות לרשימה אינה רכישה ואינה יוצרת התחייבות. נזמין קבוצה קטנה ונמדוד תוצאות לפני פתיחה רחבה.
+              ההצטרפות לרשימה אינה רכישה ואינה יוצרת חיוב. לאחר בדיקת זכאות נשלח קישור אישי להצעה המלאה.
             </p>
             <button
               type="button"

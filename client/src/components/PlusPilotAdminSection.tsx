@@ -29,7 +29,7 @@ export default function PlusPilotAdminSection() {
 
   if (overview.isLoading) return <section className="h-44 rounded-2xl bg-white animate-pulse border border-[#e9e8e8]" />;
   if (!overview.data) return null;
-  const { counts, waitlistToInviteRate, inviteToActiveRate, retentionRate } = overview.data;
+  const { counts, commitment, waitlistToInviteRate, inviteToActiveRate, retentionRate } = overview.data;
 
   const changeStatus = (id: number, status: "waitlist" | "eligible" | "invited" | "active" | "declined" | "churned") => {
     updateStatus.mutate({
@@ -44,9 +44,9 @@ export default function PlusPilotAdminSection() {
     <section className="rounded-2xl border border-[#e4d27e] bg-gradient-to-br from-[#fffdf4] to-white p-5 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold text-[#8b7420]">פיילוט מדיד — ללא הבטחת כמות התאמות</p>
+          <p className="text-[11px] font-bold text-[#8b7420]">מנוי פרימיום · יעד מדיד של 2 הצעות בכל מחזור</p>
           <h3 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h3>
-          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">רשימת המתנה, זכאות, הזמנה, הפעלה ושימור. מעבר ל״הוזמן״ שולח מייל אישי ומדוד.</p>
+          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">רשימת המתנה, חיוב, שירות פרימיום, מונה 0/2–2/2 והתראות לפני סוף מחזור. מעבר ל״הוזמן״ שולח מייל אישי עם מסך ההצעה.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <label className="rounded-xl border bg-white px-3 py-2">קוהורט <input value={cohort} onChange={event => setCohort(event.target.value)} className="mr-2 w-24 outline-none" /></label>
@@ -74,6 +74,12 @@ export default function PlusPilotAdminSection() {
         <div className="rounded-lg bg-[#f7f6fb] p-2">פעילים שנשמרו <strong>{retentionRate}%</strong></div>
       </div>
 
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">
+        <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800">עמדו ב־2/2 <strong>{commitment.met}</strong></div>
+        <div className="rounded-lg bg-amber-50 p-2 text-amber-800">בתהליך <strong>{commitment.inProgress}</strong></div>
+        <div className="rounded-lg bg-red-50 p-2 text-red-800">דורשים טיפול <strong>{commitment.atRisk}</strong></div>
+      </div>
+
       <div className="mt-4 flex flex-col sm:flex-row gap-2">
         <input value={search} onChange={event => setSearch(event.target.value)} placeholder="חיפוש לפי שם, מייל או טלפון" className="flex-1 rounded-xl border border-[#ddd] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#191265]" />
         <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="rounded-xl border border-[#ddd] bg-white px-3 py-2.5 text-xs">
@@ -94,6 +100,12 @@ export default function PlusPilotAdminSection() {
                 </div>
                 <p className="mt-1 text-[10px] text-[#777]">{row.single.email} · {row.single.phone || "ללא טלפון"} · {row.single.age || "?"} · {row.single.city || ""}</p>
                 <p className="mt-1 text-[9px] text-[#999]">נרשם/ה לרשימה: {new Date(row.pilot.waitlistedAt).toLocaleDateString("he-IL")}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold">
+                  <span className={`rounded-full px-2 py-1 ${row.cycleProgress.state === "green" ? "bg-emerald-100 text-emerald-800" : row.cycleProgress.state === "red" ? "bg-red-100 text-red-800" : row.cycleProgress.state === "yellow" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"}`}>{row.cycleProgress.delivered}/{row.cycleProgress.target} הצעות · {row.cycleProgress.daysRemaining} ימים</span>
+                  <span className={`rounded-full px-2 py-1 ${row.pilot.billingStatus === "active" ? "bg-blue-100 text-blue-800" : row.pilot.billingStatus === "past_due" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}>חיוב: {row.pilot.billingStatus}</span>
+                  {row.pilot.premiumSupportEnabled && <span className="rounded-full bg-[#191265] px-2 py-1 text-[#ffe27c]">שירות פרימיום</span>}
+                  {row.pilot.socialExposureConsent === "approved" && <span className="rounded-full bg-pink-100 px-2 py-1 text-pink-800">אושר לסושיאל</span>}
+                </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {(["eligible", "invited", "active", "declined", "churned"] as const).map(status => (
