@@ -6,12 +6,23 @@ const routerSource = readFileSync(resolve(process.cwd(), "server/routers.ts"), "
 const dashboardSource = readFileSync(resolve(process.cwd(), "client/src/pages/UserDashboard.tsx"), "utf8");
 
 describe("personal-area profile completeness", () => {
-  it("returns the stored height in singles.getDashboard", () => {
+  it("returns the CRM-editable profile fields in singles.getDashboard", () => {
     const dashboardProcedure = routerSource.slice(
       routerSource.indexOf("getDashboard: publicProcedure"),
       routerSource.indexOf("sendDashboardLink: publicProcedure"),
     );
-    expect(dashboardProcedure).toContain("height: profile.height");
+    const expectedFields = [
+      "phone", "gender", "seekingGender", "age", "birthDate", "height", "city",
+      "occupation", "education", "religiosity", "shomerShabbat", "maritalStatus",
+      "hasKids", "numKids", "wantsKids", "acceptsKids", "hasPets", "petType",
+      "acceptsPets", "locationPreference", "smokingStatus", "smokingPreference",
+      "minAgePreference", "maxAgePreference", "minHeightPreference", "maxHeightPreference",
+      "relationshipPace", "stepParentOpenness", "partnerDescription", "about", "interests",
+      "photoUrl", "dnaType", "isActive",
+    ];
+    for (const field of expectedFields) {
+      expect(dashboardProcedure).toContain(`${field}: profile.${field}`);
+    }
   });
 
   it("only reports height as missing when the returned value is empty or zero", () => {
