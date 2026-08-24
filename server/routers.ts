@@ -2160,7 +2160,7 @@ export const appRouter = router({
          importance: z.union([z.literal(0), z.literal(1), z.literal(2)]),
        })),
        // Optional fields for skeleton records (Grow payments without profile form)
-        age: z.number().min(0).max(120).optional(),
+        age: z.number().finite().optional(),
         gender: z.enum(["female", "male"]).optional(),
         city: z.string().optional(),
         birthDate: z.string().optional(),
@@ -2180,10 +2180,10 @@ export const appRouter = router({
         hasKids: z.boolean().optional(),
         numKids: z.number().min(0).max(15).optional(),
         wantsKids: z.enum(["yes", "no", "open"]).optional(),
-        minAgePreference: z.number().min(18).max(80).optional(),
-        maxAgePreference: z.number().min(18).max(80).optional(),
-        minHeightPreference: z.number().min(100).max(250).optional(),
-        maxHeightPreference: z.number().min(100).max(250).optional(),
+        minAgePreference: z.number().finite().optional(),
+        maxAgePreference: z.number().finite().optional(),
+        minHeightPreference: z.number().finite().optional(),
+        maxHeightPreference: z.number().finite().optional(),
         religiosityPreference: z.string().optional(),
         acceptsKids: z.enum(["yes", "no", "open"]).optional(),
         openToPartnerWithKids: z.enum(["yes", "no", "depends_on_age"]).optional(),
@@ -2243,10 +2243,10 @@ export const appRouter = router({
           if (input.hasKids !== undefined) patchData.hasKids = input.hasKids;
           if (input.numKids !== undefined) patchData.numKids = input.numKids;
           if (input.wantsKids) patchData.wantsKids = input.wantsKids;
-          if (input.minAgePreference) patchData.minAgePreference = input.minAgePreference;
-          if (input.maxAgePreference) patchData.maxAgePreference = input.maxAgePreference;
-          if (input.minHeightPreference) patchData.minHeightPreference = input.minHeightPreference;
-          if (input.maxHeightPreference) patchData.maxHeightPreference = input.maxHeightPreference;
+          if (input.minAgePreference && input.minAgePreference >= 18 && input.minAgePreference <= 120) patchData.minAgePreference = input.minAgePreference;
+          if (input.maxAgePreference && input.maxAgePreference >= 18 && input.maxAgePreference <= 120) patchData.maxAgePreference = input.maxAgePreference;
+          if (input.minHeightPreference && input.minHeightPreference >= 100 && input.minHeightPreference <= 250) patchData.minHeightPreference = input.minHeightPreference;
+          if (input.maxHeightPreference && input.maxHeightPreference >= 100 && input.maxHeightPreference <= 250) patchData.maxHeightPreference = input.maxHeightPreference;
           if (input.religiosityPreference) patchData.religiosityPreference = input.religiosityPreference;
           if (input.acceptsKids) patchData.acceptsKids = input.acceptsKids === "yes" ? true : input.acceptsKids === "no" ? false : null;
           if (input.openToPartnerWithKids) patchData.openToPartnerWithKids = input.openToPartnerWithKids;
