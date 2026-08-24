@@ -8,6 +8,17 @@
 const BREVO_API_URL = "https://api.brevo.com/v3";
 const SENDER = { name: "הילית כספי", email: "hilit@hilitcaspi.com" };
 
+export const PERMANENTLY_BLOCKED_EMAILS = new Set([
+  "eli.fribert1@gmail.com",
+  "michalbs5921@gmail.com",
+  "tomy.23@gmail.com",
+  "alonrozenstain@gmail.com",
+]);
+
+export function isPermanentlyBlockedEmail(email: string): boolean {
+  return PERMANENTLY_BLOCKED_EMAILS.has(email.toLowerCase().trim());
+}
+
 // Brevo contact list IDs - will be created on first use
 // These are stored as constants; actual IDs are fetched/created dynamically
 export const LIST_NAMES = {
@@ -77,9 +88,8 @@ export async function sendEmail({
   textContent?: string;
 }): Promise<{ messageId?: string; success: boolean; error?: string }> {
   try {
-    // Hardcoded blocklist - these contacts must NEVER receive any email
-    const BLOCKED_EMAILS = ['eli.fribert1@gmail.com', 'michalbs5921@gmail.com', 'tomy.23@gmail.com'];
-    if (BLOCKED_EMAILS.includes(to.email.toLowerCase().trim())) {
+    // Permanent blocklist - these contacts must NEVER receive any email.
+    if (isPermanentlyBlockedEmail(to.email)) {
       console.log(`[Brevo] BLOCKED: ${to.email} is on the permanent blocklist`);
       return { success: true, messageId: 'blocked' };
     }
