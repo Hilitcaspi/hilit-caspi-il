@@ -2400,6 +2400,7 @@ export const appRouter = router({
             lastName: profile.lastName,
             gender: profile.gender,
             age: profile.age,
+            height: profile.height,
             city: profile.city,
             occupation: profile.occupation,
             education: profile.education,
