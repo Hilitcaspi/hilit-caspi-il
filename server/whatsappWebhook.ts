@@ -21,11 +21,20 @@ export type MakeWhatsAppPayload = {
   channel: "whatsapp";
   idempotencyKey: string;
   phone: string;
+  phoneInternational: string;
   phoneLocal: string;
+  to: string;
+  number: string;
+  recipientPhone: string;
+  recipient_phone: string;
+  chatId: string;
   message: string;
+  text: string;
+  body: string;
   sender: string;
   from: string;
   senderPhone: string;
+  sender_phone: string;
   senderPhoneInternational: string;
   [key: string]: unknown;
 };
@@ -49,20 +58,29 @@ export function buildMakeWhatsAppPayload(input: {
   message: string;
   metadata?: Record<string, unknown>;
 }): MakeWhatsAppPayload | null {
-  const phone = normalizeWhatsAppPhone(input.phone);
+  const phoneInternational = normalizeWhatsAppPhone(input.phone);
   const phoneLocal = toLocalIsraeliPhone(input.phone);
-  if (!phone || !phoneLocal) return null;
+  if (!phoneInternational || !phoneLocal) return null;
   return {
     ...(input.metadata ?? {}),
     event: input.event,
     channel: "whatsapp",
     idempotencyKey: input.idempotencyKey,
-    phone,
+    phone: phoneLocal,
+    phoneInternational,
     phoneLocal,
+    to: phoneLocal,
+    number: phoneLocal,
+    recipientPhone: phoneLocal,
+    recipient_phone: phoneLocal,
+    chatId: `${phoneInternational}@c.us`,
     message: input.message,
+    text: input.message,
+    body: input.message,
     sender: BUSINESS_WHATSAPP_SENDER_LOCAL,
     from: BUSINESS_WHATSAPP_SENDER_LOCAL,
     senderPhone: BUSINESS_WHATSAPP_SENDER_LOCAL,
+    sender_phone: BUSINESS_WHATSAPP_SENDER_LOCAL,
     senderPhoneInternational: BUSINESS_WHATSAPP_SENDER_INTERNATIONAL,
   };
 }
@@ -89,7 +107,7 @@ export async function postWhatsAppWebhook(
       console.error(`[WhatsAppWebhook] Make rejected ${payload.idempotencyKey}: ${response.status} ${responseText.slice(0, 160)}`);
       return false;
     }
-    console.log(`[WhatsAppWebhook] Make accepted ${payload.idempotencyKey} for ${payload.phone.slice(0, 5)}****${payload.phone.slice(-2)}`);
+    console.log(`[WhatsAppWebhook] Make accepted ${payload.idempotencyKey} for ${payload.phoneInternational.slice(0, 5)}****${payload.phoneInternational.slice(-2)}`);
     return true;
   } catch (error) {
     console.error(`[WhatsAppWebhook] Make failed for ${payload.idempotencyKey}:`, error);

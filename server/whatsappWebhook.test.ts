@@ -19,11 +19,20 @@ describe("general Make WhatsApp webhook", () => {
       metadata: { sender: "000", from: "000", senderPhone: "000" },
     });
     expect(payload).toMatchObject({
-      phone: "972544530975",
+      phone: "0544530975",
+      phoneInternational: "972544530975",
       phoneLocal: "0544530975",
+      to: "0544530975",
+      number: "0544530975",
+      recipientPhone: "0544530975",
+      recipient_phone: "0544530975",
+      chatId: "972544530975@c.us",
+      text: "בדיקה",
+      body: "בדיקה",
       sender: BUSINESS_WHATSAPP_SENDER_LOCAL,
       from: BUSINESS_WHATSAPP_SENDER_LOCAL,
       senderPhone: BUSINESS_WHATSAPP_SENDER_LOCAL,
+      sender_phone: BUSINESS_WHATSAPP_SENDER_LOCAL,
       senderPhoneInternational: BUSINESS_WHATSAPP_SENDER_INTERNATIONAL,
     });
   });
@@ -41,7 +50,8 @@ describe("general Make WhatsApp webhook", () => {
     expect(ok).toBe(true);
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body).toMatchObject({
-      phone: "972529467614",
+      phone: "0529467614",
+      phoneInternational: "972529467614",
       senderPhone: "0552442334",
       senderPhoneInternational: "972552442334",
     });
