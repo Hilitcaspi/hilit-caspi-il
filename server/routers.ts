@@ -27,6 +27,7 @@ import { sendWhatsAppViaMake } from "./whatsappWebhook";
 import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
 import { calculateOutcomeSegments } from "./matchmakingSegments";
+import { calculateAgeFromBirthDate } from "../shared/profileValidation";
 import {
   parseMatchOutcomeNotes,
   setAdminOutcome,
@@ -2212,12 +2213,17 @@ export const appRouter = router({
           return { singleId: profile.id, success: true, alreadyCompleted: true };
         }
 
+        const ageFromBirthDate = input.birthDate ? calculateAgeFromBirthDate(input.birthDate) : null;
+        if (input.birthDate && ageFromBirthDate === null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "תאריך הלידה אינו תקין או שהגיל נמוך מ־18" });
+        }
+        const resolvedAge = ageFromBirthDate ?? input.age;
         const now = Date.now();
         // Always update personal details if provided (all users, not just skeleton records)
         {
           const patchData: Record<string, any> = { updatedAt: now };
           // Always update basic identity fields if provided
-          if (input.age && input.age >= 18 && input.age <= 120) patchData.age = input.age;
+          if (resolvedAge && resolvedAge >= 18 && resolvedAge <= 120) patchData.age = resolvedAge;
           if (input.gender) patchData.gender = input.gender;
           if (input.city) patchData.city = input.city;
           if (input.birthDate) patchData.birthDate = input.birthDate;

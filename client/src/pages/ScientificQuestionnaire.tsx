@@ -11,6 +11,7 @@ import { trpc } from "@/lib/trpc";
 import { useSearch, useLocation } from "wouter";
 import { MATCH_QUESTIONS, IMPORTANCE_LABELS, type MatchAnswer } from "@/lib/matchmakingQuestions";
 import EmbeddedDnaQuiz from "@/components/EmbeddedDnaQuiz";
+import { calculateAgeFromBirthDate, parseOptionalIntegerInRange } from "@shared/profileValidation";
 
 const slideIn = {
   initial: { opacity: 0, y: 30 },
@@ -88,6 +89,7 @@ export default function ScientificQuestionnaire() {
     return {};
   });
   const [errorMsg, setErrorMsg] = useState("");
+  const [errorRetryStep, setErrorRetryStep] = useState<"details" | "partner_prefs" | "quiz">("quiz");
 
   // ── Profile fields (details step) ──
   const [missingGender, setMissingGender] = useState<"female" | "male">("female");
@@ -124,14 +126,7 @@ export default function ScientificQuestionnaire() {
   const [dnaType, setDnaType] = useState("");
 
   // Derived age from birthDate
-  const calculatedAge = birthDate ? (() => {
-    const today = new Date();
-    const birth = new Date(birthDate);
-    let a = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
-    return a;
-  })() : null;
+  const calculatedAge = birthDate ? calculateAgeFromBirthDate(birthDate) : null;
 
   // If we have saved progress, start at quiz step instead of intro
   const [hasRestoredProgress] = useState(() => {
@@ -224,6 +219,9 @@ export default function ScientificQuestionnaire() {
 
   const completeMutation = trpc.singles.completeQuestionnaire.useMutation({
     onSuccess: () => {
+      if (storageKey) {
+        try { localStorage.removeItem(storageKey); } catch {}
+      }
       try {
         if (typeof window !== "undefined" && (window as any).fbq) {
           (window as any).fbq("track", "CompleteRegistration", {
@@ -237,14 +235,22 @@ export default function ScientificQuestionnaire() {
     onError: (err) => {
       let friendlyMsg = "אירעה שגיאה. אנא נסה/י שוב.";
       const raw = err.message || "";
+      const normalizedError = raw.toLowerCase();
       if (raw.includes('height')) {
         friendlyMsg = "שגיאה בשדה הגובה. יש להזין גובה בסנטימטרים (לדוגמה: 170).";
-      } else if (raw.includes('age')) {
-        friendlyMsg = "שגיאה בשדה הגיל. יש להזין גיל תקין.";
+        setErrorRetryStep("details");
+      } else if (normalizedError.includes('birthdate') || normalizedError.includes('"age"') || normalizedError.includes("'age'")) {
+        friendlyMsg = "שגיאה בתאריך הלידה. יש לבחור תאריך מלא ותקין לגיל 18 ומעלה.";
+        setErrorRetryStep("details");
+      } else if (normalizedError.includes('minagepreference') || normalizedError.includes('maxagepreference')) {
+        friendlyMsg = "טווח הגילאים המבוקש אינו תקין. יש להזין גיל בין 18 ל־120.";
+        setErrorRetryStep("partner_prefs");
       } else if (raw.includes('too_small') || raw.includes('too_big')) {
         friendlyMsg = "אחד מהערכים שהוזנו אינו תקין. אנא בדקי את הפרטים ונסי שוב.";
+        setErrorRetryStep("partner_prefs");
       } else if (raw.length > 0 && !raw.includes('{') && !raw.includes('[')) {
         friendlyMsg = raw;
+        setErrorRetryStep("quiz");
       }
       setErrorMsg(friendlyMsg);
       setStep("error");
@@ -355,15 +361,12 @@ export default function ScientificQuestionnaire() {
       setCurrentIndex(safeCurrentIndex + 1);
     } else {
       // Submit
-      if (storageKey) {
-        try { localStorage.removeItem(storageKey); } catch {}
-      }
       setStep("uploading");
-      const ageVal = calculatedAge || (profile.age || 0);
+      const ageVal = calculatedAge ?? (profile.age && profile.age >= 18 ? profile.age : undefined);
       completeMutation.mutate({
         token,
         answers: Object.values(answers),
-        age: ageVal > 0 ? ageVal : undefined,
+        age: ageVal,
         gender: missingGender,
         city: missingCity || undefined,
         birthDate: birthDate || undefined,
@@ -382,10 +385,10 @@ export default function ScientificQuestionnaire() {
         hasKids,
         numKids: hasKids ? parseInt(numKids) || 0 : 0,
         wantsKids: wantsKids === "yes" || wantsKids === "no" || wantsKids === "open" ? wantsKids : undefined,
-        minAgePreference: minAge ? parseInt(minAge) : undefined,
-        maxAgePreference: maxAge ? parseInt(maxAge) : undefined,
-        minHeightPreference: minHeight ? parseInt(minHeight) : undefined,
-        maxHeightPreference: maxHeight ? parseInt(maxHeight) : undefined,
+        minAgePreference: parseOptionalIntegerInRange(minAge, 18, 120),
+        maxAgePreference: parseOptionalIntegerInRange(maxAge, 18, 120),
+        minHeightPreference: parseOptionalIntegerInRange(minHeight, 100, 250),
+        maxHeightPreference: parseOptionalIntegerInRange(maxHeight, 100, 250),
         religiosityPreference: religiosityPref.length > 0 ? religiosityPref.join(",") : undefined,
         acceptsKids: acceptsKids === "yes" || acceptsKids === "no" || acceptsKids === "open" ? acceptsKids as "yes" | "no" | "open" : undefined,
         openToPartnerWithKids: openToPartnerWithKids === "yes" || openToPartnerWithKids === "no" || openToPartnerWithKids === "depends_on_age" ? openToPartnerWithKids as any : undefined,
@@ -408,7 +411,7 @@ export default function ScientificQuestionnaire() {
     );
 
   // Validation for details step
-  const detailsValid = birthDate && missingCity && phone;
+  const detailsValid = calculatedAge !== null && !!missingCity.trim() && !!phone.trim();
 
   return (
     <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">
@@ -538,9 +541,10 @@ export default function ScientificQuestionnaire() {
                     <label className="block text-[#191265] font-bold text-sm mb-2">תאריך לידה *</label>
                     <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)}
                       max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                      min={new Date(new Date().setFullYear(new Date().getFullYear() - 80)).toISOString().split('T')[0]}
+                      min={new Date(new Date().setFullYear(new Date().getFullYear() - 120)).toISOString().split('T')[0]}
                       className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] focus:outline-none focus:border-[#191265] text-right" />
                     {calculatedAge && <p className="text-xs text-[#191265] mt-1 font-medium">גיל: {calculatedAge}</p>}
+                    {birthDate && calculatedAge === null && <p className="text-xs text-red-500 mt-1 font-medium">יש לבחור תאריך לידה מלא ותקין לגיל 18 ומעלה</p>}
                   </div>
                   <div>
                     <label className="block text-[#191265] font-bold text-sm mb-2">גובה (ס"מ)</label>
@@ -746,12 +750,12 @@ export default function ScientificQuestionnaire() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-[#727272]">מגיל</label>
-                      <input type="number" value={minAge} onChange={e => setMinAge(e.target.value)} min={18} max={80} placeholder="25"
+                      <input type="number" value={minAge} onChange={e => setMinAge(e.target.value)} min={18} max={120} placeholder="25"
                         className="w-full px-3 py-2.5 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265]" />
                     </div>
                     <div>
                       <label className="text-xs text-[#727272]">עד גיל</label>
-                      <input type="number" value={maxAge} onChange={e => setMaxAge(e.target.value)} min={18} max={80} placeholder="45"
+                      <input type="number" value={maxAge} onChange={e => setMaxAge(e.target.value)} min={18} max={120} placeholder="45"
                         className="w-full px-3 py-2.5 rounded-xl border-2 border-[#e9e8e8] text-[#191265] text-right focus:outline-none focus:border-[#191265]" />
                     </div>
                   </div>
@@ -1052,7 +1056,10 @@ export default function ScientificQuestionnaire() {
               <p className="text-[#727272] text-sm mb-6">{errorMsg}</p>
               <div className="flex flex-col gap-3 max-w-xs mx-auto">
                 <button
-                  onClick={() => { setStep("quiz"); setCurrentIndex(activeQuestions.length - 1); }}
+                  onClick={() => {
+                    setStep(errorRetryStep);
+                    if (errorRetryStep === "quiz") setCurrentIndex(activeQuestions.length - 1);
+                  }}
                   className="bg-[#191265] text-white font-bold py-3 rounded-2xl">
                   נסה/י שוב
                 </button>
