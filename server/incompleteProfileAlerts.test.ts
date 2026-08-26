@@ -4,6 +4,7 @@ import {
   buildIncompleteProfileOwnerMessage,
   getMissingProfileFields,
   INCOMPLETE_PROFILE_ALERT_JOURNEY,
+  INCOMPLETE_PROFILE_ALERT_SMS_JOURNEY,
 } from "./incompleteProfileAlerts";
 
 describe("24-hour incomplete profile alerts", () => {
@@ -24,6 +25,7 @@ describe("24-hour incomplete profile alerts", () => {
       occupation: "עצמאות",
       religiosity: "מסורתיות",
     })).toEqual([]);
+    expect(getMissingProfileFields({ birthDate: "1990-05-15" })).not.toContain("גיל");
   });
 
   it("builds a neutral owner alert with CRM link", () => {
@@ -39,13 +41,18 @@ describe("24-hour incomplete profile alerts", () => {
     expect(message).toContain("hilitcaspi.com/crm");
   });
 
-  it("uses a durable idempotency log and an hourly Heartbeat endpoint", () => {
+  it("uses separate durable idempotency logs for email and Vibrate SMS", () => {
     expect(INCOMPLETE_PROFILE_ALERT_JOURNEY).toBe("incomplete_profile_24h");
+    expect(INCOMPLETE_PROFILE_ALERT_SMS_JOURNEY).toBe("incomplete_profile_24h_sms");
     const alertSource = readFileSync(new URL("./incompleteProfileAlerts.ts", import.meta.url), "utf8");
     const growSource = readFileSync(new URL("./growWebhook.ts", import.meta.url), "utf8");
     const indexSource = readFileSync(new URL("./_core/index.ts", import.meta.url), "utf8");
     expect(alertSource).toContain("emailLog.journeyKey");
-    expect(alertSource).toContain("incomplete-profile-24h-${profile.id}");
+    expect(alertSource).toContain("sendSMS(HILIT_ALERT_PHONE, message)");
+    expect(alertSource).toContain("sendEmail({");
+    expect(alertSource).not.toContain("sendWhatsAppViaMake");
+    expect(alertSource).toContain("eq(singles.consentMatchmaking, true)");
+    expect(alertSource).not.toContain("eq(singles.isActive, true)");
     expect(growSource).not.toContain("TWENTY_FOUR_HOURS");
     expect(growSource).not.toContain("setTimeout(async () =>");
     expect(indexSource).toContain('/api/scheduled/incomplete-profile-alerts');

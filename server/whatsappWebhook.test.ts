@@ -4,16 +4,14 @@ import {
   BUSINESS_WHATSAPP_SENDER_INTERNATIONAL,
   BUSINESS_WHATSAPP_SENDER_LOCAL,
   buildMakeWhatsAppPayload,
-  buildPurchaseOwnerMessage,
-  PURCHASE_ALERT_RECIPIENTS,
   sendWhatsAppViaMake,
 } from "./whatsappWebhook";
 
-describe("general Make WhatsApp webhook", () => {
-  it("forces every payload to request the business sender number", () => {
+describe("match-only Make WhatsApp webhook", () => {
+  it("forces every match payload to request the business sender number", () => {
     const payload = buildMakeWhatsAppPayload({
-      event: "purchase_completed",
-      idempotencyKey: "purchase-test",
+      event: "match_proposal_sent",
+      idempotencyKey: "match-test",
       phone: "054-453-0975",
       message: "בדיקה",
       metadata: { sender: "000", from: "000", senderPhone: "000" },
@@ -42,8 +40,8 @@ describe("general Make WhatsApp webhook", () => {
     process.env.MATCH_WHATSAPP_WEBHOOK_URL = "https://hook.eu1.make.com/test";
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     const ok = await sendWhatsAppViaMake({
-      event: "system_test",
-      idempotencyKey: "system-test",
+      event: "match_follow_up",
+      idempotencyKey: "match-follow-up-test",
       phone: "0529467614",
       message: "בדיקה",
     }, fetchMock as any);
@@ -59,34 +57,21 @@ describe("general Make WhatsApp webhook", () => {
     else process.env.MATCH_WHATSAPP_WEBHOOK_URL = previous;
   });
 
-  it("builds a detailed owner purchase notification for both recipients", () => {
-    const message = buildPurchaseOwnerMessage({
-      name: "ישראל ישראלי",
-      email: "test@example.com",
-      phone: "0500000000",
-      product: "database",
-      amount: 299,
-      transactionId: "tx-1",
-    });
-    expect(message).toContain("רכישה חדשה הושלמה");
-    expect(message).toContain("מאגר הרווקים");
-    expect(message).toContain("299.00 ש״ח");
-    expect(PURCHASE_ALERT_RECIPIENTS.map(item => item.phone)).toEqual(["0544530975", "0529467614"]);
-  });
+  it("keeps Make exclusive to match events and routes operational SMS through Vibrate", () => {
+    const webhookSource = readFileSync(new URL("./whatsappWebhook.ts", import.meta.url), "utf8");
+    const growSource = readFileSync(new URL("./growWebhook.ts", import.meta.url), "utf8");
+    const incompleteSource = readFileSync(new URL("./incompleteProfileAlerts.ts", import.meta.url), "utf8");
+    const dashboardSource = readFileSync(new URL("./dashboardRouter.ts", import.meta.url), "utf8");
+    const routerSource = readFileSync(new URL("./routers.ts", import.meta.url), "utf8");
 
-  it("leaves no active Vibrate callers in the server", () => {
-    const files = ["automation.ts", "dashboardRouter.ts", "growWebhook.ts", "matchingScheduler.ts", "routers.ts"];
-    for (const file of files) {
-      const source = readFileSync(new URL(`./${file}`, import.meta.url), "utf8");
-      expect(source).not.toContain("sendSMS(");
-      expect(source).not.toContain('from "./vibrate"');
-    }
-  });
-
-  it("keeps purchase WhatsApp after Grow idempotency and successful processing", () => {
-    const source = readFileSync(new URL("./growWebhook.ts", import.meta.url), "utf8");
-    expect(source).toContain("PURCHASE_ALERT_RECIPIENTS.map");
-    expect(source.indexOf("Duplicate transactionId")).toBeLessThan(source.indexOf("PURCHASE_ALERT_RECIPIENTS.map"));
-    expect(source.indexOf("await handleDatabase")).toBeLessThan(source.indexOf("PURCHASE_ALERT_RECIPIENTS.map"));
+    expect(webhookSource).toContain('"match_proposal_sent"');
+    expect(webhookSource).toContain('"match_follow_up"');
+    expect(webhookSource).toContain('"match_expired"');
+    expect(webhookSource).not.toMatch(/purchase_completed|incomplete_profile_alert|profile_completion_request|system_test/);
+    expect(growSource).not.toContain("sendWhatsAppViaMake");
+    expect(incompleteSource).toContain("sendSMS(HILIT_ALERT_PHONE, message)");
+    expect(incompleteSource).not.toContain("sendWhatsAppViaMake");
+    expect(dashboardSource).toContain("sendSMS(s.phone, message)");
+    expect(routerSource).toContain("sendSMS(phone,");
   });
 });

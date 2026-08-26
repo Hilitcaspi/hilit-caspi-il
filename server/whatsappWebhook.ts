@@ -1,20 +1,9 @@
 export const BUSINESS_WHATSAPP_SENDER_LOCAL = "0552442334";
 export const BUSINESS_WHATSAPP_SENDER_INTERNATIONAL = "972552442334";
-export const HILIT_WHATSAPP = "0544530975";
-export const SHAHAR_WHATSAPP = "0529467614";
-export const PURCHASE_ALERT_RECIPIENTS = [
-  { key: "hilit", phone: HILIT_WHATSAPP },
-  { key: "shahar", phone: SHAHAR_WHATSAPP },
-] as const;
-
 export type WhatsAppEvent =
   | "match_proposal_sent"
   | "match_follow_up"
-  | "match_expired"
-  | "profile_completion_request"
-  | "purchase_completed"
-  | "incomplete_profile_alert"
-  | "system_test";
+  | "match_expired";
 
 export type MakeWhatsAppPayload = {
   event: WhatsAppEvent;
@@ -124,34 +113,4 @@ export async function sendWhatsAppViaMake(input: {
 }, fetchImpl: typeof fetch = fetch): Promise<boolean> {
   const payload = buildMakeWhatsAppPayload(input);
   return payload ? postWhatsAppWebhook(payload, fetchImpl) : false;
-}
-
-export function buildPurchaseOwnerMessage(input: {
-  name: string;
-  email: string;
-  phone?: string;
-  product: string;
-  amount: number;
-  transactionId?: string;
-}): string {
-  const productLabels: Record<string, string> = {
-    guide: "המדריך לבחור נכון",
-    course: "הקורס הדיגיטלי",
-    coaching: "ליווי אישי",
-    coaching_mas: "תהליך המסע",
-    session: "פגישת היכרות",
-    database: "מאגר הרווקים",
-    bundle_tubav: "חבילת ט״ו באב",
-    live_event: "אירוע לייב",
-    plus: "Database Plus",
-  };
-  return [
-    "💳 רכישה חדשה הושלמה",
-    `שם: ${input.name}`,
-    `מוצר: ${productLabels[input.product] ?? input.product}`,
-    `סכום: ${input.amount.toFixed(2)} ש״ח`,
-    input.phone ? `טלפון: ${input.phone}` : null,
-    `מייל: ${input.email}`,
-    input.transactionId ? `עסקה: ${input.transactionId}` : null,
-  ].filter(Boolean).join("\n");
 }

@@ -825,6 +825,37 @@ export const plusPaymentEvents = mysqlTable("plus_payment_events", {
 export type PlusPaymentEvent = typeof plusPaymentEvents.$inferSelect;
 export type InsertPlusPaymentEvent = typeof plusPaymentEvents.$inferInsert;
 
+/**
+ * Auditable match boost lifecycle. A boost prioritizes a hidden pending match
+ * for Hilit's review; it never reveals or sends a match before human approval.
+ */
+export const matchBoostRequests = mysqlTable("match_boost_requests", {
+  id: int("id").primaryKey().autoincrement(),
+  singleId: int("single_id").notNull(),
+  matchId: int("match_id").notNull(),
+  source: mysqlEnum("source", ["paid", "plus_included", "admin"]).notNull(),
+  status: mysqlEnum("status", ["awaiting_payment", "paid", "queued", "reviewing", "approved", "rejected", "refunded", "cancelled"]).default("awaiting_payment").notNull(),
+  amountAgorot: int("amount_agorot").default(1999).notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 200 }).notNull().unique(),
+  providerTransactionId: varchar("provider_transaction_id", { length: 200 }).unique(),
+  plusBillingCycleStartedAt: bigint("plus_billing_cycle_started_at", { mode: "number" }),
+  requestedAt: bigint("requested_at", { mode: "number" }).notNull(),
+  paidAt: bigint("paid_at", { mode: "number" }),
+  reviewStartedAt: bigint("review_started_at", { mode: "number" }),
+  decidedAt: bigint("decided_at", { mode: "number" }),
+  fulfilledAt: bigint("fulfilled_at", { mode: "number" }),
+  expiresAt: bigint("expires_at", { mode: "number" }),
+  decisionReason: text("decision_reason"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  singleStatusIdx: index("boost_single_status_idx").on(t.singleId, t.status),
+  matchStatusIdx: index("boost_match_status_idx").on(t.matchId, t.status),
+  requestedIdx: index("boost_requested_idx").on(t.requestedAt),
+}));
+export type MatchBoostRequest = typeof matchBoostRequests.$inferSelect;
+export type InsertMatchBoostRequest = typeof matchBoostRequests.$inferInsert;
+
 /** Team operations tasks for matching, follow-up, calls and outcome collection. */
 export const crmTeamTasks = mysqlTable("crm_team_tasks", {
   id: int("id").primaryKey().autoincrement(),

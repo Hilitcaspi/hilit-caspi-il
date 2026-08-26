@@ -367,6 +367,92 @@ function DnaCard({ dnaType, gender }: { dnaType: DnaType; gender: "female" | "ma
   );
 }
 
+function MatchBoostCard({ email, token }: { email: string; token: string }) {
+  const utils = trpc.useUtils();
+  const [resultMessage, setResultMessage] = useState("");
+  const statusQuery = trpc.matchBoost.getMyStatus.useQuery(
+    { email, token },
+    { enabled: Boolean(email && token), retry: false },
+  );
+  const redeemPlus = trpc.matchBoost.redeemPlusBoost.useMutation({
+    onSuccess: () => {
+      setResultMessage("הבוסט התקבל וההתאמה הועברה לבדיקה בעדיפות גבוהה.");
+      utils.matchBoost.getMyStatus.invalidate({ email, token });
+    },
+    onError: error => setResultMessage(error.message),
+  });
+
+  if (statusQuery.isLoading) {
+    return <div className="h-44 animate-pulse rounded-2xl border border-[#e9e8e8] bg-white/70" />;
+  }
+  const status = statusQuery.data;
+  if (!status || (status.candidateCount === 0 && !status.openRequest)) return null;
+
+  if (status.openRequest) {
+    const labels: Record<string, string> = {
+      awaiting_payment: "ממתין לתשלום",
+      paid: "התשלום התקבל",
+      queued: "ממתין לבדיקה בעדיפות גבוהה",
+      reviewing: "ההתאמה בבדיקה",
+    };
+    return (
+      <section className="overflow-hidden rounded-2xl border border-[#d9c05c] bg-gradient-to-br from-white to-[#fff8da] p-5 text-right shadow-sm">
+        <p className="text-xs font-bold text-[#8b7420]">בוסט התאמה</p>
+        <h3 className="mt-1 text-lg font-black text-[#191265]">הבקשה שלך בטיפול</h3>
+        <p className="mt-2 text-sm leading-6 text-[#555]">{labels[status.openRequest.status] || "הבקשה נמצאת בטיפול"}</p>
+        <p className="mt-3 text-xs leading-5 text-[#727272]">לא נחשפים פרטים לפני בדיקה ואישור, וההתאמה נשלחת לשני הצדדים רק דרך הזרימה הרגילה.</p>
+      </section>
+    );
+  }
+
+  const primaryBlocker = status.blockers[0];
+  // Paid Match Boost remains intentionally unavailable until Grow has a dedicated approved product.
+  const regularPaymentReady = false;
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[#d9c05c] bg-gradient-to-br from-white via-[#fffdf4] to-[#fff3bf] text-right shadow-sm">
+      <div className="grid gap-5 p-5 sm:grid-cols-[92px_1fr] sm:items-center">
+        <div className="mx-auto flex h-24 w-20 items-center justify-center rounded-2xl border border-white/80 bg-[#191265] shadow-md">
+          <div className="flex h-16 w-14 items-center justify-center rounded-full bg-white/15 text-3xl blur-[1px]">?</div>
+        </div>
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-bold text-[#8b7420]">התאמה אפשרית שממתינה לבדיקה</p>
+            {status.topScore && <span className="rounded-full bg-[#191265] px-3 py-1 text-xs font-black text-white">{status.topScore}% התאמה</span>}
+          </div>
+          <h3 className="mt-2 text-xl font-black text-[#191265]">רוצים לקדם את הבדיקה?</h3>
+          <p className="mt-2 text-sm leading-6 text-[#555]">הבוסט מעלה התאמה אפשרית לראש תור הבדיקה של הילית. רק לאחר בדיקה ואישור, ההצעה תישלח לשני הצדדים.</p>
+          <p className="mt-2 text-xs leading-5 text-[#727272]">הבוסט אינו מבטיח שההתאמה תאושר או שהצד השני יסכים, ואינו חושף פרטים לפני הסכמה הדדית.</p>
+        </div>
+      </div>
+      <div className="border-t border-[#eadb91] bg-white/70 p-4">
+        {status.plusBenefitAvailable ? (
+          <button
+            type="button"
+            disabled={!status.eligible || redeemPlus.isPending}
+            onClick={() => redeemPlus.mutate({ email, token })}
+            className="w-full rounded-xl bg-[#191265] px-5 py-3 font-black text-white transition-colors hover:bg-[#1800ad] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {redeemPlus.isPending ? "מפעיל את הבוסט..." : "הפעלת בוסט Plus חודשי ללא תשלום"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!regularPaymentReady || !status.eligible}
+            className="w-full rounded-xl bg-[#191265] px-5 py-3 font-black text-white disabled:cursor-not-allowed disabled:bg-[#bbb]"
+          >
+            בוסט התאמה ב־19.99 ש״ח · בקרוב
+          </button>
+        )}
+        {primaryBlocker && <p className="mt-2 text-center text-xs font-medium text-[#9a5b00]">{primaryBlocker}</p>}
+        {!primaryBlocker && !status.plusBenefitAvailable && (
+          <p className="mt-2 text-center text-xs text-[#727272]">התשלום ייפתח לאחר חיבור מוצר בוסט ייעודי ב־Grow.</p>
+        )}
+        {resultMessage && <p className="mt-3 rounded-lg bg-[#e8f5e9] p-2 text-center text-xs font-bold text-[#2e7d32]">{resultMessage}</p>}
+      </div>
+    </section>
+  );
+}
+
 // ─── Match Card ───────────────────────────────────────────────────────────────
 function MatchCard({ match }: { match: any }) {
   const statusInfo = STATUS_LABELS[match.status] || STATUS_LABELS.pending;
@@ -727,7 +813,10 @@ export default function UserDashboard() {
   const email = params.get("email") || "";
   const token = params.get("token") || "";
 
-  const [activeTab, setActiveTab] = useState<"profile" | "matches" | "dna">("profile");
+  const requestedTab = params.get("tab");
+  const [activeTab, setActiveTab] = useState<"profile" | "matches" | "dna">(
+    requestedTab === "matches" || requestedTab === "dna" ? requestedTab : "profile",
+  );
 
   const { data, isLoading, error } = trpc.singles.getDashboard.useQuery(
     { email, token },
@@ -898,6 +987,7 @@ export default function UserDashboard() {
          {activeTab === "matches" && (
            <motion.div key="matches" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
              className="space-y-4">
+              <MatchBoostCard email={email} token={token} />
               {myMatches.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#e9e8e8] p-8 text-center">
                   <div className="text-4xl mb-3">🔍</div>

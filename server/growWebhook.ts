@@ -36,11 +36,6 @@ import { getDb } from "./db";
 import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusPaymentEvents } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
-import {
-  buildPurchaseOwnerMessage,
-  PURCHASE_ALERT_RECIPIENTS,
-  sendWhatsAppViaMake,
-} from "./whatsappWebhook";
 import { startJourney } from "./automation";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
@@ -780,24 +775,6 @@ export async function handleGrowWebhook(body: any): Promise<void> {
       transactionId: transactionId || undefined,
       utmSource: utm.utmSource,
     }).catch(err => console.error("[MetaCAPI] capiPurchase failed:", err));
-
-    const purchaseMessage = buildPurchaseOwnerMessage({
-      name,
-      email,
-      phone,
-      product,
-      amount: sum,
-      transactionId,
-    });
-    await Promise.all(PURCHASE_ALERT_RECIPIENTS.map(recipient =>
-      sendWhatsAppViaMake({
-        event: "purchase_completed",
-        idempotencyKey: `purchase-${transactionId || `${email}-${product}`}-${recipient.key}`,
-        phone: recipient.phone,
-        message: purchaseMessage,
-        metadata: { product, amount: sum, transactionId, recipient: recipient.key },
-      }),
-    ));
 
     console.log(`[GrowWebhook] ✓ Processed ${product} for ${email}`);
   } catch (err) {
