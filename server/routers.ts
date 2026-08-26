@@ -37,6 +37,7 @@ import {
   PARTICIPANT_OUTCOME_STATUSES,
   PUBLICITY_SCOPES,
 } from "./matchOutcome";
+import { extractApprovedTestimonialSeeds, hydrateApprovedTestimonials } from "./publicTestimonials";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -576,6 +577,40 @@ export const appRouter = router({
   plusPilot: plusPilotRouter,
   matchBoost: matchBoostRouter,
   operations: operationsRouter,
+  publicProof: router({
+    approvedTestimonials: publicProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+
+      const candidateMatches = await db.select({
+        matchId: matches.id,
+        singleAId: matches.singleAId,
+        singleBId: matches.singleBId,
+        notes: matches.notes,
+      })
+        .from(matches)
+        .where(isNotNull(matches.notes))
+        .orderBy(desc(matches.id))
+        .limit(1000);
+
+      const seeds = candidateMatches.flatMap(extractApprovedTestimonialSeeds);
+      if (seeds.length === 0) return [];
+
+      const personIds = Array.from(new Set(seeds.map(seed => seed.personId)));
+      const people = await db.select({
+        id: singles.id,
+        firstName: singles.firstName,
+        lastName: singles.lastName,
+        photoUrl: singles.photoUrl,
+      })
+        .from(singles)
+        .where(inArray(singles.id, personIds));
+
+      return hydrateApprovedTestimonials(seeds, new Map(people.map(person => [person.id, person])))
+        .sort((a, b) => b.submittedAt - a.submittedAt)
+        .slice(0, 6);
+    }),
+  }),
 
   auth: router({
     me: publicProcedure.query(opts => {

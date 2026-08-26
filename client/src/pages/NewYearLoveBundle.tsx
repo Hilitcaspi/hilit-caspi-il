@@ -13,6 +13,7 @@ import GrowWallet from "@/components/GrowWallet";
 import { gaBeginCheckout, gaViewItem } from "@/lib/ga";
 import { trackInitiateCheckout, trackViewContent } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
+import { trpc } from "@/lib/trpc";
 
 const HERO_VISUAL = "/manus-storage/sep26-holiday-feed-hero_d85b4394.png";
 const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
@@ -99,6 +100,9 @@ const faqs = [
 
 export default function NewYearLoveBundle() {
   const paymentRef = useRef<HTMLDivElement>(null);
+  const { data: approvedTestimonials = [] } = trpc.publicProof.approvedTestimonials.useQuery(undefined, {
+    staleTime: 10 * 60 * 1000,
+  });
 
   useEffect(() => {
     document.title = "חבילת שנה חדשה לזוגיות | הילית כספי";
@@ -224,6 +228,30 @@ export default function NewYearLoveBundle() {
             </motion.div>
           </Reveal>
         </section>
+
+        {approvedTestimonials.length > 0 ? (
+          <section className="bg-white px-5 py-20 md:py-28" aria-labelledby="approved-stories-title">
+            <Reveal className="mx-auto max-w-5xl">
+              <motion.p variants={fadeUp} className="text-center text-sm font-bold text-[#c96b87]">נכתב על ידי חברי המאגר ואומת על ידי הצוות</motion.p>
+              <motion.h2 id="approved-stories-title" variants={fadeUp} className="mt-3 text-center text-3xl font-black md:text-5xl">סיפורים שקיבלנו רשות לשתף</motion.h2>
+              <div className="mt-10 grid gap-5 md:grid-cols-2">
+                {approvedTestimonials.map((testimonial) => (
+                  <motion.blockquote key={testimonial.id} variants={fadeUp} className="rounded-3xl border border-[#191265]/10 bg-[#fbf7ef] p-7 shadow-[0_18px_45px_rgba(25,18,101,0.06)]">
+                    <p className="text-base leading-8 text-[#514b63]">״{testimonial.text}״</p>
+                    <footer className="mt-6 flex items-center gap-3 border-t border-[#191265]/10 pt-5">
+                      {testimonial.photoUrl ? (
+                        <img src={testimonial.photoUrl} alt="" className="h-11 w-11 rounded-full object-cover" />
+                      ) : (
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#191265] text-lg text-[#f5d978]">♥</div>
+                      )}
+                      <span className="text-sm font-black text-[#191265]">{testimonial.displayName}</span>
+                    </footer>
+                  </motion.blockquote>
+                ))}
+              </div>
+            </Reveal>
+          </section>
+        ) : null}
 
         <section className="px-5 py-20 md:py-28">
           <Reveal className="mx-auto max-w-4xl">

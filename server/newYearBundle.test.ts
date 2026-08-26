@@ -43,7 +43,8 @@ describe("New Year holiday bundle", () => {
     expect(app).toContain('<Route path={"/join/:token"} component={Register} />');
     expect(landing).toContain('product="bundle_new_year"');
     expect(landing).toContain('termsPath="/terms/new-year-love"');
-    expect(landing).not.toContain("testimonial");
+    expect(landing).toContain("trpc.publicProof.approvedTestimonials.useQuery");
+    expect(landing).toContain("approvedTestimonials.length > 0");
     expect(landing).not.toContain("בתאל");
   });
 
