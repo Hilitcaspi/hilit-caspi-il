@@ -11,9 +11,6 @@ import { buildGrowUrl } from "@/lib/utils";
 // CDN Image URLs
 const HERO_IMG    = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-hero_30e4b53c.png";
 const ABOUT_IMG   = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-about_1da3754a.jpg";
-const COUPLE1     = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp";
-const COUPLE2     = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp";
-const COUPLE3     = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp";
 
 // Links
 const GROW_PAYMENT = "https://pay.grow.link/OTkwNzQ~37ba5f3ada87872fd5446ded66942ebe-MzUwODUwMg";
@@ -408,16 +405,16 @@ export default function LiveEvent() {
                 </h2>
 
                 <div className="space-y-4 text-white/80 text-base leading-relaxed mb-8">
-                  <p>מאמנת זוגיות, משדכת, ומייסדת המאגר הגדול ביותר לרווקים בישראל.</p>
-                  <p>פיתחתי אלגוריתם ייחודי המבוסס על מחקרים מוכחים שמנבאים הצלחה זוגית. לא אפליקציה. לא שדכן קלאסי. משהו אחר לגמרי.</p>
-                  <p className="text-white font-semibold">שדכנית של היי-טקיסטים, רופאות, לוחמים ומפורסמים. מאגר של 5,000 רווקים איכותיים.</p>
+                  <p>מאמנת זוגיות, משדכת ומייסדת מאגר רווקים פעיל המבוסס על שאלוני עומק ובדיקת פרופילים.</p>
+                  <p>פיתחתי תהליך שמשלב נתוני התאמה, DNA זוגי, שאלון מדעי ובדיקה אנושית לפני כל הצעה.</p>
+                  <p className="text-white font-semibold">המטרה היא להרחיב הזדמנויות להיכרות תוך שמירה על פרטיות והסכמה הדדית.</p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4 mb-8">
                   {[
-                    { n: "5,000+", label: "רווקים במאגר" },
-                    { n: "200K+", label: "האזנות לפודקאסט" },
-                    { n: "500+", label: "אנשים שליוויתי" },
+                    { n: "1,171", label: "חברים פעילים" },
+                    { n: "98%", label: "קיבלו הצעה" },
+                    { n: "96%", label: "שאלון מדעי" },
                   ].map(({ n, label }) => (
                     <div key={label} className="text-center">
                       <div className="text-2xl font-black text-[#ffe27c]">{n}</div>
@@ -442,41 +439,32 @@ export default function LiveEvent() {
         </AnimatedSection>
       </section>
 
-      {/* TESTIMONIALS */}
+      {/* EVENT TAKEAWAYS */}
       <section className="bg-[#f0eadc] py-20 px-6">
         <AnimatedSection>
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-14">
-              <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-4">לקוחות ממליצים</motion.p>
+              <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-4">מה לוקחים מהאירוע</motion.p>
               <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-[#191265] leading-tight">
-                הם הכירו. הם בחרו. הם בנו.<br />
-                <span className="text-[#1800ad]">אחרי תהליך עם הילית.</span>
+                פחות רעש. יותר בהירות.<br />
+                <span className="text-[#1800ad]">וכיוון מעשי להמשך.</span>
               </motion.h2>
             </div>
 
             <div className="grid md:grid-cols-3 gap-6">
               {[
-                { photo: COUPLE1, names: "מיכל ואורי", when: "הכירו דרך המאגר, מרץ 2024", text: "הגעתי להילית אחרי 5 שנים של דייטינג מתיש. תוך 3 חודשים הבנתי לגמרי מה עצר אותי. אנחנו ביחד כבר שנה.", who: "מיכל, 34" },
-                { photo: COUPLE2, names: "שירה ודניאל", when: "הכירו בתהליך ליווי, ינואר 2024", text: "חשבתי שאני יודעת מה אני מחפשת. הילית הראתה לי שחיפשתי בדיוק את מה שמזיק לי. היום אני בזוגיות הבריאה הראשונה שלי בחיים.", who: "שירה, 29" },
-                { photo: COUPLE3, names: "נועה ואיתי", when: "הכירו דרך המאגר, נובמבר 2023", text: "הייתי בטוחה שהגיל שלי הוא מכשול. הילית הוכיחה לי שזה בדיוק ההפך. אנחנו מאורסים.", who: "נועה, 38" },
-              ].map((t) => (
-                <motion.div key={t.names} variants={fadeUp} className="bg-white rounded-2xl overflow-hidden shadow-xl">
-                  <div className="relative h-48 overflow-hidden">
-                    <img src={t.photo} alt={t.names} loading="lazy" className="w-full h-full object-cover object-[center_20%]" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#191265]/80 to-transparent" />
-                    <div className="absolute bottom-3 right-3">
-                      <div className="text-white font-black text-sm">{t.names}</div>
-                      <div className="text-[#ffe27c] text-xs">{t.when}</div>
-                    </div>
-                  </div>
-                  <div className="p-5">
-                    <div className="text-[#ffe27c] text-sm mb-2">★★★★★</div>
-                    <p className="text-[#555] text-sm leading-relaxed mb-3">"{t.text}"</p>
-                    <p className="text-[#191265] text-xs font-semibold">{t.who}</p>
-                  </div>
+                { icon: "🧠", title: "הבנת דפוסים", text: "לזהות מה חוזר בבחירות ובקשרים בלי להפוך את זה להאשמה עצמית." },
+                { icon: "🎯", title: "בחירה מדויקת יותר", text: "להבחין בין רשימת דרישות לבין צרכים שבאמת חשובים לקשר." },
+                { icon: "🧭", title: "צעד להמשך", text: "לצאת עם שאלה אחת וכלי אחד שאפשר לקחת למציאות." },
+              ].map((item) => (
+                <motion.div key={item.title} variants={fadeUp} className="rounded-2xl bg-white p-6 text-right shadow-xl">
+                  <div className="text-3xl">{item.icon}</div>
+                  <h3 className="mt-4 text-lg font-black text-[#191265]">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-[#555]">{item.text}</p>
                 </motion.div>
               ))}
             </div>
+            <motion.p variants={fadeUp} className="mx-auto mt-8 max-w-2xl text-center text-xs leading-6 text-[#727272]">האירוע הוא תוכן לימודי ואינו מבטיח זוגיות או תוצאה בזמן קבוע.</motion.p>
           </div>
         </AnimatedSection>
       </section>

@@ -153,8 +153,8 @@ export default function SingleSessionSales() {
               <div className="absolute -inset-4 bg-gradient-to-br from-[#ffe27c]/30 to-[#1800ad]/30 rounded-3xl blur-2xl" />
               <img src={HERO_IMG} alt="הילית כספי" className="relative w-64 md:w-80 h-auto rounded-3xl object-cover shadow-2xl" />
               <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-[#191265] font-black text-lg">500+</div>
-                <div className="text-[#727272] text-xs">אנשים שליוויתי</div>
+                <div className="text-[#191265] font-black text-lg">1:1</div>
+                <div className="text-[#727272] text-xs">פגישה מותאמת אישית</div>
               </div>
             </div>
           </motion.div>
@@ -175,7 +175,7 @@ export default function SingleSessionSales() {
         <AnimatedSection>
           <div className="max-w-4xl mx-auto">
             <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest text-center mb-3">מה קורה בפגישה</motion.p>
-            <motion.h2 variants={fadeUp} className="text-3xl font-black text-[#191265] text-center mb-10">60 דקות שמשנות כיוון</motion.h2>
+            <motion.h2 variants={fadeUp} className="text-3xl font-black text-[#191265] text-center mb-10">60 דקות למיפוי ולצעד הבא</motion.h2>
             <div className="grid md:grid-cols-2 gap-4">
               {SESSION_FLOW.map((step) => (
                 <motion.div key={step.num} variants={fadeUp} className="bg-[#f0eadc] rounded-2xl p-6 flex gap-4 items-start">
@@ -228,16 +228,16 @@ export default function SingleSessionSales() {
               <p className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">על הילית</p>
               <h2 className="text-3xl font-black text-[#191265] mb-4">מאמנת ומשדכת בכירה</h2>
               <p className="text-[#727272] leading-relaxed mb-4">
-                הילית כספי היא מאמנת זוגיות ומשדכת עם ניסיון עשיר בליווי מאות אנשים בדרכם לזוגיות. היא פיתחה שיטה ייחודית שמשלבת הבנה פסיכולוגית עמוקה עם כלים מעשיים שעובדים בשטח.
+                הילית כספי היא מאמנת זוגיות ומשדכת. היא פיתחה שיטה שמשלבת שאלות עומק, מיפוי דפוסים וכלים מעשיים שאפשר לבחון בחיים עצמם.
               </p>
               <p className="text-[#727272] leading-relaxed mb-6">
                 בפגישה אחת איתה נתחיל להבין יחד את התמונה שלך, לזהות דפוסים, ולהבין מה הצעד הבא שלך.
               </p>
               <div className="flex flex-wrap gap-4">
                 {[
-                  { n: "1,100+", l: "חברים פעילים במאגר" },
-                  { n: "500+", l: "אנשים שליוויתי" },
-                  { n: "200K+", l: "האזנות לפודקאסט" },
+                  { n: "60", l: "דקות פגישה" },
+                  { n: "1:1", l: "שיחה מותאמת" },
+                  { n: "3", l: "שלבי מיפוי" },
                 ].map(({ n, l }) => (
                   <div key={l} className="text-center bg-[#f0eadc] rounded-xl px-4 py-3">
                     <div className="font-black text-[#191265] text-xl">{n}</div>

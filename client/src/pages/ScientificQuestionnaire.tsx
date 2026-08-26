@@ -1005,7 +1005,7 @@ export default function ScientificQuestionnaire() {
                 הפרופיל שלך פעיל במאגר הרווקים של הילית.
               </p>
               <p className="text-[#191265] font-bold text-sm mb-8">
-                ממוצע זמן המתנה: 7–14 ימים
+                כל הצעה נבדקת לפני שליחה. זמן ההמתנה משתנה לפי הפרופיל, ההעדפות והזמינות במאגר.
               </p>
 
               <div className="w-full bg-white rounded-3xl p-6 shadow-md mb-5 text-right">

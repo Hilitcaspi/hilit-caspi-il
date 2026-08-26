@@ -55,6 +55,7 @@ const PAGE_CODES: Record<string, string> = {
   coaching_mas: process.env.GROW_PAGE_CODE_COACHING_MAS || PROD_PAGE_CODE,
   session:      process.env.GROW_PAGE_CODE_SESSION      || PROD_PAGE_CODE,
   bundle_tubav: process.env.GROW_PAGE_CODE_DATABASE   || PROD_PAGE_CODE,
+  bundle_new_year: process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   // No fallback by design: Plus requires a dedicated recurring-payment page.
   plus:         process.env.GROW_PAGE_CODE_PLUS || "",
 };
@@ -77,6 +78,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   coaching_mas: { description: "ליווי אישי - תהליך המסע (12 פגישות) עם הילית כספי", sum: 4200, maxPaymentNum: 10 },
   session:      { description: "פגישת היכרות עם הילית כספי",                          sum: 500,  paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון",            sum: 349,  paymentNum: 1 },
+  bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 449, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי",                         sum: 99 },
 };
 
@@ -121,6 +123,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     coaching_mas: "/thank-you/coaching",
     session:      "/thank-you/session",
     bundle_tubav: "/thank-you/bundle",
+    bundle_new_year: "/thank-you/new-year-love",
     plus:         "/thank-you/plus",
   };
   const successPath = SUCCESS_PATHS[input.product] || "/thank-you/digital";

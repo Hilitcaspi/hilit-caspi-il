@@ -292,7 +292,10 @@ export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "plus">(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    return requestedTab === "dashboard" || requestedTab === "plus" ? requestedTab : "singles";
+    const allowedTabs = new Set(["singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "plus"]);
+    return allowedTabs.has(requestedTab || "")
+      ? requestedTab as "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "plus"
+      : "singles";
   });
   // Filter-search tab state
   const [filterGender, setFilterGender] = useState("");
@@ -885,7 +888,7 @@ export default function CRMMatchmaking() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-4 bg-white rounded-xl p-1 shadow-sm">
+        <div className="flex gap-2 mb-4 overflow-x-auto rounded-xl bg-white p-1 shadow-sm scroll-smooth [scrollbar-width:thin]">
           {[
             { id: "singles" as const, label: "חברי המאגר", icon: <Users size={14} /> },
             { id: "matches" as const, label: `התאמות (${pendingCount} ממתינות)`, icon: <Heart size={14} /> },
@@ -903,7 +906,7 @@ export default function CRMMatchmaking() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all flex-1 justify-center ${
+              className={`flex flex-none items-center justify-center gap-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                 activeTab === tab.id
                   ? "bg-[#191265] text-white shadow"
                   : "text-[#727272] hover:text-[#191265]"

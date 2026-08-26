@@ -35,6 +35,7 @@ const PAGE_CODES: Record<string, string> = {
   coaching_mas: import.meta.env.VITE_GROW_PAGE_CODE_COACHING_MAS || PROD_PAGE_CODE,
   session:      import.meta.env.VITE_GROW_PAGE_CODE_SESSION  || PROD_PAGE_CODE,
   bundle_tubav: import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
+  bundle_new_year: import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   plus:         import.meta.env.VITE_GROW_PAGE_CODE_PLUS || "",
 };
 
@@ -46,6 +47,7 @@ const PRODUCT_CONFIGS: Record<string, { description: string; sum: number; paymen
   coaching_mas: { description: "ליווי אישי - תהליך המסע (12 פגישות) עם הילית כספי", sum: 4200, maxPaymentNum: 10 },
   session:      { description: "פגישה בודדת עם הילית כספי", sum: 500, paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון", sum: 349, paymentNum: 1 },
+  bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 449, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי", sum: 99 },
 };
 
@@ -138,7 +140,7 @@ declare global {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface GrowWalletProps {
-  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "plus";
+  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "plus";
   buttonLabel?: string;
   buttonClassName?: string;
   prefillName?: string;
@@ -383,6 +385,13 @@ export default function GrowWallet({
       const utmMedium = sessionStorage.getItem('utm_medium') || localStorage.getItem('utm_medium') || undefined;
       const utmCampaign = sessionStorage.getItem('utm_campaign') || localStorage.getItem('utm_campaign') || undefined;
       const utmContent = sessionStorage.getItem('utm_content') || localStorage.getItem('utm_content') || undefined;
+      const utmTerm = sessionStorage.getItem('utm_term') || localStorage.getItem('utm_term') || undefined;
+      const metaCampaignId = sessionStorage.getItem('meta_campaign_id') || localStorage.getItem('meta_campaign_id') || undefined;
+      const metaAdSetId = sessionStorage.getItem('meta_adset_id') || localStorage.getItem('meta_adset_id') || undefined;
+      const metaAdId = sessionStorage.getItem('meta_ad_id') || localStorage.getItem('meta_ad_id') || undefined;
+      const metaPlacement = sessionStorage.getItem('meta_placement') || localStorage.getItem('meta_placement') || undefined;
+      const metaSiteSource = sessionStorage.getItem('site_source_name') || localStorage.getItem('site_source_name') || undefined;
+      const attributionTerm = [utmTerm, metaPlacement, metaSiteSource].filter(Boolean).join('|').slice(0, 200) || undefined;
 
       // Extract GA4 client_id from _ga cookie (format: GA1.1.XXXXXXXX.XXXXXXXXXX)
       // The client_id is the last two dot-separated segments: "XXXXXXXX.XXXXXXXXXX"
@@ -422,7 +431,7 @@ export default function GrowWallet({
 
       logStep("4_createProcess_start");
       const result = await createProcessMutation.mutateAsync({
-        product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "plus",
+        product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "plus",
         fullName,
         email: userEmail,
         phone: userPhone || undefined,
@@ -431,7 +440,12 @@ export default function GrowWallet({
         utmMedium,
         utmCampaign,
         utmContent,
+        utmTerm: attributionTerm,
+        metaCampaignId,
+        metaAdSetId,
+        metaAdId,
         ga4ClientId,
+        ga4SessionId,
         personalToken,
       });
 

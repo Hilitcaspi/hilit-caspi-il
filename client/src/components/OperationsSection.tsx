@@ -13,9 +13,13 @@ const TASK_LABELS: Record<string, string> = {
   other: "אחר",
 };
 const STATUS_LABELS: Record<string, string> = { todo: "לביצוע", in_progress: "בטיפול", done: "הושלם", cancelled: "בוטל" };
+const BOOST_STATUS_LABELS: Record<string, string> = { paid: "שולם", queued: "ממתין לבדיקה", reviewing: "בבדיקה" };
 
 export default function OperationsSection() {
-  const [tab, setTab] = useState<"tasks" | "partners">("tasks");
+  const [tab, setTab] = useState<"tasks" | "boosts" | "partners">(() => {
+    const requested = new URLSearchParams(window.location.search).get("operationsTab");
+    return requested === "boosts" || requested === "partners" ? requested : "tasks";
+  });
   const [title, setTitle] = useState("");
   const [taskType, setTaskType] = useState("followup");
   const [priority, setPriority] = useState("normal");
@@ -31,12 +35,19 @@ export default function OperationsSection() {
   const tasksQuery = trpc.operations.listTasks.useQuery(undefined, { refetchInterval: 30000 });
   const teamQuery = trpc.operations.teamMembers.useQuery();
   const partnerQuery = trpc.operations.partnerOverview.useQuery(undefined, { refetchInterval: 60000 });
+  const boostQueueQuery = trpc.matchBoost.listReviewQueue.useQuery(undefined, { refetchInterval: 30000 });
   const createTask = trpc.operations.createTask.useMutation({ onSuccess: () => { setTitle(""); tasksQuery.refetch(); } });
   const updateTask = trpc.operations.updateTask.useMutation({ onSuccess: () => tasksQuery.refetch() });
   const createPartner = trpc.operations.createPartnerSource.useMutation({ onSuccess: () => {
     setPartnerName(""); setPartnerCode(""); setEventDate(""); setContactEmail(""); partnerQuery.refetch();
   } });
   const updatePartner = trpc.operations.updatePartnerStatus.useMutation({ onSuccess: () => partnerQuery.refetch() });
+  const startBoostReview = trpc.matchBoost.startReview.useMutation({
+    onSuccess: () => {
+      boostQueueQuery.refetch();
+      tasksQuery.refetch();
+    },
+  });
 
   const tasks = useMemo(() => {
     const query = taskSearch.trim().toLowerCase();
@@ -80,6 +91,9 @@ export default function OperationsSection() {
         </div>
         <div className="flex rounded-xl bg-[#f4f2fb] p-1">
           <button onClick={() => setTab("tasks")} className={`rounded-lg px-4 py-2 text-xs font-bold ${tab === "tasks" ? "bg-[#191265] text-white" : "text-[#666]"}`}>משימות צוות</button>
+          <button onClick={() => setTab("boosts")} className={`rounded-lg px-4 py-2 text-xs font-bold ${tab === "boosts" ? "bg-[#191265] text-white" : "text-[#666]"}`}>
+            בדיקות בוסט {(boostQueueQuery.data || []).length > 0 ? `(${(boostQueueQuery.data || []).length})` : ""}
+          </button>
           <button onClick={() => setTab("partners")} className={`rounded-lg px-4 py-2 text-xs font-bold ${tab === "partners" ? "bg-[#191265] text-white" : "text-[#666]"}`}>שותפים ואירועים</button>
         </div>
       </div>
@@ -131,6 +145,68 @@ export default function OperationsSection() {
               </article>
             ))}
             {tasks.length === 0 && <div className="py-8 text-center text-xs text-[#888]">אין משימות לפי החיפוש הנוכחי</div>}
+          </div>
+        </div>
+      ) : tab === "boosts" ? (
+        <div className="mt-5">
+          <div className="rounded-xl border border-[#f0d981] bg-[#fff9df] p-4 text-xs leading-6 text-[#514000]">
+            בקשת בוסט נותנת קדימות לבדיקה בלבד. היא לא שולחת התאמה אוטומטית. מתחילים בדיקה כאן, ואז מאשרים או דוחים דרך טאב ההתאמות הרגיל. רק פעולה בזרימה הרגילה מעדכנת את הבקשה כהושלמה.
+          </div>
+
+          <div className="mt-3 space-y-3">
+            {(boostQueueQuery.data || []).map((row: any) => (
+              <article key={row.request.id} className="rounded-2xl border border-[#dfd9f2] bg-gradient-to-br from-white to-[#f9f7ff] p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <strong className="text-sm text-[#191265]">בקשת בוסט #{row.request.id}</strong>
+                      <span className="rounded-full bg-[#fff0a8] px-2.5 py-1 text-[10px] font-black text-[#6c5200]">{BOOST_STATUS_LABELS[row.request.status] || row.request.status}</span>
+                      <span className="rounded-full bg-[#ece8fb] px-2.5 py-1 text-[10px] font-bold text-[#51448c]">{row.request.source === "plus_included" ? "כלול ב־Plus" : `₪${(Number(row.request.amountAgorot || 0) / 100).toFixed(2)}`}</span>
+                    </div>
+                    <p className="mt-1 text-[10px] text-[#777]">התאמה #{row.match.id} · ציון {row.match.score}% · נפתחה {new Date(row.request.requestedAt).toLocaleString("he-IL")}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {row.request.status !== "reviewing" && (
+                      <button
+                        onClick={() => startBoostReview.mutate({ requestId: row.request.id })}
+                        disabled={startBoostReview.isPending}
+                        className="rounded-lg bg-[#191265] px-3 py-2 text-[10px] font-black text-white disabled:opacity-50"
+                      >התחל/י בדיקה</button>
+                    )}
+                    <button
+                      onClick={() => window.location.assign(`/crm/matchmaking?tab=matches&boostMatchId=${row.match.id}`)}
+                      className="rounded-lg border border-[#cfc7e8] bg-white px-3 py-2 text-[10px] font-black text-[#191265]"
+                    >פתח/י בטאב התאמות</button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {[
+                    { label: "מבקש/ת הבוסט", profile: row.requester },
+                    { label: "ההתאמה המוסתרת", profile: row.candidate },
+                  ].map(({ label, profile }) => (
+                    <div key={label} className="rounded-xl border border-[#ebe7f5] bg-white p-3">
+                      <div className="flex items-start gap-3">
+                        {profile?.photoUrl ? (
+                          <img src={profile.photoUrl} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                        ) : (
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#efecf8] text-lg font-black text-[#7669a8]">{profile?.firstName?.[0] || "?"}</div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-black text-[#8a7eaf]">{label}</p>
+                          <strong className="mt-0.5 block text-sm text-[#191265]">{profile ? `${profile.firstName} ${profile.lastName || ""}` : "פרופיל לא זמין"}</strong>
+                          {profile && <p className="mt-1 text-[10px] text-[#666]">{profile.age} · {profile.city} · {profile.occupation || "ללא עיסוק"}</p>}
+                        </div>
+                      </div>
+                      {profile?.about && <p className="mt-3 line-clamp-3 text-[10px] leading-5 text-[#555]">{profile.about}</p>}
+                      {profile?.partnerDescription && <p className="mt-2 line-clamp-3 rounded-lg bg-[#faf9fd] p-2 text-[10px] leading-5 text-[#555]"><strong>מחפש/ת:</strong> {profile.partnerDescription}</p>}
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+            {boostQueueQuery.isLoading && <div className="py-8 text-center text-xs text-[#888]">טוען בקשות בוסט...</div>}
+            {!boostQueueQuery.isLoading && (boostQueueQuery.data || []).length === 0 && <div className="py-8 text-center text-xs text-[#888]">אין כרגע בקשות בוסט שממתינות לבדיקה</div>}
           </div>
         </div>
       ) : (

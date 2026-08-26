@@ -2,7 +2,7 @@
  * GuideSales - דף מכירה למדריך המעשי ₪149 - לבחור נכון
  * Route: /guide
  */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import React from "react";
 import { track } from "@/lib/track";
 import { trackViewContent } from "@/lib/metaPixel";
@@ -13,36 +13,6 @@ import GrowWallet from "@/components/GrowWallet";
 
 const HILIT_PHOTO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-about_1da3754a.jpg";
 const HILIT_PROFILE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-thankyou_a6c21266.jpeg";
-
-function useCountdown(hours = 24) {
-  const [timeLeft, setTimeLeft] = useState(() => {
-    const stored = localStorage.getItem('guide_countdown');
-    if (stored) {
-      const diff = parseInt(stored) - Date.now();
-      if (diff > 0) return diff;
-    }
-    const end = Date.now() + hours * 60 * 60 * 1000;
-    localStorage.setItem('guide_countdown', String(end));
-    return hours * 60 * 60 * 1000;
-  });
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(() => {
-        const stored = localStorage.getItem('guide_countdown');
-        if (stored) {
-          const diff = parseInt(stored) - Date.now();
-          return diff > 0 ? diff : 0;
-        }
-        return 0;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const h = Math.floor(timeLeft / 3600000);
-  const m = Math.floor((timeLeft % 3600000) / 60000);
-  const s = Math.floor((timeLeft % 60000) / 1000);
-  return { h, m, s };
-}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -68,7 +38,6 @@ export default function GuideSales() {
     gaViewItem("guide");
   }, []);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const { h, m, s } = useCountdown(24);
 
   const faqs = [
     { q: "למי מתאים המדריך?", a: "לכל מי שמחפש זוגיות אמיתית ומרגיש שמשהו תקוע. לא משנה גיל, רקע, או כמה זמן חיפשת עד עכשיו. המדריך מתאים גם למי שנמצא בתהליך דייטינג פעיל וגם למי שעדיין לא שם." },
@@ -106,9 +75,7 @@ export default function GuideSales() {
             <p className="text-white/70 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
               לא עוד מדריך קריאה. מדריך עבודה פרקטי עם כלים מעשיים ותוצרים שמתארים לך בדיוק מי האדם שמתאים לך. השלב הראשון לפני שמגיעים אליי, ובמקום אחד.
             </p>
-            <p className="text-[#ffe27c] text-sm font-bold mt-3">
-              ✨ שווה ערך ל-2 פגישות אישיות איתי (שווי ₪1,000)
-            </p>
+            <p className="text-[#ffe27c] text-sm font-bold mt-3">✨ מוצר דיגיטלי בתשלום חד־פעמי ובגישה מיידית</p>
           </motion.div>
 
           <div className="grid md:grid-cols-2 gap-8 items-start max-w-4xl mx-auto">
@@ -117,25 +84,12 @@ export default function GuideSales() {
             <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.1 }}>
               {/* Discount banner */}
               <div className="bg-gradient-to-l from-[#ffe27c] to-[#ffcf00] rounded-2xl p-4 mb-5 text-center shadow-lg">
-                <p className="text-[#191265] text-xs font-bold uppercase tracking-widest mb-1">🔥 מבצע מוגבל בזמן</p>
+                <p className="text-[#191265] text-xs font-bold uppercase tracking-widest mb-1">מחיר הרכישה באתר</p>
                 <div className="flex items-baseline justify-center gap-3">
                   <span className="text-[#191265] font-black text-5xl">₪149</span>
                   <span className="text-[#191265]/50 line-through text-2xl font-bold">₪249</span>
                 </div>
-                <p className="text-[#191265] font-black text-base mt-1">חיסכון של ₪100. המחיר מסתיים בקרוב!</p>
-              </div>
-
-              {/* Countdown */}
-              <div className="bg-white/10 border border-white/20 rounded-xl p-3 mb-5 text-center">
-                <p className="text-white/80 text-xs font-semibold mb-2">⏰ המחיר המיוחד נגמר בעוד:</p>
-                <div className="flex justify-center gap-3">
-                  {[{ v: String(h).padStart(2,'0'), l: 'שעות' }, { v: String(m).padStart(2,'0'), l: 'דקות' }, { v: String(s).padStart(2,'0'), l: 'שניות' }].map(({ v, l }) => (
-                    <div key={l} className="text-center">
-                      <div className="bg-[#ffe27c] rounded-lg w-14 h-12 flex items-center justify-center text-[#191265] font-black text-xl">{v}</div>
-                      <div className="text-white/60 text-xs mt-1">{l}</div>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-[#191265] font-black text-base mt-1">חיסכון של ₪100 לעומת מחיר המקור</p>
               </div>
 
               {/* Features */}
@@ -280,13 +234,13 @@ export default function GuideSales() {
               <p className="text-[#ffe27c] font-semibold text-sm uppercase tracking-widest mb-4">מי כתבה את המדריך</p>
               <h2 className="text-3xl font-black text-white mb-4">הילית כספי</h2>
               <p className="text-white/70 leading-relaxed mb-4">
-                מאמנת זוגיות ומשדכת. ליוויתי מאות רווקים ורווקות בדרך לזוגיות אמיתית. פיצחתי את הקוד הסודי למציאת אהבה ועכשיו אני מלמדת אותו.
+                מאמנת זוגיות ומשדכת. פיתחתי שיטה שמחברת בין דפוסי בחירה, שאלות עומק וכלים מעשיים, ועכשיו ריכזתי אותה במדריך ברור וישיר.
               </p>
               <p className="text-white/70 leading-relaxed mb-6">
-                המדריך הזה הוא תמצית של מה שלמדתי מאלפי שיחות, פגישות ותהליכים. לא תיאורטי, אלא מה שבאמת עובד בשטח.
+                המדריך אינו אוסף סיסמאות. הוא נועד לעזור לזהות דפוסים, לחדד בחירה ולתרגם את התובנות לצעדים שאפשר לנסות בחיים עצמם.
               </p>
               <div className="flex gap-6">
-                {[{ n: "500+", label: "אנשים שליוויתי" }, { n: "5,000+", label: "רווקים במאגר" }, { n: "200K+", label: "האזנות לפודקאסט" }].map(({ n, label }) => (
+                {[{ n: "5", label: "פרקים מעשיים" }, { n: "1", label: "תשלום חד־פעמי" }, { n: "מיד", label: "גישה דיגיטלית" }].map(({ n, label }) => (
                   <div key={label} className="text-center">
                     <div className="text-[#ffe27c] font-black text-2xl">{n}</div>
                     <div className="text-white/50 text-xs mt-1">{label}</div>
@@ -301,28 +255,28 @@ export default function GuideSales() {
         </AnimatedSection>
       </section>
 
-      {/* TESTIMONIALS */}
+      {/* READING PROCESS */}
       <section className="bg-[#f0eadc] py-20 px-6">
         <AnimatedSection>
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
-              <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">מה אומרים אחרי שקוראים</motion.p>
-              <motion.h2 variants={fadeUp} className="text-3xl font-black text-[#191265]">הם קראו. הם יישמו. הם מצאו.</motion.h2>
+              <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">איך להשתמש במדריך</motion.p>
+              <motion.h2 variants={fadeUp} className="text-3xl font-black text-[#191265]">קוראים, עוצרים, כותבים ומנסים אחרת</motion.h2>
             </div>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid gap-6 md:grid-cols-3">
               {[
-                { name: "מיכל, 34", text: "קראתי את המדריך בלילה אחד ולא יכולתי להפסיק. הבנתי לראשונה למה כל הקשרים שלי נגמרו אותו הדבר. שינה לי את הראש." },
-                { name: "דניאל, 38", text: "חשבתי שאני יודע הכל על דייטינג. טעיתי. הסוד של הדייט הראשון לבד שווה פי 10 מהמחיר." },
-                { name: "רחל, 41", text: "הילית כותבת בצורה ישירה ואמיתית. אין שטויות, אין מניפולציות. רק כלים שעובדים." },
-                { name: "דני, 29", text: "קניתי בהיסוס. אחרי הדייט הראשון שיישמתי את השיטות, הוא ביקש להיפגש שנית. מספיק אמור." },
-              ].map(({ name, text }) => (
-                <motion.div key={name} variants={fadeUp} className="bg-white rounded-2xl p-6 shadow-sm text-right">
-                  <div className="flex gap-1 mb-3 justify-end">{[...Array(5)].map((_, i) => <span key={i} className="text-[#ffe27c]">★</span>)}</div>
-                  <p className="text-[#727272] text-sm leading-relaxed mb-4">"{text}"</p>
-                  <p className="text-[#191265] font-bold text-sm">{name}</p>
+                { icon: "📖", title: "קוראים בקצב שלכם", text: "הגישה דיגיטלית ואפשר לחזור לכל חלק כשרוצים." },
+                { icon: "✍️", title: "עונים בכנות", text: "השאלות נועדו לחבר את הרעיונות לדפוסים האישיים שלכם." },
+                { icon: "🧭", title: "בוחרים צעד אחד", text: "בסוף כל חלק מסמנים פעולה קטנה שאפשר לנסות במציאות." },
+              ].map(({ icon, title, text }) => (
+                <motion.div key={title} variants={fadeUp} className="rounded-2xl bg-white p-6 text-right shadow-sm">
+                  <div className="text-3xl">{icon}</div>
+                  <h3 className="mt-4 font-black text-[#191265]">{title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-[#727272]">{text}</p>
                 </motion.div>
               ))}
             </div>
+            <motion.p variants={fadeUp} className="mx-auto mt-8 max-w-2xl text-center text-xs leading-6 text-[#727272]">המדריך הוא מוצר לימודי ואינו מבטיח זוגיות, דייט נוסף או תוצאה בזמן קבוע.</motion.p>
           </div>
         </AnimatedSection>
       </section>

@@ -31,9 +31,13 @@ function hiddenUtmFields(): Record<string, string> {
   const s = get("utm_source");
   const m = get("utm_medium");
   const c = get("utm_campaign");
+  const content = get("utm_content");
+  const term = get("utm_term");
   if (s) out.utm_source = s;
   if (m) out.utm_medium = m;
   if (c) out.utm_campaign = c;
+  if (content) out.utm_content = content;
+  if (term) out.utm_term = term;
   return out;
 }
 
@@ -92,6 +96,13 @@ export const GA_PRODUCTS = {
     item_name: "חבילת טו באב - מאגר + מדריך",
     item_category: "bundle",
     price: 349,
+    currency: "ILS",
+  },
+  bundle_new_year: {
+    item_id: "bundle_new_year_449",
+    item_name: "חבילת שנה חדשה - מאגר + מדריך + קורס",
+    item_category: "bundle",
+    price: 449,
     currency: "ILS",
   },
 } as const;

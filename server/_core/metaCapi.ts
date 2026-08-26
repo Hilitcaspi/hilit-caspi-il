@@ -26,6 +26,7 @@ const CAPI_PRODUCTS: Record<string, { name: string; price: number; currency: str
   session:      { name: "פגישה בודדת",           price: 500,  currency: "ILS" },
   live_event:   { name: "אירוע לייב",             price: 99,   currency: "ILS" },
   bundle_tubav: { name: "חבילת טו באב - מאגר + מדריך", price: 349, currency: "ILS" },
+  bundle_new_year: { name: "חבילת שנה חדשה - מאגר + מדריך + קורס", price: 449, currency: "ILS" },
 };
 
 // ─── Hashing helper (Meta requires SHA-256 of PII) ────────────────────────────

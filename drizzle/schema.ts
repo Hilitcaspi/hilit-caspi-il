@@ -350,6 +350,10 @@ export const crmLeads = mysqlTable("crm_leads", {
   utmMedium: varchar("utmMedium", { length: 100 }),
   utmCampaign: varchar("utmCampaign", { length: 200 }),
   utmContent: varchar("utmContent", { length: 200 }),
+  utmTerm: varchar("utmTerm", { length: 200 }),
+  metaCampaignId: varchar("metaCampaignId", { length: 100 }),
+  metaAdSetId: varchar("metaAdSetId", { length: 100 }),
+  metaAdId: varchar("metaAdId", { length: 100 }),
 
   // GA4 browser client_id (from _ga cookie) — used to stitch server-side purchase events to the browser session
   ga4ClientId: varchar("ga4ClientId", { length: 100 }),

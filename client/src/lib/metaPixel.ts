@@ -21,6 +21,8 @@ function hiddenUtmFields(): Record<string, string> {
   if (u.utmSource) out.utm_source = u.utmSource;
   if (u.utmMedium) out.utm_medium = u.utmMedium;
   if (u.utmCampaign) out.utm_campaign = u.utmCampaign;
+  if (u.utmContent) out.utm_content = u.utmContent;
+  if (u.utmTerm) out.utm_term = u.utmTerm;
   return out;
 }
 

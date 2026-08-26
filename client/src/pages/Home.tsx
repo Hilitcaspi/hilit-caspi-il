@@ -360,9 +360,9 @@ export default function Home() {
             {/* Social proof strip */}
             <div className="flex gap-4 mt-10 pt-8 border-t border-white/10 flex-wrap">
               {[
-                { n: 5000, s: "+", label: "רווקים במאגר" },
-                { n: 200, s: "K+", label: "האזנות לפודקאסט" },
-                { n: 500, s: "+", label: "נשים שליוויתי" },
+                { n: 1171, s: "", label: "חברים פעילים במאגר" },
+                { n: 98, s: "%", label: "קיבלו לפחות הצעה אחת" },
+                { n: 96, s: "%", label: "השלימו שאלון מדעי" },
               ].map(({ n, s, label }) => (
                 <div key={label} className="text-center flex-1 min-w-[80px]">
                   <div className="text-2xl md:text-3xl font-black text-[#ffe27c]">
@@ -383,9 +383,9 @@ export default function Home() {
               {/* Floating badge */}
               <motion.div animate={{ y: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
                 className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-2xl">💛</div>
-                <div className="text-[#191265] font-black text-sm">סיפורי הצלחה</div>
-                <div className="text-[#727272] text-xs">אמיתיים</div>
+                <div className="text-2xl">📊</div>
+                <div className="text-[#191265] font-black text-sm">נתוני מאגר</div>
+                <div className="text-[#727272] text-xs">שקופים ומתוארכים</div>
               </motion.div>
             </div>
           </motion.div>
@@ -452,8 +452,8 @@ export default function Home() {
             <motion.div variants={fadeUp} className="relative">
               <img src={ABOUT_IMG} alt="הילית כספי" loading="lazy" decoding="async" className="w-full max-w-md mx-auto rounded-3xl object-cover shadow-2xl" />
               <div className="absolute -bottom-6 -left-6 bg-[#191265] text-white rounded-2xl p-5 shadow-xl max-w-[200px]">
-                <div className="text-[#ffe27c] font-black text-2xl">300+</div>
-                <div className="text-white/80 text-sm">נשים שמצאו אהבה</div>
+                <div className="text-[#ffe27c] font-black text-2xl">1:1</div>
+                <div className="text-white/80 text-sm">ליווי מותאם אישית</div>
               </div>
             </motion.div>
           </AnimatedSection>
@@ -678,7 +678,7 @@ export default function Home() {
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#191265] to-[#1800ad]" />
                 <div className="text-3xl mb-3">💛</div>
                 <span className="inline-block bg-[#191265]/15 text-[#191265] text-xs font-bold px-3 py-1 rounded-full mb-3 w-fit">הכי פופולרי</span>
-                <h3 className="text-[#191265] font-black text-base mb-1">המאגר החכם הגדול והמוביל בישראל</h3>
+                <h3 className="text-[#191265] font-black text-base mb-1">מאגר הרווקים החכם של הילית כספי</h3>
                 <p className="text-[#191265] font-black text-lg mb-1">₪299 <span className="text-[#191265]/40 line-through text-sm font-normal">₪499</span></p>
                 <p className="text-[#191265]/70 text-sm leading-relaxed flex-1 mb-3">
                   הפרופיל שלך נכנס למאגר הבלעדי. ההתאמות מבוססות על חישובים מתקדמים ועוברות אישור אישי של הילית לפני כל הצעה.
@@ -713,7 +713,7 @@ export default function Home() {
                 <p className="text-white/60 text-sm leading-relaxed flex-1 mb-3">
                   תהליך אישי עמוק - DNA זוגי, פרופיל, דפוסים, וליווי עד הזוגיות.
                 </p>
-                <p className="text-[#ffe27c]/70 text-xs mb-4">🎁 המאגר החכם הגדול והמוביל בישראל כלולה בתהליך</p>
+                <p className="text-[#ffe27c]/70 text-xs mb-4">🎁 הגישה למאגר הרווקים כלולה בתהליך</p>
                 <a href="/coaching" className="block bg-[#ffe27c] text-[#191265] font-black text-sm py-3 rounded-xl text-center hover:bg-white transition-colors">
                   לפרטים ולרכישה
                 </a>
@@ -781,56 +781,29 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS with couple photos ── */}
+      {/* ── VERIFIED MATCHMAKING DATA ── */}
       <section className="bg-[#191265] py-20 px-6">
         <AnimatedSection>
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-14">
-              <motion.p variants={fadeUp} className="text-[#ffe27c] font-semibold text-sm uppercase tracking-widest mb-4">סיפורי הצלחה אמיתיים</motion.p>
+              <motion.p variants={fadeUp} className="text-[#ffe27c] font-semibold text-sm uppercase tracking-widest mb-4">נתוני המאגר בפועל</motion.p>
               <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-white leading-tight">
-                הם הכירו. הם בחרו. הם בנו.<br />
-                <span className="text-[#ffe27c]">אחרי תהליך עם הילית.</span>
+                שקיפות במקום הבטחות.<br />
+                <span className="text-[#ffe27c]">הצעות נשלחות רק אחרי בדיקה.</span>
               </motion.h2>
+              <motion.p variants={fadeUp} className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-white/60">הנתונים חושבו ממערכת המאגר נכון ל־26.8.2026. הם מתארים פעילות מצטברת ואינם מבטיחים התאמה, זוגיות או תוצאה בזמן קבוע.</motion.p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid gap-6 md:grid-cols-4">
               {[
-                {
-                  photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp",
-                  names: "רותם ועידו",
-                  when: "הכירו דרך המאגר, פברואר 2026",
-                  text: "נרשמתי למאגר בלי ציפיות גדולות. ההתאמה הראשונה שהילית שלחה לי הייתה מדויקת בצורה שלא האמנתי. אנחנו ביחד כבר חצי שנה.",
-                  who: "רותם, 31",
-                },
-                {
-                  photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp",
-                  names: "יעל ותומר",
-                  when: "הכירו בתהליך ליווי, אוגוסט 2025",
-                  text: "עברתי תהליך ליווי שבו הבנתי מה באמת חשוב לי בזוגיות. ברגע שהתמונה התבהרה, הדברים קרו מהר. אנחנו מתחתנים בקיץ.",
-                  who: "יעל, 33",
-                },
-                {
-                  photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp",
-                  names: "אורית ואלון",
-                  when: "הכירו דרך המאגר, מאי 2025",
-                  text: "אחרי שנים באפליקציות הרגשתי שאני בלופ. המאגר של הילית עבד אחרת לגמרי. ההתאמה שקיבלתי הייתה של מישהו שבחיים לא הייתי פוגשת לבד. היום אנחנו גרים ביחד.",
-                  who: "אורית, 36",
-                },
-              ].map((t) => (
-                <motion.div key={t.names} variants={fadeUp} className="bg-white rounded-2xl overflow-hidden shadow-xl">
-                  <div className="relative h-56 overflow-hidden">
-                    <img src={t.photo} alt={t.names} loading="lazy" decoding="async" className="w-full h-full object-cover object-[center_20%]" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#191265]/80 to-transparent" />
-                    <div className="absolute bottom-3 right-3">
-                      <div className="text-white font-black text-base">{t.names}</div>
-                      <div className="text-[#ffe27c] text-xs">{t.when}</div>
-                    </div>
-                  </div>
-                  <div className="p-5">
-                    <div className="text-[#ffe27c] text-sm mb-2">★★★★★</div>
-                    <p className="text-[#727272] text-sm leading-relaxed mb-3">"{t.text}"</p>
-                    <p className="text-[#191265] text-xs font-semibold">{t.who}</p>
-                  </div>
+                { value: "1,171", label: "חברים פעילים ומשלמים" },
+                { value: "98%", label: "קיבלו לפחות הצעה אחת" },
+                { value: "75%", label: "הצעה בתוך 30 יום בקבוצת המדידה" },
+                { value: "96%", label: "השלימו שאלון מדעי" },
+              ].map((item) => (
+                <motion.div key={item.label} variants={fadeUp} className="rounded-2xl border border-white/15 bg-white/8 p-6 text-center shadow-xl">
+                  <div className="text-3xl font-black text-[#ffe27c]">{item.value}</div>
+                  <p className="mt-2 text-xs leading-5 text-white/65">{item.label}</p>
                 </motion.div>
               ))}
             </div>
@@ -893,7 +866,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-black mb-2">ליווי אישי - שתי תוכניות</h3>
                 <p className="text-white/75 text-sm leading-relaxed mb-4">
-                  תהליך "הבנה" (8 פגישות) או תהליך "המסע" (12 פגישות). שניהם כוללים המאגר החכם הגדול והמוביל בישראל.
+                  תהליך "הבנה" (8 פגישות) או תהליך "המסע" (12 פגישות). שניהם כוללים גישה למאגר הרווקים.
                 </p>
                 <div className="flex items-center gap-3 mb-5">
                   <span className="text-3xl font-black">מ-₪2,960</span>
@@ -989,9 +962,9 @@ export default function Home() {
               מוכנה לשנות את הסיפור שלך?
             </motion.h2>
             <motion.p variants={fadeUp} className="text-[#727272] text-lg mb-10 max-w-2xl mx-auto leading-relaxed">
-              כל אחת מהנשים שליוויתי חשבה שהמצב שלה שונה. שהיא המקרה הקשה. שזה לא יעבוד בשבילה.
+              כל תהליך מתחיל במקום אחר. בפגישה נבין מה קורה היום, מה כבר ניסית, ומה יכול להיות הצעד הבא שמתאים לך.
               <br /><br />
-              <strong className="text-[#191265]">כולן טעו.</strong> ואני מאמינה שגם את תופתעי.
+              <strong className="text-[#191265]">בלי הבטחות קסם ובלי מסלול אחיד לכולם.</strong>
             </motion.p>
             <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 justify-center">
               <a href="/single-session"

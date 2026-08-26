@@ -82,6 +82,7 @@ export const GA4_PRODUCTS: Record<string, { id: string; name: string; price: num
   coaching:  { id: "coaching",  name: "ליווי אישי 8 פגישות",  price: 2900 },
   guide:     { id: "guide",     name: "מדריך לבחור נכון",     price: 149 },
   session:   { id: "session",   name: "פגישה בודדת",          price: 500 },
+  bundle_new_year: { id: "bundle_new_year", name: "חבילת שנה חדשה - מאגר + מדריך + קורס", price: 449 },
 };
 
 // ─── Convenience helpers ───────────────────────────────────────────────────────

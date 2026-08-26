@@ -62,13 +62,14 @@ const GROW_LINK_TO_PRODUCT: Record<string, string> = {
 };
 
 // Fallback: detect by payment amount
-function detectProductByAmount(sum: number): string | null {
+export function detectProductByAmount(sum: number): string | null {
+  if (sum === 449) return "bundle_new_year";
+  if (sum === 349) return "bundle_tubav"; // Tu B'Av bundle: database + guide
   if (sum >= 3800 && sum <= 4500) return "coaching_mas"; // המסע full price (4200) or with coupon
   if (sum >= 400 && sum <= 460) return "coaching_mas"; // המסע installment (4200/10 = 420)
   if (sum >= 2200 && sum <= 3200) return "coaching"; // הבנה full price (2960) or with coupon (2664)
   if (sum >= 340 && sum <= 400) return "coaching";   // הבנה installment (2960/8 = 370)
   if (sum >= 480 && sum <= 520) return "session";
-  if (sum === 349) return "bundle_tubav"; // Tu B'Av bundle: database + guide
   if (sum >= 240 && sum <= 260) return "course";
   if (sum >= 140 && sum <= 160) return "guide";
   if (sum >= 280 && sum <= 320) return "database"; // ₪299
@@ -77,9 +78,10 @@ function detectProductByAmount(sum: number): string | null {
 }
 
 // Fallback: detect by description
-function detectProductByDesc(desc: string): string | null {
+export function detectProductByDesc(desc: string): string | null {
   const d = (desc || "").toLowerCase();
   if (d.includes("database plus") || d.includes("מאגר פלוס") || d.includes("database+")) return "plus";
+  if (d.includes("חבילת שנה חדשה") || d.includes("bundle_new_year") || (d.includes("מאגר") && d.includes("מדריך") && d.includes("קורס"))) return "bundle_new_year";
   // IMPORTANT: bundle_tubav MUST be checked before guide/database because its description contains both "מדריך" and "מאגר"
   if (d.includes("חבילת טו באב") || d.includes("bundle_tubav") || (d.includes("מאגר") && d.includes("מדריך"))) return "bundle_tubav";
   if (d.includes("המסע") && (d.includes("ליווי") || d.includes("12"))) return "coaching_mas";
@@ -402,6 +404,19 @@ async function handleBundleTuBav(email: string, name: string, phone: string, tra
   console.log(`[GrowWebhook] Bundle Tu B'Av completed for ${email} (database + guide)`);
 }
 
+// ─── New Year Bundle handler ──────────────────────────────────────────────────
+async function handleBundleNewYear(email: string, name: string, phone: string, transactionId: string = "") {
+  // The course handler grants both course and guide access. This creates two
+  // customer emails in total: database onboarding and one digital-access email.
+  await handleDatabase(email, name, phone, transactionId);
+  await handleCourse(email, name);
+  await notifyOwner({
+    title: "רכישת חבילת שנה חדשה",
+    content: `${name} (${email}) רכש/ה את חבילת השנה החדשה (מאגר + מדריך + קורס) ב־449 ₪. Transaction: ${transactionId || "N/A"}`,
+  });
+  console.log(`[GrowWebhook] New Year bundle completed for ${email} (database + guide + course)`);
+}
+
 async function handlePlus(email: string, name: string, transactionId: string, sum: number, data: any) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -586,7 +601,7 @@ export async function handleGrowWebhook(body: any): Promise<void> {
   const descProduct = detectProductByDesc(desc);
   if (descProduct) {
     // Description is more specific than processToken for bundles (bundle_tubav uses same pageCode as database)
-    if (descProduct === "bundle_tubav" || !product) {
+    if (descProduct === "bundle_tubav" || descProduct === "bundle_new_year" || !product) {
       product = descProduct;
     }
   }
@@ -614,6 +629,10 @@ export async function handleGrowWebhook(body: any): Promise<void> {
   if ((product === "database" || product === "guide") && sum === 349) {
     console.log(`[GrowWebhook] Overriding product from ${product} to bundle_tubav based on sum=349`);
     product = "bundle_tubav";
+  }
+  if (product !== "bundle_new_year" && sum === 449) {
+    console.log(`[GrowWebhook] Overriding product from ${product || "unknown"} to bundle_new_year based on sum=449`);
+    product = "bundle_new_year";
   }
 
   console.log(`[GrowWebhook] Payment: ${name} (${email}) | product: ${product} | sum: ${sum} | tx: ${transactionId}`);
@@ -703,6 +722,7 @@ export async function handleGrowWebhook(body: any): Promise<void> {
       case "session":  await handleSession(email, name); break;
       case "database": await handleDatabase(email, name, phone, transactionId); break;
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
+      case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
       case "plus": await handlePlus(email, name, transactionId, sum, data); break;
     }
@@ -757,7 +777,7 @@ export async function handleGrowWebhook(body: any): Promise<void> {
     }
 
     // Fire GA4 purchase event server-side via Measurement Protocol
-    const GA4_KEYS = ["guide", "course", "coaching", "session", "database"] as const;
+    const GA4_KEYS = ["guide", "course", "coaching", "session", "database", "bundle_new_year"] as const;
     type GA4Key = typeof GA4_KEYS[number];
     if (GA4_KEYS.includes(product as GA4Key)) {
       // Prefer the real browser client_id (from _ga cookie) for accurate DebugView stitching

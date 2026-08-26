@@ -14,40 +14,7 @@ import { motion, useInView } from "framer-motion";
 import { Link } from "wouter";
 import GrowWallet from "@/components/GrowWallet";
 
-const COUPLE1 = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp";
-const COUPLE4 = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple4-Zr2SS5VPXgS3gKAzHobA5s.webp";
-const COUPLE3 = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp";
 const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
-
-function useCountdown(hours = 24) {
-  const [timeLeft, setTimeLeft] = useState(() => {
-    const stored = localStorage.getItem('course_countdown');
-    if (stored) {
-      const diff = parseInt(stored) - Date.now();
-      if (diff > 0) return diff;
-    }
-    const end = Date.now() + hours * 60 * 60 * 1000;
-    localStorage.setItem('course_countdown', String(end));
-    return hours * 60 * 60 * 1000;
-  });
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(() => {
-        const stored = localStorage.getItem('course_countdown');
-        if (stored) {
-          const diff = parseInt(stored) - Date.now();
-          return diff > 0 ? diff : 0;
-        }
-        return 0;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const h = Math.floor(timeLeft / 3600000);
-  const m = Math.floor((timeLeft % 3600000) / 60000);
-  const s = Math.floor((timeLeft % 60000) / 1000);
-  return { h, m, s };
-}
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A4%D7%A8%D7%98%D7%99%D7%9D%20%D7%A0%D7%95%D7%A1%D7%A4%D7%99%D7%9D%20%D7%9C%D7%92%D7%91%D7%99%20%D7%94%D7%A7%D7%95%D7%A8%D7%A1";
 
@@ -105,32 +72,8 @@ const MODULES = [
   },
 ];
 
-const TESTIMONIALS = [
-  {
-    photo: COUPLE1,
-    names: "גיל ונעמה",
-    when: "הכירו דרך המאגר, ינואר 2026",
-    text: "הקורס שינה לי את הראש. הבנתי למה כל הקשרים שלי נגמרו אותו הדבר, ואיך לשבור את הדפוס.",
-    who: "גיל, 32",
-  },
-  {
-    photo: COUPLE4,
-    names: "הדר ויונתן",
-    when: "הכירו בתהליך ליווי, יוני 2025",
-    text: "ציפיתי לעוד 'טיפים לדייטינג'. קיבלתי כלים אמיתיים לחיים. שווה כל שקל ועוד.",
-    who: "הדר, 30",
-  },
-  {
-    photo: COUPLE3,
-    names: "אורית ואלון",
-    when: "הכירו דרך המאגר, מאי 2025",
-    text: "המפה שקיבלתי בסוף הקורס עזרה לי להסביר לפרטנר שלי מה אני צריכה. זה שינה את הדינמיקה בינינו.",
-    who: "אורית, 36",
-  },
-];
-
 const WHAT_YOU_GET = [
-  { icon: "🎬", title: "5 מודולים דיגיטליים", desc: "תוכן מעמיק שנבנה מאות פגישות קליניקה" },
+  { icon: "🎬", title: "5 מודולים דיגיטליים", desc: "תוכן מעמיק שמחבר בין ידע, שאלות ותרגול" },
   { icon: "📋", title: "חוברת עבודה", desc: "תרגילים מעשיים לכל מודול" },
   { icon: "🗺️", title: "מפה זוגית אישית", desc: "מסמך מסכם שיוצא מהקורס, שלכם לתמיד" },
   { icon: "🎁", title: "מדריך דיגיטלי (בונוס)", desc: "כלול בחבילה, ללא תשלום נוסף" },
@@ -143,7 +86,6 @@ export default function CourseSales() {
     gaViewItem("course");
   }, []);
   const [scrolled, setScrolled] = useState(false);
-  const { h, m, s } = useCountdown(24);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
     window.addEventListener("scroll", onScroll);
@@ -198,17 +140,10 @@ export default function CourseSales() {
               <span className="text-white/60 text-base">הטבה מיוחדת</span>
             </div>
 
-            {/* Countdown */}
+            {/* Transparent promotion note */}
             <div className="bg-white/10 border border-[#ffe27c]/30 rounded-2xl p-4 mb-5">
-              <p className="text-[#ffe27c] text-xs font-semibold mb-2 text-center">⏰ ההטבה בתוקף עוד:</p>
-              <div className="flex justify-center gap-3">
-                {[{ v: String(h).padStart(2,'0'), l: 'שעות' }, { v: String(m).padStart(2,'0'), l: 'דקות' }, { v: String(s).padStart(2,'0'), l: 'שניות' }].map(({ v, l }) => (
-                  <div key={l} className="text-center">
-                    <div className="bg-[#191265] border border-[#ffe27c]/40 rounded-xl w-14 h-12 flex items-center justify-center text-[#ffe27c] font-black text-xl">{v}</div>
-                    <div className="text-white/50 text-xs mt-1">{l}</div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-[#ffe27c] text-sm font-black text-center">מחיר העמוד: 249 ₪ בתשלום חד־פעמי</p>
+              <p className="mt-1 text-center text-xs text-white/65">המחיר והתכולה מוצגים במלואם לפני פתיחת התשלום.</p>
             </div>
 
             {/* Early bird bonus */}
@@ -232,8 +167,8 @@ export default function CourseSales() {
               <div className="absolute -inset-4 bg-gradient-to-br from-[#ffe27c]/30 to-[#1800ad]/30 rounded-3xl blur-2xl" />
               <img src={PROFILE_IMG} alt="הילית כספי" className="relative w-64 md:w-80 h-auto rounded-3xl object-cover shadow-2xl" />
               <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-[#191265] font-black text-lg">500+</div>
-                <div className="text-[#727272] text-xs">בוגרי הקורס</div>
+                <div className="text-[#191265] font-black text-lg">5 מודולים</div>
+                <div className="text-[#727272] text-xs">בקצב שמתאים לכם</div>
               </div>
             </div>
           </motion.div>
@@ -297,31 +232,26 @@ export default function CourseSales() {
         </AnimatedSection>
       </section>
 
-      {/* Testimonials */}
+      {/* Learning process */}
       <section className="py-20 px-6 bg-[#191265]">
         <AnimatedSection>
           <div className="max-w-5xl mx-auto">
-            <motion.p variants={fadeUp} className="text-[#ffe27c]/70 font-semibold text-sm uppercase tracking-widest text-center mb-3">סיפורי הצלחה אמיתיים</motion.p>
-            <motion.h2 variants={fadeUp} className="text-3xl font-black text-white text-center mb-10">הם למדו. הם יישמו. הם מצאו.</motion.h2>
+            <motion.p variants={fadeUp} className="text-[#ffe27c]/70 font-semibold text-sm uppercase tracking-widest text-center mb-3">איך לומדים בקורס</motion.p>
+            <motion.h2 variants={fadeUp} className="text-3xl font-black text-white text-center mb-10">ידע, תרגול ומפה אישית להמשך הדרך</motion.h2>
             <div className="grid md:grid-cols-3 gap-6">
-              {TESTIMONIALS.map((t) => (
-                <motion.div key={t.names} variants={fadeUp} className="bg-white rounded-2xl overflow-hidden shadow-xl">
-                  <div className="relative h-56 overflow-hidden">
-                    <img src={t.photo} alt={t.names} className="w-full h-full object-cover object-[center_20%]" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#191265]/80 to-transparent" />
-                    <div className="absolute bottom-3 right-3">
-                      <div className="text-white font-black text-base">{t.names}</div>
-                      <div className="text-[#ffe27c] text-xs">{t.when}</div>
-                    </div>
-                  </div>
-                  <div className="p-5">
-                    <div className="text-[#ffe27c] text-sm mb-2">★★★★★</div>
-                    <p className="text-[#727272] text-sm leading-relaxed mb-3">"{t.text}"</p>
-                    <p className="text-[#191265] text-xs font-semibold">{t.who}</p>
-                  </div>
+              {[
+                { icon: "▶️", title: "לומדים", text: "כל מודול מסביר רעיון אחד לעומק ובשפה נגישה." },
+                { icon: "✍️", title: "עובדים", text: "השאלות והתרגילים מחברים את הידע לחיים האישיים שלכם." },
+                { icon: "🗺️", title: "מסכמים", text: "בסוף נשארת מפה אישית שמרכזת את התובנות והצעדים הבאים." },
+              ].map((item) => (
+                <motion.div key={item.title} variants={fadeUp} className="rounded-2xl border border-white/15 bg-white/8 p-6 text-right">
+                  <div className="text-3xl">{item.icon}</div>
+                  <h3 className="mt-4 text-xl font-black text-[#ffe27c]">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-white/75">{item.text}</p>
                 </motion.div>
               ))}
             </div>
+            <motion.p variants={fadeUp} className="mx-auto mt-8 max-w-3xl text-center text-xs leading-6 text-white/55">הקורס הוא מוצר לימודי ואינו מבטיח זוגיות, התאמה או תוצאה בזמן קבוע.</motion.p>
           </div>
         </AnimatedSection>
       </section>
@@ -335,7 +265,7 @@ export default function CourseSales() {
               <p className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">מי אני</p>
               <h2 className="text-2xl font-black text-[#191265] mb-4">הילית כספי</h2>
               <p className="text-[#727272] leading-relaxed text-sm mb-4">
-                מאמנת זוגיות ומשדכת. ליוויתי מאות אנשים בתהליך מציאת הזוגיות ופיתחתי שיטה ייחודית המבוססת על DNA זוגי.
+                מאמנת זוגיות ומשדכת. פיתחתי שיטה ייחודית המבוססת על DNA זוגי, פסיכולוגיה חיובית ועבודה מעשית.
               </p>
               <p className="text-[#727272] leading-relaxed text-sm">
                 הקורס הזה הוא תמצית של כל מה שלמדתי, ארוז בצורה ברורה, מעשית, ושניתן ליישם מיד. ובסוף, מסמך שיישאר אתכם.

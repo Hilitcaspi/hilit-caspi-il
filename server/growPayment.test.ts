@@ -11,11 +11,21 @@ describe("growPayment module", () => {
   });
 
   it("has product configs for all supported products", () => {
-    const expected = ["database", "guide", "course", "coaching", "session"];
+    const expected = ["database", "guide", "course", "coaching", "session", "bundle_new_year"];
     for (const p of expected) {
       expect(PRODUCT_CONFIGS[p]).toBeDefined();
       expect(PRODUCT_CONFIGS[p].sum).toBeGreaterThan(0);
     }
+  });
+
+  it("configures the New Year bundle as a single 449 ILS charge", () => {
+    expect(PRODUCT_CONFIGS.bundle_new_year).toMatchObject({
+      sum: 449,
+      paymentNum: 1,
+    });
+    expect(PRODUCT_CONFIGS.bundle_new_year.description).toContain("מאגר");
+    expect(PRODUCT_CONFIGS.bundle_new_year.description).toContain("מדריך");
+    expect(PRODUCT_CONFIGS.bundle_new_year.description).toContain("קורס");
   });
 
   it("uses sandbox URL when GROW_ENV is not production", () => {

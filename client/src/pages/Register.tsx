@@ -62,39 +62,8 @@ const slideIn = {
   transition: { duration: 0.4 },
 };
 
-function useCountdown(hours = 48) {
-  const [timeLeft, setTimeLeft] = useState(() => {
-    const stored = localStorage.getItem('database_countdown');
-    if (stored) {
-      const diff = parseInt(stored) - Date.now();
-      if (diff > 0) return diff;
-    }
-    const end = Date.now() + hours * 60 * 60 * 1000;
-    localStorage.setItem('database_countdown', String(end));
-    return hours * 60 * 60 * 1000;
-  });
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(() => {
-        const stored = localStorage.getItem('database_countdown');
-        if (stored) {
-          const diff = parseInt(stored) - Date.now();
-          return diff > 0 ? diff : 0;
-        }
-        return 0;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const h = Math.floor(timeLeft / 3600000);
-  const m = Math.floor((timeLeft % 3600000) / 60000);
-  const s = Math.floor((timeLeft % 60000) / 1000);
-  return { h, m, s };
-}
-
 export default function Register() {
   React.useEffect(() => { track({ eventType: "database_cta" }); }, []);
-  const countdown = useCountdown(48);
   const [, navigate] = useLocation();
   const search = useSearch();
   const params = new URLSearchParams(search);
@@ -646,15 +615,15 @@ export default function Register() {
               {/* Database intro (shown when coming from /database) */}
               {params.get("source") === "database" && (
                 <div className="bg-[#191265] rounded-2xl p-6 mb-6 text-right">
-                  <h2 className="text-[#ffe27c] font-black text-xl mb-3">💎 המאגר החכם הגדול והמוביל בישראל</h2>
+                  <h2 className="text-[#ffe27c] font-black text-xl mb-3">💎 מאגר הרווקים החכם של הילית כספי</h2>
                   <p className="text-white/80 text-sm leading-relaxed mb-4">
                     המאגר שלי שונה מכל אפליקציה אחרת. ההתאמות מבוססות על חישובים מתקדמים ומודלים מדעיים, ולאחר מכן אני עוברת על כל הצעה אישית ומאשרת אותה בעצמי.
                   </p>
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     {[
-                      { n: "5,000+", l: "רווקים במאגר" },
-                      { n: "500+", l: "סיפורי הצלחה" },
-                      { n: "7-14", l: "ימים להתאמה ראשונה" },
+                      { n: "1,171", l: "חברים פעילים" },
+                      { n: "98%", l: "קיבלו הצעה" },
+                      { n: "75%", l: "הצעה תוך 30 יום בקבוצת המדידה" },
                     ].map(({ n, l }) => (
                       <div key={l} className="bg-white/10 rounded-xl p-3 text-center">
                         <div className="text-[#ffe27c] font-black text-xl">{n}</div>
@@ -663,8 +632,9 @@ export default function Register() {
                     ))}
                   </div>
                   <div className="bg-[#ffe27c]/10 border border-[#ffe27c]/30 rounded-xl p-3">
-                    <p className="text-[#ffe27c] text-xs font-bold mb-1">הפלואו:</p>
+                    <p className="text-[#ffe27c] text-xs font-bold mb-1">איך מצטרפים:</p>
                     <p className="text-white/70 text-xs">מלא/י פרטים ושאלון DNA → תשלום ₪299 → מייל עם קישור לשאלון המדעי → אישור כניסה למאגר</p>
+                    <p className="mt-2 text-[11px] leading-5 text-white/50">נתוני המאגר נכונים ל־26.8.2026. זמן ההמתנה משתנה לפי הפרופיל, ההעדפות והזמינות במאגר, ואין התחייבות למועד או לכמות קבועה של הצעות.</p>
                   </div>
                 </div>
               )}
@@ -1293,20 +1263,6 @@ export default function Register() {
           {/* ── PAYMENT ── */}
           {step === "payment" && (
             <motion.div key="payment" {...slideIn}>
-              {/* Countdown banner */}
-              <div className="bg-[#191265] rounded-2xl p-4 mb-6 text-center">
-                <p className="text-[#ffe27c] text-xs font-bold uppercase tracking-widest mb-2">⏳ מחיר ההטבה פוקע בעוד:</p>
-                <div className="flex justify-center gap-3">
-                  {[{ v: countdown.h, l: 'שעות' }, { v: countdown.m, l: 'דקות' }, { v: countdown.s, l: 'שניות' }].map(({ v, l }) => (
-                    <div key={l} className="bg-white/10 rounded-xl px-4 py-2 min-w-[60px]">
-                      <div className="text-white font-black text-2xl">{String(v).padStart(2, '0')}</div>
-                      <div className="text-white/50 text-xs">{l}</div>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-white/60 text-xs mt-2">מחיר מועדף ₪299 במקום ₪499</p>
-              </div>
-
               <div className="text-center mb-8">
                 <div className="text-4xl mb-3">💳</div>
                 <h1 className="text-2xl md:text-3xl font-black text-[#191265] mb-2">

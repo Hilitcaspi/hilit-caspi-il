@@ -32,5 +32,5 @@ describe("META_ADS_TOKEN live validation", () => {
       expect(insightsResponse.status, `${accountId} insights: ${JSON.stringify(insights?.error ?? insights)}`).toBe(200);
       expect(Array.isArray(insights.data)).toBe(true);
     }
-  });
+  }, 20_000);
 });

@@ -7,10 +7,10 @@ import { sql } from "drizzle-orm";
 import { sendEmail } from "./brevo";
 
 const PRODUCT_PRICES: Record<string, number> = {
-  database: 299, guide: 149, course: 249, session: 500, coaching: 2900, coaching_mas: 2900, bundle_tubav: 349,
+  database: 299, guide: 149, course: 249, session: 500, coaching: 2900, coaching_mas: 2900, bundle_tubav: 349, bundle_new_year: 449,
 };
 const PRODUCT_LABELS: Record<string, string> = {
-  database: "מאגר", guide: "מדריך", course: "קורס", session: "פגישה", coaching: "ליווי", coaching_mas: "ליווי מאסטר", bundle_tubav: "חבילת טו באב",
+  database: "מאגר", guide: "מדריך", course: "קורס", session: "פגישה", coaching: "ליווי", coaching_mas: "ליווי מאסטר", bundle_tubav: "חבילת טו באב", bundle_new_year: "חבילת שנה חדשה",
 };
 
 async function fetchMetaSpend(since: string, until: string) {

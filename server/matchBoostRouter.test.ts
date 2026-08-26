@@ -150,6 +150,8 @@ describe("match boost eligibility", () => {
 describe("match boost privacy and payment gate", () => {
   const source = fs.readFileSync(path.join(process.cwd(), "server/matchBoostRouter.ts"), "utf8");
   const uiSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/UserDashboard.tsx"), "utf8");
+  const operationsSource = fs.readFileSync(path.join(process.cwd(), "client/src/components/OperationsSection.tsx"), "utf8");
+  const routersSource = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
 
   it("returns only candidate count and score to the personal area, not candidate identity", () => {
     const publicReturn = source.slice(source.indexOf("return {\n        eligible:"), source.indexOf("redeemPlusBoost:"));
@@ -166,5 +168,32 @@ describe("match boost privacy and payment gate", () => {
     expect(uiSource).not.toContain("trpc.matchBoost.startPaidBoost");
     expect(uiSource).toContain("בוסט התאמה ב־19.99 ש״ח · בקרוב");
     expect(uiSource).toContain("הבוסט אינו מבטיח שההתאמה תאושר");
+  });
+
+  it("exposes candidate identity only in the team-protected CRM review queue", () => {
+    expect(source).toContain("listReviewQueue: teamProcedure");
+    expect(operationsSource).toContain("ההתאמה המוסתרת");
+    expect(operationsSource).toContain("trpc.matchBoost.listReviewQueue");
+    expect(uiSource).not.toContain("candidate.firstName");
+    expect(uiSource).not.toContain("candidate.photoUrl");
+  });
+
+  it("starts review from Operations but sends or rejects only through the normal match flow", () => {
+    expect(operationsSource).toContain("trpc.matchBoost.startReview");
+    expect(operationsSource).toContain("/crm/matchmaking?tab=matches&boostMatchId=");
+    expect(operationsSource).not.toContain("trpc.matchmaking.approveMatch");
+    expect(operationsSource).not.toContain("trpc.matchmaking.rejectMatch");
+    expect(routersSource).toContain('decision: "approved"');
+    expect(routersSource).toContain('decision: "rejected"');
+  });
+
+  it("updates the boost request and CRM task together after a match decision", () => {
+    const syncFunction = source.slice(
+      source.indexOf("export async function syncBoostRequestAfterMatchDecision"),
+      source.indexOf("async function getVerifiedSingle"),
+    );
+    expect(syncFunction).toContain("db.transaction");
+    expect(syncFunction).toContain("tx.update(matchBoostRequests)");
+    expect(syncFunction).toContain("tx.update(crmTeamTasks)");
   });
 });

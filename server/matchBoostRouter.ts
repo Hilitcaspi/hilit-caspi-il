@@ -8,7 +8,7 @@ import {
   plusPilotMembers,
   singles,
 } from "../drizzle/schema";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { getMissingProfileFields } from "./matchmakingMetrics";
 
@@ -16,6 +16,37 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const BOOST_PRICE_AGOROT = 1999;
 const MIN_BOOST_SCORE = 70;
 const OPEN_BOOST_STATUSES = ["awaiting_payment", "paid", "queued", "reviewing"] as const;
+const REVIEWABLE_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
+
+export async function syncBoostRequestAfterMatchDecision(
+  db: any,
+  input: { matchId: number; decision: "approved" | "rejected"; reason?: string; now?: number },
+) {
+  const now = input.now ?? Date.now();
+  await db.transaction(async (tx: any) => {
+    await tx.update(matchBoostRequests).set({
+      status: input.decision,
+      decidedAt: now,
+      fulfilledAt: input.decision === "approved" ? now : null,
+      decisionReason: input.reason || (input.decision === "approved"
+        ? "ההתאמה אושרה ונשלחה בזרימה הרגילה"
+        : "ההתאמה נדחתה בבדיקת CRM"),
+      updatedAt: now,
+    }).where(and(
+      eq(matchBoostRequests.matchId, input.matchId),
+      inArray(matchBoostRequests.status, [...REVIEWABLE_BOOST_STATUSES]),
+    ));
+    await tx.update(crmTeamTasks).set({
+      status: "done",
+      completedAt: now,
+      updatedAt: now,
+    }).where(and(
+      eq(crmTeamTasks.matchId, input.matchId),
+      eq(crmTeamTasks.taskType, "match_review"),
+      inArray(crmTeamTasks.status, ["todo", "in_progress"]),
+    ));
+  });
+}
 
 async function getVerifiedSingle(email: string, token: string) {
   const db = await getDb();
@@ -145,6 +176,95 @@ async function loadBoostContext(db: any, single: any) {
 }
 
 export const matchBoostRouter = router({
+  listReviewQueue: teamProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    const requests = await db.select().from(matchBoostRequests)
+      .where(inArray(matchBoostRequests.status, [...REVIEWABLE_BOOST_STATUSES]))
+      .orderBy(desc(matchBoostRequests.requestedAt));
+
+    return Promise.all(requests.map(async (request: any) => {
+      const [match] = await db.select().from(matches).where(eq(matches.id, request.matchId)).limit(1);
+      if (!match) return null;
+      const [singleA, singleB, taskRows] = await Promise.all([
+        db.select().from(singles).where(eq(singles.id, match.singleAId)).limit(1),
+        db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1),
+        db.select().from(crmTeamTasks).where(and(
+          eq(crmTeamTasks.matchId, match.id),
+          eq(crmTeamTasks.taskType, "match_review"),
+          inArray(crmTeamTasks.status, ["todo", "in_progress"]),
+        )).orderBy(desc(crmTeamTasks.createdAt)).limit(1),
+      ]);
+      const requester = request.singleId === match.singleAId ? singleA[0] : singleB[0];
+      const candidate = request.singleId === match.singleAId ? singleB[0] : singleA[0];
+      const profile = (single: any) => single ? ({
+        id: single.id,
+        firstName: single.firstName,
+        lastName: single.lastName,
+        gender: single.gender,
+        age: single.age,
+        city: single.city,
+        height: single.height,
+        occupation: single.occupation,
+        religiosity: single.religiosity,
+        dnaType: single.dnaType,
+        photoUrl: single.photoUrl,
+        hasKids: single.hasKids,
+        wantsKids: single.wantsKids,
+        about: single.about,
+        partnerDescription: single.partnerDescription,
+      }) : null;
+      return {
+        request: {
+          id: request.id,
+          source: request.source,
+          status: request.status,
+          amountAgorot: request.amountAgorot,
+          requestedAt: request.requestedAt,
+        },
+        match: { id: match.id, status: match.status, score: Math.round(Number(match.score || 0)) },
+        requester: profile(requester),
+        candidate: profile(candidate),
+        task: taskRows[0] ? {
+          id: taskRows[0].id,
+          status: taskRows[0].status,
+          assignedTeamMemberId: taskRows[0].assignedTeamMemberId,
+        } : null,
+      };
+    })).then(rows => rows.filter(Boolean));
+  }),
+
+  startReview: teamProcedure
+    .input(z.object({ requestId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [request] = await db.select().from(matchBoostRequests)
+        .where(eq(matchBoostRequests.id, input.requestId)).limit(1);
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "בקשת הבוסט לא נמצאה" });
+      if (request.status === "reviewing") return { success: true, status: "reviewing" as const };
+      if (!REVIEWABLE_BOOST_STATUSES.includes(request.status as any)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "בקשת הבוסט אינה פתוחה לבדיקה" });
+      }
+      const now = Date.now();
+      await db.transaction(async (tx: any) => {
+        await tx.update(matchBoostRequests).set({
+          status: "reviewing",
+          reviewStartedAt: now,
+          updatedAt: now,
+        }).where(eq(matchBoostRequests.id, request.id));
+        await tx.update(crmTeamTasks).set({
+          status: "in_progress",
+          updatedAt: now,
+        }).where(and(
+          eq(crmTeamTasks.matchId, request.matchId),
+          eq(crmTeamTasks.taskType, "match_review"),
+          eq(crmTeamTasks.status, "todo"),
+        ));
+      });
+      return { success: true, status: "reviewing" as const };
+    }),
+
   getMyStatus: publicProcedure
     .input(z.object({ email: z.string().email(), token: z.string().min(16) }))
     .query(async ({ input }) => {

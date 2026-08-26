@@ -14,9 +14,6 @@ import { motion, useInView } from "framer-motion";
 import { Link } from "wouter";
 import GrowWallet from "@/components/GrowWallet";
 
-const COUPLE1 = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp";
-const COUPLE2 = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp";
-const COUPLE3 = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp";
 const HERO_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-hero_30e4b53c.png";
 const ABOUT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-about_1da3754a.jpg";
 
@@ -44,30 +41,6 @@ const PAIN_POINTS = [
   "אתם יודעים שאתם רוצים זוגיות, אבל לא מצליחים להגיע לשם",
   "חזרתם לאותם דפוסים שוב ושוב",
   "ניסיתם אפליקציות, שדכנים, חברים, ועדיין לבד",
-];
-
-const COUPLE_TESTIMONIALS = [
-  {
-    photo: COUPLE1,
-    names: "דנה ואסף",
-    when: "הכירו בתהליך ליווי, מרץ 2026",
-    text: "אחרי שנים של 'לא מוצאת', 4 חודשים עם הילית שינו לי את הגישה לחיים. היום אני בזוגיות מאושרת.",
-    who: "דנה, 34",
-  },
-  {
-    photo: COUPLE2,
-    names: "עמית ונועם",
-    when: "הכירו בתהליך ליווי, אוקטובר 2025",
-    text: "הגעתי ספקן. יצאתי עם כלים שאני משתמש בהם כל יום. הילית רואה דברים שאתה לא רואה בעצמך.",
-    who: "עמית, 39",
-  },
-  {
-    photo: COUPLE3,
-    names: "ליאור ומאיה",
-    when: "הכירו דרך המאגר, יולי 2025",
-    text: "הכי טוב שעשיתי לעצמי. לא רק מצאתי זוגיות, הבנתי מה אני באמת רוצה.",
-    who: "ליאור, 37",
-  },
 ];
 
 export default function CoachingSales() {
@@ -130,8 +103,8 @@ export default function CoachingSales() {
               <div className="absolute -inset-4 bg-gradient-to-br from-[#ffe27c]/30 to-[#1800ad]/30 rounded-3xl blur-2xl" />
               <img src={HERO_IMG} alt="הילית כספי" className="relative w-64 md:w-80 h-auto rounded-3xl object-cover shadow-2xl" />
               <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-[#191265] font-black text-lg">500+</div>
-                <div className="text-[#727272] text-xs">אנשים שליוויתי</div>
+                <div className="text-[#191265] font-black text-lg">1:1</div>
+                <div className="text-[#727272] text-xs">תהליך מותאם אישית</div>
               </div>
             </div>
           </motion.div>
@@ -305,7 +278,7 @@ export default function CoachingSales() {
                   <div className="inline-block bg-[#ffe27c] text-[#191265] text-xs font-black px-3 py-1 rounded-full mb-3">כלול בשני התהליכים</div>
                   <h3 className="text-2xl font-black text-white mb-3">גישה למאגר הרווקים הבלעדי</h3>
                   <p className="text-white/75 text-sm leading-relaxed mb-4">
-                    מעל 5,000 רווקים ורווקות שעברו סינון אישי. לא אפליקציה. לא שדכן אקראי. מאגר שנבנה על בסיס DNA זוגי ואישור אישי של הילית לכל פרופיל.
+                    מאגר פעיל של חברים משלמים שעברו שאלונים ובדיקת פרופיל. לא אפליקציה ולא התאמה אקראית. המאגר נבנה על בסיס נתוני פרופיל, DNA זוגי ושאלון מדעי, וכל הצעה עוברת בדיקה לפני שליחה.
                     <br /><br />
                     לאחר התשלום תקבלו הסבר מלא על הכניסה למאגר ואיך להפעיל את הגישה.
                   </p>
@@ -320,31 +293,26 @@ export default function CoachingSales() {
         </AnimatedSection>
       </section>
 
-      {/* ── TESTIMONIALS ── */}
+      {/* ── PROCESS PROOF ── */}
       <section className="py-20 px-6 bg-[#191265]">
         <AnimatedSection>
           <div className="max-w-5xl mx-auto">
-            <motion.p variants={fadeUp} className="text-[#ffe27c]/70 font-semibold text-sm uppercase tracking-widest text-center mb-3">סיפורי הצלחה אמיתיים</motion.p>
-            <motion.h2 variants={fadeUp} className="text-3xl font-black text-white text-center mb-10">הם הכירו. הם בחרו. הם בנו.</motion.h2>
+            <motion.p variants={fadeUp} className="text-[#ffe27c]/70 font-semibold text-sm uppercase tracking-widest text-center mb-3">מה קורה בתוך התהליך</motion.p>
+            <motion.h2 variants={fadeUp} className="text-3xl font-black text-white text-center mb-10">לא הבטחות. עבודה מדויקת שלב אחר שלב.</motion.h2>
             <div className="grid md:grid-cols-3 gap-6">
-              {COUPLE_TESTIMONIALS.map((t) => (
-                <motion.div key={t.names} variants={fadeUp} className="bg-white rounded-2xl overflow-hidden shadow-xl">
-                  <div className="relative h-56 overflow-hidden">
-                    <img src={t.photo} alt={t.names} className="w-full h-full object-cover object-[center_20%]" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#191265]/80 to-transparent" />
-                    <div className="absolute bottom-3 right-3">
-                      <div className="text-white font-black text-base">{t.names}</div>
-                      <div className="text-[#ffe27c] text-xs">{t.when}</div>
-                    </div>
-                  </div>
-                  <div className="p-5">
-                    <div className="text-[#ffe27c] text-sm mb-2">★★★★★</div>
-                    <p className="text-[#727272] text-sm leading-relaxed mb-3">"{t.text}"</p>
-                    <p className="text-[#191265] text-xs font-semibold">{t.who}</p>
-                  </div>
+              {[
+                { icon: "🧭", title: "מיפוי", text: "מזהים את הדפוסים, הבחירות והפערים שחוזרים שוב ושוב." },
+                { icon: "🛠️", title: "תרגול מעשי", text: "מתרגמים תובנות להתנהלות אחרת בפרופיל, בשיחה ובדייט." },
+                { icon: "💬", title: "ליווי ומעקב", text: "בודקים מה קורה במציאות, לומדים ומדייקים את הצעד הבא." },
+              ].map((item) => (
+                <motion.div key={item.title} variants={fadeUp} className="rounded-2xl border border-white/15 bg-white/8 p-6 text-right">
+                  <div className="text-3xl">{item.icon}</div>
+                  <h3 className="mt-4 text-xl font-black text-[#ffe27c]">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-white/75">{item.text}</p>
                 </motion.div>
               ))}
             </div>
+            <motion.p variants={fadeUp} className="mx-auto mt-8 max-w-3xl text-center text-xs leading-6 text-white/55">התהליך אינו מבטיח זוגיות או תוצאה בזמן קבוע. הוא נועד לייצר בהירות, כלים, תרגול וליווי מקצועי שמותאם לאדם ולמצב שלו.</motion.p>
           </div>
         </AnimatedSection>
       </section>
@@ -358,7 +326,7 @@ export default function CoachingSales() {
               <p className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">מי אני</p>
               <h2 className="text-2xl font-black text-[#191265] mb-4">הילית כספי</h2>
               <p className="text-[#727272] leading-relaxed text-sm mb-4">
-                מאמנת ומנטורית לזוגיות. ליוויתי מאות אנשים בתהליך מציאת הזוגיות ופיתחתי שיטה ייחודית המבוססת על DNA זוגי ופסיכולוגיה חיובית.
+                מאמנת ומנטורית לזוגיות. פיתחתי שיטה ייחודית המבוססת על DNA זוגי, פסיכולוגיה חיובית ועבודה מעשית בין הפגישות.
               </p>
               <p className="text-[#727272] leading-relaxed text-sm mb-4">
                 הפגישות מתקיימות בקליניקה ברמת השרון, בתל אביב, או בזום, לפי מה שנוח לכם.

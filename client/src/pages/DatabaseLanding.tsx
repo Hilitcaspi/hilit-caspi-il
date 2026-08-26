@@ -13,9 +13,6 @@ import { trackViewContent, trackInitiateCheckout } from "@/lib/metaPixel";
 // ─── Assets ──────────────────────────────────────────────────────────────────
 const HERO_IMG    = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-hero_30e4b53c.png";
 const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
-const COUPLE1     = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp";
-const COUPLE2     = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp";
-const COUPLE3     = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp";
 
 const JOIN_URL = "/join?source=campaign_direct";
 
@@ -48,7 +45,7 @@ function StickyCTA() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#191265]/97 backdrop-blur-md border-t border-white/10 px-4 py-3 flex items-center justify-between gap-4">
       <div className="text-white text-sm hidden sm:block">
-        <span className="font-bold">המאגר החכם הגדול והמוביל בישראל | הילית כספי</span>
+        <span className="font-bold">מאגר הרווקים של הילית כספי</span>
         <span className="text-white/60 mr-2">תשלום חד-פעמי ₪299</span>
       </div>
       <Link href={JOIN_URL}>
@@ -85,7 +82,7 @@ export default function DatabaseLanding() {
           <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.9 }} className="text-right order-2 md:order-1">
             <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
               className="inline-flex items-center gap-2 bg-[#ffe27c]/15 border border-[#ffe27c]/30 text-[#ffe27c] text-sm font-semibold px-4 py-2 rounded-full mb-6">
-              ✦ 5,000+ רווקים ורווקות במאגר
+              ✦ 1,171 חברים פעילים ומשלמים · נכון ל־26.8.2026
             </motion.div>
 
             <h1 className="text-4xl md:text-5xl lg:text-[3.4rem] font-black text-white leading-[1.15] mb-5">
@@ -135,9 +132,8 @@ export default function DatabaseLanding() {
               {/* Floating badge */}
               <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
                 className="absolute -bottom-5 -right-5 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-2xl">💛</div>
-                <div className="text-[#191265] font-black text-xs">500+ זוגות</div>
-                <div className="text-[#727272] text-xs">שנוצרו</div>
+                <div className="text-[#191265] font-black text-lg">98%</div>
+                <div className="text-[#727272] text-xs">קיבלו לפחות הצעה אחת</div>
               </motion.div>
             </div>
           </motion.div>
@@ -183,7 +179,7 @@ export default function DatabaseLanding() {
                 { n: "1", title: "שאלון DNA", desc: "ממלאים שאלון מעמיק שחושף את הדפוסים הזוגיים האמיתיים שלך." },
                 { n: "2", title: "פרופיל אישי", desc: "מוסיפים תמונה ומשפטים. אני קוראת כל פרופיל ומאשרת אישית." },
                 { n: "3", title: "תשלום חד-פעמי", desc: "₪299 פעם אחת. ללא דמי מנוי. ללא הפתעות." },
-                { n: "4", title: "התאמות מדויקות", desc: "כשיש התאמה מעל 80%, שניכם מקבלים הצעה. רק אם שניכם אמרתם כן — הפרטים נחשפים." },
+                { n: "4", title: "בדיקה והסכמה", desc: "כשנמצאת התאמה שעוברת בדיקה, שני הצדדים מקבלים הצעה. רק אם שניכם אמרתם כן, הפרטים נחשפים." },
               ].map(step => (
                 <motion.div key={step.n} variants={fadeUp} className="relative">
                   <div className="w-12 h-12 bg-[#ffe27c] rounded-full flex items-center justify-center text-[#191265] font-black text-xl mb-4 mr-auto ml-0">
@@ -212,10 +208,10 @@ export default function DatabaseLanding() {
                 עזבתי קריירה בהייטק כי הבנתי שמשימת חיי היא אחרת. ראיתי יותר מדי אנשים מוכשרים ומצליחים שנשארים לבד — לא כי משהו שבור בהם, אלא כי אף אחד לא ראה את הפרופיל האמיתי שלהם.
               </p>
               <p className="text-[#444] leading-relaxed mb-6">
-                בניתי שיטה שמשלבת מחקר פסיכולוגי, DNA זוגי, ואינטואיציה שצברתי מ-500+ שיחות עם לקוחות. הפודקאסט שלי נשמע 200,000+ פעמים. המאגר שלי מכיל 5,000+ רווקים שעברו אבחון מעמיק.
+                בניתי שיטה שמשלבת שאלוני עומק, DNA זוגי, בדיקת פרופילים ותהליך הסכמה הדדי. המטרה היא לא לייצר עוד גלילה, אלא לבדוק התאמות אפשריות ולשלוח אותן רק אחרי בחינה מקצועית.
               </p>
               <div className="flex gap-6 flex-wrap">
-                {[["500+", "לקוחות"], ["200K+", "האזנות"], ["5,000+", "במאגר"]].map(([n, l]) => (
+                {[["1,171", "חברים פעילים"], ["98%", "קיבלו הצעה"], ["96%", "שאלון מדעי"]].map(([n, l]) => (
                   <div key={l} className="text-center">
                     <div className="text-2xl font-black text-[#191265]">{n}</div>
                     <div className="text-[#727272] text-xs">{l}</div>
@@ -227,24 +223,23 @@ export default function DatabaseLanding() {
         </Reveal>
       </section>
 
-      {/* ── TESTIMONIALS ─────────────────────────────────────────────────── */}
+      {/* ── VERIFIED DATA ─────────────────────────────────────────────────── */}
       <section className="bg-white py-16 px-6">
         <Reveal>
           <div className="max-w-4xl mx-auto">
-            <motion.p variants={fadeUp} className="text-center text-[#1800ad] font-bold text-sm uppercase tracking-widest mb-3">סיפורי הצלחה</motion.p>
-            <motion.h2 variants={fadeUp} className="text-center text-3xl font-black text-[#191265] mb-10">הם מצאו. עכשיו תורך.</motion.h2>
-            <div className="grid md:grid-cols-3 gap-6">
+            <motion.p variants={fadeUp} className="text-center text-[#1800ad] font-bold text-sm uppercase tracking-widest mb-3">נתוני המאגר</motion.p>
+            <motion.h2 variants={fadeUp} className="text-center text-3xl font-black text-[#191265] mb-4">שקיפות במקום הבטחות</motion.h2>
+            <motion.p variants={fadeUp} className="mx-auto mb-10 max-w-2xl text-center text-sm leading-7 text-[#727272]">הנתונים הבאים חושבו ממערכת המאגר נכון ל־26.8.2026. הם מתארים את פעילות המאגר ואינם מבטיחים תוצאה אישית או זמן קבוע.</motion.p>
+            <div className="grid gap-6 md:grid-cols-4">
               {[
-                { img: COUPLE1, names: "רותם ועידו", text: "נרשמתי למאגר ותוך חודשיים קיבלתי התאמה שהרגישה נכונה מהרגע הראשון. אנחנו ביחד כבר חצי שנה.", who: "רותם, 31" },
-                { img: COUPLE2, names: "שי ומיכל", text: "ניסיתי אפליקציות שנים. המאגר של הילית שונה לגמרי. ההתאמות מדויקות כי מישהו באמת בדק את הפרופילים.", who: "שי, 35" },
-                { img: COUPLE3, names: "אורית ואלון", text: "אחרי שנים באפליקציות הרגשתי שאני בלופ. כאן ההתאמה הייתה של מישהו שבחיים לא הייתי פוגשת לבד.", who: "אורית, 36" },
-              ].map(t => (
-                <motion.div key={t.names} variants={fadeUp} className="bg-[#f9f6f0] rounded-2xl overflow-hidden">
-                  <img src={t.img} alt={t.names} className="w-full h-44 object-cover" />
-                  <div className="p-5 text-right">
-                    <p className="text-[#191265] text-sm leading-relaxed mb-3">"{t.text}"</p>
-                    <p className="text-[#727272] text-xs font-semibold">{t.who}</p>
-                  </div>
+                { value: "1,171", label: "חברים פעילים ומשלמים" },
+                { value: "98%", label: "קיבלו לפחות הצעה אחת" },
+                { value: "75%", label: "הצעה בתוך 30 יום בקבוצת המדידה" },
+                { value: "96%", label: "השלימו שאלון מדעי" },
+              ].map(item => (
+                <motion.div key={item.label} variants={fadeUp} className="rounded-2xl bg-[#f9f6f0] p-6 text-center">
+                  <div className="text-3xl font-black text-[#191265]">{item.value}</div>
+                  <p className="mt-2 text-xs leading-5 text-[#727272]">{item.label}</p>
                 </motion.div>
               ))}
             </div>
@@ -285,7 +280,7 @@ export default function DatabaseLanding() {
             תפסיק/י לחפש לבד.
           </motion.h2>
           <motion.p variants={fadeUp} className="text-white/65 text-lg mb-8 max-w-lg mx-auto">
-            5,000+ רווקים ורווקות מחכים. שדכנית אמיתית שתחפש בשבילך. תשלום חד-פעמי.
+            מאגר פעיל, בדיקה אנושית ותהליך הסכמה הדדי. תשלום חד־פעמי וללא דמי מנוי.
           </motion.p>
           <motion.div variants={fadeUp} className="flex flex-col items-center gap-3">
             <div className="bg-white/8 border border-white/15 rounded-2xl px-8 py-4 mb-2 inline-block">

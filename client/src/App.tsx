@@ -68,6 +68,9 @@ const DatabasePlusSales = lazy(() => import("@/pages/DatabasePlusSales"));
 const TermsPlus = lazy(() => import("@/pages/TermsPlus"));
 const ThankYouPlus = lazy(() => import("@/pages/ThankYouPlus"));
 const SeptemberOffers = lazy(() => import("@/pages/SeptemberOffers"));
+const NewYearLoveBundle = lazy(() => import("@/pages/NewYearLoveBundle"));
+const ThankYouNewYearBundle = lazy(() => import("@/pages/ThankYouNewYearBundle"));
+const TermsNewYearBundle = lazy(() => import("@/pages/TermsNewYearBundle"));
 
 // US English (EN) pages
 const EnHome = lazy(() => import("@/pages/en/Home"));
@@ -108,7 +111,18 @@ function ReferrerDetector() {
       // Persist UTM params to BOTH sessionStorage AND localStorage
       // localStorage survives cross-domain redirects (e.g. Grow payment page → back to site)
       // sessionStorage is cleared when user leaves the domain
-      const utmKeys = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
+      const utmKeys = [
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_content",
+        "utm_term",
+        "meta_campaign_id",
+        "meta_adset_id",
+        "meta_ad_id",
+        "meta_placement",
+        "site_source_name",
+      ];
       let capturedAny = false;
       utmKeys.forEach(key => {
         const val = p.get(key);
@@ -264,6 +278,9 @@ function HeRouter() {
           <Route path={"/terms/plus"} component={TermsPlus} />
           <Route path={"/thank-you/plus"} component={ThankYouPlus} />
           <Route path="/september" component={SeptemberOffers} />
+          <Route path="/new-year-love" component={NewYearLoveBundle} />
+          <Route path="/terms/new-year-love" component={TermsNewYearBundle} />
+          <Route path="/thank-you/new-year-love" component={ThankYouNewYearBundle} />
           <Route path={"/thank-you/course"} component={ThankYouCourse} />
           <Route path={"/course-sales"} component={CourseSales} />
           <Route path={"/course/view"} component={CourseView} />

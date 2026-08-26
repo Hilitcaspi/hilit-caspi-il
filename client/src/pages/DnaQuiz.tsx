@@ -299,26 +299,6 @@ export default function DnaQuiz() {
   // ── Gender selection ────────────────────────────────────────────────────────
   if (phase === "gender") {
     const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
-    const TESTIMONIALS = [
-      {
-        text: "נרשמתי למאגר ותוך חודשיים קיבלתי התאמה מדויקת. אנחנו ביחד כבר חצי שנה.",
-        name: "רותם, 31",
-        avatar: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple1-dTY36Cjdzm8mF33xfMS9aM.webp",
-        gender: "female"
-      },
-      {
-        text: "עברתי תהליך ליווי שבו הבנתי מה באמת חשוב לי. הדברים קרו מהר.",
-        name: "יעל, 33",
-        avatar: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple2-newTkojCq886Az6dFS7mCS.webp",
-        gender: "female"
-      },
-      {
-        text: "אחרי שנים באפליקציות, המאגר של הילית חיבר אותי למישהו שבחיים לא הייתי פוגשת.",
-        name: "אורית, 36",
-        avatar: "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/couple3-hk4WGsw2RaLsvtzFcRTaeh.webp",
-        gender: "female"
-      },
-    ];
     return (
       <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">
         {/* Back to home bar */}
@@ -351,8 +331,8 @@ export default function DnaQuiz() {
             <p className="text-[#ffe27c] text-sm font-semibold mb-0.5">הילית כספי</p>
             <p className="text-white/60 text-xs mb-6">מאמנת זוגיות ושדכנית מקצועית</p>
             <h1 className="text-white font-black text-2xl md:text-3xl leading-tight mb-4 max-w-sm mx-auto">
-              3 דקות שיחסכו לך<br />
-              <span className="text-[#ffe27c]">שנים של דייטים עם האדם הלא נכון</span>
+              3 דקות כדי להתחיל להבין<br />
+              <span className="text-[#ffe27c]">איזה דפוס זוגי מוביל אותך</span>
             </h1>
             <p className="text-white/75 text-sm leading-relaxed max-w-xs mx-auto mb-7">
               פיתחתי שאלון המבוסס על מודלים מפסיכולוגיה זוגית. הוא חושף את ה-DNA הזוגי שלך ומסביר למה עד עכשיו זה לא עבד.
@@ -387,31 +367,29 @@ export default function DnaQuiz() {
           </motion.div>
         </div>
         <div className="px-5 py-8 max-w-md mx-auto">
-          <p className="text-center text-[#191265] font-bold text-xs mb-5 opacity-60 uppercase tracking-widest">מה אומרים אחרי השאלון</p>
+          <p className="text-center text-[#191265] font-bold text-xs mb-5 opacity-60 uppercase tracking-widest">מה מקבלים בסיום</p>
           <div className="flex flex-col gap-3">
-            {TESTIMONIALS.map((t, i) => (
+            {[
+              { icon: "🧬", title: "טיפוס DNA זוגי", text: "סיכום של נטיות ודפוסים מרכזיים שעולים מהתשובות." },
+              { icon: "🪞", title: "נקודות להתבוננות", text: "שאלות שיעזרו לבדוק איך הדפוס מתבטא בבחירות ובקשרים." },
+              { icon: "🧭", title: "כיוון להמשך", text: "אפשרות להמשיך למאגר, למדריך או לתהליך, לפי מה שמתאים לכם." },
+            ].map((item, i) => (
               <motion.div
-                key={`testimonial-${i}`}
+                key={item.title}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 + i * 0.1 }}
                 className="bg-white rounded-2xl p-4 shadow-sm flex items-start gap-3"
               >
-                <img
-                  src={t.avatar}
-                  alt={t.name}
-                  className="w-10 h-10 rounded-full object-cover object-[center_20%] flex-shrink-0 mt-0.5"
-                  style={{border: "2px solid #ffe27c"}}
-                  loading="lazy"
-                />
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#fff4bd] text-lg">{item.icon}</div>
                 <div>
-                  <p className="text-[#191265] text-sm leading-relaxed">"{t.text}"</p>
-                  <p className="text-[#727272] text-xs mt-1 font-semibold">{t.name}</p>
+                  <p className="font-black text-[#191265] text-sm">{item.title}</p>
+                  <p className="text-[#727272] text-xs mt-1 leading-5">{item.text}</p>
                 </div>
               </motion.div>
             ))}
           </div>
-          <p className="text-center text-[#727272] text-xs mt-6">ללא ספאם. התוצאה שלך נשארת אצלך.</p>
+          <p className="text-center text-[#727272] text-xs mt-6">ללא ספאם. התוצאה היא כלי להתבוננות ואינה אבחון מקצועי או הבטחה לזוגיות.</p>
         </div>
       </div>
     );

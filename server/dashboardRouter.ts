@@ -18,6 +18,7 @@ const PRODUCT_PRICES: Record<string, number> = {
   coaching: 2960,
   coaching_mas: 4200,
   bundle_tubav: 349,
+  bundle_new_year: 449,
 };
 
 /**
@@ -1055,6 +1056,7 @@ export const dashboardRouter = router({
         coaching: "תוכנית ליווי",
         coaching_mas: "תוכנית ליווי",
         bundle_tubav: "חבילת טו באב",
+        bundle_new_year: "חבילת שנה חדשה",
       };
 
       return (rows as any[]).map((r: any) => ({

@@ -153,9 +153,9 @@ export default function Speaking() {
           <h2 className="text-2xl font-black text-white mb-6">למה הילית?</h2>
           <div className="grid md:grid-cols-3 gap-6 mb-10">
             {[
-              { n: "500+", label: "נשים שליוותי" },
-              { n: "200K+", label: "האזנות לפודקאסט" },
-              { n: "5,000+", label: "רווקים במאגר" },
+              { n: "חי", label: "מפגש עם הקהל" },
+              { n: "מעשי", label: "כלים שאפשר לנסות" },
+              { n: "מותאם", label: "תוכן לפי האירוע" },
             ].map(item => (
               <div key={item.label} className="bg-white/10 rounded-2xl p-6">
                 <div className="text-3xl font-black text-[#ffe27c] mb-1">{item.n}</div>

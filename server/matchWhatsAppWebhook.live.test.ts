@@ -11,10 +11,10 @@ describe("match WhatsApp Make webhook secret", () => {
 
     const response = await fetch(url, {
       method: "OPTIONS",
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(20_000),
     });
 
     expect(response.status).toBeLessThan(500);
     expect(response.status).not.toBe(404);
-  }, 15_000);
+  }, 25_000);
 });

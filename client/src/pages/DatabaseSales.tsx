@@ -44,7 +44,7 @@ const STEPS = [
   { num: 1, title: "שאלון DNA זוגי", desc: "ממלאים שאלון מעמיק שחושף את הדפוסים הזוגיים האמיתיים שלך. לא מה שאתה/את חושבים שאתם רוצים. מה שבאמת מנבא הצלחה בזוגיות." },
   { num: 2, title: "פרופיל אישי", desc: "מוסיפים תמונה ומספר משפטים עליך. אני קוראת כל פרופיל לפני שהוא נכנס, ומאשרת אותו אישית." },
   { num: 3, title: "כניסה למאגר", desc: "תשלום חד-פעמי. אין דמי חבר חודשיים, אין הפתעות. משלמים פעם אחת ונכנסים." },
-  { num: 4, title: "האלגוריתם עובד", desc: "האלגוריתם סורק את כל המאגר ומחפש התאמות מעל 80% על בסיס כל הממדים. רק ההתאמות הגבוהות ביותר מגיעות אליי לבדיקה אישית." },
+  { num: 4, title: "המערכת בודקת", desc: "המערכת משווה בין פרופילים, העדפות ושאלונים. הציון הוא כלי עזר, וההתאמות האפשריות עוברות בדיקה אנושית לפני שליחה." },
   { num: 5, title: "אישור הדדי", desc: "שניכם מקבלים מייל ומחליטים בנפרד אם להתקדם לפגישה. רק אם שניכם אמרתם כן, הפרטים נחשפים. אם אחד מכם לא מעוניין, לא קורה כלום, וממשיכים הלאה עד שמגיעה ההתאמה הבאה." },
 ];
 
@@ -109,7 +109,7 @@ export default function DatabaseSales() {
               לא אפליקציה.<br />
             <span className="text-[#ffe27c]">משהו אחר לגמרי.</span>
             </h1>
-            <p className="text-[#ffe27c]/90 text-sm font-bold tracking-wide mb-3">המאגר החכם הגדול והמוביל בישראל • 5,000+ רווקים</p>
+            <p className="text-[#ffe27c]/90 text-sm font-bold tracking-wide mb-3">1,171 חברים פעילים ומשלמים במאגר • נכון ל־26.8.2026</p>
             <p className="text-white/75 text-lg leading-relaxed mb-8">
               בניתי שיטה שלוקחת את כל מה שטוב בכל אחד מהעולמות: גם המראה חשוב, גם הפרמטרים הבסיסיים, וגם הדפוסים הפנימיים שמנבאים אהבה שתחזיק לאורך שנים. לא בחרתי בין הגישות. שילבתי את כולן.
             </p>
@@ -131,8 +131,8 @@ export default function DatabaseSales() {
               <div className="absolute -inset-4 bg-gradient-to-br from-[#ffe27c]/30 to-[#1800ad]/30 rounded-3xl blur-2xl" />
               <img src={CASUAL_IMG} alt="הילית כספי" className="relative w-64 md:w-80 h-auto rounded-3xl object-cover shadow-2xl" />
               <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-[#191265] font-black text-2xl">5,000+</div>
-                <div className="text-[#727272] text-xs">רווקים במאגר</div>
+                <div className="text-[#191265] font-black text-2xl">98%</div>
+                <div className="text-[#727272] text-xs">קיבלו לפחות הצעה אחת</div>
               </div>
             </div>
           </motion.div>
@@ -188,10 +188,10 @@ export default function DatabaseSales() {
               ))}
             </div>
             <motion.div variants={fadeUp} className="mt-12 bg-[#ffe27c]/10 border border-[#ffe27c]/25 rounded-2xl p-8 text-center">
-              <div className="text-[#ffe27c] font-black text-5xl mb-2">80%</div>
-              <p className="text-white/80 text-lg font-semibold mb-2">סף המינימום להתאמה</p>
+              <div className="text-[#ffe27c] font-black text-5xl mb-2">2 שכבות</div>
+              <p className="text-white/80 text-lg font-semibold mb-2">חישוב התאמה ובדיקה אנושית</p>
               <p className="text-white/55 text-base max-w-xl mx-auto leading-relaxed">
-                להגיע ל-80% תאימות על פני כל הממדים זה קשה מאוד. כשהאלגוריתם מזהה התאמה כזו, זה כמו 100%. רק אז ההתאמה מגיעה אליי לבדיקה אישית, ורק ההתאמות שאני מאמינה בהן יוצאות הלאה.
+                הציון עוזר לזהות התאמות אפשריות, אבל אינו מבטיח קשר או תוצאה. לפני שליחה נבדקים תנאי הסף, הפרופילים וההתאמה הכוללת, ורק אז מתקבלת החלטה אם להציע אותה לשני הצדדים.
               </p>
             </motion.div>
           </div>
@@ -209,10 +209,10 @@ export default function DatabaseSales() {
             </motion.h2>
             <motion.div variants={fadeUp} className="space-y-5 text-[#444] text-lg leading-relaxed text-right">
               <p>
-                אחרי שהאלגוריתם מזהה התאמה מעל 80%, ההתאמה מגיעה אליי. אני לומדת את המאפיינים של כל אחד מהצדדים, קראתי את הפרופילים שלהם, ומפעילה את האינטואיציה שלי על מה שהמחשב לא יכול לראות.
+                אחרי שהמערכת מזהה התאמה אפשרית, היא מגיעה לבדיקה אנושית. אני בוחנת את המאפיינים של שני הצדדים, את הפרופילים ואת תנאי הסף שהגדירו.
               </p>
               <p>
-                כשהאלגוריתם מנבא 80% תאימות, זה כבר ציון גבוה מאוד. אבל יש דברים שרק עין אנושית רואה. <span className="font-bold text-[#191265]">השילוב הזה בין מדע לשיקול דעת הוא מה שמבדיל בין matchmaking אמיתי לכל שאר הדרכים להכיר.</span>
+                הציון אינו תחליף לשיקול דעת. יש דברים שרק עין אנושית רואה. <span className="font-bold text-[#191265]">השילוב בין נתונים לבדיקה אנושית נועד לשמור על רלוונטיות בלי להבטיח התאמה או תדירות קבועה.</span>
               </p>
               <p>
                 ורק אחרי שאני אישרתי, שניכם מקבלים מייל. כל אחד מחליט בנפרד אם להתקדם לפגישה. רק אם שניכם אמרתם כן, הפרטים נחשפים. אם אחד מכם לא מעוניין, לא קורה כלום, וממשיכים הלאה עד שמגיעה ההתאמה הבאה.

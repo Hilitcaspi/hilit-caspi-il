@@ -10,7 +10,7 @@ import { getDb } from "./db";
 import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
-import { matchBoostRouter } from "./matchBoostRouter";
+import { matchBoostRouter, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
 import { operationsRouter } from "./operationsRouter";
 import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
 import type { ScoreBreakdown as FullScoreBreakdown } from "./compatibility";
@@ -3888,6 +3888,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName },
         });
 
+        await syncBoostRequestAfterMatchDecision(db, { matchId: input.matchId, decision: "approved" });
+
         return { success: true, sentTo: [singleA.email, singleB.email] };
       }),
 
@@ -4202,7 +4204,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        await db.update(matches).set({ status: "rejected", updatedAt: Date.now() }).where(eq(matches.id, input.matchId));
+        const now = Date.now();
+        await db.update(matches).set({ status: "rejected", updatedAt: now }).where(eq(matches.id, input.matchId));
+        await syncBoostRequestAfterMatchDecision(db, { matchId: input.matchId, decision: "rejected", now });
         return { success: true };
       }),
 
@@ -6799,7 +6803,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
   payment: router({
     createProcess: publicProcedure
       .input(z.object({
-        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "plus"]),
+        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "bundle_new_year", "plus"]),
         fullName: z.string().min(2),
         email: z.string().email(),
         phone: z.string().optional(),
@@ -6810,6 +6814,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         utmMedium: z.string().max(100).optional(),
         utmCampaign: z.string().max(200).optional(),
         utmContent: z.string().max(200).optional(),
+        utmTerm: z.string().max(200).optional(),
+        metaCampaignId: z.string().max(100).optional(),
+        metaAdSetId: z.string().max(100).optional(),
+        metaAdId: z.string().max(100).optional(),
         // GA4 client_id from browser _ga cookie — enables DebugView and accurate user stitching
         ga4ClientId: z.string().max(100).optional(),
         // GA4 session_id from _ga_ZH1CYQCTMN cookie — required for campaign_details UTM attribution
@@ -6909,7 +6917,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
 
         // Save/update UTM + ga4ClientId + ga4SessionId in crm_leads so the webhook can use them later
-        if (db && (input.utmSource || input.utmMedium || input.utmCampaign || input.ga4ClientId || input.ga4SessionId)) {
+        if (db && (input.utmSource || input.utmMedium || input.utmCampaign || input.metaCampaignId || input.metaAdId || input.ga4ClientId || input.ga4SessionId)) {
           try {
             const { crmLeads: crmLeadsTable } = await import("../drizzle/schema");
             // Upsert: update existing lead or insert new one
@@ -6923,6 +6931,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
                   utmMedium: input.utmMedium || existing.utmMedium,
                   utmCampaign: input.utmCampaign || existing.utmCampaign,
                   utmContent: input.utmContent || existing.utmContent,
+                  utmTerm: input.utmTerm || existing.utmTerm,
+                  metaCampaignId: input.metaCampaignId || existing.metaCampaignId,
+                  metaAdSetId: input.metaAdSetId || existing.metaAdSetId,
+                  metaAdId: input.metaAdId || existing.metaAdId,
                   // Always overwrite ga4ClientId and ga4SessionId with the freshest browser values
                   ...(input.ga4ClientId ? { ga4ClientId: input.ga4ClientId } : {}),
                   ...(input.ga4SessionId ? { ga4SessionId: input.ga4SessionId } : {}),
@@ -6931,10 +6943,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
                 .where(eq(crmLeadsTable.email, input.email));
             } else {
               // Map product to valid crm product enum (session not in crm enum, use null)
-              const crmProduct = (["database", "guide", "course", "coaching", "coaching_mas"] as const)
-                .includes(input.product as any)
-                ? (input.product as "database" | "guide" | "course" | "coaching" | "coaching_mas")
-                : undefined;
+              const crmProduct = input.product === "bundle_new_year"
+                ? "database"
+                : (["database", "guide", "course", "coaching", "coaching_mas"] as const)
+                    .includes(input.product as any)
+                  ? (input.product as "database" | "guide" | "course" | "coaching" | "coaching_mas")
+                  : undefined;
               await db.insert(crmLeadsTable).values({
                 name: input.fullName,
                 email: input.email,
@@ -6946,7 +6960,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
                 utmMedium: input.utmMedium,
                 utmCampaign: input.utmCampaign,
                 utmContent: input.utmContent,
+                utmTerm: input.utmTerm,
+                metaCampaignId: input.metaCampaignId,
+                metaAdSetId: input.metaAdSetId,
+                metaAdId: input.metaAdId,
                 ga4ClientId: input.ga4ClientId,
+                ga4SessionId: input.ga4SessionId,
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
               });

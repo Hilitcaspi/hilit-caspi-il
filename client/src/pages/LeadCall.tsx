@@ -14,12 +14,6 @@ import { gaGenerateLead } from "@/lib/ga";
 const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
 const HERO_IMG    = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-hero_30e4b53c.png";
 
-const SOCIAL_PROOF = [
-  { name: "מיכל, 34", text: "אחרי שנתיים של דייטים שלא הובילו לשום מקום, 4 חודשים אחרי השיחה עם הילית אני בזוגיות." },
-  { name: "שירה, 38", text: "הילית ראתה בדיוק מה עצר אותי. שיחה אחת שינתה את הכיוון לחלוטין." },
-  { name: "נועה, 31", text: "חשבתי שאני יודעת מה אני מחפשת. הילית עזרה לי להבין מה אני באמת צריכה." },
-];
-
 export default function LeadCall() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -124,15 +118,15 @@ export default function LeadCall() {
             <p className="text-white/75 text-lg leading-relaxed mb-8">
               השאירי פרטים ואחזור אלייך תוך 24 שעות לתיאום פגישת היכרות אישית.
               <br />
-              <span className="text-white font-semibold">60 דקות שישנו לך את הכיוון.</span>
+              <span className="text-white font-semibold">60 דקות למיפוי המצב והצעד הבא.</span>
             </p>
 
             {/* Trust signals */}
             <div className="flex gap-6 flex-wrap">
               {[
-                { n: "500+", label: "נשים שליוויתי" },
-                { n: "200K+", label: "האזנות לפודקאסט" },
                 { n: "60 דק'", label: "פגישה אישית" },
+                { n: "1:1", label: "שיחה מותאמת" },
+                { n: "3", label: "שלבי מיפוי" },
               ].map(({ n, label }) => (
                 <div key={label} className="text-center">
                   <div className="text-2xl font-black text-[#ffe27c]">{n}</div>
@@ -261,7 +255,7 @@ export default function LeadCall() {
               <span className="text-xl font-bold text-[#727272]">Relationship Expert &amp; Matchmaker</span>
             </h2>
             <p className="text-[#444] text-lg leading-relaxed mb-5">
-              עבדתי עם מאות נשים שהגיעו אלי אחרי שנים של דייטים מתסכלים, תחושה שמשהו לא עובד, ולא הצלחה למצוא את מה שהן מחפשות.
+              אני פוגשת נשים שמבקשות להבין למה אותם דפוסים חוזרים, מה נכון להן עכשיו, ואיך להפסיק לפעול מתוך בלבול או לחץ.
             </p>
             <p className="text-[#444] text-lg leading-relaxed">
               בשיחה שלנו נדבר על מה שבאמת קורה, ונבין יחד מה הצעד הנכון עבורך.
@@ -276,7 +270,7 @@ export default function LeadCall() {
           <h2 className="text-3xl font-black text-white mb-3">
             מה קורה בשיחה?
           </h2>
-          <p className="text-white/60 mb-12 text-lg">60 דקות שמשנות כיוון</p>
+          <p className="text-white/60 mb-12 text-lg">60 דקות למיפוי, הבנה וצעד מעשי</p>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
@@ -306,20 +300,26 @@ export default function LeadCall() {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ── */}
+      {/* ── MEETING OUTPUT ── */}
       <section className="bg-[#f0eadc] py-16 px-6">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-3xl font-black text-[#191265] text-center mb-12">
-            מה אומרות נשים שדיברו איתי
+            עם מה יוצאים מהפגישה
           </h2>
           <div className="grid md:grid-cols-3 gap-6">
-            {SOCIAL_PROOF.map(({ name, text }) => (
-              <div key={name} className="bg-white rounded-2xl p-6 shadow-md text-right">
-                <p className="text-[#444] leading-relaxed mb-4 text-base italic">"{text}"</p>
-                <p className="text-[#191265] font-bold text-sm">{name}</p>
+            {[
+              { icon: "🧭", title: "תמונת מצב", text: "הבנה מסודרת של מה קורה היום ומה כבר ניסית." },
+              { icon: "🔍", title: "דפוס מרכזי", text: "זיהוי של נושא אחד שכדאי לבדוק לעומק במקום לנסות לשנות הכל בבת אחת." },
+              { icon: "➡️", title: "צעד הבא", text: "המלצה מעשית שמתאימה למצב שלך, גם אם ההמלצה אינה להמשיך לתהליך." },
+            ].map(({ icon, title, text }) => (
+              <div key={title} className="bg-white rounded-2xl p-6 shadow-md text-right">
+                <div className="text-3xl">{icon}</div>
+                <h3 className="mt-4 font-black text-[#191265]">{title}</h3>
+                <p className="mt-2 text-sm leading-7 text-[#444]">{text}</p>
               </div>
             ))}
           </div>
+          <p className="mt-8 text-center text-xs leading-6 text-[#727272]">הפגישה אינה מבטיחה זוגיות או תוצאה בזמן קבוע. מטרתה לייצר בהירות והמלצה מקצועית להמשך.</p>
         </div>
       </section>
 
