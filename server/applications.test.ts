@@ -85,6 +85,17 @@ describe("applications router", () => {
     expect(createSingleOfWeekApplication).not.toHaveBeenCalledWith(expect.objectContaining({ photoBase64: expect.anything() }));
   });
 
+  it("accepts an Instagram username with a leading at-sign and stores its normalized value", async () => {
+    await appRouter.createCaller(createContext()).applications.submit({ ...validSubmission, instagramUsername: "@test_account" });
+
+    expect(createSingleOfWeekApplication).toHaveBeenCalledWith(expect.objectContaining({ instagramUsername: "test_account" }));
+  });
+
+  it("rejects a self-description shorter than ten characters before storage", async () => {
+    await expect(appRouter.createCaller(createContext()).applications.submit({ ...validSubmission, selfDescription: "קצר" })).rejects.toMatchObject<Partial<TRPCError>>({ code: "BAD_REQUEST" });
+    expect(storagePut).not.toHaveBeenCalled();
+  });
+
   it("rejects an image with an invalid file signature before storage", async () => {
     const caller = appRouter.createCaller(createContext());
     const invalidFile = Buffer.from("this is not an image file").toString("base64");

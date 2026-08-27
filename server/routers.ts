@@ -26,7 +26,11 @@ const submissionInput = z.object({
   desiredPartner: z.string().trim().min(10, "כתבו מה חשוב לכם בקשר").max(800),
   relationshipStatus: z.enum(["single", "divorced", "widowed", "separated", "other"]),
   hasChildren: z.boolean(),
-  instagramUsername: z.string().trim().regex(/^[A-Za-z0-9._]{1,30}$/, "שם המשתמש באינסטגרם אינו תקין"),
+  instagramUsername: z
+    .string()
+    .trim()
+    .transform(value => value.replace(/^@+/, ""))
+    .pipe(z.string().regex(/^[A-Za-z0-9._]{1,30}$/, "שם המשתמש באינסטגרם אינו תקין")),
   photoBase64: z.string().min(32).max(5_600_000),
   photoFilename: z.string().trim().min(1).max(255),
   photoMimeType: z.enum(allowedImageMimes),
@@ -90,7 +94,7 @@ export const appRouter = router({
           desiredPartner: input.desiredPartner,
           relationshipStatus: input.relationshipStatus,
           hasChildren: input.hasChildren,
-          instagramUsername: input.instagramUsername.replace(/^@/, ""),
+          instagramUsername: input.instagramUsername,
           photoKey: photo.key,
           photoUrl: photo.url,
           photoFilename: input.photoFilename,

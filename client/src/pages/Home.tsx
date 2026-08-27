@@ -20,6 +20,8 @@ type FormValues = {
   publicationConsent: boolean;
 };
 
+type FieldErrors = Partial<Pick<FormValues, "selfDescription" | "instagramUsername">>;
+
 const initialForm: FormValues = {
   fullName: "",
   age: "",
@@ -57,6 +59,7 @@ export default function Home() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitted, setSubmitted] = useState(false);
   const submitApplication = trpc.applications.submit.useMutation({
     onSuccess: () => setSubmitted(true),
@@ -65,6 +68,9 @@ export default function Home() {
 
   const setText = (field: keyof FormValues, value: string | boolean) => {
     setForm(current => ({ ...current, [field]: value }) as FormValues);
+    if (field === "selfDescription" || field === "instagramUsername") {
+      setFieldErrors(current => ({ ...current, [field]: undefined }));
+    }
   };
 
   const choosePhoto = (file: File | undefined) => {
@@ -85,6 +91,18 @@ export default function Home() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError("");
+    const normalizedInstagramUsername = form.instagramUsername.trim().replace(/^@+/, "");
+    const nextErrors: FieldErrors = {};
+    if (form.selfDescription.trim().length < 10) {
+      nextErrors.selfDescription = "כתבו לפחות 10 תווים בכמה מילים על עצמכם.";
+    }
+    if (!/^[A-Za-z0-9._]{1,30}$/.test(normalizedInstagramUsername)) {
+      nextErrors.instagramUsername = "אפשר לכתוב שם משתמש באנגלית, מספרים, נקודה או קו תחתון בלבד.";
+    }
+    if (Object.keys(nextErrors).length) {
+      setFieldErrors(nextErrors);
+      return;
+    }
     if (!photo) {
       setFormError("נא לצרף תמונת פנים לפני השליחה.");
       return;
@@ -96,7 +114,7 @@ export default function Home() {
         ...form,
         age: Number(form.age),
         hasChildren: form.hasChildren === "yes",
-        instagramUsername: form.instagramUsername.replace(/^@/, ""),
+        instagramUsername: normalizedInstagramUsername,
         photoBase64,
         photoFilename: photo.name,
         photoMimeType: photo.type as "image/jpeg" | "image/png" | "image/webp",
@@ -180,7 +198,7 @@ export default function Home() {
               <label><span className="field-label">טלפון <span className="text-[#a55e6f]">*</span></span><input className="field-control" required type="tel" dir="ltr" autoComplete="tel" value={form.phone} onChange={e => setText("phone", e.target.value)} placeholder="050-0000000" /></label>
               <label><span className="field-label">סטטוס זוגי <span className="text-[#a55e6f]">*</span></span><select className="field-control" value={form.relationshipStatus} onChange={e => setText("relationshipStatus", e.target.value)}>{relationshipStatuses.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
               <label><span className="field-label">האם יש ילדים? <span className="text-[#a55e6f]">*</span></span><select className="field-control" value={form.hasChildren} onChange={e => setText("hasChildren", e.target.value)}><option value="no">לא</option><option value="yes">כן</option></select></label>
-              <label className="md:col-span-2"><span className="field-label">כמה מילים עליי <span className="text-[#a55e6f]">*</span></span><textarea className="field-control min-h-32 resize-y" required maxLength={800} value={form.selfDescription} onChange={e => setText("selfDescription", e.target.value)} placeholder="מה חשוב שנדע עליך? מה מעורר בך סקרנות, שמחה או תשוקה?" /></label>
+              <label className="md:col-span-2"><span className="field-label">כמה מילים עליי <span className="text-[#a55e6f]">*</span></span><textarea className="field-control min-h-32 resize-y" required maxLength={800} aria-invalid={Boolean(fieldErrors.selfDescription)} aria-describedby={fieldErrors.selfDescription ? "self-description-error" : undefined} value={form.selfDescription} onChange={e => setText("selfDescription", e.target.value)} placeholder="מה חשוב שנדע עליך? מה מעורר בך סקרנות, שמחה או תשוקה?" />{fieldErrors.selfDescription && <p id="self-description-error" className="mt-2 text-sm font-semibold text-[#a23d50]">{fieldErrors.selfDescription}</p>}</label>
               <label className="md:col-span-2"><span className="field-label">מי מתאים לי להכיר? <span className="text-[#a55e6f]">*</span></span><textarea className="field-control min-h-32 resize-y" required maxLength={800} value={form.desiredPartner} onChange={e => setText("desiredPartner", e.target.value)} placeholder="ספר/י בקצרה מה חשוב לך בקשר ובאדם שמולך." /></label>
             </div>
 
@@ -198,7 +216,7 @@ export default function Home() {
                 <div className="flex flex-col justify-center rounded-2xl bg-[#f7f0ec] p-5">
                   <div className="flex items-center gap-2 text-[#914e60]"><Instagram className="h-5 w-5" /><span className="font-bold">החשבון שלך באינסטגרם</span></div>
                   <p className="mt-2 text-sm leading-6 text-[#76635e]">לפני שמגישים, חשוב לעקוב אחרי <a href={instagramUrl} target="_blank" rel="noreferrer" className="font-bold text-[#914e60] underline decoration-[#c9909c] underline-offset-4">@hilitcaspi_relationship</a>.</p>
-                  <label className="mt-5"><span className="field-label">שם משתמש לצורך תיוג <span className="text-[#a55e6f]">*</span></span><div className="relative"><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-bold text-[#a06b77]">@</span><input className="field-control pr-8" required dir="ltr" value={form.instagramUsername} onChange={e => setText("instagramUsername", e.target.value.replace(/^@/, ""))} placeholder="your_username" /></div></label>
+                  <label className="mt-5"><span className="field-label">שם משתמש לצורך תיוג <span className="text-[#a55e6f]">*</span></span><div className="relative"><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-bold text-[#a06b77]">@</span><input className="field-control pr-8" required dir="ltr" aria-invalid={Boolean(fieldErrors.instagramUsername)} aria-describedby={fieldErrors.instagramUsername ? "instagram-error" : undefined} value={form.instagramUsername} onChange={e => setText("instagramUsername", e.target.value)} placeholder="your_username" /></div>{fieldErrors.instagramUsername && <p id="instagram-error" className="mt-2 text-sm font-semibold text-[#a23d50]">{fieldErrors.instagramUsername}</p>}</label>
                 </div>
               </div>
             </div>
