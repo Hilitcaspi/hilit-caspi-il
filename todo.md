@@ -14,7 +14,7 @@
 - [x] Add a dedicated owner-only export data procedure that omits private image storage paths.
 - [x] Extend automated tests to cover submission throttling and owner-only export data privacy.
 - [x] Verify the public form in desktop and mobile screenshots, verify the unauthenticated admin access gate, and confirm tests and a production build succeed.
-- [ ] Review the populated owner-only page after the site owner signs in through the preview.
+- [x] Review the owner-only page after the site owner signs in through the preview, including the protected empty state and export controls.
 - [x] Save a final project checkpoint and synchronize the completed code with the designated GitHub repository.
 - [x] Accept an Instagram username with or without a leading `@` and normalize it before validation.
 - [x] Surface form validation feedback beside the relevant inputs before a submission is sent.
