@@ -1,6 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import {
+  InsertSingleOfWeekApplication,
+  InsertUser,
+  SingleOfWeekReviewStatus,
+  singleOfWeekApplications,
+  users,
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +95,46 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function createSingleOfWeekApplication(application: InsertSingleOfWeekApplication) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  const result = await db.insert(singleOfWeekApplications).values(application);
+  return Number(result[0].insertId);
+}
+
+export async function listSingleOfWeekApplications() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  return db
+    .select()
+    .from(singleOfWeekApplications)
+    .orderBy(desc(singleOfWeekApplications.submittedAt));
+}
+
+export async function hasRecentSingleOfWeekApplication(phone: string, since: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  const result = await db
+    .select({ id: singleOfWeekApplications.id })
+    .from(singleOfWeekApplications)
+    .where(and(eq(singleOfWeekApplications.phone, phone), gt(singleOfWeekApplications.submittedAt, since)))
+    .limit(1);
+
+  return result.length > 0;
+}
+
+export async function updateSingleOfWeekReviewStatus(
+  id: number,
+  reviewStatus: SingleOfWeekReviewStatus,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  await db
+    .update(singleOfWeekApplications)
+    .set({ reviewStatus, reviewedAt: new Date() })
+    .where(eq(singleOfWeekApplications.id, id));
+}

@@ -1,0 +1,18 @@
+# Project TODO
+
+- [x] Add a `single_of_week_applications` data model that records profile details, consent timestamps, review status, and secure photo storage references without storing image bytes in the database.
+- [x] Apply a database migration for the applications table and implement private server-side query helpers.
+- [x] Implement a public submission procedure with Hebrew validation, mandatory consent enforcement, and rate-safe error handling.
+- [x] Implement secure server-side photo upload to S3 and persist only its storage key, URL, filename, and MIME type with the application.
+- [x] Build a polished, mobile-first Hebrew RTL application form with the required personal, relationship, Instagram, photo, and consent fields.
+- [x] Add a direct external link to the Instagram account @hilitcaspi_relationship and a mandatory follow-confirmation checkbox.
+- [x] Include clear consent language limiting use of submitted details, photo, and Instagram tag to the “Single of the Week” feature only.
+- [x] Create an authenticated owner-only review page showing applications and protected photo access.
+- [x] Add an owner-only export of the reviewed submissions list as CSV.
+- [x] Add input validation and authorization tests for submissions, owner-only access, and export.
+- [x] Add server-side throttling for repeat submissions from the same phone number, with a clear Hebrew error message.
+- [x] Add a dedicated owner-only export data procedure that omits private image storage paths.
+- [x] Extend automated tests to cover submission throttling and owner-only export data privacy.
+- [x] Verify the public form in desktop and mobile screenshots, verify the unauthenticated admin access gate, and confirm tests and a production build succeed.
+- [ ] Review the populated owner-only page after the site owner signs in through the preview.
+- [ ] Save a final project checkpoint and synchronize the completed code with the designated GitHub repository.

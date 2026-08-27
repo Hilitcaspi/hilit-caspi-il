@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -25,4 +25,32 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+export const singleOfWeekApplications = mysqlTable("single_of_week_applications", {
+  id: int("id").autoincrement().primaryKey(),
+  fullName: varchar("fullName", { length: 120 }).notNull(),
+  age: int("age").notNull(),
+  city: varchar("city", { length: 120 }).notNull(),
+  phone: varchar("phone", { length: 32 }).notNull(),
+  selfDescription: text("selfDescription").notNull(),
+  desiredPartner: text("desiredPartner").notNull(),
+  relationshipStatus: mysqlEnum("relationshipStatus", ["single", "divorced", "widowed", "separated", "other"]).notNull(),
+  hasChildren: boolean("hasChildren").notNull(),
+  instagramUsername: varchar("instagramUsername", { length: 30 }).notNull(),
+  photoKey: varchar("photoKey", { length: 512 }).notNull(),
+  photoUrl: varchar("photoUrl", { length: 1024 }).notNull(),
+  photoFilename: varchar("photoFilename", { length: 255 }).notNull(),
+  photoMimeType: varchar("photoMimeType", { length: 32 }).notNull(),
+  photoSizeBytes: int("photoSizeBytes").notNull(),
+  databaseMembershipConsent: boolean("databaseMembershipConsent").notNull(),
+  instagramFollowConsent: boolean("instagramFollowConsent").notNull(),
+  publicationConsent: boolean("publicationConsent").notNull(),
+  consentedAt: timestamp("consentedAt").defaultNow().notNull(),
+  reviewStatus: mysqlEnum("reviewStatus", ["new", "reviewing", "approved", "rejected"]).default("new").notNull(),
+  reviewedAt: timestamp("reviewedAt"),
+  submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SingleOfWeekApplication = typeof singleOfWeekApplications.$inferSelect;
+export type InsertSingleOfWeekApplication = typeof singleOfWeekApplications.$inferInsert;
+export type SingleOfWeekReviewStatus = "new" | "reviewing" | "approved" | "rejected";
