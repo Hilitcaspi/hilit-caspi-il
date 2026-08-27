@@ -276,7 +276,7 @@ export default function LiveEvent() {
                 {
                   icon: "💎",
                   title: "המאגר הייחודי שבניתי",
-                  text: "5,000 רווקים איכותיים. היי-טקיסטים, רופאות, לוחמים, אנשי עסקים. אספר איך הוא עובד, מה הופך אותו לשונה מכל דבר אחר, ואיך נכנסים.",
+                  text: "מאגר של רווקים ורווקות שמחפשים קשר רציני, עם שאלוני עומק ובדיקת התאמה. אספר איך הוא עובד, מה הופך אותו לשונה מכל דבר אחר, ואיך נכנסים.",
                 },
                 {
                   icon: "💛",
@@ -408,19 +408,6 @@ export default function LiveEvent() {
                   <p>מאמנת זוגיות, משדכת ומייסדת מאגר רווקים פעיל המבוסס על שאלוני עומק ובדיקת פרופילים.</p>
                   <p>פיתחתי תהליך שמשלב נתוני התאמה, DNA זוגי, שאלון מדעי ובדיקה אנושית לפני כל הצעה.</p>
                   <p className="text-white font-semibold">המטרה היא להרחיב הזדמנויות להיכרות תוך שמירה על פרטיות והסכמה הדדית.</p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 mb-8">
-                  {[
-                    { n: "1,171", label: "חברים פעילים" },
-                    { n: "98%", label: "קיבלו הצעה" },
-                    { n: "96%", label: "שאלון מדעי" },
-                  ].map(({ n, label }) => (
-                    <div key={label} className="text-center">
-                      <div className="text-2xl font-black text-[#ffe27c]">{n}</div>
-                      <div className="text-white/50 text-xs mt-1">{label}</div>
-                    </div>
-                  ))}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">

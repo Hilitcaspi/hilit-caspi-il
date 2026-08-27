@@ -5327,49 +5327,6 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         return { notes: row?.adminNotes || "" };
       }),
     // ── Dashboard: comprehensive matchmaking analytics ──────────────────────
-    getPublicTrustStats: publicProcedure.query(async () => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const activeSingles = await db.select({
-        id: singles.id,
-        firstName: singles.firstName,
-        lastName: singles.lastName,
-        email: singles.email,
-        phone: singles.phone,
-        gender: singles.gender,
-        age: singles.age,
-        city: singles.city,
-        height: singles.height,
-        occupation: singles.occupation,
-        religiosity: singles.religiosity,
-        about: singles.about,
-        partnerDescription: singles.partnerDescription,
-        photoUrl: singles.photoUrl,
-        dnaType: singles.dnaType,
-        questionnaireCompletedAt: singles.questionnaireCompletedAt,
-        createdAt: singles.createdAt,
-        isActive: singles.isActive,
-        isPaid: singles.isPaid,
-        isSeed: singles.isSeed,
-        subscriptionRenewsAt: singles.subscriptionRenewsAt,
-      }).from(singles).where(and(
-        eq(singles.isActive, true),
-        eq(singles.isPaid, true),
-        eq(singles.isSeed, false),
-      ));
-
-      const metrics = calculateMatchmakingMetrics(activeSingles as any, [], { now: Date.now() });
-      return {
-        femaleRate: metrics.balance.femaleRate,
-        maleRate: metrics.balance.maleRate,
-        profileCompletenessRate: metrics.quality.completeRate,
-        scientificRate: metrics.quality.scientificRate,
-        photoRate: metrics.quality.photoRate,
-        updatedAt: metrics.meta.calculatedAt,
-      };
-    }),
-
     getDashboardData: teamProcedure
       .input(z.object({ from: z.number().optional(), to: z.number().optional() }))
       .query(async ({ ctx, input }) => {

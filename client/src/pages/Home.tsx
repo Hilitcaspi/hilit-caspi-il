@@ -60,25 +60,6 @@ function AnimatedSection({ children, className = "" }: { children: React.ReactNo
   );
 }
 
-// ─── Counter animation ────────────────────────────────────────────────────────
-function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true });
-  useEffect(() => {
-    if (!inView) return;
-    let start = 0;
-    const step = Math.ceil(target / 60);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= target) { setCount(target); clearInterval(timer); }
-      else setCount(start);
-    }, 25);
-    return () => clearInterval(timer);
-  }, [inView, target]);
-  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
-}
-
 // ─── Lead form ────────────────────────────────────────────────────────────────
 // CDN URLs for guides
 const FREE_GUIDE_PDF_RAW = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit_guide_v3_13e3caa9.pdf";
@@ -357,21 +338,6 @@ export default function Home() {
               </a>
             </div>
 
-            {/* Social proof strip */}
-            <div className="flex gap-4 mt-10 pt-8 border-t border-white/10 flex-wrap">
-              {[
-                { n: 1171, s: "", label: "חברים פעילים במאגר" },
-                { n: 98, s: "%", label: "קיבלו לפחות הצעה אחת" },
-                { n: 96, s: "%", label: "השלימו שאלון מדעי" },
-              ].map(({ n, s, label }) => (
-                <div key={label} className="text-center flex-1 min-w-[80px]">
-                  <div className="text-2xl md:text-3xl font-black text-[#ffe27c]">
-                    <CountUp target={n} suffix={s} />
-                  </div>
-                  <div className="text-white/60 text-xs mt-1">{label}</div>
-                </div>
-              ))}
-            </div>
           </motion.div>
 
           {/* Image side */}
@@ -383,9 +349,9 @@ export default function Home() {
               {/* Floating badge */}
               <motion.div animate={{ y: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
                 className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-2xl">📊</div>
-                <div className="text-[#191265] font-black text-sm">נתוני מאגר</div>
-                <div className="text-[#727272] text-xs">שקופים ומתוארכים</div>
+                <div className="text-2xl">🧬</div>
+                <div className="text-[#191265] font-black text-sm">התאמה מקצועית</div>
+                <div className="text-[#727272] text-xs">מדע, עומק ובדיקה אנושית</div>
               </motion.div>
             </div>
           </motion.div>
@@ -779,36 +745,6 @@ export default function Home() {
             </motion.div>
           </AnimatedSection>
         </div>
-      </section>
-
-      {/* ── VERIFIED MATCHMAKING DATA ── */}
-      <section className="bg-[#191265] py-20 px-6">
-        <AnimatedSection>
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-14">
-              <motion.p variants={fadeUp} className="text-[#ffe27c] font-semibold text-sm uppercase tracking-widest mb-4">נתוני המאגר בפועל</motion.p>
-              <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-white leading-tight">
-                שקיפות במקום הבטחות.<br />
-                <span className="text-[#ffe27c]">הצעות נשלחות רק אחרי בדיקה.</span>
-              </motion.h2>
-              <motion.p variants={fadeUp} className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-white/60">הנתונים חושבו ממערכת המאגר נכון ל־26.8.2026. הם מתארים פעילות מצטברת ואינם מבטיחים התאמה, זוגיות או תוצאה בזמן קבוע.</motion.p>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-4">
-              {[
-                { value: "1,171", label: "חברים פעילים ומשלמים" },
-                { value: "98%", label: "קיבלו לפחות הצעה אחת" },
-                { value: "75%", label: "הצעה בתוך 30 יום בקבוצת המדידה" },
-                { value: "96%", label: "השלימו שאלון מדעי" },
-              ].map((item) => (
-                <motion.div key={item.label} variants={fadeUp} className="rounded-2xl border border-white/15 bg-white/8 p-6 text-center shadow-xl">
-                  <div className="text-3xl font-black text-[#ffe27c]">{item.value}</div>
-                  <p className="mt-2 text-xs leading-5 text-white/65">{item.label}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </AnimatedSection>
       </section>
 
       {/* ── LEAD MAGNET ── */}

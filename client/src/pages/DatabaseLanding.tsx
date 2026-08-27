@@ -82,7 +82,7 @@ export default function DatabaseLanding() {
           <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.9 }} className="text-right order-2 md:order-1">
             <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
               className="inline-flex items-center gap-2 bg-[#ffe27c]/15 border border-[#ffe27c]/30 text-[#ffe27c] text-sm font-semibold px-4 py-2 rounded-full mb-6">
-              ✦ 1,171 חברים פעילים ומשלמים · נכון ל־26.8.2026
+              ✦ מאגר שידוכים דיסקרטי ומקצועי
             </motion.div>
 
             <h1 className="text-4xl md:text-5xl lg:text-[3.4rem] font-black text-white leading-[1.15] mb-5">
@@ -132,8 +132,8 @@ export default function DatabaseLanding() {
               {/* Floating badge */}
               <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
                 className="absolute -bottom-5 -right-5 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-[#191265] font-black text-lg">98%</div>
-                <div className="text-[#727272] text-xs">קיבלו לפחות הצעה אחת</div>
+                <div className="text-[#191265] font-black text-lg">DNA זוגי</div>
+                <div className="text-[#727272] text-xs">להיכרות עמוקה יותר</div>
               </motion.div>
             </div>
           </motion.div>
@@ -210,39 +210,7 @@ export default function DatabaseLanding() {
               <p className="text-[#444] leading-relaxed mb-6">
                 בניתי שיטה שמשלבת שאלוני עומק, DNA זוגי, בדיקת פרופילים ותהליך הסכמה הדדי. המטרה היא לא לייצר עוד גלילה, אלא לבדוק התאמות אפשריות ולשלוח אותן רק אחרי בחינה מקצועית.
               </p>
-              <div className="flex gap-6 flex-wrap">
-                {[["1,171", "חברים פעילים"], ["98%", "קיבלו הצעה"], ["96%", "שאלון מדעי"]].map(([n, l]) => (
-                  <div key={l} className="text-center">
-                    <div className="text-2xl font-black text-[#191265]">{n}</div>
-                    <div className="text-[#727272] text-xs">{l}</div>
-                  </div>
-                ))}
-              </div>
             </motion.div>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* ── VERIFIED DATA ─────────────────────────────────────────────────── */}
-      <section className="bg-white py-16 px-6">
-        <Reveal>
-          <div className="max-w-4xl mx-auto">
-            <motion.p variants={fadeUp} className="text-center text-[#1800ad] font-bold text-sm uppercase tracking-widest mb-3">נתוני המאגר</motion.p>
-            <motion.h2 variants={fadeUp} className="text-center text-3xl font-black text-[#191265] mb-4">שקיפות במקום הבטחות</motion.h2>
-            <motion.p variants={fadeUp} className="mx-auto mb-10 max-w-2xl text-center text-sm leading-7 text-[#727272]">הנתונים הבאים חושבו ממערכת המאגר נכון ל־26.8.2026. הם מתארים את פעילות המאגר ואינם מבטיחים תוצאה אישית או זמן קבוע.</motion.p>
-            <div className="grid gap-6 md:grid-cols-4">
-              {[
-                { value: "1,171", label: "חברים פעילים ומשלמים" },
-                { value: "98%", label: "קיבלו לפחות הצעה אחת" },
-                { value: "75%", label: "הצעה בתוך 30 יום בקבוצת המדידה" },
-                { value: "96%", label: "השלימו שאלון מדעי" },
-              ].map(item => (
-                <motion.div key={item.label} variants={fadeUp} className="rounded-2xl bg-[#f9f6f0] p-6 text-center">
-                  <div className="text-3xl font-black text-[#191265]">{item.value}</div>
-                  <p className="mt-2 text-xs leading-5 text-[#727272]">{item.label}</p>
-                </motion.div>
-              ))}
-            </div>
           </div>
         </Reveal>
       </section>

@@ -76,7 +76,7 @@ const products = [
     number: "01",
     title: "מאגר הרווקים",
     promise: "לפתוח יותר דלתות",
-    description: "קהילה של אלפי רווקים ורווקות, פרופיל אישי, שאלון DNA זוגי, שאלון מדעי, חישוב התאמה ובדיקה אנושית של שני הצדדים.",
+    description: "קהילה לרווקים ולרווקות שמחפשים קשר רציני, פרופיל אישי, שאלון DNA זוגי, שאלון מדעי, חישוב התאמה ובדיקה אנושית של שני הצדדים.",
     original: "499 ₪",
     current: "299 ₪",
   },
@@ -293,17 +293,13 @@ export default function NewYearLoveBundle() {
           <Reveal className="mx-auto grid max-w-5xl items-center gap-12 md:grid-cols-2">
             <motion.div variants={fadeUp} className="relative mx-auto max-w-sm">
               <img src={ABOUT_IMG} alt="הילית כספי" className="w-full rounded-[2rem] object-cover shadow-2xl" />
-              <div className="absolute -bottom-5 -left-4 rounded-2xl bg-gradient-to-l from-[#ff4f7d] to-[#c73567] p-4 text-white shadow-xl">
-                <div className="text-2xl font-black">+5,000</div>
-                <div className="text-xs text-white/85">רווקים ורווקות נרשמו לקהילה ולתהליך</div>
-              </div>
             </motion.div>
             <motion.div variants={fadeUp}>
               <p className="text-sm font-black text-[#c73567]">מי עומדת מאחורי החבילה?</p>
               <h2 className="mt-3 text-4xl font-black">הילית כספי</h2>
               <p className="mt-2 text-xl font-bold text-[#7a2454]">מאמנת למציאת זוגיות, שדכנית ומפתחת שיטת ״מדע האהבה״.</p>
               <div className="mt-6 space-y-4 text-base leading-8 text-[#625367]">
-                <p>בניתי קהילה ותהליך שאליהם נרשמו יותר מ־5,000 רווקים ורווקות. אני והצוות המקצועי שהוכשר על ידי בודקים את שני הצדדים ושומרים על הסכמה הדדית לפני חשיפת הפרטים.</p>
+                <p>בניתי קהילה ותהליך עבור רווקים ורווקות שמחפשים קשר רציני. אני והצוות המקצועי שהוכשר על ידי בודקים את שני הצדדים ושומרים על הסכמה הדדית לפני חשיפת הפרטים.</p>
                 <p>אני לא מאמינה בעוד גלילה אינסופית. אני מאמינה בהיכרות שמתחילה בהבנה עמוקה יותר של האדם ושל החיים שרוצים לבנות.</p>
               </div>
               <div className="mt-6 flex flex-wrap gap-2">{["פסיכולוגיה חיובית", "מודלים מדעיים", "בדיקה אנושית", "הסכמה הדדית"].map((tag) => <span key={tag} className="rounded-full bg-[#250b3c] px-3 py-1.5 text-xs font-bold text-white">{tag}</span>)}</div>

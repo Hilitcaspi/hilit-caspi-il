@@ -10,7 +10,6 @@ import { trackViewContent } from "@/lib/metaPixel";
 import { gaViewItem } from "@/lib/ga";
 import { motion, useInView } from "framer-motion";
 import { Link, useSearch } from "wouter";
-import DatabaseExpectations from "@/components/DatabaseExpectations";
 
 const CASUAL_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-casual_dac3228f.jpg";
 const DNA_QUIZ_URL = "/dna-quiz";
@@ -109,7 +108,6 @@ export default function DatabaseSales() {
               לא אפליקציה.<br />
             <span className="text-[#ffe27c]">משהו אחר לגמרי.</span>
             </h1>
-            <p className="text-[#ffe27c]/90 text-sm font-bold tracking-wide mb-3">1,171 חברים פעילים ומשלמים במאגר • נכון ל־26.8.2026</p>
             <p className="text-white/75 text-lg leading-relaxed mb-8">
               בניתי שיטה שלוקחת את כל מה שטוב בכל אחד מהעולמות: גם המראה חשוב, גם הפרמטרים הבסיסיים, וגם הדפוסים הפנימיים שמנבאים אהבה שתחזיק לאורך שנים. לא בחרתי בין הגישות. שילבתי את כולן.
             </p>
@@ -131,8 +129,8 @@ export default function DatabaseSales() {
               <div className="absolute -inset-4 bg-gradient-to-br from-[#ffe27c]/30 to-[#1800ad]/30 rounded-3xl blur-2xl" />
               <img src={CASUAL_IMG} alt="הילית כספי" className="relative w-64 md:w-80 h-auto rounded-3xl object-cover shadow-2xl" />
               <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-[#191265] font-black text-2xl">98%</div>
-                <div className="text-[#727272] text-xs">קיבלו לפחות הצעה אחת</div>
+                <div className="text-[#191265] font-black text-lg">התאמה לעומק</div>
+                <div className="text-[#727272] text-xs">שאלון, נתונים ובדיקה אנושית</div>
               </div>
             </div>
           </motion.div>
@@ -245,12 +243,6 @@ export default function DatabaseSales() {
             </motion.p>
           </div>
         </AnimatedSection>
-      </section>
-
-      <section className="py-10 px-6 bg-[#f0eadc]">
-        <div className="max-w-3xl mx-auto">
-          <DatabaseExpectations showStats />
-        </div>
       </section>
 
       {/* ── WHO'S IN THE DATABASE ── */}

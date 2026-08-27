@@ -1,5 +1,3 @@
-import { trpc } from "@/lib/trpc";
-
 type DatabaseExpectationsProps = {
   variant?: "light" | "dark";
   compact?: boolean;
@@ -10,20 +8,13 @@ type DatabaseExpectationsProps = {
 export default function DatabaseExpectations({
   variant = "light",
   compact = false,
-  showStats = true,
   className = "",
 }: DatabaseExpectationsProps) {
-  const { data } = (trpc.matchmaking as any).getPublicTrustStats.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-
   const dark = variant === "dark";
   const shell = dark
     ? "bg-white/8 border-white/15 text-white"
     : "bg-[#fffaf0] border-[#ead47e] text-[#191265]";
   const muted = dark ? "text-white/70" : "text-[#5f5b50]";
-  const statBox = dark ? "bg-white/10 border-white/10" : "bg-white border-[#eee7cf]";
 
   return (
     <section className={`rounded-2xl border p-4 md:p-5 text-right ${shell} ${className}`} dir="rtl">
@@ -44,28 +35,6 @@ export default function DatabaseExpectations({
         </div>
       </div>
 
-      {showStats && data && (
-        <div className="grid grid-cols-3 gap-2 mt-4">
-          <div className={`rounded-xl border p-2.5 text-center ${statBox}`}>
-            <div className={`text-lg font-black ${dark ? "text-[#ffe27c]" : "text-[#191265]"}`}>{data.femaleRate}% / {data.maleRate}%</div>
-            <div className={`text-[10px] mt-1 ${muted}`}>נשים / גברים</div>
-          </div>
-          <div className={`rounded-xl border p-2.5 text-center ${statBox}`}>
-            <div className={`text-lg font-black ${dark ? "text-[#ffe27c]" : "text-[#191265]"}`}>{data.scientificRate}%</div>
-            <div className={`text-[10px] mt-1 ${muted}`}>שאלון מדעי</div>
-          </div>
-          <div className={`rounded-xl border p-2.5 text-center ${statBox}`}>
-            <div className={`text-lg font-black ${dark ? "text-[#ffe27c]" : "text-[#191265]"}`}>{data.profileCompletenessRate}%</div>
-            <div className={`text-[10px] mt-1 ${muted}`}>פרופיל מלא</div>
-          </div>
-        </div>
-      )}
-
-      {showStats && data && (
-        <p className={`text-[9px] mt-2 ${dark ? "text-white/45" : "text-[#8a8477]"}`}>
-          הנתונים מחושבים בזמן אמת מתוך חברי המאגר הפעילים ומתעדכנים אוטומטית.
-        </p>
-      )}
     </section>
   );
 }

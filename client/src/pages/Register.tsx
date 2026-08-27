@@ -619,22 +619,10 @@ export default function Register() {
                   <p className="text-white/80 text-sm leading-relaxed mb-4">
                     המאגר שלי שונה מכל אפליקציה אחרת. ההתאמות מבוססות על חישובים מתקדמים ומודלים מדעיים, ולאחר מכן אני עוברת על כל הצעה אישית ומאשרת אותה בעצמי.
                   </p>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    {[
-                      { n: "1,171", l: "חברים פעילים" },
-                      { n: "98%", l: "קיבלו הצעה" },
-                      { n: "75%", l: "הצעה תוך 30 יום בקבוצת המדידה" },
-                    ].map(({ n, l }) => (
-                      <div key={l} className="bg-white/10 rounded-xl p-3 text-center">
-                        <div className="text-[#ffe27c] font-black text-xl">{n}</div>
-                        <div className="text-white/60 text-xs">{l}</div>
-                      </div>
-                    ))}
-                  </div>
                   <div className="bg-[#ffe27c]/10 border border-[#ffe27c]/30 rounded-xl p-3">
                     <p className="text-[#ffe27c] text-xs font-bold mb-1">איך מצטרפים:</p>
                     <p className="text-white/70 text-xs">מלא/י פרטים ושאלון DNA → תשלום ₪299 → מייל עם קישור לשאלון המדעי → אישור כניסה למאגר</p>
-                    <p className="mt-2 text-[11px] leading-5 text-white/50">נתוני המאגר נכונים ל־26.8.2026. זמן ההמתנה משתנה לפי הפרופיל, ההעדפות והזמינות במאגר, ואין התחייבות למועד או לכמות קבועה של הצעות.</p>
+                    <p className="mt-2 text-[11px] leading-5 text-white/50">זמן ההמתנה משתנה לפי הפרופיל, ההעדפות והזמינות במאגר, ואין התחייבות למועד או לכמות קבועה של הצעות.</p>
                   </div>
                 </div>
               )}

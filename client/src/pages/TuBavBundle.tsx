@@ -175,10 +175,6 @@ export default function TuBavBundle() {
         <AnimatedSection className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center">
           <motion.div variants={fadeUp} className="relative">
             <img src={ABOUT_IMG} alt="הילית כספי" loading="lazy" decoding="async" className="w-full max-w-sm mx-auto rounded-3xl object-cover shadow-2xl" />
-            <div className="absolute -bottom-4 -left-4 bg-gradient-to-r from-[#ff4466] to-[#ff6b9d] text-white rounded-2xl p-4 shadow-xl max-w-[180px]">
-              <div className="font-black text-xl">+5,000</div>
-              <div className="text-white/90 text-xs">רווקים במאגר</div>
-            </div>
           </motion.div>
 
           <motion.div variants={fadeUp}>
