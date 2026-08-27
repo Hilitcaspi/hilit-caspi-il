@@ -10,7 +10,7 @@ import { getDb } from "./db";
 import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, matchBoostMemberships } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
-import { matchBoostRouter, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
+import { cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
 import { matchBoostPilotRouter } from "./matchBoostPilotRouter";
 import { operationsRouter } from "./operationsRouter";
 import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
@@ -6807,7 +6807,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
   payment: router({
     createProcess: publicProcedure
       .input(z.object({
-        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "bundle_new_year", "plus"]),
+        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "bundle_new_year", "match_boost", "plus"]),
         fullName: z.string().min(2),
         email: z.string().email(),
         phone: z.string().optional(),
@@ -6827,10 +6827,27 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         // GA4 session_id from _ga_ZH1CYQCTMN cookie — required for campaign_details UTM attribution
         ga4SessionId: z.string().max(50).optional(),
         personalToken: z.string().min(16).max(200).optional(),
+        boostTermsAccepted: z.literal(true).optional(),
       }))
       .mutation(async ({ input }) => {
         const { createPaymentProcess, PRODUCT_CONFIGS } = await import("./growPayment");
         const db = await getDb();
+
+        let preparedBoostRequestId: number | null = null;
+        let verifiedPaymentIdentity: { fullName: string; email: string; phone: string } | null = null;
+
+        if (input.product === "match_boost") {
+          if (!db || !input.personalToken || input.boostTermsAccepted !== true) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "נדרש קישור אישי ואישור תקנון Boost לפני התשלום" });
+          }
+          const prepared = await preparePaidBoostCheckout({
+            email: input.email,
+            token: input.personalToken,
+            termsAccepted: true,
+          });
+          preparedBoostRequestId = prepared.requestId;
+          verifiedPaymentIdentity = { fullName: prepared.fullName, email: prepared.email, phone: prepared.phone };
+        }
 
         if (input.product === "plus") {
           if (!process.env.GROW_PAGE_CODE_PLUS?.trim()) {
@@ -6886,7 +6903,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
         // Server-side coupon validation — never trust client-supplied price
         let finalSum: number | undefined = undefined;
-        if (input.couponCode && db && input.product !== "plus") {
+        if (input.couponCode && db && input.product !== "plus" && input.product !== "match_boost") {
           const { discountCodes } = await import("../drizzle/schema");
           const [code] = await db.select().from(discountCodes)
             .where(eq(discountCodes.code, input.couponCode.toUpperCase()))
@@ -6979,8 +6996,19 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           }
         }
 
-        const result = await createPaymentProcess({ ...input, sum: finalSum });
-        return result; // { authCode, processToken? }
+        try {
+          const result = await createPaymentProcess({
+            ...input,
+            ...(verifiedPaymentIdentity || {}),
+            sum: finalSum,
+          });
+          return { ...result, boostRequestId: preparedBoostRequestId }; // { authCode, processToken?, boostRequestId? }
+        } catch (error: any) {
+          if (preparedBoostRequestId) {
+            await cancelPaidBoostCheckout(preparedBoostRequestId, error?.message || "grow_create_process_failed");
+          }
+          throw error;
+        }
       }),
 
     // Client reports SDK-level payment failure (onFailure callback from Grow SDK)

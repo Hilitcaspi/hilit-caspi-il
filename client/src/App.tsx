@@ -72,6 +72,9 @@ const NewYearLoveBundle = lazy(() => import("@/pages/NewYearLoveBundle"));
 const ThankYouNewYearBundle = lazy(() => import("@/pages/ThankYouNewYearBundle"));
 const TermsNewYearBundle = lazy(() => import("@/pages/TermsNewYearBundle"));
 const MatchBoostLanding = lazy(() => import("@/pages/MatchBoostLanding"));
+const TermsMatchBoost = lazy(() => import("@/pages/TermsMatchBoost"));
+const ThankYouMatchBoost = lazy(() => import("@/pages/ThankYouMatchBoost"));
+const MatchBoostDemo = lazy(() => import("@/pages/MatchBoostDemo"));
 
 // US English (EN) pages
 const EnHome = lazy(() => import("@/pages/en/Home"));
@@ -283,6 +286,9 @@ function HeRouter() {
           <Route path="/terms/new-year-love" component={TermsNewYearBundle} />
           <Route path="/thank-you/new-year-love" component={ThankYouNewYearBundle} />
           <Route path="/match-boost" component={MatchBoostLanding} />
+          <Route path="/match-boost/demo" component={MatchBoostDemo} />
+          <Route path="/terms/match-boost" component={TermsMatchBoost} />
+          <Route path="/thank-you/match-boost" component={ThankYouMatchBoost} />
           <Route path={"/thank-you/course"} component={ThankYouCourse} />
           <Route path={"/course-sales"} component={CourseSales} />
           <Route path={"/course/view"} component={CourseView} />

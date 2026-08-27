@@ -193,6 +193,12 @@ describe("match boost privacy and payment gate", () => {
   const operationsSource = fs.readFileSync(path.join(process.cwd(), "client/src/components/OperationsSection.tsx"), "utf8");
   const emailSource = fs.readFileSync(path.join(process.cwd(), "server/emailTemplates.ts"), "utf8");
   const whatsappSource = fs.readFileSync(path.join(process.cwd(), "server/matchWhatsApp.ts"), "utf8");
+  const paymentSource = fs.readFileSync(path.join(process.cwd(), "server/growPayment.ts"), "utf8");
+  const paymentRouterSource = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
+  const webhookSource = fs.readFileSync(path.join(process.cwd(), "server/growWebhook.ts"), "utf8");
+  const walletSource = fs.readFileSync(path.join(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
+  const termsSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/TermsMatchBoost.tsx"), "utf8");
+  const demoSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/MatchBoostDemo.tsx"), "utf8");
 
   it("returns a sanitized anonymous card to the personal area, not candidate identity", () => {
     const publicReturn = source.slice(source.indexOf("return {\n        eligible:"), source.indexOf("redeemPlusBoost:"));
@@ -250,14 +256,41 @@ describe("match boost privacy and payment gate", () => {
     expect(uiSource).toContain("יציאה ממסלול Boost");
   });
 
-  it("keeps regular payment visibly blocked until a dedicated Grow product is connected", () => {
-    expect(source).toContain("GROW_PAGE_CODE_MATCH_BOOST");
-    expect(source).toContain("התשלום לבוסט עדיין אינו מחובר");
-    expect(uiSource).toContain("const regularPaymentReady = false");
-    expect(uiSource).not.toContain("trpc.matchBoost.startPaidBoost");
-    expect(uiSource).toContain("בוסט התאמה ב־19.99 ש״ח · בקרוב");
+  it("opens a one-time 19.99 ILS Grow payment only from the personal Boost card with explicit terms", () => {
+    expect(paymentSource).toContain('match_boost:  { description: "Match Boost - הצעת התאמה אלגוריתמית",');
+    expect(paymentSource).toContain("sum: 19.99, paymentNum: 1");
+    expect(paymentRouterSource).toContain('"match_boost"');
+    expect(paymentRouterSource).toContain("boostTermsAccepted: z.literal(true).optional()");
+    expect(paymentRouterSource).toContain("preparePaidBoostCheckout");
+    expect(uiSource).not.toContain("const regularPaymentReady = false");
+    expect(uiSource).toContain('product="match_boost"');
+    expect(uiSource).toContain("שליחת Boost ב־19.99 ₪");
+    expect(uiSource).toContain('termsPath="/terms/match-boost"');
+    expect(walletSource).toContain('boostTermsAccepted: product === "match_boost" ? true : undefined');
+    expect(walletSource).toContain("כולל קבלת הצעות Boost אלגוריתמיות שלא נבדקו ידנית על ידי הילית");
+    expect(termsSource).toContain("באישור התקנון מאשרים גם לקבל הצעות Boost אלגוריתמיות");
     expect(source).toContain("הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית");
     expect(uiSource).toContain("card.disclosure");
+  });
+
+  it("revalidates the candidate at payment confirmation and creates a reusable credit if dispatch cannot complete", () => {
+    expect(source).toContain("fulfillPaidBoostPayment");
+    expect(source).toContain('status: "paid"');
+    expect(source).toContain("dispatchAlgorithmicBoostProposal(db, request.id)");
+    expect(source).toContain('eq(matches.status, "pending")');
+    expect(source).toContain("boost_credit_available:");
+    expect(source).toContain("redeemPaidCredit: publicProcedure");
+    expect(uiSource).toContain("מימוש קרדיט Boost ללא חיוב נוסף");
+    expect(webhookSource).toContain('case "match_boost": await handleMatchBoost');
+    expect(webhookSource).toContain('product !== "match_boost" && sum >= 19 && sum <= 21');
+  });
+
+  it("provides a clearly labelled non-customer demo of the paid Boost card without opening Grow", () => {
+    expect(demoSource).toContain("המחשה בלבד: אין פרטי לקוח ולא מתבצע חיוב");
+    expect(demoSource).toContain("שליחת Boost ב־19.99 ₪");
+    expect(demoSource).toContain('href="/terms/match-boost"');
+    expect(demoSource).not.toContain('product="match_boost"');
+    expect(demoSource).not.toContain("questionnaireToken");
   });
 
   it("never exposes candidate identity in the personal-area Boost card", () => {

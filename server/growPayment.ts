@@ -56,6 +56,10 @@ const PAGE_CODES: Record<string, string> = {
   session:      process.env.GROW_PAGE_CODE_SESSION      || PROD_PAGE_CODE,
   bundle_tubav: process.env.GROW_PAGE_CODE_DATABASE   || PROD_PAGE_CODE,
   bundle_new_year: process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
+  // Boost is a one-time micro-payment and may safely use the existing one-time
+  // wallet page. Product identity is preserved by its unique description and
+  // by the pending Boost request created before Grow is opened.
+  match_boost: process.env.GROW_PAGE_CODE_MATCH_BOOST || process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   // No fallback by design: Plus requires a dedicated recurring-payment page.
   plus:         process.env.GROW_PAGE_CODE_PLUS || "",
 };
@@ -79,6 +83,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   session:      { description: "פגישת היכרות עם הילית כספי",                          sum: 500,  paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון",            sum: 349,  paymentNum: 1 },
   bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 449, paymentNum: 1 },
+  match_boost:  { description: "Match Boost - הצעת התאמה אלגוריתמית",                 sum: 19.99, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי",                         sum: 99 },
 };
 
@@ -90,7 +95,7 @@ export interface CreatePaymentInput {
   phone?: string;
   /** Override price (e.g. coupon) */
   sum?: number;
-  /** Personal questionnaire token used only to return a Plus member to their account. */
+  /** Personal questionnaire token used to return Plus/Boost members to their account. */
   personalToken?: string;
 }
 
@@ -106,7 +111,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
 
   const pageCode = PAGE_CODES[input.product];
   if (!pageCode) {
-    throw new Error("Database Plus recurring payment is not configured yet");
+    throw new Error("The selected Grow payment product is not configured yet");
   }
   const sum = input.sum ?? config.sum;
 
@@ -124,11 +129,12 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     session:      "/thank-you/session",
     bundle_tubav: "/thank-you/bundle",
     bundle_new_year: "/thank-you/new-year-love",
+    match_boost:  "/thank-you/match-boost",
     plus:         "/thank-you/plus",
   };
   const successPath = SUCCESS_PATHS[input.product] || "/thank-you/digital";
   const successUrl = new URL(`${SITE_BASE}${successPath}`);
-  if (input.product === "plus") {
+  if (input.product === "plus" || input.product === "match_boost") {
     successUrl.searchParams.set("email", input.email);
     if (input.personalToken) successUrl.searchParams.set("token", input.personalToken);
   }

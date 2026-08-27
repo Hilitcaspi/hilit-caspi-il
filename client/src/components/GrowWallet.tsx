@@ -36,6 +36,7 @@ const PAGE_CODES: Record<string, string> = {
   session:      import.meta.env.VITE_GROW_PAGE_CODE_SESSION  || PROD_PAGE_CODE,
   bundle_tubav: import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   bundle_new_year: import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
+  match_boost: import.meta.env.VITE_GROW_PAGE_CODE_MATCH_BOOST || import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   plus:         import.meta.env.VITE_GROW_PAGE_CODE_PLUS || "",
 };
 
@@ -48,6 +49,7 @@ const PRODUCT_CONFIGS: Record<string, { description: string; sum: number; paymen
   session:      { description: "פגישה בודדת עם הילית כספי", sum: 500, paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון", sum: 349, paymentNum: 1 },
   bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 449, paymentNum: 1 },
+  match_boost:  { description: "Match Boost - הצעת התאמה אלגוריתמית", sum: 19.99, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי", sum: 99 },
 };
 
@@ -140,7 +142,7 @@ declare global {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface GrowWalletProps {
-  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "plus";
+  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "match_boost" | "plus";
   buttonLabel?: string;
   buttonClassName?: string;
   prefillName?: string;
@@ -151,6 +153,7 @@ interface GrowWalletProps {
   onFailure?: (response: any) => void;
   termsPath?: string;
   personalToken?: string;
+  showCoupon?: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -166,6 +169,7 @@ export default function GrowWallet({
   onFailure,
   termsPath,
   personalToken,
+  showCoupon = true,
 }: GrowWalletProps) {
   const [name, setName] = useState(prefillName || "");
   const [email, setEmail] = useState(prefillEmail || "");
@@ -431,7 +435,7 @@ export default function GrowWallet({
 
       logStep("4_createProcess_start");
       const result = await createProcessMutation.mutateAsync({
-        product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "plus",
+        product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "match_boost" | "plus",
         fullName,
         email: userEmail,
         phone: userPhone || undefined,
@@ -447,6 +451,7 @@ export default function GrowWallet({
         ga4ClientId,
         ga4SessionId,
         personalToken,
+        boostTermsAccepted: product === "match_boost" ? true : undefined,
       });
 
       // Save processToken for failure reporting (if SDK payment fails later)
@@ -472,7 +477,7 @@ export default function GrowWallet({
         stage: "createProcess",
       });
     }
-  }, [name, email, phone, product, termsPath, termsAccepted]);
+  }, [name, email, phone, product, termsPath, termsAccepted, personalToken, couponApplied]);
 
   const hasAllDetails = prefillName && prefillEmail;
 
@@ -526,7 +531,7 @@ export default function GrowWallet({
       )}
 
       {/* Coupon field */}
-      <div className="mb-4">
+      {showCoupon && <div className="mb-4">
         <p className="text-xs font-semibold text-[#727272] mb-1.5">יש לך קוד קופון?</p>
         {couponApplied ? (
           <div className="flex items-center justify-between bg-green-50 border border-green-300 rounded-xl px-4 py-2.5">
@@ -558,7 +563,7 @@ export default function GrowWallet({
           </div>
         )}
         {couponError && <p className="text-red-500 text-xs mt-1">{couponError}</p>}
-      </div>
+      </div>}
 
       {/* Age confirmation */}
       <div className="flex items-start gap-2 mb-2">
@@ -577,7 +582,7 @@ export default function GrowWallet({
             className="mt-0.5 shrink-0"
           />
           <label htmlFor={`gw-terms-${instanceId}`} className="text-sm cursor-pointer leading-snug" style={{ color: '#191265' }}>
-            קראתי ואני מסכים/ה ל<a
+            {product === "match_boost" ? "קראתי, הבנתי ואישרתי את " : "קראתי ואישרתי את "}<a
               href={termsPath}
               target="_blank"
               rel="noopener noreferrer"
@@ -586,6 +591,7 @@ export default function GrowWallet({
             >
               תקנון ומדיניות ביטול
             </a>
+            {product === "match_boost" && " כולל קבלת הצעות Boost אלגוריתמיות שלא נבדקו ידנית על ידי הילית"}
           </label>
         </div>
       )}
@@ -607,8 +613,8 @@ export default function GrowWallet({
 
       <div className="flex justify-center items-center gap-4 mt-3 text-xs opacity-70" style={{ color: '#191265' }}>
         <span>🔒 תשלום מאובטח</span>
-        <span>⚡ גישה מיידית</span>
-        <span>✓ תוכן מעשי וישים</span>
+        {product === "match_boost" ? <span>✓ חיוב חד־פעמי</span> : <span>⚡ גישה מיידית</span>}
+        {product === "match_boost" ? <span>✓ 19.99 ₪</span> : <span>✓ תוכן מעשי וישים</span>}
       </div>
       <p className="text-center text-xs mt-1 opacity-60" style={{ color: '#191265' }}>
         תשלום מאובטח באמצעות Grow Payments

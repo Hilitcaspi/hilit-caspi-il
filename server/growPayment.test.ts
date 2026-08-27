@@ -11,11 +11,20 @@ describe("growPayment module", () => {
   });
 
   it("has product configs for all supported products", () => {
-    const expected = ["database", "guide", "course", "coaching", "session", "bundle_new_year"];
+    const expected = ["database", "guide", "course", "coaching", "session", "bundle_new_year", "match_boost"];
     for (const p of expected) {
       expect(PRODUCT_CONFIGS[p]).toBeDefined();
       expect(PRODUCT_CONFIGS[p].sum).toBeGreaterThan(0);
     }
+  });
+
+  it("configures Match Boost as a one-time 19.99 ILS product", () => {
+    expect(PRODUCT_CONFIGS.match_boost).toMatchObject({
+      sum: 19.99,
+      paymentNum: 1,
+    });
+    expect(PRODUCT_CONFIGS.match_boost.description).toContain("Match Boost");
+    expect(PRODUCT_CONFIGS.match_boost.description).toContain("אלגוריתמית");
   });
 
   it("configures the New Year bundle as a single 449 ILS charge", () => {
