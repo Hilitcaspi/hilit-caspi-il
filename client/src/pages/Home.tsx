@@ -1,15 +1,15 @@
 /**
- * DESIGN REMINDER — "שולחן אחד קדימה": מודרניזם ים־תיכוני עריכתי, א־סימטרי וחם.
- * צבעי שמנת, זית ורימון; שפה אנושית וישירה ללא לחץ, הבטחות זוגיות או עדויות מומצאות.
+ * BRAND REMINDER — הילית כספי: נייבי עמוק, זהב #FFE27C, קרם, Rubik וצילום הילית אמיתי.
+ * היררכיה: הילית והשיטה, אחריה המוצרים וההצעה. החג הוא נגיעה טקסטואלית בלבד.
  */
-import { ArrowLeft, Check, ChevronDown, HeartHandshake, MessageCircle, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Heart, MessageCircle, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 
-const DEFAULT_UTM = {
+const BASE_UTM = {
   utm_source: "meta",
   utm_medium: "paid_social",
-  utm_campaign: "sep26_tishrei_database_cold",
-  utm_content: "landing_open_place_v1",
+  utm_campaign: "sep26_holidays_tubav_bundle",
+  utm_content: "landing_bundle_v1",
   utm_term: "landing_page",
 };
 
@@ -17,273 +17,148 @@ const FAQ = [
   {
     question: "כמה התאמות אקבל/י?",
     answer:
-      "זאת שאלה חשובה, והתשובה הישרה היא שאין מספר קבוע שאפשר להבטיח מראש. מספר ההתאמות תלוי בפרופילים הפעילים, בהעדפות, באזור ובאישור ההדדי. אנחנו מעדיפים לא לשלוח סתם שמות בשביל כמות, אלא להציע חיבורים עם היגיון אמיתי.",
+      "זו שאלה חשובה, ולכן חשוב לי לענות עליה ישר: אין מספר קבוע שאפשר להבטיח מראש. מספר ההתאמות תלוי באנשים הפעילים במאגר, בהעדפות, באזור ובאישור ההדדי. המטרה היא לא לשלוח סתם שמות בשביל כמות, אלא לבדוק היכרות שיש לה היגיון אמיתי.",
   },
   {
-    question: "מה שונה כאן מאפליקציית היכרויות?",
+    question: "מה ההבדל בין המאגר לבין אפליקציית היכרויות?",
     answer:
-      "זה לא עוד מקום לגלול בו לבד. הפרופילים נבדקים, וההצעות עוברות תהליך התאמה ובדיקה אנושית לפני שהן מגיעות לאישור. המטרה היא להפוך את החיפוש לפחות אקראי ויותר מדויק.",
+      "המאגר אינו אפליקציה. לא גוללים לבד בין פרופילים. כל מי שנכנס/ת ממלא/ת שאלון, עובר/ת סינון, וההתאמות נבנות על בסיס עומק, נתונים והיכרות אנושית עם שני הצדדים.",
   },
   {
-    question: "מה קורה אחרי ההצטרפות?",
+    question: "מה כולל מבצע החגים?",
     answer:
-      "ממלאים את הפרטים וההעדפות, נכנסים למאגר, ואז מתחיל תהליך בדיקה והתאמה. כשיש היכרות רלוונטית, היא נשלחת לאישור הדדי. אין דמי מנוי חודשיים.",
+      "ההצעה משלבת את הכניסה למאגר עם המדריך ״לבחור נכון״. המדריך נועד לעזור להבין את הדפוסים שעומדים מאחורי הבחירות הזוגיות, כדי שהיכרות חדשה תתחיל ממקום מדויק יותר.",
   },
 ];
 
-const productBenefits = [
-  "כניסה למאגר רווקים ורווקות שמחפשים קשר רציני",
-  "פרופיל והעדפות שעוברים בדיקה אנושית",
-  "תהליך התאמה המבוסס על עומק, נתונים והיכרות",
-  "המדריך המעשי „לבחור נכון” — בבאנדל החג",
-];
-
-function buildDatabaseLink(utm: Record<string, string>) {
-  const params = new URLSearchParams(utm);
-  return `https://hilitcaspi.com/database?${params.toString()}`;
+function withUtm(path: string, fallback: Record<string, string>) {
+  const inbound = new URLSearchParams(window.location.search);
+  const merged = Object.fromEntries(
+    Object.entries(fallback).map(([key, value]) => [key, inbound.get(key) || value]),
+  );
+  return `https://hilitcaspi.com${path}?${new URLSearchParams(merged).toString()}`;
 }
 
 export default function Home() {
   const [openFaq, setOpenFaq] = useState(0);
-  const databaseLink = useMemo(() => {
-    const search = new URLSearchParams(window.location.search);
-    const utm = Object.fromEntries(
-      Object.entries(DEFAULT_UTM).map(([key, fallback]) => [key, search.get(key) || fallback]),
-    );
-    return buildDatabaseLink(utm);
-  }, []);
-
-  const whatsappLink = `https://wa.me/972552442334?${new URLSearchParams({
-    text: "היי הילית, הגעתי מעמוד חגי תשרי ורוצה לשמוע עוד על המאגר.",
-  }).toString()}`;
+  const links = useMemo(() => ({
+    database: withUtm("/database", BASE_UTM),
+    guide: withUtm("/guide", { ...BASE_UTM, utm_content: "landing_guide_v1" }),
+    quiz: withUtm("/dna-quiz", { ...BASE_UTM, utm_content: "landing_dna_v1" }),
+  }), []);
+  const whatsapp = "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%94%D7%92%D7%A2%D7%AA%D7%99%20%D7%9E%D7%9E%D7%91%D7%A6%D7%A2%20%D7%94%D7%97%D7%92%D7%99%D7%9D%20%D7%95%D7%A8%D7%95%D7%A6%D7%94%20%D7%9C%D7%A9%D7%9E%D7%95%D7%A2%20%D7%A2%D7%9C%20%D7%94%D7%9E%D7%90%D7%92%D7%A8.";
 
   return (
-    <main className="tishrei-page" dir="rtl">
-      <header className="site-header">
-        <a className="brand" href="#top" aria-label="עמוד חגי תשרי של הילית כספי">
-          <img
-            src="/manus-storage/hilit-tishrei-pomegranate-mark_f11bb954.png"
-            alt=""
-            className="brand-mark"
-          />
-          <span className="brand-copy">
+    <main className="hilit-page" dir="rtl">
+      <section className="brand-hero" id="top">
+        <header className="brand-header">
+          <a className="wordmark" href="#top" aria-label="הילית כספי">
             <strong>הילית כספי</strong>
             <span>Relationship Expert &amp; Matchmaker</span>
-          </span>
-        </a>
-        <a className="header-cta" href={databaseLink}>
-          לפרטים והצטרפות <ArrowLeft size={16} strokeWidth={2.3} />
-        </a>
-      </header>
+          </a>
+          <a className="header-link" href={links.quiz}>שאלון חינמי <Sparkles size={15} /></a>
+        </header>
 
-      <section className="hero" id="top" aria-labelledby="hero-title">
-        <div className="hero-background" aria-hidden="true" />
-        <div className="hero-route" aria-hidden="true"><span /><span /></div>
-        <div className="hero-content">
-          <span className="eyebrow"><i /> חגי תשרי תשפ״ז</span>
-          <p className="hero-kicker">מקום לשניים מתחיל בהחלטה אחת.</p>
-          <h1 id="hero-title">בחגים האלה,<br /><em>פותחים מקום</em><br />להיכרות חדשה.</h1>
-          <p className="hero-lede">
-            לא עוד גלילה ולא עוד ניחושים. מאגר הרווקים החכם של הילית כספי מחבר בין אנשים שמחפשים קשר רציני—עם עומק, נתונים ובדיקה אנושית.
-          </p>
-          <div className="hero-actions">
-            <a className="button button-primary" href={databaseLink}>
-              לפתוח מקום במאגר <ArrowLeft size={19} />
-            </a>
-            <a className="button button-quiet" href="#how-it-works">
-              לראות איך זה עובד <ChevronDown size={18} />
-            </a>
-          </div>
-          <p className="small-note">ללא דמי מנוי חודשיים · התאמות נשלחות רק אחרי בדיקה ואישור הדדי</p>
-        </div>
-        <div className="hero-seal" aria-label="מאגר היכרויות, לא אפליקציה">
-          <HeartHandshake size={22} />
-          <span>מאגר היכרויות</span>
-          <strong>לא אפליקציה</strong>
-        </div>
-      </section>
-
-      <section className="opening-section">
-        <div className="motif-route motif-route-opening" aria-hidden="true" />
-        <div className="section-aside">
-          <span className="section-number">01</span>
-          <img src="/manus-storage/hilit-tishrei-pomegranate-mark_f11bb954.png" alt="" className="section-mark" />
-          <p>לפני שולחן החג הבא</p>
-        </div>
-        <div className="opening-copy">
-          <p className="label">הצעה לחג</p>
-          <h2>פחות „אולי”.<br />יותר מקום לאפשרות אמיתית.</h2>
-          <p>
-            חגי תשרי מזכירים לנו מה חשוב: שיחות טובות, אנשים קרובים ומקום שאפשר להיות בו עצמנו. ההצעה שלנו לא מבטיחה קסם—היא פותחת דרך אחרת להכיר.
-          </p>
-          <p>
-            מצטרפים למאגר, בונים פרופיל מדויק, ומתחילים תהליך שבו ההתאמות נבדקות לפני שהן נשלחות. כי הזמן והלב שלך ראויים ליותר מעוד מסך.
-          </p>
-        </div>
-        <figure className="match-figure">
-          <img src="/manus-storage/tishrei-match-path_290002ce.jpg" alt="כרטיס מקום על שולחן חג" />
-          <figcaption>שני מסלולים. נקודת מפגש אחת.</figcaption>
-        </figure>
-      </section>
-
-      <section className="bundle-section" aria-labelledby="bundle-title">
-        <div className="bundle-heading">
-          <span className="eyebrow eyebrow-light"><i /> הצעת חג מוגבלת</span>
-          <h2 id="bundle-title">„מקום לשניים”</h2>
-          <p>שני שלבים משלימים: להרחיב אפשרויות להיכרות, ולדעת לבחור אחרת כשמשהו כבר מתחיל.</p>
-        </div>
-        <div className="bundle-card place-card">
-          <span className="card-notch card-notch-top" aria-hidden="true" />
-          <span className="card-notch card-notch-bottom" aria-hidden="true" />
-          <div className="bundle-card-top">
-            <span>המאגר החכם של הילית</span>
-            <span className="plus">+</span>
-            <span>„לבחור נכון” — מדריך מעשי</span>
-          </div>
-          <div className="bundle-content">
-            <div>
-              <p className="bundle-label">מה נכנס לחג הזה</p>
-              <ul>
-                {productBenefits.map((benefit) => (
-                  <li key={benefit}><Check size={18} strokeWidth={2.5} /> {benefit}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="bundle-price">
-              <span>מסלול חג</span>
-              <div><del>₪748</del> <strong>₪249</strong></div>
-              <small>מחיר הבאנדל כפוף למחיר הקופה הפעיל</small>
-              <a href={databaseLink} className="button button-primary">לראות את ההצעה <ArrowLeft size={18} /></a>
+        <div className="hero-main">
+          <div className="hero-copy">
+            <span className="expert-pill">✦ Relationship Expert &amp; Matchmaker</span>
+            <h1>פיצחתי את הקוד<br />הסודי <mark>למציאת האהבה.</mark><br /><b>עכשיו תורך.</b></h1>
+            <p>
+              המאגר והמדריך שלי נבנו כדי לעזור לך להפסיק לחזור על אותן בחירות, ולהתחיל להכיר אחרת.
+              לקראת החגים, הכנתי את שניהם יחד בהצעה אחת.
+            </p>
+            <div className="hero-buttons">
+              <a href="#offer" className="cta-gold"><Heart size={19} fill="currentColor" /> למבצע החגים</a>
+              <a href={links.quiz} className="cta-outline">שאלון DNA חינמי</a>
             </div>
           </div>
+
+          <div className="hero-photo-wrap">
+            <div className="gold-glow" />
+            <img src="/manus-storage/hilit-hero-original_e7f57482.png" alt="הילית כספי" className="hero-photo" />
+            <div className="photo-note"><span>🧬</span><strong>התאמה מקצועית</strong><small>מדע, עומק ובדיקה אנושית</small></div>
+          </div>
+        </div>
+        <p className="scroll-cue">לגלות איך זה עובד ↓</p>
+      </section>
+
+      <section className="offer-section" id="offer" aria-labelledby="offer-title">
+        <div className="offer-heading">
+          <p className="section-kicker">מבצע חגי תשרי</p>
+          <h2>לא צריך לבחור<br />בין להבין לבין להכיר.</h2>
+          <p>בדיוק כמו בט״ו באב, גם לקראת החגים אפשר לקבל את שני הכלים יחד: מאגר שנותן אפשרות אמיתית להיכרות, ומדריך שעוזר לבחור נכון בתוכה.</p>
+        </div>
+        <article className="offer-card">
+          <div className="card-topline"><span>הטבה מיוחדת</span><span>לזמן מוגבל</span></div>
+          <div className="offer-products">
+            <div><span className="product-index">01</span><h3>מאגר הרווקים החכם</h3><p>התאמה מקצועית על בסיס עומק, נתונים ובדיקה אישית.</p></div>
+            <span className="product-plus">+</span>
+            <div><span className="product-index">02</span><h3>״לבחור נכון״</h3><p>מדריך מעשי שיעזור לך לזהות למה את/ה נמשכ/ת ולבחור אחרת.</p></div>
+          </div>
+          <div className="offer-bottom">
+            <div className="price-line"><span>במקום <del>₪748</del></span><strong>₪349</strong><small>חיסכון של ₪399</small></div>
+            <a href={links.database} className="cta-navy">לפרטים ולהצטרפות <span>←</span></a>
+          </div>
+        </article>
+      </section>
+
+      <section className="story-section" aria-labelledby="story-title">
+        <div className="story-image"><img src="/manus-storage/hilit-about-original_d5a478de.jpg" alt="הילית כספי" /></div>
+        <div className="story-copy">
+          <p className="section-kicker">זה לא מזל. זה דפוסים.</p>
+          <h2 id="story-title">למה אנשים טובים,<br />חכמים ואוהבים<br />לא מצליחים למצוא אהבה?</h2>
+          <p>מאות אנשים כבר ישבו מולי עייפים מדייטים, מותשים מאפליקציות ובטוחים שמשהו בהם שבור. אבל הבעיה בדרך כלל לא הייתה שאין אנשים טובים, אלא דפוסים עמוקים שממשיכים להוביל לאותן בחירות.</p>
+          <p>אני משלבת פסיכולוגיה, אינטואיציה וניסיון מעשי כדי לעזור להבין את הדפוסים האלה, וליצור דרך אחרת להכיר.</p>
+          <a href={links.quiz} className="inline-link">להתחיל מהשאלון החינמי <span>←</span></a>
         </div>
       </section>
 
-      <section className="process-section" id="how-it-works" aria-labelledby="process-title">
-        <div className="process-intro">
-          <span className="section-number">02</span>
-          <p className="label">הדרך למפגש מתחילה כאן</p>
-          <h2 id="process-title">לא יותר התאמות בכל מחיר.<br /><em>יותר התאמות שיש להן סיבה.</em></h2>
-        </div>
-        <div className="process-route" aria-hidden="true"><span>01</span><span>02</span><span>03</span></div>
-        <ol className="process-list">
-          <li>
-            <span>01</span>
-            <h3>מספרים מי את ומה באמת חשוב לך</h3>
-            <p>פרופיל, העדפות ודפוסים—כדי להתחיל מהמקום שנכון לך, לא מרשימת קלישאות.</p>
-          </li>
-          <li>
-            <span>02</span>
-            <h3>מכניסים אותך למאגר חי</h3>
-            <p>אנשים שמחפשים קשר רציני. לא משחק, לא מרתון של swipe, לא עוד סתם עוד אפליקציה.</p>
-          </li>
-          <li>
-            <span>03</span>
-            <h3>בודקים לפני שמציעים</h3>
-            <p>כל חיבור עובר תהליך התאמה ובדיקה אנושית, ורק אז מגיע לאישור של שני הצדדים.</p>
-          </li>
-        </ol>
-      </section>
-
-      <section className="clarity-section" aria-labelledby="clarity-title">
-        <div className="clarity-photo">
-          <img src="/manus-storage/tishrei-community-portrait_835fabcb.jpg" alt="אישה קוראת הודעה בחלל ביתי מואר" />
-          <span className="photo-stamp">שקיפות לפני הכול</span>
-        </div>
-        <div className="clarity-copy">
-          <p className="label">שאלה שמגיעה הרבה</p>
-          <span className="place-card-tag"><img src="/manus-storage/hilit-tishrei-pomegranate-mark_f11bb954.png" alt="" /> תשובה ישירה</span>
-          <h2 id="clarity-title">„כמה התאמות<br />אקבל/י?”</h2>
-          <p className="quote-intro">זאת לא שאלה לא נוחה. זאת בדיוק השאלה שכדאי לשאול.</p>
-          <p>
-            אין מספר קבוע שאפשר להבטיח מראש, כי התאמה טובה תלויה באנשים פעילים, בהעדפות, באזור ובאישור הדדי. אנחנו לא שולחים שמות רק כדי לייצר כמות. אנחנו בודקים, ומציעים כשיש היגיון אמיתי לחיבור.
-          </p>
-          <a className="text-link" href="#faq">לקרוא את התשובה המלאה <ArrowLeft size={16} /></a>
-        </div>
-      </section>
-
-      <section className="proof-section" aria-labelledby="proof-title">
-        <div className="proof-title-block">
-          <span className="section-number">03</span>
-          <p className="label">הוכחה בדרך שעובדת לנו</p>
-          <h2 id="proof-title">לא הבטחות גדולות.<br />תהליך שאפשר להבין.</h2>
-        </div>
-        <div className="proof-grid">
-          <article className="proof-card">
-            <span className="proof-seed" />
-            <Sparkles size={24} />
-            <h3>בחינה אנושית</h3>
-            <p>מאחורי הנתונים יש מישהי שמכירה את התהליך ואת שני הצדדים של ההיכרות.</p>
+      <section className="products-section" aria-labelledby="products-title">
+        <div className="products-heading"><p className="section-kicker">המוצרים שלי</p><h2 id="products-title">לבחור את הצעד<br />שמתאים לך עכשיו.</h2></div>
+        <div className="product-grid">
+          <article className="product-card feature-card">
+            <span className="mini-badge">הכי פופולרי</span><span className="card-icon">💛</span>
+            <h3>מאגר הרווקים החכם</h3><p>מאגר רווקים ורווקות שעברו סינון, עם התאמות שמבוססות על חישובים מתקדמים ועוברות אישור אישי.</p>
+            <strong className="product-price">₪149 <del>₪499</del></strong><a href={links.database}>לפרטים והצטרפות <span>←</span></a>
           </article>
-          <article className="proof-card">
-            <span className="proof-seed" />
-            <HeartHandshake size={24} />
-            <h3>אישור הדדי</h3>
-            <p>היכרות טובה מתחילה רק כשיש רצון של שני אנשים לבדוק אותה.</p>
+          <article className="product-card">
+            <span className="card-icon">📖</span><h3>לבחור נכון</h3><p>שאלון אישי, תרגילים מעמיקים וכלים שיעזרו להפסיק לבחור מתוך פחד ולהתחיל לבחור מתוך חופש.</p>
+            <strong className="product-price">₪149 <del>₪249</del></strong><a href={links.guide}>לפרטים ורכישה <span>←</span></a>
           </article>
-          <article className="proof-card">
-            <span className="proof-seed" />
-            <MessageCircle size={24} />
-            <h3>שיחה במקום רעש</h3>
-            <p>פחות סימנים מעורבים, יותר תהליך שמחזיר מקום לתקשורת ברורה.</p>
+          <article className="product-card">
+            <span className="card-icon">🧬</span><h3>אבחון DNA זוגי</h3><p>20 משפטים שיכולים לעזור להבין מהו הטיפוס הזוגי שלך ואיזו התאמה יכולה להיות מדויקת עבורך.</p>
+            <strong className="product-price free">חינם</strong><a href={links.quiz}>לאבחון החינמי <span>←</span></a>
           </article>
         </div>
       </section>
 
-      <section className="faq-section" id="faq" aria-labelledby="faq-title">
-        <div className="faq-heading">
-          <p className="label">שקיפות היא חלק מהשיטה</p>
-          <h2 id="faq-title">כדאי לשאול<br />לפני שמצטרפים.</h2>
-          <p>התשובות הישרות חשובות לא פחות מההזמנה להצטרף.</p>
+      <section className="database-section" aria-labelledby="database-title">
+        <div className="database-copy">
+          <p className="section-kicker">מאגר הרווקים הבלעדי</p>
+          <h2 id="database-title">לא אפליקציה.<br /><mark>Matchmaking אמיתי.</mark></h2>
+          <p>כל מי שנכנס/ת למאגר עובר/ת שאלון וסינון. אני לא מחברת אנשים באקראי: אני בודקת את שני הצדדים, ומעבירה התאמה רק כשיש סיבה אמיתית לבדוק אותה.</p>
+          <ul><li><Check size={18} /> סינון קפדני של כל המועמדים</li><li><Check size={18} /> היכרות אישית עם כל צד</li><li><Check size={18} /> התאמה שמבוססת על עומק, לא על תמונה</li></ul>
+          <a href={links.database} className="cta-gold">לפרטים והצטרפות <span>←</span></a>
         </div>
+        <div className="database-photo"><img src="/manus-storage/hilit-casual-original_92df5afc.jpg" alt="הילית כספי" /><span className="photo-caption">מדע, עומק וקסם החיבור</span></div>
+      </section>
+
+      <section className="faq-section" aria-labelledby="faq-title">
+        <div className="faq-intro"><p className="section-kicker">חשוב לי להיות ברורה</p><h2 id="faq-title">השאלות שכדאי<br />לשאול לפני שמצטרפים.</h2><p>כן, גם השאלה על כמות ההתאמות. שקיפות היא חלק מהדרך שלי לעבוד.</p></div>
         <div className="faq-list">
-          {FAQ.map((item, index) => {
-            const isOpen = openFaq === index;
-            return (
-              <article className={`faq-item ${isOpen ? "is-open" : ""}`} key={item.question}>
-                <button
-                  aria-expanded={isOpen}
-                  aria-controls={`faq-panel-${index}`}
-                  onClick={() => setOpenFaq(isOpen ? -1 : index)}
-                >
-                  <span>{item.question}</span>
-                  <ChevronDown size={22} aria-hidden="true" />
-                </button>
-                <div id={`faq-panel-${index}`} className="faq-answer" hidden={!isOpen}>
-                  <p>{item.answer}</p>
-                </div>
-              </article>
-            );
-          })}
+          {FAQ.map((item, index) => <article className={`faq-item ${openFaq === index ? "open" : ""}`} key={item.question}>
+            <button onClick={() => setOpenFaq(openFaq === index ? -1 : index)} aria-expanded={openFaq === index}><span>{item.question}</span><ChevronDown size={22} /></button>
+            {openFaq === index && <p>{item.answer}</p>}
+          </article>)}
         </div>
       </section>
 
-      <section className="closing-section">
-        <div className="closing-table-art" aria-hidden="true">
-          <img src="/manus-storage/hilit-tishrei-pomegranate-mark_f11bb954.png" alt="" />
-          <span className="table-card card-one">מקום אחד</span>
-          <span className="table-card card-two">לשיחה חדשה</span>
-          <span className="table-route" />
-        </div>
-        <div className="closing-copy">
-          <span className="eyebrow eyebrow-light"><i /> מקום להיכרות חדשה</span>
-          <h2>אפשר לפנות<br />מקום חדש בשולחן.</h2>
-          <p>אפשר לבחור בדרך קצת אחרת להכיר. בלי לחץ, בלי הבטחות קסם, עם מקום לשיחה אמיתית.</p>
-          <div className="closing-actions">
-            <a className="button button-cream" href={databaseLink}>לפרטים והצטרפות <ArrowLeft size={19} /></a>
-            <a className="button button-outline-light" href={whatsappLink} target="_blank" rel="noreferrer">לשאלה ב-WhatsApp <MessageCircle size={18} /></a>
-          </div>
-        </div>
+      <section className="final-section">
+        <div className="final-copy"><p className="section-kicker">לקראת החגים</p><h2>אולי הגיע הזמן<br />להכיר אחרת.</h2><p>בלי הבטחות קסם ובלי מסלול אחיד לכולם. רק דרך ברורה יותר להבין, לבחור ולהיפתח לאפשרות חדשה.</p><div><a href={links.database} className="cta-gold">למבצע החגים <Heart size={19} fill="currentColor" /></a><a href={whatsapp} target="_blank" rel="noreferrer" className="whatsapp-link"><MessageCircle size={18} /> יש שאלות? דברו איתי</a></div></div>
+        <img src="/manus-storage/hilit-profile-original_9ce4f7ac.jpg" alt="הילית כספי" className="final-photo" />
       </section>
 
-      <footer className="site-footer">
-        <a className="brand" href="#top">
-          <img src="/manus-storage/hilit-tishrei-pomegranate-mark_f11bb954.png" alt="" className="brand-mark" />
-          <span className="brand-copy"><strong>הילית כספי</strong><span>Matchmaking with depth</span></span>
-        </a>
-        <p>© 2026 הילית כספי · כל הזכויות שמורות</p>
-        <a href="https://hilitcaspi.com" className="text-link">לאתר הראשי <ArrowLeft size={15} /></a>
-      </footer>
+      <footer className="brand-footer"><a className="wordmark" href="#top"><strong>הילית כספי</strong><span>Relationship Expert &amp; Matchmaker</span></a><span>© 2026 הילית כספי. כל הזכויות שמורות.</span><a href="https://hilitcaspi.com">לאתר הראשי ←</a></footer>
     </main>
   );
 }
