@@ -1,0 +1,109 @@
+{
+  "asOf": "2026-08-26T09:30:38.696Z",
+  "baseline": {
+    "august_days_observed": 26,
+    "august_product_units": 280,
+    "august_product_revenue": 84307.0,
+    "august_30d_units_run_rate": 323.1,
+    "august_30d_crm_revenue_run_rate": 97277.31,
+    "other_monthly_coaching_revenue_user_stated": 10000.0,
+    "august_30d_total_revenue_run_rate": 107277.31,
+    "august_30d_meta_spend_run_rate": 15709.54,
+    "active_paid_members": 1171,
+    "email_reachable_members": 1149,
+    "plus_waitlist_and_eligible": 40,
+    "boost_requests": 0
+  },
+  "offer_assumption": {
+    "holiday_bundle_price": 449.0,
+    "holiday_bundle_contents": "מאגר + מדריך + קורס; חלופת מסר ומחיר לאישור לפני בנייה",
+    "holiday_bundle_original_value": 1245.0,
+    "holiday_bundle_current_standalone_value": 697.0,
+    "holiday_bundle_saving_vs_original": 796.0,
+    "holiday_bundle_saving_vs_current": 248.0,
+    "coaching_average_price": 3360.0,
+    "plus_and_boost_revenue_is_conditional": true
+  },
+  "database_media_plan": {
+    "conservative": {
+      "target_units": 350,
+      "direct_database_media_budget": 10000.0,
+      "required_direct_media_cpa": 28.57,
+      "required_direct_media_roas": 10.46,
+      "required_daily_purchases_30d": 11.67
+    },
+    "base": {
+      "target_units": 400,
+      "direct_database_media_budget": 10000.0,
+      "required_direct_media_cpa": 25.0,
+      "required_direct_media_roas": 11.96,
+      "required_daily_purchases_30d": 13.33
+    },
+    "stretch": {
+      "target_units": 450,
+      "direct_database_media_budget": 11250.0,
+      "required_direct_media_cpa": 25.0,
+      "required_direct_media_roas": 11.96,
+      "required_daily_purchases_30d": 15.0
+    }
+  },
+  "fixed_monthly_costs": {
+    "campaign_manager": 5000.0,
+    "customer_service": 5000.0,
+    "sales": 5000.0,
+    "social_media": 4000.0,
+    "platforms": 500.0,
+    "miscellaneous": 2000.0,
+    "coaching_delivery": 2000.0
+  },
+  "scenarios": [
+    {
+      "scenario": "conservative",
+      "scenario_label_he": "שמרני",
+      "meta_budget": 18000.0,
+      "core_units": 430,
+      "gated_units": 50,
+      "core_revenue": 144200.0,
+      "conditional_grow_revenue": 1789.6,
+      "total_revenue_if_grow_live": 145989.6,
+      "revenue_vs_august_30d_pct": 36.1,
+      "budget_vs_august_30d_pct": 14.6,
+      "blended_revenue_to_ad_spend": 8.11,
+      "fixed_costs_excluding_media": 23500.0,
+      "total_costs_including_media": 41500.0,
+      "operating_surplus_before_vat_tax_fees_refunds": 104489.6
+    },
+    {
+      "scenario": "base",
+      "scenario_label_he": "יעד עבודה",
+      "meta_budget": 20000.0,
+      "core_units": 541,
+      "gated_units": 105,
+      "core_revenue": 187552.0,
+      "conditional_grow_revenue": 4074.2,
+      "total_revenue_if_grow_live": 191626.2,
+      "revenue_vs_august_30d_pct": 78.6,
+      "budget_vs_august_30d_pct": 27.3,
+      "blended_revenue_to_ad_spend": 9.58,
+      "fixed_costs_excluding_media": 23500.0,
+      "total_costs_including_media": 43500.0,
+      "operating_surplus_before_vat_tax_fees_refunds": 148126.2
+    },
+    {
+      "scenario": "stretch",
+      "scenario_label_he": "מתיחה",
+      "meta_budget": 24000.0,
+      "core_units": 655,
+      "gated_units": 175,
+      "core_revenue": 232053.0,
+      "conditional_grow_revenue": 6263.6,
+      "total_revenue_if_grow_live": 238316.6,
+      "revenue_vs_august_30d_pct": 122.2,
+      "budget_vs_august_30d_pct": 52.8,
+      "blended_revenue_to_ad_spend": 9.93,
+      "fixed_costs_excluding_media": 23500.0,
+      "total_costs_including_media": 47500.0,
+      "operating_surplus_before_vat_tax_fees_refunds": 190816.6
+    }
+  ]
+}
