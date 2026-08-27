@@ -29,10 +29,10 @@ describe("Match Boost personal approval link funnel", () => {
 
   it("makes the distinction between receiving a link and joining visible", () => {
     expect(appSource).toContain('<Route path="/match-boost" component={MatchBoostLanding} />');
-    expect(pageSource).toContain("קבלת הקישור אינה מצרפת למסלול");
-    expect(pageSource).toContain("שלוש הסכמות מפורשות");
-    expect(pageSource).toContain("לא נבדקה ידנית על ידי הילית");
-    expect(pageSource).toContain("בלי שם ותמונה");
+    expect(pageSource).toContain("האישור עצמו יתבצע רק בקישור האישי");
+    expect(pageSource).toContain("אישור הפרופיל מאפשר גם לשלוח וגם לקבל");
+    expect(pageSource).toContain("אינן עוברות אישור אישי שלי");
+    expect(pageSource).toContain("הפרטים המלאים נפתחים רק אם שני הצדדים מאשרים");
   });
 
   it("keeps pilot metrics and personal details behind team procedures", () => {
