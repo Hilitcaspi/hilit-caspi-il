@@ -1,169 +1,20 @@
 /**
- * TermsDatabase - תקנון מאגר הרווקים הבלעדי
- * Route: /terms/database
- * Updated: June 2026 — Full comprehensive terms
+ * Design: “Champagne at Midnight” — official branded addendum for Plus and Boost.
  */
-import { motion } from "framer-motion";
 import { Link } from "wouter";
+import { ArrowLeft, CheckCircle2, Info, Sparkles } from "lucide-react";
 
-const BUSINESS_ADDRESS = "ארלוזרוב 82, תל אביב";
-const BUSINESS_EMAIL = "hilitcaspi@gmail.com";
-const BUSINESS_PHONE = "055-244-2334";
-const WHATSAPP = "https://wa.me/972552442334";
+const ADDITIONS = [
+  ["Plus הוא מסלול אופציונלי", "החברות הרגילה במאגר נשארת נפרדת. הצטרפות ל-Plus אינה משנה את תנאי החברות הבסיסיים ואינה מבטיחה תוצאה, פגישה או זוגיות. היא מוסיפה התחייבות שירות מוגדרת: שתי התאמות חדשות לכל הפחות במחזור חיוב פעיל ובוסט נוסף."],
+  ["התאמות מקצועיות גם מעבר לציון", "ציון ההתאמה הוא כלי מסייע בלבד. התאמה שציון ההתאמה שלה נמוך מ־80% עשויה להישלח כאשר קיימת הערכה מקצועית שיש בה פוטנציאל ובהתקיים תנאי הסף החשובים של שני הצדדים."],
+  ["בוסט הוא הצעה נוספת ומסומנת", "כל לקוח או לקוחה ב-Plus נותנים הסכמה מפורשת לקבלת בוסטים כחלק מההצטרפות. בוסט מבוסס על נתוני הפרופיל ועל העדפות, עשוי להגיע לפני בדיקה ידנית, והוא אינו נספר כאחת משתי ההתאמות במסלול Plus."],
+  ["חשיפה בפינת הרווקים", "חשיפה אינה אוטומטית. לקוחות Plus יכולים לבחור לבקש מידע על פינת הרווקים, אך פרסום מותנה תמיד באישור מפורש ונפרד לתוכן הסופי. פרטי קשר לא יפורסמו."],
+];
+
+function Lockup() {
+  return <Link href="/database-plus" className="flex items-center gap-3"><span className="relative grid h-11 w-11 place-items-center rounded-full border border-[#d8b67e]/45 bg-[#d8b67e]/10"><span className="font-serif text-2xl font-bold text-[#e8cb91]">+</span><Sparkles className="absolute -right-1 -top-1 h-3.5 w-3.5 text-[#e8cb91]" /></span><span><span className="block text-[10px] font-bold tracking-[.17em] text-[#e7c98e]">HILIT CASPI</span><span className="mt-0.5 block font-serif text-xl font-bold text-white">Plus</span></span></Link>;
+}
 
 export default function TermsDatabase() {
-  return (
-    <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">
-      <div className="bg-[#191265]/95 backdrop-blur-sm sticky top-0 z-50 px-4 py-2.5 flex items-center justify-between border-b border-white/10">
-        <a href="/" className="text-white/80 hover:text-[#ffe27c] transition-colors text-sm font-medium flex items-center gap-1.5">
-          ← לדף הבית
-        </a>
-        <span className="text-white font-bold text-sm">הילית כספי</span>
-        <div className="w-20" />
-      </div>
-      <nav className="bg-[#191265] py-4 px-6">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link href="/"><span className="text-white font-bold text-lg cursor-pointer hover:text-[#ffe27c] transition-colors">הילית כספי</span></Link>
-          <Link href="/database"><span className="text-[#ffe27c] text-sm font-semibold cursor-pointer hover:text-white transition-colors">← חזרה לדף המאגר</span></Link>
-        </div>
-      </nav>
-
-      <div className="max-w-3xl mx-auto px-6 py-16">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          <h1 className="text-3xl font-black text-[#191265] mb-2">תקנון הצטרפות למאגר הרווקים הבלעדי</h1>
-          <p className="text-[#727272] text-sm mb-10">הילית כספי | עודכן: יוני 2026</p>
-
-          <div className="bg-white rounded-3xl p-8 shadow-sm space-y-8 text-right">
-
-            {/* 1 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">1. פרטי בית העסק</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                <strong>שם בית העסק:</strong> הילית כספי — ייעוץ ואימון זוגי<br />
-                <strong>כתובת:</strong> {BUSINESS_ADDRESS}<br />
-                <strong>דוא"ל:</strong> <a href={`mailto:${BUSINESS_EMAIL}`} className="text-[#1800ad] underline">{BUSINESS_EMAIL}</a><br />
-                <strong>טלפון / וואטסאפ:</strong> <a href={`tel:${BUSINESS_PHONE}`} className="text-[#1800ad] underline">{BUSINESS_PHONE}</a>
-              </p>
-            </section>
-
-            {/* 2 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">2. השירות</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                בתשלום דמי הרצינות והרישום בסך <strong>₪299 (חד-פעמי)</strong> במקום ₪499, המשתתף/ת מצטרפ/ת למאגר הרווקים הבלעדי של הילית כספי ומאשר/ת את תנאי תקנון זה במלואו. ביצוע התשלום מהווה הסכמה מלאה ובלתי חוזרת לכל האמור בתקנון זה.
-              </p>
-            </section>
-
-            {/* 3 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">3. הגבלת גיל</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                השירות מיועד לבני/בנות <strong>18 ומעלה בלבד</strong>. ביצוע הרכישה מהווה הצהרה כי הרוכש/ת הינו/ה בגיר/ה בן/בת 18 שנה ומעלה.
-              </p>
-            </section>
-
-            {/* 4 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">4. תקופת הפעילות</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                הפרופיל יישאר פעיל במאגר למשך <strong>12 חודשים</strong> ממועד ההצטרפות. במהלך 6 החודשים הראשונים, הילית כספי תעשה מאמץ לבצע התאמות פעילות. לאחר 6 חודשים ועד תום שנה, הפרופיל נשאר במאגר אך ההתאמות הפעילות אינן מובטחות.
-              </p>
-            </section>
-
-            {/* 5 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">5. אין ערובה להתאמות או לתוצאה</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                הצטרפות למאגר <strong>אינה מהווה ערובה</strong> לקבלת הצעות שידוך כלשהן. הצעות ישלחו אך ורק אם וכאשר תימצא התאמה מתאימה לפי שיקול דעתה המקצועי של הילית כספי, ובכפוף לאישור שני הצדדים מראש. אין כל התחייבות למספר ההתאמות, לתדירותן, לתוצאות הזוגיות, או לכך שיימצא שידוך שיצליח.
-              </p>
-            </section>
-
-            {/* 6 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">6. אי-ביצוע בדיקות רקע</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                יובהר כי <strong>לא מבוצעת כל בדיקת רקע</strong> על המשתתפים במאגר, לרבות בדיקה פלילית, אימות זהות, או בדיקת מצב משפחתי. הילית כספי אינה נושאת באחריות לכל מידע שגוי שמסר משתתף/ת, ולרבות במקרה של אדם בעל עבר פלילי, נשוי/אה, או בעל/ת מצג שווא. האחריות על בחינת ההתאמה ועל ההתנהלות מול הצד השני מוטלת על המשתתף/ת בלבד.
-              </p>
-            </section>
-
-            {/* 7 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">7. פרטיות וסודיות</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                פרטי המשתתף/ת ישמרו בסודיות מלאה ולא יועברו לצד שלישי כלשהו, למעט לצורך ביצוע ההתאמה עצמה ובהסכמת המשתתף/ת. פרטי הצד השני יועברו רק לאחר קבלת אישור מפורש משני הצדדים.
-              </p>
-            </section>
-
-            {/* 8 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">8. התנהגות ראויה</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                המשתתף/ת מתחייב/ת לנהוג בכבוד, בתום לב ובאחריות כלפי כל מי שיוצג/ת בפניו/ה כהתאמה פוטנציאלית. התנהגות פוגענית, הטרדה, או מסירת מידע כוזב עלולים להביא ל<strong>הסרת הפרופיל מהמאגר ללא החזר כספי</strong>.
-              </p>
-            </section>
-
-            {/* 9 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">9. מדיניות ביטול והחזר כספי</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                <strong>דמי הרישום אינם ניתנים להחזר בשום מקרה</strong> לאחר ביצוע התשלום, מאחר והפרופיל נכנס למאגר מיד עם אישור העסקה. לא יינתן החזר כספי חלקי או מלא בגין כל סיבה שהיא, לרבות: אי-קבלת התאמות, שינוי דעה, מציאת זוגיות בדרך אחרת, או כל סיבה אחרת. בהצטרפות למאגר מאשר/ת המשתתף/ת כי הבין/ה והסכים/ה למדיניות זו במלואה.
-              </p>
-            </section>
-
-            {/* 10 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">10. תהליך ההצטרפות</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                לאחר הרכישה, יישלח קישור למילוי שאלון ה-DNA הזוגי ויצירת פרופיל. הפרופיל יעבור סינון ואישור על ידי הילית כספי לפני הכניסה למאגר. הילית שומרת לעצמה את הזכות לסרב לפרופיל שאינו עומד בקריטריונים, ובמקרה כזה יינתן החזר מלא של דמי הרישום.
-              </p>
-            </section>
-
-            {/* 11 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">11. אחריות הספק</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                הילית כספי מתחייבת לספק את השירות כמתואר. במקרה של תקלה טכנית המונעת גישה לפרופיל, יינתן פתרון בתוך 3 ימי עסקים. האחריות מוגבלת לשווי הרכישה בלבד. הילית כספי אינה אחראית לנזקים עקיפים, תוצאתיים או מיוחדים. המאגר מיועד להכרויות בלבד; ההחלטה להתקדם עם כל הצעה היא של החבר בלבד.
-              </p>
-            </section>
-
-            {/* 12 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">12. שינויים בתנאים</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                הילית כספי שומרת לעצמה את הזכות לעדכן תקנון זה מעת לעת. שינויים מהותיים יפורסמו מראש באתר.
-              </p>
-            </section>
-
-            {/* 13 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">13. יצירת קשר</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                לכל שאלה או פנייה:<br />
-                <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="text-[#1800ad] underline">וואטסאפ: {BUSINESS_PHONE}</a><br />
-                דוא"ל: <a href={`mailto:${BUSINESS_EMAIL}`} className="text-[#1800ad] underline">{BUSINESS_EMAIL}</a><br />
-                כתובת: {BUSINESS_ADDRESS}
-              </p>
-            </section>
-
-            {/* 14 */}
-            <section>
-              <h2 className="text-xl font-black text-[#191265] mb-3">14. דין וסמכות שיפוט</h2>
-              <p className="text-[#727272] text-sm leading-relaxed">
-                תקנון זה נכנס לתוקף עם ביצוע התשלום ומהווה הסכם מחייב בין המשתתף/ת לבין הילית כספי. תקנון זה כפוף לדיני מדינת ישראל. סמכות השיפוט לבתי המשפט המוסמכים במחוז תל אביב.
-              </p>
-            </section>
-
-          </div>
-
-          <div className="mt-12 pt-8 border-t border-[#191265]/10">
-            <Link href="/database">
-              <span className="inline-block bg-[#191265] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#1800ad] transition-colors cursor-pointer">
-                ← חזרה לדף המאגר
-              </span>
-            </Link>
-          </div>
-        </motion.div>
-      </div>
-    </div>
-  );
+  return <main className="min-h-screen overflow-x-hidden bg-[#0c1327] font-rubik text-[#17213d]" dir="rtl"><header className="border-b border-white/10 bg-[#10182f]"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 md:px-10"><Lockup /><Link href="/database-plus" className="flex items-center gap-2 text-sm text-white/70 transition-colors hover:text-[#e8cb91]"><ArrowLeft className="h-4 w-4" />חזרה לעמוד Plus</Link></div></header><section className="relative isolate overflow-hidden border-b border-[#d8b67e]/25 bg-[#10182f] px-5 pb-20 pt-16 text-white md:px-10 md:pb-24 md:pt-20"><div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_22%,rgba(216,182,126,.14),transparent_0_20%),radial-gradient(circle_at_92%_85%,rgba(84,107,165,.16),transparent_0_25%)]" /><div className="mx-auto max-w-6xl"><div className="max-w-3xl"><p className="text-xs font-bold tracking-[.18em] text-[#d8b67e]">DATABASE / OFFICIAL ADDENDUM</p><h1 className="mt-5 font-serif text-5xl font-bold leading-[.94] md:text-7xl">עדכון תקנון המאגר:<span className="mt-2 block text-[#e8cb91]">Plus ובוסטים</span></h1><p className="mt-7 max-w-2xl text-base leading-8 text-white/72">מסמך שמציג במפורש את מקום Plus והבוסט בתוך החברות הקיימת במאגר.</p></div></div></section><section className="bg-[#ede2cf] px-5 py-12 md:px-10 md:py-20"><div className="mx-auto max-w-6xl"><div className="border border-[#c6a66e]/40 bg-[#fffaf1] shadow-[0_28px_70px_rgba(0,0,0,.15)]"><div className="border-b border-[#17213d]/10 px-6 py-5 md:flex md:items-center md:justify-between md:px-10"><p className="text-xs font-bold tracking-[.16em] text-[#9c7436]">DATABASE / PLUS ADDENDUM</p><span className="mt-2 inline-flex items-center gap-2 text-xs font-medium text-[#626875] md:mt-0"><CheckCircle2 className="h-4 w-4 text-[#a77c37]" />תנאים משלימים לחברי Plus בלבד</span></div><div className="divide-y divide-[#17213d]/12 px-6 md:px-10">{ADDITIONS.map(([title, body], index) => <section key={title} className="grid gap-4 py-9 md:grid-cols-[78px_1fr] md:gap-8 md:py-11"><span className="font-serif text-4xl font-bold leading-none text-[#b48c4b]">{String(index + 1).padStart(2, "0")}</span><div><h2 className="text-xl font-bold md:text-2xl">{title}</h2><p className="mt-3 max-w-3xl text-sm leading-8 text-[#4d5361] md:text-base">{body}</p></div></section>)}</div><div className="border-t border-[#d8b67e]/45 bg-[#fff5de] px-6 py-7 md:px-10"><div className="flex items-start gap-3 text-sm leading-7 text-[#5d4a29]"><Info className="mt-1 h-5 w-5 shrink-0 text-[#9c7436]" />בעת ההצטרפות ל-Plus נדרש אישור נפרד של התקנון, חיוב חודשי מתחדש והשתתפות בבוסטים. למסמך המלא: <Link href="/terms/plus" className="font-bold underline underline-offset-4">תקנון Plus ומדיניות ביטול</Link>.</div></div></div></div></section></main>;
 }
