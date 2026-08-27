@@ -29,7 +29,7 @@ export default function PlusPilotAdminSection() {
 
   if (overview.isLoading) return <section className="h-44 rounded-2xl bg-white animate-pulse border border-[#e9e8e8]" />;
   if (!overview.data) return null;
-  const { counts, commitment, waitlistToInviteRate, inviteToActiveRate, retentionRate } = overview.data;
+  const { counts, commitment, capacity, waitlistToInviteRate, inviteToActiveRate, retentionRate } = overview.data;
 
   const changeStatus = (id: number, status: "waitlist" | "eligible" | "invited" | "active" | "declined" | "churned") => {
     updateStatus.mutate({
@@ -46,7 +46,7 @@ export default function PlusPilotAdminSection() {
         <div>
           <p className="text-[11px] font-bold text-[#8b7420]">מנוי פרימיום · יעד מדיד של 2 הצעות בכל מחזור</p>
           <h3 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h3>
-          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">רשימת המתנה, חיוב, שירות פרימיום, מונה 0/2–2/2 והתראות לפני סוף מחזור. מעבר ל״הוזמן״ שולח מייל אישי עם מסך ההצעה.</p>
+          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">רשימת המתנה, חיוב, שירות פרימיום, מונה 0/2–2/2 להצעות שנבדקו ידנית ובוסט אלגוריתמי נוסף בכל מחזור. מעבר ל״הוזמן״ שולח מייל אישי עם מסך ההצעה.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <label className="rounded-xl border bg-white px-3 py-2">קוהורט <input value={cohort} onChange={event => setCohort(event.target.value)} className="mr-2 w-24 outline-none" /></label>
@@ -66,6 +66,19 @@ export default function PlusPilotAdminSection() {
             <div className="text-[10px] text-[#777]">{label}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
+        <div className={`rounded-xl border p-3 ${capacity.female.remaining === 0 ? "border-red-200 bg-red-50 text-red-800" : "border-pink-200 bg-pink-50 text-pink-800"}`}>
+          <strong className="text-lg">{capacity.female.reserved}/20</strong>
+          <span className="mr-1">נשים בפיילוט</span>
+          <div className="text-[10px]">נותרו {capacity.female.remaining} מקומות</div>
+        </div>
+        <div className={`rounded-xl border p-3 ${capacity.male.remaining === 0 ? "border-red-200 bg-red-50 text-red-800" : "border-blue-200 bg-blue-50 text-blue-800"}`}>
+          <strong className="text-lg">{capacity.male.reserved}/20</strong>
+          <span className="mr-1">גברים בפיילוט</span>
+          <div className="text-[10px]">נותרו {capacity.male.remaining} מקומות</div>
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">
@@ -109,7 +122,23 @@ export default function PlusPilotAdminSection() {
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {(["eligible", "invited", "active", "declined", "churned"] as const).map(status => (
-                  <button key={status} onClick={() => changeStatus(row.pilot.id, status)} disabled={updateStatus.isPending || row.pilot.status === status}
+                  <button
+                    key={status}
+                    onClick={() => changeStatus(row.pilot.id, status)}
+                    disabled={
+                      updateStatus.isPending
+                      || row.pilot.status === status
+                      || (
+                        (status === "invited" || status === "active")
+                        && row.pilot.status !== "invited"
+                        && row.pilot.status !== "active"
+                        && (
+                          (row.single.gender === "female" && capacity.female.remaining === 0)
+                          || (row.single.gender === "male" && capacity.male.remaining === 0)
+                          || !["female", "male"].includes(row.single.gender)
+                        )
+                      )
+                    }
                     className="rounded-lg border border-[#dcd8ef] px-2.5 py-1.5 text-[9px] font-bold text-[#191265] hover:bg-[#f3f1fb] disabled:opacity-40">
                     {STATUS_LABELS[status]}
                   </button>

@@ -66,8 +66,9 @@ describe("New Year holiday bundle", () => {
   it("states the service limits and does not promise a relationship or match cadence", () => {
     const landing = readProjectFile("client/src/pages/NewYearLoveBundle.tsx");
 
-    expect(landing).toContain("אין הבטחה למספר התאמות או לתדירות קבועה");
-    expect(landing).toContain("הנתונים אינם הבטחה אישית לתוצאה");
-    expect(landing).toContain("Plus ו־Match Boost אינם מופעלים אוטומטית");
+    expect(landing).toContain("אין מכסה קבועה");
+    expect(landing).toContain("אינה מבטיחה התאמה, הסכמה של הצד השני או תוצאה זוגית");
+    expect(landing).toContain("Plus אינו מופעל אוטומטית");
+    expect(landing).toContain("Match Boost ו־Plus הם שירותים נפרדים");
   });
 });

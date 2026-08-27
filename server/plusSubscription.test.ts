@@ -30,6 +30,23 @@ describe("Database Plus billing cycle", () => {
     expect(progress.progressPercent).toBe(100);
   });
 
+  it("does not count an algorithmic Boost instead of the two manually reviewed Plus proposals", () => {
+    const start = Date.UTC(2026, 7, 12);
+    const end = Date.UTC(2026, 8, 12);
+    const progress = calculatePlusCycleProgress({
+      singleId: 7,
+      monthlyMatchTarget: 2,
+      billingCycleStartedAt: start,
+      billingCycleEndsAt: end,
+    }, [
+      { id: 1, singleAId: 7, singleBId: 8, proposedAt: start + 1_000, proposalSource: "manual" },
+      { id: 2, singleAId: 7, singleBId: 9, proposedAt: start + 2_000, proposalSource: "boost" },
+    ], start + 10 * 24 * 60 * 60 * 1000);
+
+    expect(progress.delivered).toBe(1);
+    expect(progress.remaining).toBe(1);
+  });
+
   it("turns red and creates a team task in the final seven days when the target is not met", () => {
     const start = Date.UTC(2026, 7, 1);
     const end = Date.UTC(2026, 8, 1);

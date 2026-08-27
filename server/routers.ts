@@ -7,10 +7,11 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers } from "../drizzle/schema";
+import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, matchBoostMemberships } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
 import { matchBoostRouter, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
+import { matchBoostPilotRouter } from "./matchBoostPilotRouter";
 import { operationsRouter } from "./operationsRouter";
 import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
 import type { ScoreBreakdown as FullScoreBreakdown } from "./compatibility";
@@ -576,6 +577,7 @@ export const appRouter = router({
   dashboard: dashboardRouter,
   plusPilot: plusPilotRouter,
   matchBoost: matchBoostRouter,
+  matchBoostPilot: matchBoostPilotRouter,
   operations: operationsRouter,
   publicProof: router({
     approvedTestimonials: publicProcedure.query(async () => {
@@ -2733,7 +2735,7 @@ export const appRouter = router({
       const db = await getDb();
       if (!db) return [];
       // Exclude seed/demo data - only show real registrations
-      const [singleRows, plusRows] = await Promise.all([
+      const [singleRows, plusRows, boostRows] = await Promise.all([
         db.select().from(singles)
         .where(eq(singles.isSeed, false))
           .orderBy(desc(singles.createdAt)),
@@ -2743,13 +2745,23 @@ export const appRouter = router({
           billingStatus: plusPilotMembers.billingStatus,
           premiumSupportEnabled: plusPilotMembers.premiumSupportEnabled,
         }).from(plusPilotMembers),
+        db.select({
+          singleId: matchBoostMemberships.singleId,
+          status: matchBoostMemberships.status,
+          consentedAt: matchBoostMemberships.consentedAt,
+          consentVersion: matchBoostMemberships.consentVersion,
+        }).from(matchBoostMemberships),
       ]);
       const plusBySingle = new Map(plusRows.map(row => [row.singleId, row]));
+      const boostBySingle = new Map(boostRows.map(row => [row.singleId, row]));
       return singleRows.map(single => ({
         ...single,
         plusStatus: plusBySingle.get(single.id)?.status ?? null,
         plusBillingStatus: plusBySingle.get(single.id)?.billingStatus ?? null,
         plusPremiumSupport: plusBySingle.get(single.id)?.premiumSupportEnabled ?? false,
+        boostStatus: boostBySingle.get(single.id)?.status ?? null,
+        boostConsentedAt: boostBySingle.get(single.id)?.consentedAt ?? null,
+        boostConsentVersion: boostBySingle.get(single.id)?.consentVersion ?? null,
       }));
     }),
 

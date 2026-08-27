@@ -64,6 +64,24 @@ describe("match WhatsApp delivery via Make", () => {
     });
   });
 
+  it("builds a clearly labeled anonymous Boost message without attributing it to Hilit", () => {
+    const message = buildMatchWhatsAppMessage("דנה", "שם שלא אמור להופיע", 85, "boost");
+    expect(message).toContain("הצעת Boost אלגוריתמית");
+    expect(message).toContain("לא נבדקה ידנית על ידי הילית");
+    expect(message).toContain("רק לאחר הסכמה הדדית");
+    expect(message).not.toContain("שם שלא אמור להופיע");
+    expect(message).not.toContain("שבחרתי עבורך");
+
+    const payload = buildMatchWhatsAppPayload({
+      matchId: 43,
+      score: 85,
+      proposalSource: "boost",
+      recipient: { side: "A", phone: "0559348719", firstName: "דנה", matchFirstName: "שם שלא אמור להופיע" },
+    });
+    expect(payload?.message).not.toContain("שם שלא אמור להופיע");
+    expect(payload).toMatchObject({ proposalSource: "boost" });
+  });
+
   it("posts JSON to Make and handles rejection without throwing", async () => {
     const payload = buildMatchWhatsAppPayload({
       matchId: 42,

@@ -1028,6 +1028,14 @@ export default function CRMMatchmaking() {
                         PLUS
                       </span>
                     )}
+                    {(single as any).boostStatus === "active" && (
+                      <span
+                        className="rounded-full bg-fuchsia-100 px-2.5 py-1 text-[10px] font-black text-fuchsia-800 ring-1 ring-fuchsia-200"
+                        title="הפרופיל אישר הצעות Boost אלגוריתמיות והופעה בכרטיס אנונימי"
+                      >
+                        ✓ אישר Boost
+                      </span>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleCoachingClient.mutate({ id: single.id }); }}
                       disabled={toggleCoachingClient.isPending}

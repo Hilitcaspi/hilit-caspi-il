@@ -716,6 +716,38 @@ async function startServer() {
     }
   });
 
+  // One-time owner reminder to top up Vibrate credits. This route only creates
+  // a Manus owner notification; it never sends an SMS or touches customer data.
+  app.post("/api/scheduled/vibrate-credit-reminder", express.json(), async (req, res) => {
+    try {
+      let isAuthorized = Boolean(req.headers["x-manus-cron-task-uid"]);
+      if (!isAuthorized) {
+        try {
+          const user = await sdk.authenticateRequest(req as any);
+          if (user && (user.role === "admin" || (user as any).isCron)) isAuthorized = true;
+        } catch { /* invalid session */ }
+      }
+      if (!isAuthorized) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const delivered = await notifyOwner({
+        title: "תזכורת: לטעון קרדיטי SMS ב־Vibrate",
+        content: "כדי להשלים את אימות התראות הפרופילים החסרים, יש לטעון לפחות 10 קרדיטי SMS ב־Vibrate ולכתוב לי כאן ״נטען״.",
+      });
+      res.json({ ok: true, delivered });
+    } catch (err) {
+      console.error("[VibrateCreditReminder] Error:", err);
+      res.status(500).json({
+        error: String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+        context: { url: req.originalUrl, taskUid: req.headers["x-manus-cron-task-uid"] || null },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // Daily Plus commitment monitor. Creates one team task when an active paid
   // member enters the final seven days of a billing cycle below the 2/2 target.
   app.post("/api/scheduled/plus-commitments", express.json(), async (req, res) => {

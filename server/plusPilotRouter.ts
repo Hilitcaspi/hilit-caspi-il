@@ -1,11 +1,12 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, or } from "drizzle-orm";
 import { z } from "zod";
-import { crmTeamTasks, matches, plusPilotMembers, singles } from "../drizzle/schema";
+import { crmTeamTasks, matchBoostRequests, matches, plusPilotMembers, singles } from "../drizzle/schema";
 import { getDb } from "./db";
 import { sendEmail } from "./brevo";
 import { getMissingProfileFields } from "./matchmakingMetrics";
 import { calculatePlusCycleProgress } from "./plusSubscription";
+import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved } from "./plusPilotCapacity";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 
 const PLUS_STATUSES = ["waitlist", "eligible", "invited", "active", "declined", "churned"] as const;
@@ -63,7 +64,7 @@ async function getVerifiedSingle(email: string, token: string) {
 }
 
 async function getMemberMatches(db: any, singleId: number) {
-  return db.select({
+  const memberMatches = await db.select({
     id: matches.id,
     singleAId: matches.singleAId,
     singleBId: matches.singleBId,
@@ -72,6 +73,12 @@ async function getMemberMatches(db: any, singleId: number) {
     matchDetailStatus: matches.matchDetailStatus,
     returnedToPoolAt: matches.returnedToPoolAt,
   }).from(matches).where(or(eq(matches.singleAId, singleId), eq(matches.singleBId, singleId)));
+  const boostRows = await db.select({ matchId: matchBoostRequests.matchId }).from(matchBoostRequests);
+  const boostMatchIds = new Set(boostRows.map((row: any) => Number(row.matchId || 0)).filter(Boolean));
+  return memberMatches.map((match: any) => ({
+    ...match,
+    proposalSource: boostMatchIds.has(match.id) ? "boost" : "manual",
+  }));
 }
 
 function assertAdmin(ctx: any) {
@@ -103,6 +110,7 @@ export const plusPilotRouter = router({
         paymentConfigured: Boolean(process.env.GROW_PAGE_CODE_PLUS?.trim()),
         benefits: [
           "לפחות שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב",
+          "בוסט אלגוריתמי אחד כלול בכל מחזור, בנוסף לשתי ההצעות שנבדקו ידנית",
           "קדימות באיתור ובבדיקה ידנית של מועמדים מתאימים",
           "שירות לקוחות Plus בעדיפות דרך המספר העסקי",
           "אפשרות לחשיפה בסושיאל רק לאחר אישור מפורש של הטקסט והתמונה",
@@ -246,9 +254,15 @@ export const plusPilotRouter = router({
       singleBId: matches.singleBId,
       proposedAt: matches.proposedAt,
     }).from(matches);
+    const boostRows = await db.select({ matchId: matchBoostRequests.matchId }).from(matchBoostRequests);
+    const boostMatchIds = new Set(boostRows.map(row => Number(row.matchId || 0)).filter(Boolean));
+    const countableMatches = allMatches.map(match => ({
+      ...match,
+      proposalSource: boostMatchIds.has(match.id) ? "boost" : "manual",
+    }));
     const enrichedRows = rows.map(row => ({
       ...row,
-      cycleProgress: calculatePlusCycleProgress(row.pilot, allMatches),
+      cycleProgress: calculatePlusCycleProgress(row.pilot, countableMatches),
     }));
     const counts = Object.fromEntries(PLUS_STATUSES.map(status => [status, rows.filter(row => row.pilot.status === status).length]));
     const invitedBase = counts.invited + counts.active + counts.declined + counts.churned;
@@ -258,9 +272,14 @@ export const plusPilotRouter = router({
       atRisk: enrichedRows.filter(row => row.pilot.status === "active" && row.cycleProgress.state === "red").length,
       inProgress: enrichedRows.filter(row => row.pilot.status === "active" && row.cycleProgress.delivered < row.cycleProgress.target && row.cycleProgress.state !== "red").length,
     };
+    const capacity = calculatePlusPilotCapacity(rows.map(row => ({
+      status: row.pilot.status,
+      gender: row.single.gender,
+    })));
     return {
       counts,
       commitment,
+      capacity,
       waitlistToInviteRate: rows.length > 0 ? Math.round(invitedBase / rows.length * 100) : 0,
       inviteToActiveRate: invitedBase > 0 ? Math.round((counts.active + counts.churned) / invitedBase * 100) : 0,
       retentionRate: activatedBase > 0 ? Math.round(counts.active / activatedBase * 100) : 0,
@@ -286,12 +305,31 @@ export const plusPilotRouter = router({
           firstName: singles.firstName,
           email: singles.email,
           questionnaireToken: singles.questionnaireToken,
+          gender: singles.gender,
         },
       }).from(plusPilotMembers)
         .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
         .where(eq(plusPilotMembers.id, input.id))
         .limit(1);
       if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "חבר/ת הפיילוט לא נמצא/ה" });
+
+      const reservingSlot = input.status === "invited" || input.status === "active";
+      if (reservingSlot && !isPlusPilotSlotReserved(member.pilot.status)) {
+        const capacityRows = await db.select({
+          status: plusPilotMembers.status,
+          gender: singles.gender,
+        }).from(plusPilotMembers)
+          .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id));
+        if (!hasPlusPilotCapacity(capacityRows, member.single.gender)) {
+          const genderLabel = member.single.gender === "female" ? "נשים" : member.single.gender === "male" ? "גברים" : "המגדר הזה";
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: member.single.gender === "female" || member.single.gender === "male"
+              ? `מכסת 20 ${genderLabel} בפיילוט Plus מלאה`
+              : "יש לעדכן מגדר בפרופיל לפני הזמנה לפיילוט Plus",
+          });
+        }
+      }
 
       await db.update(plusPilotMembers).set({
         status: input.status,
@@ -313,7 +351,7 @@ export const plusPilotRouter = router({
               <div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;background:#fff;color:#292552;padding:28px;border-radius:18px">
                 <p style="font-size:12px;font-weight:bold;color:#9a7e15">קבוצה מצומצמת לחברים פעילים במאגר</p>
                 <h2 style="color:#191265">היי ${member.single.firstName}, יש לך הזמנה ל־Database Plus</h2>
-                <p style="line-height:1.8">Plus מוסיף עבודה יזומה וקדימות סביב הפרופיל שלך: לפחות <strong>שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב</strong>, קדימות בבדיקה האנושית, שירות לקוחות בעדיפות ואפשרות לחשיפה בסושיאל רק אם תרצה/י ותאשר/י.</p>
+                <p style="line-height:1.8">Plus מוסיף עבודה יזומה וקדימות סביב הפרופיל שלך: לפחות <strong>שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב</strong>, ובנוסף <strong>בוסט אלגוריתמי אחד כלול בכל מחזור</strong>, קדימות בבדיקה האנושית, שירות לקוחות בעדיפות ואפשרות לחשיפה בסושיאל רק לאחר אישור מפורש.</p>
                 <p style="line-height:1.8"><strong>99 ש״ח לחודש</strong>, בנוסף לחברות הרגילה במאגר, עם אפשרות ביטול בכל עת.</p>
                 <p style="line-height:1.8;font-size:13px;color:#666"><strong>חשוב:</strong> ההבטחה היא להצעות שנבדקו ונשלחו. אישור הדדי, דייט או זוגיות תלויים גם בצד השני ואינם מובטחים.</p>
                 <p style="text-align:center;margin:28px 0"><a href="${personalUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">לפרטים ולהצטרפות</a></p>

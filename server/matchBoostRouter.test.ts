@@ -2,7 +2,7 @@ import fs from "node:fs";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { evaluateBoostEligibility } from "./matchBoostRouter";
+import { BOOST_CONSENT_VERSION, buildAnonymousBoostCard, evaluateBoostEligibility } from "./matchBoostRouter";
 
 const NOW = new Date("2026-08-25T12:00:00Z").getTime();
 
@@ -46,11 +46,24 @@ function pendingMatch(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function activeMembership(overrides: Record<string, unknown> = {}) {
+  return {
+    status: "active",
+    consentVersion: BOOST_CONSENT_VERSION,
+    algorithmicDisclosureAccepted: true,
+    anonymousProfileAccepted: true,
+    termsAccepted: true,
+    consentedAt: NOW - 1000,
+    ...overrides,
+  };
+}
+
 describe("match boost eligibility", () => {
   it("allows a complete paid active member with a hidden pending candidate", () => {
     const result = evaluateBoostEligibility({
       single: completeSingle(),
       memberMatches: [pendingMatch()],
+      membership: activeMembership(),
       boostRequests: [],
       now: NOW,
     });
@@ -63,6 +76,7 @@ describe("match boost eligibility", () => {
     const result = evaluateBoostEligibility({
       single: completeSingle(),
       memberMatches: [pendingMatch({ candidateEligible: false })],
+      membership: activeMembership(),
       boostRequests: [],
       now: NOW,
     });
@@ -75,6 +89,7 @@ describe("match boost eligibility", () => {
     const result = evaluateBoostEligibility({
       single: completeSingle({ questionnaireCompletedAt: null, photoUrl: null }),
       memberMatches: [pendingMatch()],
+      membership: activeMembership(),
       boostRequests: [],
       now: NOW,
     });
@@ -87,6 +102,7 @@ describe("match boost eligibility", () => {
     const active = evaluateBoostEligibility({
       single: completeSingle(),
       memberMatches: [pendingMatch(), pendingMatch({ id: 102, status: "proposed" })],
+      membership: activeMembership(),
       boostRequests: [],
       now: NOW,
     });
@@ -96,6 +112,7 @@ describe("match boost eligibility", () => {
     const relationship = evaluateBoostEligibility({
       single: completeSingle(),
       memberMatches: [pendingMatch(), pendingMatch({ id: 103, status: "matched", matchDetailStatus: "relationship" })],
+      membership: activeMembership(),
       boostRequests: [],
       now: NOW,
     });
@@ -107,6 +124,7 @@ describe("match boost eligibility", () => {
     const result = evaluateBoostEligibility({
       single: completeSingle(),
       memberMatches: [pendingMatch()],
+      membership: activeMembership(),
       boostRequests: [{ id: 1, status: "queued", requestedAt: NOW - 1000, source: "paid" }],
       now: NOW,
     });
@@ -125,6 +143,7 @@ describe("match boost eligibility", () => {
       single: completeSingle(),
       memberMatches: [pendingMatch()],
       plusMember,
+      membership: activeMembership(),
       boostRequests: [],
       now: NOW,
     });
@@ -134,6 +153,7 @@ describe("match boost eligibility", () => {
       single: completeSingle(),
       memberMatches: [pendingMatch()],
       plusMember,
+      membership: activeMembership(),
       boostRequests: [{
         id: 3,
         status: "approved",
@@ -145,20 +165,89 @@ describe("match boost eligibility", () => {
     });
     expect(used.plusBenefitAvailable).toBe(false);
   });
+
+  it("blocks members without current explicit Boost consent", () => {
+    const missing = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [pendingMatch()],
+      boostRequests: [],
+      now: NOW,
+    });
+    expect(missing.eligible).toBe(false);
+    expect(missing.blockers).toContain("יש להצטרף למסלול Boost ולאשר את תנאי השירות");
+
+    const outdated = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [pendingMatch()],
+      membership: activeMembership({ consentVersion: "old-version" }),
+      boostRequests: [],
+      now: NOW,
+    });
+    expect(outdated.eligible).toBe(false);
+  });
 });
 
 describe("match boost privacy and payment gate", () => {
   const source = fs.readFileSync(path.join(process.cwd(), "server/matchBoostRouter.ts"), "utf8");
   const uiSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/UserDashboard.tsx"), "utf8");
   const operationsSource = fs.readFileSync(path.join(process.cwd(), "client/src/components/OperationsSection.tsx"), "utf8");
-  const routersSource = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
+  const emailSource = fs.readFileSync(path.join(process.cwd(), "server/emailTemplates.ts"), "utf8");
+  const whatsappSource = fs.readFileSync(path.join(process.cwd(), "server/matchWhatsApp.ts"), "utf8");
 
-  it("returns only candidate count and score to the personal area, not candidate identity", () => {
+  it("returns a sanitized anonymous card to the personal area, not candidate identity", () => {
     const publicReturn = source.slice(source.indexOf("return {\n        eligible:"), source.indexOf("redeemPlusBoost:"));
     expect(publicReturn).toContain("candidateCount");
     expect(publicReturn).toContain("topScore");
-    expect(publicReturn).not.toContain("topCandidate");
+    expect(publicReturn).toContain("anonymousCard");
+    expect(publicReturn).toContain("buildAnonymousBoostCard");
     expect(publicReturn).not.toContain("otherId");
+
+    const card = buildAnonymousBoostCard({
+      firstName: "נועה",
+      lastName: "בדיקה",
+      email: "private@example.com",
+      phone: "0501234567",
+      photoUrl: "/private-photo.jpg",
+      city: "רעננה",
+      age: 37,
+      occupation: "מנהלת מוצר בהייטק",
+      education: "master",
+      height: 168,
+      maritalStatus: "single",
+      hasKids: false,
+      smokingStatus: "no",
+      religiosity: "traditional",
+      wantsKids: "yes",
+    }, { score: 86, scoreBreakdown: JSON.stringify({ questionnaire: 90, dna: 82, lifeStage: 88 }) });
+    const serialized = JSON.stringify(card);
+    expect(card.region).toBe("השרון");
+    expect(card.occupation).toBe("טכנולוגיה והנדסה");
+    expect(card.reasons.length).toBeGreaterThanOrEqual(3);
+    expect(serialized).not.toContain("נועה");
+    expect(serialized).not.toContain("בדיקה");
+    expect(serialized).not.toContain("private@example.com");
+    expect(serialized).not.toContain("0501234567");
+    expect(serialized).not.toContain("private-photo.jpg");
+    expect(serialized).not.toContain("רעננה");
+  });
+
+  it("allows every active database member to opt in with all three explicit consents and records opt-in and opt-out events", () => {
+    expect(source).toContain("inviteMember: teamProcedure");
+    expect(source).toContain('status: "invited"');
+    expect(operationsSource).toContain("פתיחת הזמנה אישית");
+    expect(operationsSource).toContain("אינה מצרפת את האדם למסלול");
+    expect(source).toContain("joinPool: publicProcedure");
+    expect(source).toContain("algorithmicDisclosureAccepted: z.literal(true)");
+    expect(source).toContain("anonymousProfileAccepted: z.literal(true)");
+    expect(source).toContain("termsAccepted: z.literal(true)");
+    expect(source).not.toContain("פיילוט Boost פתוח כרגע בהזמנה אישית בלבד");
+    expect(source).toContain('"opted_in"');
+    expect(source).toContain('"consent_updated"');
+    expect(source).toContain("leavePool: publicProcedure");
+    expect(source).toContain('eventType: "opted_out"');
+    expect(uiSource).toContain("הצטרפות למסלול Boost");
+    expect(uiSource).toContain("בהצטרפות יזומה");
+    expect(uiSource).toContain("יציאה ממסלול Boost");
   });
 
   it("keeps regular payment visibly blocked until a dedicated Grow product is connected", () => {
@@ -167,33 +256,33 @@ describe("match boost privacy and payment gate", () => {
     expect(uiSource).toContain("const regularPaymentReady = false");
     expect(uiSource).not.toContain("trpc.matchBoost.startPaidBoost");
     expect(uiSource).toContain("בוסט התאמה ב־19.99 ש״ח · בקרוב");
-    expect(uiSource).toContain("הבוסט אינו מבטיח שההתאמה תאושר");
+    expect(source).toContain("הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית");
+    expect(uiSource).toContain("card.disclosure");
   });
 
-  it("exposes candidate identity only in the team-protected CRM review queue", () => {
+  it("never exposes candidate identity in the personal-area Boost card", () => {
     expect(source).toContain("listReviewQueue: teamProcedure");
-    expect(operationsSource).toContain("ההתאמה המוסתרת");
-    expect(operationsSource).toContain("trpc.matchBoost.listReviewQueue");
     expect(uiSource).not.toContain("candidate.firstName");
     expect(uiSource).not.toContain("candidate.photoUrl");
   });
 
-  it("starts review from Operations but sends or rejects only through the normal match flow", () => {
-    expect(operationsSource).toContain("trpc.matchBoost.startReview");
-    expect(operationsSource).toContain("/crm/matchmaking?tab=matches&boostMatchId=");
-    expect(operationsSource).not.toContain("trpc.matchmaking.approveMatch");
-    expect(operationsSource).not.toContain("trpc.matchmaking.rejectMatch");
-    expect(routersSource).toContain('decision: "approved"');
-    expect(routersSource).toContain('decision: "rejected"');
+  it("dispatches an included Plus boost automatically without a Hilit approval task", () => {
+    const plusFlow = source.slice(source.indexOf("redeemPlusBoost:"), source.indexOf("startPaidBoost:"));
+    expect(source).toContain("dispatchAlgorithmicBoostProposal");
+    expect(plusFlow).toContain("dispatchAlgorithmicBoostProposal");
+    expect(plusFlow).not.toContain("tx.insert(crmTeamTasks)");
+    expect(source).toContain('proposalSource: "boost"');
+    expect(source).toContain('ownerApprovedAt: null');
+    expect(source).toContain('decisionReason: "algorithmic_boost_auto_dispatch"');
   });
 
-  it("updates the boost request and CRM task together after a match decision", () => {
-    const syncFunction = source.slice(
-      source.indexOf("export async function syncBoostRequestAfterMatchDecision"),
-      source.indexOf("async function getVerifiedSingle"),
-    );
-    expect(syncFunction).toContain("db.transaction");
-    expect(syncFunction).toContain("tx.update(matchBoostRequests)");
-    expect(syncFunction).toContain("tx.update(crmTeamTasks)");
+  it("labels Boost email and WhatsApp as algorithmic and hides name and photo until mutual consent", () => {
+    expect(emailSource).toContain('proposalSource?: "manual" | "boost"');
+    expect(emailSource).toContain("לא נבדקה ולא אושרה ידנית על ידי הילית");
+    expect(emailSource).toContain("!isBoost && params.matchPhotoUrl");
+    expect(emailSource).toContain('isBoost ? "כרטיס התאמה אנונימי" : params.matchFirstName');
+    expect(whatsappSource).toContain('proposalSource === "boost"');
+    expect(whatsappSource).toContain("הצעת Boost אלגוריתמית");
+    expect(whatsappSource).toContain("לא נבדקה ידנית על ידי הילית");
   });
 });

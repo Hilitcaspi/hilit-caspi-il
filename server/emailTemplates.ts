@@ -1319,9 +1319,11 @@ export function buildMatchProposalEmail(params: {
   recipientEmail: string;
   singleId: number;
   trackingPixelUrl?: string;
+  proposalSource?: "manual" | "boost";
 }): EmailTemplate {
   const isFemale = params.recipientGender === "female";
   const isMale = params.recipientGender === "male";
+  const isBoost = params.proposalSource === "boost";
   const dnaLabel = params.matchDnaType
     ? (isFemale ? DNA_PROFILES[params.matchDnaType]?.label_m ?? "" : DNA_PROFILES[params.matchDnaType]?.label_f ?? DNA_PROFILES[params.matchDnaType]?.label_m ?? "")
     : "";
@@ -1352,10 +1354,11 @@ export function buildMatchProposalEmail(params: {
       <p style="font-size:13px; color:#191265; font-weight:700; margin:0;">📌 את התגובה יש להזין בתחתית המייל</p>
     </div>
 
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">יש לך הצעה, ${params.firstName} 💛</h2>
+    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? "יש לך הצעת Boost" : "יש לך הצעה"}, ${params.firstName} 💛</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      מצאתי עבורך התאמה שחשבתי עליה הרבה לפני שהחלטתי לשלוח אותה ${isFemale ? "אלייך" : "אליך"}.
-      לא כל ההצעות מגיעות ${isFemale ? "אלייך" : "אליך"}, רק אלו שאני מאמינה בהן.
+      ${isBoost
+        ? `ההצעה נשלחה דרך מסלול Boost על בסיס בדיקת האלגוריתם ותנאי הסף שהגדרתם. <strong>היא לא נבדקה ולא אושרה ידנית על ידי הילית.</strong>`
+        : `מצאתי עבורך התאמה שחשבתי עליה הרבה לפני שהחלטתי לשלוח אותה ${isFemale ? "אלייך" : "אליך"}. לא כל ההצעות מגיעות ${isFemale ? "אלייך" : "אליך"}, רק אלו שאני מאמינה בהן.`}
     </p>
 
     <!-- Compatibility score badge -->
@@ -1367,10 +1370,10 @@ export function buildMatchProposalEmail(params: {
 
     <!-- Match profile (no last name, no phone) -->
     <div style="background:#f9f6f0; border-radius:14px; padding:24px 28px; margin:20px 0;">
-      <p style="color:#191265; font-size:13px; font-weight:700; margin:0 0 12px; letter-spacing:0.5px;">✨ ההתאמה שלך</p>
+      <p style="color:#191265; font-size:13px; font-weight:700; margin:0 0 12px; letter-spacing:0.5px;">${isBoost ? "⚡ כרטיס Boost אנונימי" : "✨ ההתאמה שלך"}</p>
       <div style="background:#191265; border-radius:12px; padding:20px 24px; text-align:center;">
-        ${params.matchPhotoUrl ? `<a href="${params.matchPhotoUrl}" target="_blank" rel="noopener noreferrer" style="display:block; margin-bottom:16px; text-decoration:none;"><img src="${params.matchPhotoUrl}" alt="${params.matchFirstName}" style="width:200px; height:200px; border-radius:16px; object-fit:cover; object-position:center 20%; border:3px solid #ffe27c; display:block; margin-left:auto; margin-right:auto;" /></a>` : ""}
-        <p style="color:#ffffff; font-size:22px; font-weight:800; margin:0 0 4px;">${params.matchFirstName}</p>
+        ${!isBoost && params.matchPhotoUrl ? `<a href="${params.matchPhotoUrl}" target="_blank" rel="noopener noreferrer" style="display:block; margin-bottom:16px; text-decoration:none;"><img src="${params.matchPhotoUrl}" alt="${params.matchFirstName}" style="width:200px; height:200px; border-radius:16px; object-fit:cover; object-position:center 20%; border:3px solid #ffe27c; display:block; margin-left:auto; margin-right:auto;" /></a>` : ""}
+        <p style="color:#ffffff; font-size:22px; font-weight:800; margin:0 0 4px;">${isBoost ? "כרטיס התאמה אנונימי" : params.matchFirstName}</p>
         <p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">🎂 ${params.matchAge} · 📍 ${params.matchCity}</p>
         ${occupationLine}
         ${educationLine}
@@ -1381,7 +1384,7 @@ export function buildMatchProposalEmail(params: {
     </div>
 
         <!-- Below 80% personal note from Hilit -->
-    ${params.compatibilityScore < 80 ? `
+    ${!isBoost && params.compatibilityScore < 80 ? `
     <div style="background:#fff3cd; border-right:4px solid #ffe27c; border-radius:8px; padding:16px 20px; margin:16px 0;">
       <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">✨ הערה אישית מהילית</p>
       <p style="font-size:14px; color:#333; line-height:1.8; margin:0;">
@@ -1392,12 +1395,18 @@ export function buildMatchProposalEmail(params: {
       </p>
       <p style="font-size:12px; color:#727272; margin:10px 0 0; text-align:left;">הילית כספי</p>
     </div>` : ""}
+    ${isBoost ? `
+    <div style="background:#f5f2ff; border-right:4px solid #6b57b9; border-radius:8px; padding:20px 24px; margin:20px 0;">
+      <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">⚡ למה האלגוריתם סימן התאמה</p>
+      <p style="font-size:15px; color:#333; line-height:1.9; margin:0;">${params.hilitsNote}</p>
+      <p style="font-size:12px; color:#727272; margin:12px 0 0;">הצעת Boost אלגוריתמית. לא נבדקה ידנית על ידי הילית.</p>
+    </div>` : `
     <!-- Hilit's personal note -->
     <div style="background:#fff8e1; border-right:4px solid #ffe27c; border-radius:8px; padding:20px 24px; margin:20px 0;">
       <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">💬 המלצה אישית שלי</p>
       <p style="font-size:15px; color:#333; line-height:1.9; margin:0; font-style:italic;">"${params.hilitsNote}"</p>
       <p style="font-size:13px; color:#727272; margin:12px 0 0; text-align:left;">הילית כספי</p>
-    </div>
+    </div>`}
 
     <p style="color:#444; font-size:15px; line-height:1.8; margin:20px 0;">
       אם ההצעה מעניינת ${isFemale ? "אותך" : "אותך"}, ${isFemale ? "לחצי" : "לחץ"} על "כן, מעניין אותי".
@@ -1423,9 +1432,11 @@ export function buildMatchProposalEmail(params: {
   `;
 
   return {
-    subject: `💛 יש לך התאמה שמחכה לך! ${params.compatibilityScore}%`,
+    subject: isBoost
+      ? `⚡ יש לך הצעת Boost אלגוריתמית · ${params.compatibilityScore}%`
+      : `💛 יש לך התאמה שמחכה לך! ${params.compatibilityScore}%`,
     htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\nיש לך הצעת התאמה חדשה!\n\nאחוז התאמה: ${params.compatibilityScore}%\nהתאמה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}\n\nלאישור: ${params.yesUrl}\nלדחייה: ${params.noUrl}\n\nהילית כספי`,
+    textBody: `שלום ${params.firstName},\n\n${isBoost ? "יש לך הצעת Boost אלגוריתמית שלא נבדקה ידנית על ידי הילית" : "יש לך הצעת התאמה חדשה"}.\n\nאחוז התאמה: ${params.compatibilityScore}%\nהתאמה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}\n\nלאישור: ${params.yesUrl}\nלדחייה: ${params.noUrl}\n\nהילית כספי`,
   };
 }
 

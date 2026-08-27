@@ -13,7 +13,7 @@ const TASK_LABELS: Record<string, string> = {
   other: "אחר",
 };
 const STATUS_LABELS: Record<string, string> = { todo: "לביצוע", in_progress: "בטיפול", done: "הושלם", cancelled: "בוטל" };
-const BOOST_STATUS_LABELS: Record<string, string> = { paid: "שולם", queued: "ממתין לבדיקה", reviewing: "בבדיקה" };
+const BOOST_STATUS_LABELS: Record<string, string> = { paid: "תשלום נקלט", queued: "ממתין לשליחה", reviewing: "חריגה בבדיקה" };
 
 export default function OperationsSection() {
   const [tab, setTab] = useState<"tasks" | "boosts" | "partners">(() => {
@@ -31,22 +31,31 @@ export default function OperationsSection() {
   const [partnerCode, setPartnerCode] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [boostInviteEmail, setBoostInviteEmail] = useState("");
+  const [boostInviteMessage, setBoostInviteMessage] = useState("");
 
   const tasksQuery = trpc.operations.listTasks.useQuery(undefined, { refetchInterval: 30000 });
   const teamQuery = trpc.operations.teamMembers.useQuery();
   const partnerQuery = trpc.operations.partnerOverview.useQuery(undefined, { refetchInterval: 60000 });
   const boostQueueQuery = trpc.matchBoost.listReviewQueue.useQuery(undefined, { refetchInterval: 30000 });
+  const boostPilotOverviewQuery = trpc.matchBoostPilot.overview.useQuery(undefined, { refetchInterval: 30000 });
+  const boostInterestsQuery = trpc.matchBoostPilot.listInterests.useQuery(undefined, { refetchInterval: 30000 });
   const createTask = trpc.operations.createTask.useMutation({ onSuccess: () => { setTitle(""); tasksQuery.refetch(); } });
   const updateTask = trpc.operations.updateTask.useMutation({ onSuccess: () => tasksQuery.refetch() });
   const createPartner = trpc.operations.createPartnerSource.useMutation({ onSuccess: () => {
     setPartnerName(""); setPartnerCode(""); setEventDate(""); setContactEmail(""); partnerQuery.refetch();
   } });
   const updatePartner = trpc.operations.updatePartnerStatus.useMutation({ onSuccess: () => partnerQuery.refetch() });
-  const startBoostReview = trpc.matchBoost.startReview.useMutation({
-    onSuccess: () => {
-      boostQueueQuery.refetch();
-      tasksQuery.refetch();
+  const inviteBoostMember = trpc.matchBoost.inviteMember.useMutation({
+    onSuccess: data => {
+      setBoostInviteMessage(data.alreadyActive
+        ? "החבר או החברה כבר משתתפים במסלול Boost."
+        : `ההזמנה נפתחה${data.memberName ? ` עבור ${data.memberName}` : ""}. לא נשמרה הסכמה עד לאישור באזור האישי.`);
+      setBoostInviteEmail("");
+      boostPilotOverviewQuery.refetch();
+      boostInterestsQuery.refetch();
     },
+    onError: error => setBoostInviteMessage(error.message),
   });
 
   const tasks = useMemo(() => {
@@ -92,7 +101,7 @@ export default function OperationsSection() {
         <div className="flex rounded-xl bg-[#f4f2fb] p-1">
           <button onClick={() => setTab("tasks")} className={`rounded-lg px-4 py-2 text-xs font-bold ${tab === "tasks" ? "bg-[#191265] text-white" : "text-[#666]"}`}>משימות צוות</button>
           <button onClick={() => setTab("boosts")} className={`rounded-lg px-4 py-2 text-xs font-bold ${tab === "boosts" ? "bg-[#191265] text-white" : "text-[#666]"}`}>
-            בדיקות בוסט {(boostQueueQuery.data || []).length > 0 ? `(${(boostQueueQuery.data || []).length})` : ""}
+            Boost והזמנות {(boostQueueQuery.data || []).length > 0 ? `(${(boostQueueQuery.data || []).length})` : ""}
           </button>
           <button onClick={() => setTab("partners")} className={`rounded-lg px-4 py-2 text-xs font-bold ${tab === "partners" ? "bg-[#191265] text-white" : "text-[#666]"}`}>שותפים ואירועים</button>
         </div>
@@ -149,8 +158,65 @@ export default function OperationsSection() {
         </div>
       ) : tab === "boosts" ? (
         <div className="mt-5">
+          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              ["התעניינו", boostPilotOverviewQuery.data?.interests?.interested || 0],
+              ["הוזמנו", boostPilotOverviewQuery.data?.memberships?.invited || 0],
+              ["הצטרפו", boostPilotOverviewQuery.data?.memberships?.active || 0],
+              ["יצאו", boostPilotOverviewQuery.data?.memberships?.opted_out || 0],
+              ["נשלחו", boostPilotOverviewQuery.data?.sent || 0],
+              ["אישור הדדי", boostPilotOverviewQuery.data?.mutualApproval || 0],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-xl border border-[#e4def2] bg-white p-3 text-center shadow-sm">
+                <strong className="block text-xl text-[#191265]">{value}</strong>
+                <span className="text-[10px] font-bold text-[#746b84]">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mb-4 rounded-xl border border-[#e2d8f1] bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-black text-[#191265]">מתעניינים מהעמוד הציבורי</p>
+                <p className="mt-1 text-[10px] leading-5 text-[#6d6780]">הבעת עניין אינה הסכמה למסלול. אפשר לפתוח הזמנה אישית רק לחבר או חברת מאגר פעילים.</p>
+              </div>
+              <a href="/match-boost" target="_blank" rel="noreferrer" className="rounded-lg border border-[#cfc7e8] px-3 py-2 text-[10px] font-black text-[#51448c]">פתיחת עמוד ההתעניינות</a>
+            </div>
+            <div className="mt-3 space-y-2">
+              {(boostInterestsQuery.data || []).slice(0, 20).map((row: any) => (
+                <div key={row.interest.id} className="flex flex-col gap-2 rounded-xl bg-[#f8f6ff] p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <strong className="block truncate text-xs text-[#191265]">{row.interest.firstName || row.single?.firstName || "מתעניין/ת"}</strong>
+                    <span className="block truncate text-[10px] text-[#746b84]">{row.interest.email} · {row.interest.status === "joined" ? "הצטרף/ה" : row.interest.status === "invited" ? "הוזמן/ה" : "התעניין/ה"}</span>
+                  </div>
+                  <button type="button" disabled={!row.single?.id || row.membership?.status === "active" || inviteBoostMember.isPending} onClick={() => inviteBoostMember.mutate({ email: row.interest.email, pilotCohort: "pilot_2026_09" })} className="rounded-lg bg-[#191265] px-3 py-2 text-[10px] font-black text-white disabled:opacity-40">
+                    {!row.single?.id ? "לא נמצא במאגר" : row.membership?.status === "active" ? "כבר במסלול" : "פתיחת הזמנה אישית"}
+                  </button>
+                </div>
+              ))}
+              {!boostInterestsQuery.isLoading && (boostInterestsQuery.data || []).length === 0 && <div className="py-5 text-center text-[10px] text-[#888]">אין עדיין מתעניינים מהעמוד הציבורי</div>}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#d9d3ee] bg-[#f8f6ff] p-4">
+            <p className="text-xs font-black text-[#191265]">הזמנה לפיילוט Boost</p>
+            <p className="mt-1 text-[10px] leading-5 text-[#6d6780]">הזנה כאן פותחת את טופס ההסכמה באזור האישי בלבד. היא אינה מצרפת את האדם למסלול ואינה שולחת הודעה.</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input type="email" value={boostInviteEmail} onChange={event => setBoostInviteEmail(event.target.value)} placeholder="מייל של חבר או חברת המאגר" className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2.5 text-xs" />
+              <button
+                type="button"
+                disabled={!boostInviteEmail.includes("@") || inviteBoostMember.isPending}
+                onClick={() => inviteBoostMember.mutate({ email: boostInviteEmail.trim(), pilotCohort: "pilot_2026_09" })}
+                className="rounded-lg bg-[#191265] px-4 py-2.5 text-xs font-black text-white disabled:opacity-40"
+              >
+                {inviteBoostMember.isPending ? "פותח/ת הזמנה..." : "פתיחת הזמנה אישית"}
+              </button>
+            </div>
+            {boostInviteMessage && <p className="mt-2 rounded-lg bg-white px-3 py-2 text-[10px] font-bold text-[#51448c]">{boostInviteMessage}</p>}
+          </div>
+
           <div className="rounded-xl border border-[#f0d981] bg-[#fff9df] p-4 text-xs leading-6 text-[#514000]">
-            בקשת בוסט נותנת קדימות לבדיקה בלבד. היא לא שולחת התאמה אוטומטית. מתחילים בדיקה כאן, ואז מאשרים או דוחים דרך טאב ההתאמות הרגיל. רק פעולה בזרימה הרגילה מעדכנת את הבקשה כהושלמה.
+            הצעת Boost נשלחת אוטומטית רק לאחר בדיקת זכאות סופית והסכמה פעילה של שני הצדדים. הרשימה למטה מיועדת רק לבקשות ישנות או לחריגים שלא הושלמו אוטומטית; היא אינה תור לאישור הילית.
           </div>
 
           <div className="mt-3 space-y-3">
@@ -166,17 +232,10 @@ export default function OperationsSection() {
                     <p className="mt-1 text-[10px] text-[#777]">התאמה #{row.match.id} · ציון {row.match.score}% · נפתחה {new Date(row.request.requestedAt).toLocaleString("he-IL")}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {row.request.status !== "reviewing" && (
-                      <button
-                        onClick={() => startBoostReview.mutate({ requestId: row.request.id })}
-                        disabled={startBoostReview.isPending}
-                        className="rounded-lg bg-[#191265] px-3 py-2 text-[10px] font-black text-white disabled:opacity-50"
-                      >התחל/י בדיקה</button>
-                    )}
                     <button
                       onClick={() => window.location.assign(`/crm/matchmaking?tab=matches&boostMatchId=${row.match.id}`)}
                       className="rounded-lg border border-[#cfc7e8] bg-white px-3 py-2 text-[10px] font-black text-[#191265]"
-                    >פתח/י בטאב התאמות</button>
+                    >פתח/י חריגה בטאב התאמות</button>
                   </div>
                 </div>
 
@@ -206,7 +265,7 @@ export default function OperationsSection() {
               </article>
             ))}
             {boostQueueQuery.isLoading && <div className="py-8 text-center text-xs text-[#888]">טוען בקשות בוסט...</div>}
-            {!boostQueueQuery.isLoading && (boostQueueQuery.data || []).length === 0 && <div className="py-8 text-center text-xs text-[#888]">אין כרגע בקשות בוסט שממתינות לבדיקה</div>}
+            {!boostQueueQuery.isLoading && (boostQueueQuery.data || []).length === 0 && <div className="py-8 text-center text-xs text-[#888]">אין כרגע חריגי Boost שממתינים לטיפול</div>}
           </div>
         </div>
       ) : (

@@ -71,6 +71,7 @@ const SeptemberOffers = lazy(() => import("@/pages/SeptemberOffers"));
 const NewYearLoveBundle = lazy(() => import("@/pages/NewYearLoveBundle"));
 const ThankYouNewYearBundle = lazy(() => import("@/pages/ThankYouNewYearBundle"));
 const TermsNewYearBundle = lazy(() => import("@/pages/TermsNewYearBundle"));
+const MatchBoostLanding = lazy(() => import("@/pages/MatchBoostLanding"));
 
 // US English (EN) pages
 const EnHome = lazy(() => import("@/pages/en/Home"));
@@ -281,6 +282,7 @@ function HeRouter() {
           <Route path="/new-year-love" component={NewYearLoveBundle} />
           <Route path="/terms/new-year-love" component={TermsNewYearBundle} />
           <Route path="/thank-you/new-year-love" component={ThankYouNewYearBundle} />
+          <Route path="/match-boost" component={MatchBoostLanding} />
           <Route path={"/thank-you/course"} component={ThankYouCourse} />
           <Route path={"/course-sales"} component={CourseSales} />
           <Route path={"/course/view"} component={CourseView} />

@@ -830,8 +830,82 @@ export type PlusPaymentEvent = typeof plusPaymentEvents.$inferSelect;
 export type InsertPlusPaymentEvent = typeof plusPaymentEvents.$inferInsert;
 
 /**
- * Auditable match boost lifecycle. A boost prioritizes a hidden pending match
- * for Hilit's review; it never reveals or sends a match before human approval.
+ * Explicit, revocable consent to participate in the algorithmic Match Boost
+ * pool. A WhatsApp reaction is interest only; only an active row with all
+ * consent flags accepted allows an anonymous card to be shown or received.
+ */
+export const matchBoostMemberships = mysqlTable("match_boost_memberships", {
+  id: int("id").primaryKey().autoincrement(),
+  singleId: int("single_id").notNull().unique(),
+  status: mysqlEnum("status", ["invited", "active", "paused", "opted_out", "removed"]).default("invited").notNull(),
+  consentVersion: varchar("consent_version", { length: 100 }),
+  algorithmicDisclosureAccepted: boolean("algorithmic_disclosure_accepted").default(false).notNull(),
+  anonymousProfileAccepted: boolean("anonymous_profile_accepted").default(false).notNull(),
+  termsAccepted: boolean("terms_accepted").default(false).notNull(),
+  consentedAt: bigint("consented_at", { mode: "number" }),
+  optedOutAt: bigint("opted_out_at", { mode: "number" }),
+  invitedAt: bigint("invited_at", { mode: "number" }),
+  source: varchar("source", { length: 100 }).default("personal_area").notNull(),
+  pilotCohort: varchar("pilot_cohort", { length: 100 }),
+  eligibleAt: bigint("eligible_at", { mode: "number" }),
+  eligibilitySnapshot: text("eligibility_snapshot"),
+  lastActiveAt: bigint("last_active_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  statusIdx: index("boost_membership_status_idx").on(t.status, t.consentedAt),
+  cohortIdx: index("boost_membership_cohort_idx").on(t.pilotCohort, t.status),
+}));
+export type MatchBoostMembership = typeof matchBoostMemberships.$inferSelect;
+export type InsertMatchBoostMembership = typeof matchBoostMemberships.$inferInsert;
+
+/** Immutable audit trail for every Match Boost consent-state change. */
+export const matchBoostConsentEvents = mysqlTable("match_boost_consent_events", {
+  id: int("id").primaryKey().autoincrement(),
+  singleId: int("single_id").notNull(),
+  eventType: mysqlEnum("event_type", ["invited", "opted_in", "paused", "opted_out", "removed", "consent_updated"]).notNull(),
+  consentVersion: varchar("consent_version", { length: 100 }),
+  algorithmicDisclosureAccepted: boolean("algorithmic_disclosure_accepted").default(false).notNull(),
+  anonymousProfileAccepted: boolean("anonymous_profile_accepted").default(false).notNull(),
+  termsAccepted: boolean("terms_accepted").default(false).notNull(),
+  source: varchar("source", { length: 100 }).default("personal_area").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  singleCreatedIdx: index("boost_consent_single_created_idx").on(t.singleId, t.createdAt),
+}));
+export type MatchBoostConsentEvent = typeof matchBoostConsentEvents.$inferSelect;
+export type InsertMatchBoostConsentEvent = typeof matchBoostConsentEvents.$inferInsert;
+
+/**
+ * Public interest in the invite-only Match Boost pilot. This is not consent to
+ * receive algorithmic proposals; only an active matchBoostMembership can do so.
+ */
+export const matchBoostPilotInterests = mysqlTable("match_boost_pilot_interests", {
+  id: int("id").primaryKey().autoincrement(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  phone: varchar("phone", { length: 40 }),
+  firstName: varchar("first_name", { length: 100 }),
+  matchedSingleId: int("matched_single_id"),
+  contactConsent: boolean("contact_consent").default(false).notNull(),
+  consentVersion: varchar("consent_version", { length: 100 }).notNull(),
+  source: varchar("source", { length: 100 }).default("match_boost_landing").notNull(),
+  utmSource: varchar("utm_source", { length: 200 }),
+  utmMedium: varchar("utm_medium", { length: 200 }),
+  utmCampaign: varchar("utm_campaign", { length: 200 }),
+  utmContent: varchar("utm_content", { length: 200 }),
+  status: mysqlEnum("status", ["interested", "invited", "joined", "not_eligible", "declined"]).default("interested").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  statusCreatedIdx: index("boost_interest_status_created_idx").on(t.status, t.createdAt),
+  singleIdx: index("boost_interest_single_idx").on(t.matchedSingleId),
+}));
+export type MatchBoostPilotInterest = typeof matchBoostPilotInterests.$inferSelect;
+export type InsertMatchBoostPilotInterest = typeof matchBoostPilotInterests.$inferInsert;
+
+/**
+ * Auditable Match Boost lifecycle. Eligible Boost proposals are dispatched
+ * algorithmically to two opted-in members and remain anonymous until mutual consent.
  */
 export const matchBoostRequests = mysqlTable("match_boost_requests", {
   id: int("id").primaryKey().autoincrement(),

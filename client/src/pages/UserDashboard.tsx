@@ -54,7 +54,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
             <p className="text-[11px] font-bold text-[#8b7420]">שירות פרימיום לחברים פעילים במאגר</p>
             <h4 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h4>
             <p className="mt-1 max-w-xl text-xs leading-6 text-[#555]">
-              99 ש״ח לחודש, ביטול בכל עת, עם לפחות שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב אישי.
+              99 ש״ח לחודש, ביטול בכל עת, עם לפחות שתי הצעות שנבדקו ידנית ובוסט אלגוריתמי אחד נוסף בכל מחזור חיוב.
             </p>
           </div>
           {registered && (
@@ -80,7 +80,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
                 <div className="text-left text-[11px] leading-5 text-white/65">נותרו {cycleProgress.daysRemaining} ימים<br />עד {new Date(cycleProgress.cycleEnd).toLocaleDateString("he-IL")}</div>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-[#ffe27c]" style={{ width: `${cycleProgress.progressPercent}%` }} /></div>
-              <p className="mt-2 text-[10px] leading-5 text-white/60">נספרות רק הצעות חדשות שנבדקו ונשלחו בפועל. אישור הדדי, דייט או זוגיות אינם מובטחים.</p>
+              <p className="mt-2 text-[10px] leading-5 text-white/60">המונה כולל רק הצעות שנבדקו ידנית ונשלחו בפועל. בוסט אלגוריתמי אינו מחליף את יעד 2 ההצעות. אישור הדדי, דייט או זוגיות אינם מובטחים.</p>
             </div>
             <a href="https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%9C%D7%A7%D7%95%D7%97%2F%D7%AA%20Database%20Plus%20%D7%95%D7%99%D7%A9%20%D7%9C%D7%99%20%D7%A9%D7%90%D7%9C%D7%94" target="_blank" rel="noreferrer" className="flex min-h-24 items-center justify-center rounded-xl border border-[#eadf9e] bg-white px-5 text-center text-xs font-black text-[#191265]">
               שירות Plus אישי<br />בוואטסאפ העסקי
@@ -370,13 +370,30 @@ function DnaCard({ dnaType, gender }: { dnaType: DnaType; gender: "female" | "ma
 function MatchBoostCard({ email, token }: { email: string; token: string }) {
   const utils = trpc.useUtils();
   const [resultMessage, setResultMessage] = useState("");
+  const [algorithmicConsent, setAlgorithmicConsent] = useState(false);
+  const [anonymousProfileConsent, setAnonymousProfileConsent] = useState(false);
+  const [termsConsent, setTermsConsent] = useState(false);
   const statusQuery = trpc.matchBoost.getMyStatus.useQuery(
     { email, token },
     { enabled: Boolean(email && token), retry: false },
   );
   const redeemPlus = trpc.matchBoost.redeemPlusBoost.useMutation({
     onSuccess: () => {
-      setResultMessage("הבוסט התקבל וההתאמה הועברה לבדיקה בעדיפות גבוהה.");
+      setResultMessage("הבוסט התקבל. הצעת Boost אלגוריתמית תישלח בזרימה הרגילה לאחר בדיקת הזכאות הסופית.");
+      utils.matchBoost.getMyStatus.invalidate({ email, token });
+    },
+    onError: error => setResultMessage(error.message),
+  });
+  const joinPool = trpc.matchBoost.joinPool.useMutation({
+    onSuccess: () => {
+      setResultMessage("ההצטרפות למסלול Boost נשמרה. אפשר לצאת ממנו בכל עת.");
+      utils.matchBoost.getMyStatus.invalidate({ email, token });
+    },
+    onError: error => setResultMessage(error.message),
+  });
+  const leavePool = trpc.matchBoost.leavePool.useMutation({
+    onSuccess: () => {
+      setResultMessage("יצאת ממסלול Boost. הפרופיל לא יוצג בכרטיסי Boost חדשים.");
       utils.matchBoost.getMyStatus.invalidate({ email, token });
     },
     onError: error => setResultMessage(error.message),
@@ -386,43 +403,141 @@ function MatchBoostCard({ email, token }: { email: string; token: string }) {
     return <div className="h-44 animate-pulse rounded-2xl border border-[#e9e8e8] bg-white/70" />;
   }
   const status = statusQuery.data;
-  if (!status || (status.candidateCount === 0 && !status.openRequest)) return null;
+  if (!status) return null;
+
+  if (!status.membership?.active) {
+    const allAccepted = algorithmicConsent && anonymousProfileConsent && termsConsent;
+    return (
+      <section className="overflow-hidden rounded-2xl border border-[#d9c05c] bg-gradient-to-br from-white via-[#fffdf4] to-[#fff3bf] text-right shadow-sm">
+        <div className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-[#8b7420]">Match Boost לחברי המאגר</p>
+              <h3 className="mt-1 text-xl font-black text-[#191265]">יותר שליטה בהזדמנויות להיכרות</h3>
+            </div>
+            <span className="rounded-full bg-[#191265] px-3 py-1 text-[11px] font-black text-white">בהצטרפות יזומה</span>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-[#555]">
+            במסלול Boost אפשר לקבל ולשלוח הצעות התאמה שנבחרו על ידי האלגוריתם. ההצעות אינן נבדקות או מאושרות ידנית על ידי הילית.
+          </p>
+
+          <div className="mt-4 space-y-3 rounded-2xl border border-[#eadb91] bg-white/85 p-4">
+              <p className="text-xs font-black text-[#191265]">כדי להצטרף, יש לאשר את שלושת הסעיפים:</p>
+              <label className="flex items-start gap-3 text-xs leading-5 text-[#555]">
+                <input type="checkbox" checked={algorithmicConsent} onChange={event => setAlgorithmicConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#191265]" />
+                <span>אני מסכים או מסכימה לקבל הצעות Boost אלגוריתמיות שלא נבדקו ידנית על ידי הילית.</span>
+              </label>
+              <label className="flex items-start gap-3 text-xs leading-5 text-[#555]">
+                <input type="checkbox" checked={anonymousProfileConsent} onChange={event => setAnonymousProfileConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#191265]" />
+                <span>אני מאשר או מאשרת הצגת כרטיס אנונימי עם גיל, אזור כללי, תחום עיסוק, השכלה, אורח חיים וסיבות התאמה, ללא שם, תמונה או פרטי קשר.</span>
+              </label>
+              <label className="flex items-start gap-3 text-xs leading-5 text-[#555]">
+                <input type="checkbox" checked={termsConsent} onChange={event => setTermsConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#191265]" />
+                <span>קראתי והבנתי שאין הבטחה להסכמת הצד השני, לחשיפת פרטים, לדייט או לזוגיות, ושאפשר לצאת מהמסלול בכל עת.</span>
+              </label>
+              <button
+                type="button"
+                disabled={!allAccepted || joinPool.isPending}
+                onClick={() => joinPool.mutate({
+                  email,
+                  token,
+                  algorithmicDisclosureAccepted: true,
+                  anonymousProfileAccepted: true,
+                  termsAccepted: true,
+                })}
+                className="w-full rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white transition-colors hover:bg-[#1800ad] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {joinPool.isPending ? "שומר/ת הסכמה..." : "הצטרפות למסלול Boost"}
+              </button>
+          </div>
+          {resultMessage && <p className="mt-3 rounded-lg bg-[#e8f5e9] p-2 text-center text-xs font-bold text-[#2e7d32]">{resultMessage}</p>}
+        </div>
+      </section>
+    );
+  }
+
+  if (status.candidateCount === 0 && !status.openRequest) {
+    return (
+      <section className="rounded-2xl border border-[#d9c05c] bg-white p-5 text-right shadow-sm">
+        <p className="text-xs font-bold text-[#8b7420]">Match Boost פעיל</p>
+        <h3 className="mt-1 text-lg font-black text-[#191265]">אין כרגע כרטיס שעובר את כל תנאי הסף</h3>
+        <p className="mt-2 text-sm leading-6 text-[#555]">נציג כרטיס רק כאשר שני הצדדים פעילים, פנויים, הצטרפו למסלול והפרטים שלהם מלאים.</p>
+        <button type="button" disabled={leavePool.isPending} onClick={() => leavePool.mutate({ email, token })} className="mt-4 rounded-lg border border-[#d8d5e3] px-3 py-2 text-xs font-bold text-[#655f74] disabled:opacity-50">יציאה ממסלול Boost</button>
+        {resultMessage && <p className="mt-3 text-xs font-bold text-emerald-700">{resultMessage}</p>}
+      </section>
+    );
+  }
 
   if (status.openRequest) {
     const labels: Record<string, string> = {
       awaiting_payment: "ממתין לתשלום",
       paid: "התשלום התקבל",
-      queued: "ממתין לבדיקה בעדיפות גבוהה",
-      reviewing: "ההתאמה בבדיקה",
+      queued: "ממתין לשליחה האלגוריתמית",
+      reviewing: "נדרשת בדיקת חריגה טכנית",
     };
     return (
       <section className="overflow-hidden rounded-2xl border border-[#d9c05c] bg-gradient-to-br from-white to-[#fff8da] p-5 text-right shadow-sm">
         <p className="text-xs font-bold text-[#8b7420]">בוסט התאמה</p>
         <h3 className="mt-1 text-lg font-black text-[#191265]">הבקשה שלך בטיפול</h3>
         <p className="mt-2 text-sm leading-6 text-[#555]">{labels[status.openRequest.status] || "הבקשה נמצאת בטיפול"}</p>
-        <p className="mt-3 text-xs leading-5 text-[#727272]">לא נחשפים פרטים לפני בדיקה ואישור, וההתאמה נשלחת לשני הצדדים רק דרך הזרימה הרגילה.</p>
+        <p className="mt-3 text-xs leading-5 text-[#727272]">לפני השליחה המערכת בודקת שוב ששני הצדדים פעילים, פנויים והסכימו למסלול. זו הצעת Boost אלגוריתמית שאינה נבדקת ידנית על ידי הילית.</p>
       </section>
     );
   }
 
   const primaryBlocker = status.blockers[0];
+  const card = status.anonymousCard;
   // Paid Match Boost remains intentionally unavailable until Grow has a dedicated approved product.
   const regularPaymentReady = false;
   return (
     <section className="overflow-hidden rounded-2xl border border-[#d9c05c] bg-gradient-to-br from-white via-[#fffdf4] to-[#fff3bf] text-right shadow-sm">
-      <div className="grid gap-5 p-5 sm:grid-cols-[92px_1fr] sm:items-center">
-        <div className="mx-auto flex h-24 w-20 items-center justify-center rounded-2xl border border-white/80 bg-[#191265] shadow-md">
-          <div className="flex h-16 w-14 items-center justify-center rounded-full bg-white/15 text-3xl blur-[1px]">?</div>
-        </div>
-        <div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-bold text-[#8b7420]">התאמה אפשרית שממתינה לבדיקה</p>
-            {status.topScore && <span className="rounded-full bg-[#191265] px-3 py-1 text-xs font-black text-white">{status.topScore}% התאמה</span>}
+      <div className="p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="mx-auto flex h-24 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/80 bg-[#191265] shadow-md sm:mx-0">
+            <div className="flex h-16 w-14 items-center justify-center rounded-full bg-white/15 text-3xl blur-[1px]">?</div>
           </div>
-          <h3 className="mt-2 text-xl font-black text-[#191265]">רוצים לקדם את הבדיקה?</h3>
-          <p className="mt-2 text-sm leading-6 text-[#555]">הבוסט מעלה התאמה אפשרית לראש תור הבדיקה של הילית. רק לאחר בדיקה ואישור, ההצעה תישלח לשני הצדדים.</p>
-          <p className="mt-2 text-xs leading-5 text-[#727272]">הבוסט אינו מבטיח שההתאמה תאושר או שהצד השני יסכים, ואינו חושף פרטים לפני הסכמה הדדית.</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-bold text-[#8b7420]">כרטיס Boost אנונימי</p>
+              {card?.score && <span className="rounded-full bg-[#191265] px-3 py-1 text-xs font-black text-white">{card.score}% התאמה</span>}
+            </div>
+            <h3 className="mt-2 text-xl font-black text-[#191265]">לפני תמונה, מכירים את האדם</h3>
+            <p className="mt-2 text-sm leading-6 text-[#555]">הכרטיס מציג פרטים שיכולים לעזור להחליט אם לפתוח הזדמנות, בלי שם, תמונה, עיר מדויקת, מקום עבודה או פרטי קשר.</p>
+          </div>
         </div>
+
+        {card && (
+          <div className="mt-5 space-y-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {[
+                ["גיל", card.age], ["אזור", card.region], ["תחום עיסוק", card.occupation],
+                ["השכלה", card.education], ["גובה", card.height ? `${card.height} ס״מ` : "לא צוין"],
+                ["מצב משפחתי", card.maritalStatus], ["ילדים", card.hasKids], ["עישון", card.smoking],
+                ["זיקה דתית", card.religiosity], ["כיוון משפחתי", card.relationshipIntent],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-xl border border-[#eadb91] bg-white/85 p-3">
+                  <p className="text-[10px] font-bold text-[#8b7420]">{label}</p>
+                  <p className="mt-1 text-xs font-black text-[#191265]">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl bg-[#eef9f1] p-4">
+                <p className="text-xs font-black text-[#24613a]">למה האלגוריתם סימן התאמה</p>
+                <ul className="mt-2 space-y-1.5 text-xs leading-5 text-[#315d3f]">{(card.reasons || []).map((reason: string) => <li key={reason}>✓ {reason}</li>)}</ul>
+              </div>
+              <div className="rounded-xl bg-[#fff3e8] p-4">
+                <p className="text-xs font-black text-[#8a4b17]">מה כדאי לקחת בחשבון</p>
+                {(card.considerations || []).length > 0 ? (
+                  <ul className="mt-2 space-y-1.5 text-xs leading-5 text-[#75431e]">{card.considerations.map((item: string) => <li key={item}>• {item}</li>)}</ul>
+                ) : <p className="mt-2 text-xs leading-5 text-[#75431e]">לא נמצא פער מהותי בנתונים שהוצגו.</p>}
+              </div>
+            </div>
+            <div className="rounded-xl border border-[#cfc7e8] bg-[#f5f2ff] p-3 text-center text-xs font-black text-[#51448c]">{card.disclosure}</div>
+            <h3 className="text-center text-lg font-black text-[#191265]">רוצים לשלוח הצעת Boost?</h3>
+            <p className="text-center text-xs leading-5 text-[#666]">לפני המימוש תתבצע בדיקת זכאות סופית. זהות ופרטים נוספים ייחשפו רק לאחר הסכמה הדדית.</p>
+          </div>
+        )}
       </div>
       <div className="border-t border-[#eadb91] bg-white/70 p-4">
         {status.plusBenefitAvailable ? (
@@ -445,9 +560,16 @@ function MatchBoostCard({ email, token }: { email: string; token: string }) {
         )}
         {primaryBlocker && <p className="mt-2 text-center text-xs font-medium text-[#9a5b00]">{primaryBlocker}</p>}
         {!primaryBlocker && !status.plusBenefitAvailable && (
-          <p className="mt-2 text-center text-xs text-[#727272]">התשלום ייפתח לאחר חיבור מוצר בוסט ייעודי ב־Grow.</p>
+          <div className="mt-2 space-y-1 text-center text-xs leading-5 text-[#727272]">
+            <p>התשלום ייפתח לאחר חיבור מוצר בוסט ייעודי ב־Grow.</p>
+            <p>19.99 ש״ח הם עבור שליחת ההצעה בעדיפות לאחר בדיקת זכאות סופית. התשלום אינו מבטיח הסכמה של הצד השני, חשיפת פרטים או זוגיות.</p>
+          </div>
         )}
         {resultMessage && <p className="mt-3 rounded-lg bg-[#e8f5e9] p-2 text-center text-xs font-bold text-[#2e7d32]">{resultMessage}</p>}
+        <details className="mt-3 text-center text-[11px] text-[#777]">
+          <summary className="cursor-pointer font-bold text-[#191265]">ניהול מסלול Boost</summary>
+          <button type="button" disabled={leavePool.isPending} onClick={() => leavePool.mutate({ email, token })} className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 font-bold text-red-700 disabled:opacity-50">יציאה מהמסלול</button>
+        </details>
       </div>
     </section>
   );

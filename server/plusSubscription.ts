@@ -1,5 +1,5 @@
 import { and, eq, or } from "drizzle-orm";
-import { crmTeamTasks, matches, plusPilotMembers } from "../drizzle/schema";
+import { crmTeamTasks, matchBoostRequests, matches, plusPilotMembers } from "../drizzle/schema";
 import { getDb } from "./db";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -17,6 +17,7 @@ export type PlusCycleMatch = {
   singleAId: number;
   singleBId: number;
   proposedAt?: number | null;
+  proposalSource?: string | null;
 };
 
 export function addOneBillingMonth(start: number) {
@@ -50,7 +51,7 @@ export function calculatePlusCycleProgress(
       .filter(match => {
         const proposedAt = Number(match.proposedAt || 0);
         const belongsToMember = match.singleAId === member.singleId || match.singleBId === member.singleId;
-        return belongsToMember && proposedAt >= cycleStart && proposedAt < cycleEnd;
+        return belongsToMember && match.proposalSource !== "boost" && proposedAt >= cycleStart && proposedAt < cycleEnd;
       })
       .map(match => match.id),
   );
@@ -98,11 +99,17 @@ export async function runPlusCommitmentMonitor(now = Date.now()) {
     singleBId: matches.singleBId,
     proposedAt: matches.proposedAt,
   }).from(matches);
+  const boostRows = await db.select({ matchId: matchBoostRequests.matchId }).from(matchBoostRequests);
+  const boostMatchIds = new Set(boostRows.map(row => Number(row.matchId || 0)).filter(Boolean));
+  const countableMatches = matchRows.map(match => ({
+    ...match,
+    proposalSource: boostMatchIds.has(match.id) ? "boost" : "manual",
+  }));
 
   let created = 0;
   let skipped = 0;
   for (const member of members) {
-    const progress = calculatePlusCycleProgress(member, matchRows, now);
+    const progress = calculatePlusCycleProgress(member, countableMatches, now);
     if (!shouldCreatePlusCommitmentTask(progress)) {
       skipped++;
       continue;

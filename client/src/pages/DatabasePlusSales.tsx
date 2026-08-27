@@ -12,6 +12,11 @@ const BENEFITS = [
     text: "שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב אישי.",
   },
   {
+    icon: Sparkles,
+    title: "בוסט אחד כלול בכל מחזור",
+    text: "הצעת Boost אלגוריתמית נוספת, אנונימית ומסומנת, שאינה נספרת במקום שתי ההצעות שנבדקו ידנית.",
+  },
+  {
     icon: Crown,
     title: "קדימות בבדיקה האנושית",
     text: "איתור ובדיקת מועמדים לפני התור הרגיל, תוך שמירה על תנאי הסף החשובים לך.",
@@ -63,11 +68,11 @@ export default function DatabasePlusSales() {
         <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle at 20% 30%, #ffe27c 0%, transparent 32%), radial-gradient(circle at 85% 75%, #6253d6 0%, transparent 36%)" }} />
         <div className="relative mx-auto max-w-5xl text-center">
           <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-[#ffe27c]/40 bg-[#ffe27c]/10 px-4 py-2 text-sm font-bold text-[#ffe27c]">
-            <Sparkles className="h-4 w-4" /> קבוצה מצומצמת לחברי המאגר
+            <Sparkles className="h-4 w-4" /> פיילוט מוגבל: 20 נשים ו־20 גברים
           </div>
           <h1 className="text-4xl font-black leading-tight md:text-6xl">Database <span className="text-[#ffe27c]">Plus</span></h1>
           <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-white/80 md:text-xl">
-            יותר עבודה יזומה סביב הפרופיל שלך, יותר קדימות בבדיקה — ויעד ברור של לפחות שתי הצעות התאמה חדשות בכל מחזור.
+            יותר עבודה יזומה סביב הפרופיל שלך, לפחות שתי הצעות שנבדקו ידנית בכל מחזור, ובנוסף בוסט אלגוריתמי אחד כלול.
           </p>
           <div className="mx-auto mt-8 flex max-w-xl flex-col items-center justify-center gap-3 rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur sm:flex-row">
             <div className="text-center">
@@ -80,7 +85,7 @@ export default function DatabasePlusSales() {
         </div>
       </section>
 
-      <section className="mx-auto -mt-8 grid max-w-6xl gap-4 px-5 md:grid-cols-2 lg:grid-cols-4">
+      <section className="mx-auto -mt-8 grid max-w-6xl gap-4 px-5 md:grid-cols-2 lg:grid-cols-5">
         {BENEFITS.map(({ icon: Icon, title, text }) => (
           <article key={title} className="rounded-3xl border border-[#e6dfcc] bg-white p-6 shadow-sm">
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fff4bd] text-[#191265]"><Icon className="h-6 w-6" /></div>

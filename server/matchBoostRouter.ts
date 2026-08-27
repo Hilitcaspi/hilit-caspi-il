@@ -1,22 +1,145 @@
 import { TRPCError } from "@trpc/server";
+import crypto from "crypto";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   crmTeamTasks,
+  matchBoostConsentEvents,
+  matchBoostMemberships,
+  matchBoostPilotInterests,
   matchBoostRequests,
   matches,
   plusPilotMembers,
   singles,
 } from "../drizzle/schema";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
+import { passesHardFilters } from "./compatibility";
 import { getDb } from "./db";
+import { sendEmail } from "./brevo";
+import { buildMatchProposalEmail } from "./emailTemplates";
 import { getMissingProfileFields } from "./matchmakingMetrics";
+import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BOOST_PRICE_AGOROT = 1999;
 const MIN_BOOST_SCORE = 70;
+export const BOOST_CONSENT_VERSION = "2026-08-27-v1";
 const OPEN_BOOST_STATUSES = ["awaiting_payment", "paid", "queued", "reviewing"] as const;
 const REVIEWABLE_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
+
+function hasActiveBoostConsent(membership: any) {
+  return Boolean(
+    membership
+    && membership.status === "active"
+    && membership.consentVersion === BOOST_CONSENT_VERSION
+    && membership.algorithmicDisclosureAccepted
+    && membership.anonymousProfileAccepted
+    && membership.termsAccepted,
+  );
+}
+
+const EDUCATION_LABELS: Record<string, string> = {
+  high_school: "תיכון",
+  vocational: "הכשרה מקצועית",
+  technician: "הנדסאי/ת",
+  student: "סטודנט/ית",
+  bachelor: "תואר ראשון",
+  master: "תואר שני",
+  phd: "דוקטורט",
+  other: "השכלה אחרת",
+};
+const MARITAL_LABELS: Record<string, string> = { single: "רווק/ה", divorced: "גרוש/ה", widowed: "אלמן/ה" };
+const RELIGIOSITY_LABELS: Record<string, string> = { secular: "חילוני/ת", traditional: "מסורתי/ת", religious: "דתי/ת", orthodox: "חרדי/ת", datlash: "דתל״ש/ית" };
+const SMOKING_LABELS: Record<string, string> = { no: "לא מעשן/ת", occasionally: "מעשן/ת מדי פעם", yes: "מעשן/ת" };
+const WANTS_KIDS_LABELS: Record<string, string> = { yes: "רוצה ילדים", no: "לא רוצה ילדים נוספים", open: "פתוח/ה בנושא ילדים" };
+
+function broadRegion(city: string | null | undefined) {
+  const value = String(city || "").trim();
+  const north = ["חיפה", "קריית", "קרית", "עכו", "נהריה", "כרמיאל", "טבריה", "צפת", "עפולה", "יקנעם", "זכרון יעקב"];
+  const sharon = ["נתניה", "כפר סבא", "רעננה", "הוד השרון", "הרצליה", "רמת השרון", "חדרה", "פרדס חנה"];
+  const jerusalem = ["ירושלים", "מבשרת", "מעלה אדומים", "בית שמש", "מודיעין"];
+  const south = ["באר שבע", "אשדוד", "אשקלון", "נתיבות", "שדרות", "אילת", "דימונה", "ערד"];
+  if (north.some(item => value.includes(item))) return "צפון וחיפה";
+  if (sharon.some(item => value.includes(item))) return "השרון";
+  if (jerusalem.some(item => value.includes(item))) return "ירושלים והסביבה";
+  if (south.some(item => value.includes(item))) return "דרום";
+  return "מרכז והשפלה";
+}
+
+function occupationCategory(occupation: string | null | undefined) {
+  const value = String(occupation || "").toLowerCase();
+  if (/הייטק|תוכנ|מהנדס|data|product|סייבר|מפתח/.test(value)) return "טכנולוגיה והנדסה";
+  if (/רופא|אחות|טיפול|פסיכ|עובד.*סוציא|בריאות|תרפ/.test(value)) return "טיפול ובריאות";
+  if (/מורה|חינוך|מרצה|גננ|הוראה|אקדמ/.test(value)) return "חינוך ואקדמיה";
+  if (/מנהל|ניהול|משאבי אנוש|שיווק|מכירות|עסק/.test(value)) return "ניהול ועסקים";
+  if (/עורך דין|משפט|רו״ח|רואה חשבון|פיננס|כלכל/.test(value)) return "מקצועות חופשיים ופיננסים";
+  if (/מעצב|אמנ|מוזיק|צילום|כתיב|יציר/.test(value)) return "יצירה ותקשורת";
+  return "תחום מקצועי אחר";
+}
+
+function parseScoreBreakdown(raw: unknown): Record<string, number> {
+  if (!raw) return {};
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Object.fromEntries(Object.entries(parsed as Record<string, unknown>)
+      .filter(([, value]) => Number.isFinite(Number(value)))
+      .map(([key, value]) => [key, Number(value)]));
+  } catch {
+    return {};
+  }
+}
+
+export function buildAnonymousBoostCard(candidate: any, match: any) {
+  const scores = parseScoreBreakdown(match?.scoreBreakdown);
+  const dimensions: Array<[string, string]> = [
+    ["questionnaire", "התאמה חזקה בשאלון המדעי"],
+    ["general", "התאמה טובה בדפוסי זוגיות"],
+    ["dna", "חיבור משלים בסגנון הזוגי"],
+    ["lifeStage", "שלב חיים דומה"],
+    ["age", "התאמה הדדית בטווחי הגיל"],
+    ["religiosity", "זיקה דתית ואורח חיים תואמים"],
+    ["kids", "כיוון דומה בנושא משפחה וילדים"],
+    ["city", "התאמה בהעדפות המרחק"],
+    ["practicality", "התאמה טובה בתנאים המעשיים"],
+    ["education", "רקע לימודי תואם"],
+  ];
+  const reasons = dimensions
+    .filter(([key]) => Number(scores[key] || 0) >= 70)
+    .sort(([a], [b]) => Number(scores[b] || 0) - Number(scores[a] || 0))
+    .map(([, label]) => label)
+    .slice(0, 4);
+  const fallbackReasons = [
+    "עברתם את כל תנאי הסף ההדדיים",
+    "שניכם משתתפים באופן פעיל במסלול Boost",
+    "הפרופילים והשאלונים שלכם מלאים",
+  ];
+  for (const reason of fallbackReasons) {
+    if (reasons.length >= 3) break;
+    reasons.push(reason);
+  }
+  const considerations = dimensions
+    .filter(([key]) => scores[key] > 0 && scores[key] < 60)
+    .sort(([a], [b]) => Number(scores[a] || 0) - Number(scores[b] || 0))
+    .map(([, label]) => label.replace("התאמה חזקה", "פער מסוים").replace("התאמה טובה", "פער מסוים").replace("תואמים", "דורשים פתיחות"))
+    .slice(0, 2);
+
+  return {
+    age: candidate.age,
+    region: broadRegion(candidate.city),
+    occupation: occupationCategory(candidate.occupation),
+    education: EDUCATION_LABELS[candidate.education] || "לא צוין",
+    height: candidate.height || null,
+    maritalStatus: MARITAL_LABELS[candidate.maritalStatus] || "לא צוין",
+    hasKids: candidate.hasKids ? "יש ילדים" : "ללא ילדים",
+    smoking: SMOKING_LABELS[candidate.smokingStatus] || "לא צוין",
+    religiosity: RELIGIOSITY_LABELS[candidate.religiosity] || "לא צוין",
+    relationshipIntent: WANTS_KIDS_LABELS[candidate.wantsKids] || "מחפש/ת קשר רציני",
+    score: Math.round(Number(match?.score || 0)),
+    reasons,
+    considerations,
+    disclosure: "הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית",
+  };
+}
 
 export async function syncBoostRequestAfterMatchDecision(
   db: any,
@@ -63,6 +186,7 @@ export function evaluateBoostEligibility(input: {
   single: any;
   memberMatches: any[];
   plusMember?: any | null;
+  membership?: any | null;
   boostRequests?: any[];
   now?: number;
 }) {
@@ -99,6 +223,7 @@ export function evaluateBoostEligibility(input: {
   if (missingFields.length > 0) blockers.push("יש להשלים את הפרופיל לפני הפעלת בוסט");
   if (!input.single.questionnaireCompletedAt) blockers.push("יש להשלים את השאלון המדעי");
   if (!input.single.photoUrl) blockers.push("יש להוסיף תמונה לפרופיל");
+  if (!hasActiveBoostConsent(input.membership)) blockers.push("יש להצטרף למסלול Boost ולאשר את תנאי השירות");
   if (activeMatch) blockers.push("יש לך התאמה פעילה כרגע");
   if (positiveOutcome) blockers.push("הבוסט אינו מוצע בזמן תוצאה זוגית פעילה");
   if (candidates.length === 0) blockers.push("אין כרגע התאמה אפשרית שמתאימה לבדיקת בוסט");
@@ -121,7 +246,7 @@ export function evaluateBoostEligibility(input: {
 }
 
 async function loadBoostContext(db: any, single: any) {
-  const [rawMemberMatches, plusRows, requests] = await Promise.all([
+  const [rawMemberMatches, plusRows, requests, membershipRows] = await Promise.all([
     db.select({
       id: matches.id,
       singleAId: matches.singleAId,
@@ -134,12 +259,13 @@ async function loadBoostContext(db: any, single: any) {
     }).from(matches).where(or(eq(matches.singleAId, single.id), eq(matches.singleBId, single.id))),
     db.select().from(plusPilotMembers).where(eq(plusPilotMembers.singleId, single.id)).limit(1),
     db.select().from(matchBoostRequests).where(eq(matchBoostRequests.singleId, single.id)).orderBy(desc(matchBoostRequests.requestedAt)).limit(10),
+    db.select().from(matchBoostMemberships).where(eq(matchBoostMemberships.singleId, single.id)).limit(1),
   ]);
   const candidateIds = Array.from(new Set(rawMemberMatches
     .filter((match: any) => match.status === "pending" && !match.returnedToPoolAt)
     .map((match: any) => match.singleAId === single.id ? match.singleBId : match.singleAId)
     .filter(Boolean))) as number[];
-  const [candidateProfiles, candidateActiveMatches] = candidateIds.length > 0 ? await Promise.all([
+  const [candidateProfiles, candidateActiveMatches, candidateMemberships] = candidateIds.length > 0 ? await Promise.all([
     db.select().from(singles).where(inArray(singles.id, candidateIds)),
     db.select({
       singleAId: matches.singleAId,
@@ -152,8 +278,10 @@ async function loadBoostContext(db: any, single: any) {
       inArray(matches.status, ["proposed", "matched"]),
       or(inArray(matches.singleAId, candidateIds), inArray(matches.singleBId, candidateIds)),
     )),
-  ]) : [[], []];
+    db.select().from(matchBoostMemberships).where(inArray(matchBoostMemberships.singleId, candidateIds)),
+  ]) : [[], [], []];
   const candidateProfileMap = new Map<number, any>(candidateProfiles.map((profile: any) => [profile.id, profile]));
+  const candidateMembershipMap = new Map<number, any>((candidateMemberships as any[]).map((membership: any) => [membership.singleId, membership]));
   const unavailableCandidateIds = new Set<number>();
   for (const activeMatch of candidateActiveMatches as any[]) {
     if (candidateIds.includes(activeMatch.singleAId)) unavailableCandidateIds.add(activeMatch.singleAId);
@@ -162,17 +290,161 @@ async function loadBoostContext(db: any, single: any) {
   const memberMatches = rawMemberMatches.map((match: any) => {
     const candidateId = match.singleAId === single.id ? match.singleBId : match.singleAId;
     const profile = candidateProfileMap.get(candidateId);
+    const candidateMembership = candidateMembershipMap.get(candidateId);
+    const recentActivityAt = Number(candidateMembership?.lastActiveAt || candidateMembership?.consentedAt || 0);
+    const hardFilterResult = profile ? passesHardFilters(single, profile) : { pass: false };
+    const reverseHardFilterResult = profile ? passesHardFilters(profile, single) : { pass: false };
     const candidateEligible = Boolean(
       profile
       && profile.isPaid
       && profile.isActive
       && profile.consentMatchmaking
       && getMissingProfileFields(profile).length === 0
-      && !unavailableCandidateIds.has(candidateId),
+      && !unavailableCandidateIds.has(candidateId)
+      && hasActiveBoostConsent(candidateMembership)
+      && recentActivityAt >= Date.now() - 90 * DAY_MS
+      && hardFilterResult.pass
+      && reverseHardFilterResult.pass,
     );
-    return { ...match, candidateEligible };
+    return { ...match, candidateEligible, candidateProfile: profile || null };
   });
-  return { memberMatches, plusMember: plusRows[0] || null, requests };
+  return {
+    memberMatches,
+    plusMember: plusRows[0] || null,
+    membership: membershipRows[0] || null,
+    requests,
+  };
+}
+
+async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
+  const [request] = await db.select().from(matchBoostRequests).where(eq(matchBoostRequests.id, requestId)).limit(1);
+  if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "בקשת הבוסט לא נמצאה" });
+  if (request.status === "approved" && request.fulfilledAt) {
+    return { success: true, requestId, matchId: request.matchId, status: "approved" as const, alreadySent: true };
+  }
+  if (!["paid", "queued"].includes(request.status)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "בקשת הבוסט אינה מוכנה לשליחה" });
+  }
+
+  const [match] = await db.select().from(matches).where(eq(matches.id, request.matchId)).limit(1);
+  if (!match || match.status !== "pending" || match.returnedToPoolAt) {
+    throw new TRPCError({ code: "CONFLICT", message: "ההתאמה אינה זמינה עוד. לא תישלח הצעה." });
+  }
+  const [singleA, singleB, memberships] = await Promise.all([
+    db.select().from(singles).where(eq(singles.id, match.singleAId)).limit(1),
+    db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1),
+    db.select().from(matchBoostMemberships).where(inArray(matchBoostMemberships.singleId, [match.singleAId, match.singleBId])),
+  ]);
+  const partyA = singleA[0];
+  const partyB = singleB[0];
+  if (!partyA || !partyB) throw new TRPCError({ code: "NOT_FOUND", message: "אחד הפרופילים אינו זמין" });
+  const membershipBySingle = new Map<number, any>((memberships as any[]).map((row: any) => [row.singleId, row]));
+  const bothConsented = [partyA, partyB].every((party: any) => {
+    const membership = membershipBySingle.get(party.id);
+    const recentActivityAt = Number(membership?.lastActiveAt || membership?.consentedAt || 0);
+    return party.isPaid
+      && party.isActive
+      && party.consentMatchmaking
+      && getMissingProfileFields(party).length === 0
+      && hasActiveBoostConsent(membership)
+      && recentActivityAt >= Date.now() - 90 * DAY_MS;
+  });
+  if (!bothConsented || !passesHardFilters(partyA, partyB).pass || !passesHardFilters(partyB, partyA).pass) {
+    throw new TRPCError({ code: "CONFLICT", message: "אחד הצדדים אינו עומד עוד בתנאי מסלול Boost. לא תישלח הצעה." });
+  }
+
+  const now = Date.now();
+  const tokenA = crypto.randomBytes(24).toString("hex");
+  const tokenB = crypto.randomBytes(24).toString("hex");
+  const expiresAt = now + 48 * 60 * 60 * 1000;
+  const proposalClaimed = await db.transaction(async (tx: any) => {
+    const updateResult = await tx.update(matches).set({
+      status: "proposed",
+      approvalTokenA: tokenA,
+      approvalTokenB: tokenB,
+      approvalExpiresAt: expiresAt,
+      proposedAt: now,
+      ownerApprovedAt: null,
+      autoExplanation: "[BOOST] הצעת Boost אלגוריתמית שלא נבדקה ידנית על ידי הילית",
+      updatedAt: now,
+    }).where(and(eq(matches.id, match.id), eq(matches.status, "pending"), isNull(matches.returnedToPoolAt)));
+    const affectedRows = Number((Array.isArray(updateResult) ? updateResult[0] : updateResult)?.affectedRows || 0);
+    if (affectedRows < 1) return false;
+    await tx.update(matchBoostRequests).set({
+      status: "approved",
+      decidedAt: now,
+      fulfilledAt: now,
+      decisionReason: "algorithmic_boost_auto_dispatch",
+      updatedAt: now,
+    }).where(eq(matchBoostRequests.id, request.id));
+    await tx.update(crmTeamTasks).set({ status: "cancelled", completedAt: now, updatedAt: now })
+      .where(and(eq(crmTeamTasks.matchId, match.id), eq(crmTeamTasks.taskType, "match_review"), inArray(crmTeamTasks.status, ["todo", "in_progress"])));
+    return true;
+  });
+  if (!proposalClaimed) throw new TRPCError({ code: "CONFLICT", message: "ההתאמה כבר נשלחה או אינה זמינה עוד" });
+
+  const score = Math.round(Number(match.score || 0));
+  const cardA = buildAnonymousBoostCard(partyA, match);
+  const cardB = buildAnonymousBoostCard(partyB, match);
+  const reasonText = (card: ReturnType<typeof buildAnonymousBoostCard>) => [
+    ...card.reasons,
+    ...(card.considerations.length ? [`כדאי לקחת בחשבון: ${card.considerations.join("; ")}`] : []),
+  ].join(". ");
+  const baseUrl = "https://hilitcaspi.com";
+  const emailA = buildMatchProposalEmail({
+    firstName: partyA.firstName,
+    recipientGender: partyA.gender ?? undefined,
+    matchFirstName: "התאמה אנונימית",
+    matchAge: cardB.age,
+    matchCity: cardB.region,
+    matchOccupation: cardB.occupation,
+    matchEducation: cardB.education,
+    matchHasKids: partyB.hasKids,
+    matchNumKids: partyB.numKids,
+    matchWantsKids: partyB.wantsKids,
+    matchReligiosity: partyB.religiosity,
+    compatibilityScore: score,
+    hilitsNote: reasonText(cardB),
+    yesUrl: `${baseUrl}/match/respond?token=${tokenA}&response=yes`,
+    noUrl: `${baseUrl}/match/respond?token=${tokenA}&response=no`,
+    recipientEmail: partyA.email,
+    singleId: partyA.id,
+    trackingPixelUrl: `${baseUrl}/api/match-open?token=${tokenA}&side=a`,
+    proposalSource: "boost",
+  });
+  const emailB = buildMatchProposalEmail({
+    firstName: partyB.firstName,
+    recipientGender: partyB.gender ?? undefined,
+    matchFirstName: "התאמה אנונימית",
+    matchAge: cardA.age,
+    matchCity: cardA.region,
+    matchOccupation: cardA.occupation,
+    matchEducation: cardA.education,
+    matchHasKids: partyA.hasKids,
+    matchNumKids: partyA.numKids,
+    matchWantsKids: partyA.wantsKids,
+    matchReligiosity: partyA.religiosity,
+    compatibilityScore: score,
+    hilitsNote: reasonText(cardA),
+    yesUrl: `${baseUrl}/match/respond?token=${tokenB}&response=yes`,
+    noUrl: `${baseUrl}/match/respond?token=${tokenB}&response=no`,
+    recipientEmail: partyB.email,
+    singleId: partyB.id,
+    trackingPixelUrl: `${baseUrl}/api/match-open?token=${tokenB}&side=b`,
+    proposalSource: "boost",
+  });
+  await Promise.all([
+    sendEmail({ to: { email: partyA.email, name: partyA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
+    sendEmail({ to: { email: partyB.email, name: partyB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
+  ]);
+  await sendInitialMatchWhatsAppsOnce(db, {
+    matchId: match.id,
+    score,
+    proposalSource: "boost",
+    recipientA: { phone: partyA.phone, firstName: partyA.firstName, matchFirstName: "התאמה אנונימית" },
+    recipientB: { phone: partyB.phone, firstName: partyB.firstName, matchFirstName: "התאמה אנונימית" },
+  });
+  return { success: true, requestId, matchId: match.id, status: "approved" as const, alreadySent: false };
 }
 
 export const matchBoostRouter = router({
@@ -265,6 +537,69 @@ export const matchBoostRouter = router({
       return { success: true, status: "reviewing" as const };
     }),
 
+  inviteMember: teamProcedure
+    .input(z.object({ email: z.string().email(), pilotCohort: z.string().min(2).max(100).default("pilot_2026_09") }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [single] = await db.select().from(singles)
+        .where(eq(singles.email, input.email.trim().toLowerCase())).limit(1);
+      if (!single) throw new TRPCError({ code: "NOT_FOUND", message: "לא נמצא חבר מאגר עם המייל הזה" });
+      if (!single.isPaid || !single.isActive || !single.consentMatchmaking) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "אפשר להזמין רק חבר מאגר פעיל ומשלם" });
+      }
+      const [existing] = await db.select().from(matchBoostMemberships)
+        .where(eq(matchBoostMemberships.singleId, single.id)).limit(1);
+      if (hasActiveBoostConsent(existing)) {
+        await db.update(matchBoostPilotInterests).set({ status: "joined", matchedSingleId: single.id, updatedAt: Date.now() })
+          .where(eq(matchBoostPilotInterests.email, input.email.trim().toLowerCase()));
+        return { success: true, status: "active" as const, alreadyActive: true, singleId: single.id };
+      }
+
+      const now = Date.now();
+      await db.transaction(async (tx: any) => {
+        await tx.insert(matchBoostMemberships).values({
+          singleId: single.id,
+          status: "invited",
+          algorithmicDisclosureAccepted: false,
+          anonymousProfileAccepted: false,
+          termsAccepted: false,
+          invitedAt: now,
+          source: "crm_manual",
+          pilotCohort: input.pilotCohort,
+          createdAt: now,
+          updatedAt: now,
+        }).onDuplicateKeyUpdate({ set: {
+          status: "invited",
+          algorithmicDisclosureAccepted: false,
+          anonymousProfileAccepted: false,
+          termsAccepted: false,
+          invitedAt: now,
+          source: "crm_manual",
+          pilotCohort: input.pilotCohort,
+          updatedAt: now,
+        } });
+        await tx.insert(matchBoostConsentEvents).values({
+          singleId: single.id,
+          eventType: "invited",
+          algorithmicDisclosureAccepted: false,
+          anonymousProfileAccepted: false,
+          termsAccepted: false,
+          source: "crm_manual",
+          createdAt: now,
+        });
+        await tx.update(matchBoostPilotInterests).set({ status: "invited", matchedSingleId: single.id, updatedAt: now })
+          .where(eq(matchBoostPilotInterests.email, input.email.trim().toLowerCase()));
+      });
+      return {
+        success: true,
+        status: "invited" as const,
+        alreadyActive: false,
+        singleId: single.id,
+        memberName: `${single.firstName} ${single.lastName || ""}`.trim(),
+      };
+    }),
+
   getMyStatus: publicProcedure
     .input(z.object({ email: z.string().email(), token: z.string().min(16) }))
     .query(async ({ input }) => {
@@ -279,6 +614,17 @@ export const matchBoostRouter = router({
         plusActive: eligibility.plusActive,
         plusBenefitAvailable: eligibility.plusBenefitAvailable,
         plusBenefitUsed: eligibility.plusBenefitUsed,
+        anonymousCard: eligibility.topCandidate?.candidateProfile
+          ? buildAnonymousBoostCard(eligibility.topCandidate.candidateProfile, eligibility.topCandidate)
+          : null,
+        consentVersion: BOOST_CONSENT_VERSION,
+        membership: context.membership ? {
+          status: context.membership.status,
+          active: hasActiveBoostConsent(context.membership),
+          consentVersion: context.membership.consentVersion,
+          consentedAt: context.membership.consentedAt,
+          optedOutAt: context.membership.optedOutAt,
+        } : null,
         openRequest: eligibility.openRequest ? {
           id: eligibility.openRequest.id,
           status: eligibility.openRequest.status,
@@ -288,6 +634,120 @@ export const matchBoostRouter = router({
         priceAgorot: BOOST_PRICE_AGOROT,
         paymentConfigured: Boolean(process.env.GROW_PAGE_CODE_MATCH_BOOST?.trim()),
       };
+    }),
+
+  joinPool: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      token: z.string().min(16),
+      algorithmicDisclosureAccepted: z.literal(true),
+      anonymousProfileAccepted: z.literal(true),
+      termsAccepted: z.literal(true),
+    }))
+    .mutation(async ({ input }) => {
+      const { db, single } = await getVerifiedSingle(input.email, input.token);
+      const [existingMembership] = await db.select().from(matchBoostMemberships)
+        .where(eq(matchBoostMemberships.singleId, single.id)).limit(1);
+      if (hasActiveBoostConsent(existingMembership)) {
+        return { success: true, status: "active" as const, consentedAt: existingMembership.consentedAt };
+      }
+      const missingFields = getMissingProfileFields(single);
+      if (!single.isPaid || !single.isActive || !single.consentMatchmaking) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "ההצטרפות פתוחה לחברי מאגר פעילים בלבד" });
+      }
+      if (missingFields.length > 0 || !single.questionnaireCompletedAt || !single.photoUrl) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "יש להשלים את הפרופיל, התמונה והשאלון המדעי לפני ההצטרפות ל־Boost" });
+      }
+
+      const now = Date.now();
+      const eligibilitySnapshot = JSON.stringify({
+        paidAndActive: true,
+        profileComplete: true,
+        scientificQuestionnaireComplete: true,
+        photoStored: true,
+      });
+      await db.transaction(async (tx: any) => {
+        await tx.insert(matchBoostMemberships).values({
+          singleId: single.id,
+          status: "active",
+          consentVersion: BOOST_CONSENT_VERSION,
+          algorithmicDisclosureAccepted: true,
+          anonymousProfileAccepted: true,
+          termsAccepted: true,
+          consentedAt: now,
+          optedOutAt: null,
+          source: "personal_area",
+          pilotCohort: "open_members_2026_09",
+          eligibleAt: now,
+          eligibilitySnapshot,
+          lastActiveAt: now,
+          createdAt: now,
+          updatedAt: now,
+        }).onDuplicateKeyUpdate({ set: {
+          status: "active",
+          consentVersion: BOOST_CONSENT_VERSION,
+          algorithmicDisclosureAccepted: true,
+          anonymousProfileAccepted: true,
+          termsAccepted: true,
+          consentedAt: now,
+          optedOutAt: null,
+          source: "personal_area",
+          pilotCohort: "open_members_2026_09",
+          eligibleAt: now,
+          eligibilitySnapshot,
+          lastActiveAt: now,
+          updatedAt: now,
+        } });
+        await tx.insert(matchBoostConsentEvents).values({
+          singleId: single.id,
+          eventType: existingMembership?.status === "active" ? "consent_updated" : "opted_in",
+          consentVersion: BOOST_CONSENT_VERSION,
+          algorithmicDisclosureAccepted: true,
+          anonymousProfileAccepted: true,
+          termsAccepted: true,
+          source: "personal_area",
+          createdAt: now,
+        });
+        await tx.update(matchBoostPilotInterests).set({ status: "joined", matchedSingleId: single.id, updatedAt: now })
+          .where(or(
+            eq(matchBoostPilotInterests.matchedSingleId, single.id),
+            eq(matchBoostPilotInterests.email, single.email?.toLowerCase() || ""),
+          ));
+      });
+      return { success: true, status: "active" as const, consentedAt: now };
+    }),
+
+  leavePool: publicProcedure
+    .input(z.object({ email: z.string().email(), token: z.string().min(16) }))
+    .mutation(async ({ input }) => {
+      const { db, single } = await getVerifiedSingle(input.email, input.token);
+      const now = Date.now();
+      await db.transaction(async (tx: any) => {
+        await tx.update(matchBoostMemberships).set({
+          status: "opted_out",
+          algorithmicDisclosureAccepted: false,
+          anonymousProfileAccepted: false,
+          termsAccepted: false,
+          optedOutAt: now,
+          updatedAt: now,
+        }).where(eq(matchBoostMemberships.singleId, single.id));
+        await tx.insert(matchBoostConsentEvents).values({
+          singleId: single.id,
+          eventType: "opted_out",
+          consentVersion: BOOST_CONSENT_VERSION,
+          algorithmicDisclosureAccepted: false,
+          anonymousProfileAccepted: false,
+          termsAccepted: false,
+          source: "personal_area",
+          createdAt: now,
+        });
+        await tx.update(matchBoostPilotInterests).set({ status: "declined", matchedSingleId: single.id, updatedAt: now })
+          .where(or(
+            eq(matchBoostPilotInterests.matchedSingleId, single.id),
+            eq(matchBoostPilotInterests.email, single.email?.toLowerCase() || ""),
+          ));
+      });
+      return { success: true, status: "opted_out" as const, optedOutAt: now };
     }),
 
   redeemPlusBoost: publicProcedure
@@ -322,27 +782,15 @@ export const matchBoostRouter = router({
             updatedAt: now,
           });
           const insertedId = Number((insertResult as any).insertId || 0);
-          await tx.insert(crmTeamTasks).values({
-            singleId: single.id,
-            matchId: eligibility.topCandidate.id,
-            taskType: "match_review",
-            title: `בוסט התאמה: ${single.firstName} ${single.lastName || ""}`.trim(),
-            description: `בוסט Plus חודשי. לבדוק את ההתאמה האפשרית ולאשר או לדחות. ציון: ${Math.round(Number(eligibility.topCandidate.score || 0))}%`,
-            priority: "high",
-            status: "todo",
-            dueAt: now + DAY_MS,
-            createdBy: "match_boost_plus",
-            createdAt: now,
-            updatedAt: now,
-          });
           return insertedId;
         });
-        return { success: true, requestId, status: "queued" as const };
+        return await dispatchAlgorithmicBoostProposal(db, requestId);
       } catch (error: any) {
         if (error?.code === "ER_DUP_ENTRY") {
           const [existing] = await db.select().from(matchBoostRequests)
             .where(eq(matchBoostRequests.idempotencyKey, idempotencyKey)).limit(1);
-          return { success: true, requestId: existing?.id || 0, status: existing?.status || "queued" };
+          if (!existing) throw error;
+          return await dispatchAlgorithmicBoostProposal(db, existing.id);
         }
         throw error;
       }
