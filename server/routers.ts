@@ -4298,9 +4298,24 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
-      return db.select().from(singles)
-        .where(and(eq(singles.isSeed, false), eq(singles.isActive, true)))
-        .orderBy(desc(singles.createdAt));
+      const [singleRows, boostRows] = await Promise.all([
+        db.select().from(singles)
+          .where(and(eq(singles.isSeed, false), eq(singles.isActive, true)))
+          .orderBy(desc(singles.createdAt)),
+        db.select({
+          singleId: matchBoostMemberships.singleId,
+          status: matchBoostMemberships.status,
+          consentedAt: matchBoostMemberships.consentedAt,
+          consentVersion: matchBoostMemberships.consentVersion,
+        }).from(matchBoostMemberships),
+      ]);
+      const boostBySingle = new Map(boostRows.map(row => [row.singleId, row]));
+      return singleRows.map(single => ({
+        ...single,
+        boostStatus: boostBySingle.get(single.id)?.status ?? null,
+        boostConsentedAt: boostBySingle.get(single.id)?.consentedAt ?? null,
+        boostConsentVersion: boostBySingle.get(single.id)?.consentVersion ?? null,
+      }));
     }),
 
     /**
@@ -4310,9 +4325,24 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
-      return db.select().from(singles)
-        .where(and(eq(singles.isSeed, false), eq(singles.isActive, false), eq(singles.isPaid, true)))
-        .orderBy(desc(singles.createdAt));
+      const [singleRows, boostRows] = await Promise.all([
+        db.select().from(singles)
+          .where(and(eq(singles.isSeed, false), eq(singles.isActive, false), eq(singles.isPaid, true)))
+          .orderBy(desc(singles.createdAt)),
+        db.select({
+          singleId: matchBoostMemberships.singleId,
+          status: matchBoostMemberships.status,
+          consentedAt: matchBoostMemberships.consentedAt,
+          consentVersion: matchBoostMemberships.consentVersion,
+        }).from(matchBoostMemberships),
+      ]);
+      const boostBySingle = new Map(boostRows.map(row => [row.singleId, row]));
+      return singleRows.map(single => ({
+        ...single,
+        boostStatus: boostBySingle.get(single.id)?.status ?? null,
+        boostConsentedAt: boostBySingle.get(single.id)?.consentedAt ?? null,
+        boostConsentVersion: boostBySingle.get(single.id)?.consentVersion ?? null,
+      }));
     }),
 
     /**

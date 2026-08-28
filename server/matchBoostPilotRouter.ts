@@ -26,8 +26,8 @@ function escapeEmailHtml(value: string) {
 export function buildBoostApprovalLinkEmail(input: { firstName?: string | null; approvalUrl: string }) {
   const firstName = escapeEmailHtml(String(input.firstName || "").trim());
   const greeting = firstName ? `היי ${firstName},` : "היי,";
-  const preheader = "האישור לשירות Boost ללא תשלום. 19.99 ₪ נגבים רק אם בוחרים לשלוח Boost.";
-  const subject = "פותחים את Boost באזור האישי - האישור ללא תשלום";
+  const preheader = "אישור קצר יאפשר לך לשלוח ולקבל בקשות Boost דרך האזור האישי";
+  const subject = "נפתחה עבורך האפשרות להצטרף ל־Boost";
   const htmlContent = `<!doctype html>
 <html lang="he" dir="rtl">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -154,7 +154,7 @@ export const matchBoostPilotRouter = router({
         }});
 
         if (cooldownElapsed) {
-          const approvalUrl = `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken!)}&tab=matches&focus=boost`;
+          const approvalUrl = `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken!)}&tab=boost`;
           const emailContent = buildBoostApprovalLinkEmail({ firstName: single.firstName, approvalUrl });
           try {
             await sendEmail({

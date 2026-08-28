@@ -368,7 +368,19 @@ function DnaCard({ dnaType, gender }: { dnaType: DnaType; gender: "female" | "ma
   );
 }
 
-function MatchBoostCard({ email, token, profile }: { email: string; token: string; profile: any }) {
+function MatchBoostCard({
+  email,
+  token,
+  profile,
+  hasCompletedQuestionnaire,
+  onCompleteProfile,
+}: {
+  email: string;
+  token: string;
+  profile: any;
+  hasCompletedQuestionnaire: boolean;
+  onCompleteProfile: () => void;
+}) {
   const utils = trpc.useUtils();
   const [resultMessage, setResultMessage] = useState("");
   const [algorithmicConsent, setAlgorithmicConsent] = useState(false);
@@ -466,11 +478,29 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
   }
 
   if (!status.profileReady) {
+    const missingItems = Array.from(new Set([
+      ...getMissingFields(profile),
+      !profile.dnaType ? "שאלון DNA" : null,
+      !hasCompletedQuestionnaire ? "שאלון מדעי" : null,
+    ].filter(Boolean))) as string[];
     return (
       <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
         <p className="text-xs font-black text-[#ffe27c]">✓ אישור Boost נשמר בפרופיל</p>
         <h3 className="mt-2 text-xl font-black text-white">אפשר לשלוח ולקבל Boost לאחר השלמת הפרופיל</h3>
         <p className="mt-3 text-sm leading-7 text-white/85">ההסכמה שלך כבר מעודכנת במערכת וב־CRM. כדי שהכרטיס האנונימי יוצג לחברי המאגר וכדי לראות התאמות פוטנציאליות, צריך להשלים את הפרטים והשאלון החסרים.</p>
+        {missingItems.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4">
+            <p className="text-xs font-black text-[#ffe27c]">מה נדרש להשלים</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {missingItems.map(item => (
+                <span key={item} className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold text-white">{item}</span>
+              ))}
+            </div>
+            <button type="button" onClick={onCompleteProfile} className="mt-4 w-full rounded-xl bg-[#ffe27c] px-4 py-3 text-sm font-black text-[#191265] transition-transform active:scale-[0.97]">
+              להשלמת הפרופיל
+            </button>
+          </div>
+        )}
         <div className="mt-4 rounded-2xl border border-[#ffe27c]/40 bg-white/10 p-4 text-sm leading-6 text-white">
           <strong className="text-[#ffe27c]">אין תשלום על האישור.</strong> תשלום של 19.99 ₪ מתבצע רק אם בוחרים לשלוח Boost בפועל, לאחר שהפרופיל הושלם ונמצאה התאמה זמינה.
         </div>
@@ -529,6 +559,7 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
               {card?.score && <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black text-white">{card.score}% התאמה</span>}
             </div>
             <h3 className="mt-2 text-xl font-black text-white">לפני תמונה, מכירים את האדם</h3>
+            {status.candidateCount > 1 && <p className="mt-1 text-xs font-bold text-[#ffe27c]">זו האפשרות המובילה מתוך {status.candidateCount} אפשרויות Boost זמינות</p>}
             <p className="mt-2 text-sm leading-6 text-white/80">הכרטיס מציג פרטים שיכולים לעזור להחליט אם לפתוח הזדמנות, בלי שם, תמונה, עיר מדויקת, מקום עבודה או פרטי קשר.</p>
           </div>
         </div>
@@ -989,22 +1020,18 @@ export default function UserDashboard() {
 
   const requestedTab = params.get("tab");
   const shouldFocusBoost = params.get("focus") === "boost";
-  const [activeTab, setActiveTab] = useState<"profile" | "matches" | "dna">(
-    requestedTab === "matches" || requestedTab === "dna" ? requestedTab : "profile",
+  const [activeTab, setActiveTab] = useState<"profile" | "matches" | "boost" | "dna">(
+    requestedTab === "boost" || shouldFocusBoost
+      ? "boost"
+      : requestedTab === "matches" || requestedTab === "dna"
+        ? requestedTab
+        : "profile",
   );
 
   const { data, isLoading, error } = trpc.singles.getDashboard.useQuery(
     { email, token },
     { enabled: !!email && !!token, retry: false, refetchInterval: 30000 }
   );
-
-  useEffect(() => {
-    if (!data || activeTab !== "matches" || !shouldFocusBoost) return;
-    const timer = window.setTimeout(() => {
-      document.getElementById("boost-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 280);
-    return () => window.clearTimeout(timer);
-  }, [activeTab, data, shouldFocusBoost]);
 
   // No email or token in URL → show login form
   if (!email || !token) return <LoginForm />;
@@ -1119,10 +1146,11 @@ export default function UserDashboard() {
 
       {/* Tabs */}
       <div className="max-w-2xl mx-auto px-4 mt-6">
-        <div className="flex gap-1 bg-white rounded-xl p-1 border border-[#e9e8e8] shadow-sm">
+        <div className="grid grid-cols-4 gap-1 bg-white rounded-xl p-1 border border-[#e9e8e8] shadow-sm">
           {[
             { id: "profile" as const, label: "הפרופיל שלי", icon: "👤" },
             { id: "matches" as const, label: `התאמות (${myMatches.length})`, icon: "💌" },
+            { id: "boost" as const, label: "Boost", icon: "⚡" },
             { id: "dna" as const, label: "הDNA שלי", icon: "🧬" },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -1166,11 +1194,24 @@ export default function UserDashboard() {
             </motion.div>
           )}
 
+          {/* ── Boost Tab ── */}
+          {activeTab === "boost" && (
+            <motion.div key="boost" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="space-y-4">
+              <MatchBoostCard
+                email={email}
+                token={token}
+                profile={profile}
+                hasCompletedQuestionnaire={hasCompletedQuestionnaire}
+                onCompleteProfile={() => setActiveTab("profile")}
+              />
+            </motion.div>
+          )}
+
           {/* ── Matches Tab ── */}
          {activeTab === "matches" && (
            <motion.div key="matches" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
              className="space-y-4">
-              <MatchBoostCard email={email} token={token} profile={profile} />
               {myMatches.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#e9e8e8] p-8 text-center">
                   <div className="text-4xl mb-3">🔍</div>

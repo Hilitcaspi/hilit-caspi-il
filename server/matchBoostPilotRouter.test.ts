@@ -13,6 +13,7 @@ describe("Boost personal approval link funnel", () => {
   const dashboardSource = read("client/src/pages/UserDashboard.tsx");
   const operationsSource = read("client/src/components/OperationsSection.tsx");
   const appSource = read("client/src/App.tsx");
+  const rootRouterSource = read("server/routers.ts");
 
   it("sends an approval link without creating active Boost membership", () => {
     expect(schemaSource).toContain('mysqlTable("match_boost_pilot_interests"');
@@ -32,10 +33,11 @@ describe("Boost personal approval link funnel", () => {
   it("opens the personal-area Boost section and keeps joining as a separate action", () => {
     expect(appSource).toContain('<Route path="/match-boost" component={MatchBoostLanding} />');
     expect(routerSource).toContain("https://hilitcaspi.com/my-profile?email=");
-    expect(routerSource).toContain("&tab=matches&focus=boost");
+    expect(routerSource).toContain("&tab=boost");
     expect(pageSource).toContain("window.location.replace(dashboardUrl)");
     expect(pageSource).toContain("הקישור נשלח כדי לוודא שזהו הפרופיל שלי במאגר");
-    expect(dashboardSource).toContain('params.get("focus") === "boost"');
+    expect(dashboardSource).toContain('{ id: "boost" as const, label: "Boost", icon: "⚡" }');
+    expect(dashboardSource).toContain('activeTab === "boost"');
     expect(dashboardSource).toContain('id="boost-card"');
     expect(dashboardSource).toContain("joinPool.mutate");
     expect(dashboardSource).toContain("אינן עוברות אישור אישי של הילית");
@@ -47,14 +49,25 @@ describe("Boost personal approval link funnel", () => {
       firstName: "הילית",
       approvalUrl: "https://hilitcaspi.com/my-profile?token=personal-secret",
     });
-    expect(email.subject).toBe("פותחים את Boost באזור האישי - האישור ללא תשלום");
-    expect(email.preheader).toContain("האישור לשירות Boost ללא תשלום");
+    expect(email.subject).toBe("נפתחה עבורך האפשרות להצטרף ל־Boost");
+    expect(email.preheader).toBe("אישור קצר יאפשר לך לשלוח ולקבל בקשות Boost דרך האזור האישי");
+    expect(email.subject).not.toContain("19.99");
+    expect(email.preheader).not.toContain("19.99");
     expect(email.htmlContent).toContain("יותר בחירה בידיים שלכם");
     expect(email.htmlContent).toContain("19.99 ₪ מתבצע רק אם בוחרים לשלוח Boost בפועל");
     expect(email.htmlContent).toContain("linear-gradient(135deg,#2a125d");
     expect(email.htmlContent).toContain("hilit-profile_6821862b.jpg");
     expect(email.htmlContent).toContain("display:none;max-height:0;overflow:hidden");
     expect(email.textContent).toContain("האישור וההצטרפות לשירות Boost אינם כרוכים בתשלום נוסף");
+  });
+
+  it("adds Boost consent status to both active and incomplete CRM profile lists", () => {
+    const activeList = rootRouterSource.slice(rootRouterSource.indexOf("listSingles:"), rootRouterSource.indexOf("createSingle:"));
+    const inactiveList = rootRouterSource.slice(rootRouterSource.indexOf("listInactiveSingles:"), rootRouterSource.indexOf("reactivateSingle:"));
+    expect(activeList).toContain("boostStatus");
+    expect(activeList).toContain("matchBoostMemberships");
+    expect(inactiveList).toContain("boostStatus");
+    expect(inactiveList).toContain("matchBoostMemberships");
   });
 
   it("keeps pilot metrics and personal details behind team procedures", () => {

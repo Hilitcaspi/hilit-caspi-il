@@ -1045,7 +1045,7 @@ export default function CRMMatchmaking() {
                         className="rounded-full bg-fuchsia-100 px-2.5 py-1 text-[10px] font-black text-fuchsia-800 ring-1 ring-fuchsia-200"
                         title="הפרופיל אישר את שירות Boost. הופעה בכרטיס אנונימי ושליחת הצעות מותנות בהשלמת הפרופיל ובזכאות תקינה"
                       >
-                        ✓ אישר Boost
+                        ✓ אישור Boost פעיל
                       </span>
                     )}
                     <button
@@ -1166,6 +1166,15 @@ export default function CRMMatchmaking() {
                         {single.dnaType && <div><span className="font-semibold text-[#191265]">DNA:</span> {DNA_LABELS[single.dnaType] || single.dnaType}</div>}
                       </div>
                     </div>
+
+                    {(single as any).boostStatus === "active" && (
+                      <div className="mt-3 rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-3 py-2 text-xs font-bold text-fuchsia-800">
+                        ✓ אישור Boost פעיל בפרופיל
+                        <span className="mt-1 block font-normal text-fuchsia-700">
+                          האישור נשמר גם אם הפרופיל עדיין חסר. הצגה באפשרויות Boost תתאפשר רק לאחר השלמת הפרטים ובדיקת הזכאות.
+                        </span>
+                      </div>
+                    )}
 
                     {/* Profile Completeness Indicators */}
                     {(() => {

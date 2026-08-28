@@ -259,7 +259,7 @@ describe("match boost privacy and payment gate", () => {
     expect(source).not.toContain("יש להשלים את הפרופיל, התמונה והשאלון המדעי לפני ההצטרפות ל־Boost");
     expect(uiSource).toContain("✓ אישור Boost נשמר בפרופיל");
     expect(uiSource).toContain("האישור וההצטרפות לשירות אינם כרוכים בתשלום נוסף");
-    expect(crmSource).toContain("✓ אישר Boost");
+    expect(crmSource).toContain("✓ אישור Boost פעיל");
     expect(crmSource).toContain("הופעה בכרטיס אנונימי ושליחת הצעות מותנות בהשלמת הפרופיל ובזכאות תקינה");
   });
 

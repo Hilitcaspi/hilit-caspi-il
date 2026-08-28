@@ -22,7 +22,7 @@ export default function MatchBoostLanding() {
 
   useEffect(() => {
     if (!isPersonalLink) return;
-    const dashboardUrl = `/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=matches&focus=boost`;
+    const dashboardUrl = `/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=boost`;
     window.location.replace(dashboardUrl);
   }, [isPersonalLink, personalEmail, personalToken]);
 
@@ -134,7 +134,7 @@ export default function MatchBoostLanding() {
                     <CheckCircle2 className="mx-auto h-9 w-9" />
                     <h3 className="mt-3 text-lg font-black">שירות Boost פעיל בפרופיל שלכם</h3>
                     <p className="mt-2 text-sm leading-6">האישור נשמר והפרופיל עודכן. מעכשיו אפשר לשלוח ולקבל בקשות Boost.</p>
-                    <a href={`/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=matches`} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white">כניסה לאזור האישי<ArrowLeft className="h-4 w-4" /></a>
+                    <a href={`/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=boost`} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white">כניסה ל־Boost באזור האישי<ArrowLeft className="h-4 w-4" /></a>
                   </div>
                 ) : (
                   <div>

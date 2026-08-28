@@ -16,7 +16,20 @@ export default function MatchBoostDemo() {
 
   return (
     <main className="min-h-screen bg-[#f0eadc] px-4 py-8 font-rubik text-white" dir="rtl">
-      <section className="mx-auto max-w-2xl overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] shadow-xl shadow-fuchsia-950/20">
+      <div className="mx-auto max-w-2xl">
+        <div className="mb-5 grid grid-cols-4 gap-1 rounded-xl border border-[#e9e8e8] bg-white p-1 text-center shadow-sm">
+          {[
+            ["👤", "הפרופיל שלי"],
+            ["💌", "התאמות"],
+            ["⚡", "Boost"],
+            ["🧬", "הDNA שלי"],
+          ].map(([icon, label]) => (
+            <div key={label} className={`rounded-lg px-1 py-2.5 text-[11px] font-bold ${label === "Boost" ? "bg-[#191265] text-white shadow-sm" : "text-[#727272]"}`}>
+              <span className="mb-0.5 block text-base">{icon}</span>{label}
+            </div>
+          ))}
+        </div>
+        <section className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] shadow-xl shadow-fuchsia-950/20">
         <div className="border-b border-white/20 bg-white/10 px-5 py-3 text-center text-sm font-black text-[#ffe27c]">המחשה בלבד: אין פרטי לקוח ולא מתבצע חיוב</div>
         <div className="p-5 md:p-7">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
@@ -67,7 +80,8 @@ export default function MatchBoostDemo() {
             {notice && <p className="mt-3 rounded-xl bg-[#e8f5e9] p-3 text-center text-xs font-bold text-[#2e7d32]">{notice}</p>}
           </div>
         </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }
