@@ -4,12 +4,12 @@ export default function TermsMatchBoost() {
   return (
     <main className="min-h-screen bg-[#f0eadc] px-5 py-10 font-rubik text-[#191265]" dir="rtl">
       <article className="mx-auto max-w-3xl rounded-3xl bg-white p-6 shadow-sm md:p-10">
-        <Link href="/match-boost"><span className="cursor-pointer text-sm font-bold underline">חזרה ל־Match Boost</span></Link>
-        <h1 className="mt-5 text-3xl font-black">תקנון Match Boost ומדיניות מימוש</h1>
-        <p className="mt-3 text-sm leading-7 text-[#666]">Match Boost הוא שירות אופציונלי ונפרד לחברי המאגר. הרכישה וההשתתפות כפופות לתנאים שלהלן.</p>
+        <Link href="/match-boost"><span className="cursor-pointer text-sm font-bold underline">חזרה ל־Boost</span></Link>
+        <h1 className="mt-5 text-3xl font-black">תקנון Boost ומדיניות מימוש</h1>
+        <p className="mt-3 text-sm leading-7 text-[#666]">Boost הוא שירות אופציונלי ונפרד לחברי המאגר. הרכישה וההשתתפות כפופות לתנאים שלהלן.</p>
 
         <div className="mt-8 space-y-7 text-sm leading-7 text-[#444]">
-          <section><h2 className="text-lg font-black text-[#191265]">1. השירות והמחיר</h2><p>Match Boost מאפשר לשלוח הצעת התאמה אלגוריתמית בעדיפות למועמד או למועמדת אנונימיים שהמערכת מצאה כמתאימים. המחיר הוא 19.99 ש״ח, כולל מע״מ, בחיוב חד־פעמי לכל מימוש.</p></section>
+          <section><h2 className="text-lg font-black text-[#191265]">1. השירות והמחיר</h2><p>Boost מאפשר לשלוח הצעת התאמה אלגוריתמית בעדיפות למועמד או למועמדת אנונימיים שהמערכת מצאה כמתאימים. המחיר הוא 19.99 ש״ח, כולל מע״מ, בחיוב חד־פעמי לכל מימוש.</p></section>
           <section><h2 className="text-lg font-black text-[#191265]">2. הצעה אלגוריתמית</h2><p>הצעת Boost נבחרת ונשלחת על ידי האלגוריתם ואינה נבדקת או מאושרת ידנית על ידי הילית. הכרטיס המקדים מציג מידע כללי בלבד ואינו חושף שם, תמונה, עיר מדויקת, מקום עבודה או פרטי קשר.</p></section>
           <section><h2 className="text-lg font-black text-[#191265]">3. הסכמה הדדית למסלול</h2><p>שליחת Boost מחייבת חברות פעילה במסלול Boost. באישור התקנון מאשרים גם לקבל הצעות Boost אלגוריתמיות מחברים אחרים במסלול, ולהופיע בפניהם בכרטיס אנונימי לפי כללי השירות. ניתן לצאת מהמסלול בכל עת באזור האישי; היציאה אינה מבטלת הצעה שכבר נשלחה.</p></section>
           <section><h2 className="text-lg font-black text-[#191265]">4. תנאי זכאות</h2><p>השירות זמין רק לחברי מאגר פעילים ומשלמים עם פרופיל, תמונה ושאלון מדעי מלאים, הסכמה פעילה למסלול וללא התאמה פעילה אחרת. שני הצדדים חייבים לעבור את תנאי הסף ההדדיים ולהיות פעילים לאחרונה.</p></section>

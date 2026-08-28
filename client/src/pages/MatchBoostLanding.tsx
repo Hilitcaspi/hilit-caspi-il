@@ -2,18 +2,36 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, Heart, Mail, Sparkles, UserRoundCheck, Zap } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
+const HILIT_PHOTO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
+
 export default function MatchBoostLanding() {
   const [email, setEmail] = useState("");
   const [requestAccepted, setRequestAccepted] = useState(false);
+  const [personalConsent, setPersonalConsent] = useState(false);
+  const [personalJoined, setPersonalJoined] = useState(false);
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const personalEmail = params.get("email")?.trim() || "";
+  const personalToken = params.get("token")?.trim() || "";
+  const isPersonalLink = personalEmail.includes("@") && personalToken.length >= 16;
 
   useEffect(() => {
     const previous = document.title;
-    document.title = "Match Boost | הילית כספי";
+    document.title = "Boost | הילית כספי";
     return () => { document.title = previous; };
   }, []);
 
   const interest = trpc.matchBoostPilot.submitInterest.useMutation();
+  const utils = trpc.useUtils();
+  const personalStatus = trpc.matchBoost.getMyStatus.useQuery(
+    { email: personalEmail, token: personalToken },
+    { enabled: isPersonalLink, retry: false },
+  );
+  const joinPool = trpc.matchBoost.joinPool.useMutation({
+    onSuccess: async () => {
+      setPersonalJoined(true);
+      await utils.matchBoost.getMyStatus.invalidate({ email: personalEmail, token: personalToken });
+    },
+  });
   const submit = () => {
     if (!requestAccepted || !email.includes("@")) return;
     interest.mutate({
@@ -41,6 +59,13 @@ export default function MatchBoostLanding() {
 
         <div className="relative z-10 mx-auto mt-12 grid max-w-6xl items-center gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:gap-16">
           <div>
+            <div className="mb-5 flex items-center gap-3">
+              <img src={HILIT_PHOTO} alt="הילית כספי" className="h-20 w-20 rounded-full border-4 border-white/35 object-cover shadow-xl sm:h-24 sm:w-24" />
+              <div>
+                <p className="font-black">הילית כספי</p>
+                <p className="text-sm text-white/70">מאמנת למציאת זוגיות ומנהלת המאגר</p>
+              </div>
+            </div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#4b235f] shadow-lg">
               <Sparkles className="h-4 w-4" /> אתם ביקשתם, ואני מקשיבה
             </div>
@@ -49,18 +74,19 @@ export default function MatchBoostLanding() {
               <span className="block bg-gradient-to-l from-[#ffe27c] via-white to-[#ffb6dc] bg-clip-text text-transparent">עכשיו הבחירה גם בידיים שלכם.</span>
             </h1>
             <p className="mt-6 max-w-2xl text-lg font-bold leading-8 text-white/90 sm:text-xl">
-              Match Boost מאפשר לראות באזור האישי התאמות פוטנציאליות ולבחור בעצמכם למי לשלוח בקשת התאמה.
+              שירות <span className="inline-block font-black text-[#ffe27c] motion-safe:animate-pulse">Boost</span> מאפשר לכם לראות באזור האישי התאמות פוטנציאליות ולבחור בעצמכם למי לשלוח בקשת התאמה.
             </p>
-            <div className="mt-7 grid gap-3 text-sm sm:grid-cols-3">
+            <p className="mt-3 max-w-2xl text-base font-bold leading-7 text-white/80">השירות מיועד למי שכבר רשומים ופעילים במאגר.</p>
+            <div className="mt-7 grid gap-3 sm:grid-cols-3">
               {[
                 [Zap, "יותר אפשרויות", "בנוסף להתאמות השוטפות שאני שולחת"],
                 [UserRoundCheck, "בחירה שלכם", "אפשר לבחור גם התאמות מתחת ל־80%"],
-                [Heart, "לשלוח ולקבל", "מי שמאשרים יכולים גם לשלוח וגם לקבל Boost"],
+                [Heart, "לשלוח ולקבל", "מי שמאשרים את שירות הבוסט יהיו רשאים לשלוח ולקבל בקשות Boost"],
               ].map(([Icon, title, text]: any) => (
                 <div key={title} className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
                   <Icon className="h-5 w-5 text-[#ffe27c]" />
-                  <strong className="mt-3 block">{title}</strong>
-                  <span className="mt-1 block text-xs leading-5 text-white/75">{text}</span>
+                  <strong className="mt-3 block text-lg">{title}</strong>
+                  <span className="mt-1 block text-sm leading-6 text-white/80">{text}</span>
                 </div>
               ))}
             </div>
@@ -77,7 +103,38 @@ export default function MatchBoostLanding() {
               </div>
             </div>
 
-            {interest.isSuccess ? (
+            {isPersonalLink ? (
+              <div className="mt-5">
+                {personalStatus.isLoading ? (
+                  <div className="h-40 animate-pulse rounded-2xl bg-[#f7f3ff]" />
+                ) : personalStatus.isError ? (
+                  <div className="rounded-2xl bg-amber-50 p-5 text-center text-amber-900">
+                    <h3 className="font-black">לא ניתן לפתוח את האישור בקישור הזה</h3>
+                    <p className="mt-2 text-sm leading-6">שירות Boost מיועד לחברי מאגר פעילים. אפשר לפנות לצוות אם הפרופיל אמור להיות פעיל.</p>
+                  </div>
+                ) : personalJoined || personalStatus.data?.membership?.active ? (
+                  <div className="rounded-2xl bg-emerald-50 p-5 text-center text-emerald-800">
+                    <CheckCircle2 className="mx-auto h-9 w-9" />
+                    <h3 className="mt-3 text-lg font-black">שירות Boost פעיל בפרופיל שלכם</h3>
+                    <p className="mt-2 text-sm leading-6">האישור נשמר והפרופיל עודכן. מעכשיו אפשר לשלוח ולקבל בקשות Boost.</p>
+                    <a href={`/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=matches`} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white">כניסה לאזור האישי<ArrowLeft className="h-4 w-4" /></a>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-xl font-black">אישור הצטרפות לשירות Boost</h3>
+                    <p className="mt-2 text-sm leading-6 text-[#6f627a]">בלחיצה על האישור, הפרופיל יתעדכן מיד ותוכלו לשלוח ולקבל בקשות Boost באזור האישי.</p>
+                    <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl bg-[#f7f3ff] p-4 text-sm leading-6 text-[#51475d]">
+                      <input type="checkbox" checked={personalConsent} onChange={event => setPersonalConsent(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-[#a52178]" />
+                      <span>אישור זה מצרף את הפרופיל לשירות Boost, מאפשר להופיע בכרטיס אנונימי ולשלוח ולקבל בקשות התאמה שנוצרו על ידי האלגוריתם ואינן עוברות אישור אישי של הילית. הפרטים ייחשפו רק לאחר הסכמה הדדית.</span>
+                    </label>
+                    <button type="button" disabled={!personalConsent || joinPool.isPending} onClick={() => joinPool.mutate({ email: personalEmail, token: personalToken, algorithmicDisclosureAccepted: true, anonymousProfileAccepted: true, termsAccepted: true })} className="mt-4 w-full rounded-xl bg-gradient-to-l from-[#a52178] to-[#5d176d] px-5 py-4 text-sm font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45">
+                      {joinPool.isPending ? "מאשרים..." : "אישור הצטרפות לשירות Boost"}
+                    </button>
+                    {joinPool.isError && <p className="mt-3 text-center text-xs font-bold text-red-600">{joinPool.error.message}</p>}
+                  </div>
+                )}
+              </div>
+            ) : interest.isSuccess ? (
               <div className="mt-5 rounded-2xl bg-emerald-50 p-5 text-center text-emerald-800">
                 <CheckCircle2 className="mx-auto h-9 w-9" />
                 <h3 className="mt-3 text-lg font-black">הקישור בדרך אליכם</h3>
@@ -86,14 +143,14 @@ export default function MatchBoostLanding() {
             ) : (
               <div className="mt-5">
                 <h3 className="text-xl font-black">פותחים את הפרופיל ל־Boost</h3>
-                <p className="mt-2 text-sm leading-6 text-[#6f627a]">הזינו את כתובת המייל שאיתה נרשמתם למאגר. נשלח אליה קישור אישי שבו תוכלו לאשר את הפרופיל לשליחה ולקבלה של Boost.</p>
+                <p className="mt-2 text-sm leading-6 text-[#6f627a]">השירות מיועד לחברי מאגר פעילים. הזינו את כתובת המייל שאיתו נרשמתם למאגר, ונשלח אליה קישור אישי לאישור השירות ולכניסה לאזור האישי.</p>
                 <div className="relative mt-4">
                   <Mail className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a52178]" />
                   <input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="המייל שאיתו נרשמתם למאגר" className="w-full rounded-xl border border-[#ddd4eb] bg-white py-3 pl-4 pr-11 text-sm outline-none focus:border-[#a52178]" />
                 </div>
                 <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl bg-[#f7f3ff] p-3 text-xs leading-5 text-[#5d526b]">
                   <input type="checkbox" checked={requestAccepted} onChange={event => setRequestAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-[#a52178]" />
-                  <span>אפשר לשלוח לי קישור אישי לפתיחת הפרופיל ל־Match Boost. האישור עצמו יתבצע רק בקישור האישי.</span>
+                  <span>אפשר לשלוח לי קישור אישי לאישור שירות Boost. הקישור נשלח כדי לוודא שזהו הפרופיל שלי במאגר.</span>
                 </label>
                 <button type="button" onClick={submit} disabled={!requestAccepted || !email.includes("@") || interest.isPending} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-[#a52178] to-[#5d176d] px-5 py-4 text-sm font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45">
                   {interest.isPending ? "שולחים קישור..." : "שלחו לי קישור לפתיחת Boost"}<ArrowLeft className="h-4 w-4" />
@@ -112,8 +169,8 @@ export default function MatchBoostLanding() {
         </div>
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           {[
-            ["01", "מזינים את מייל המאגר", "משתמשים באותה כתובת שאיתה הצטרפתם למאגר."],
-            ["02", "מקבלים קישור אישי", "נכנסים לאזור האישי ומאשרים שהפרופיל פתוח ל־Boost."],
+            ["01", "מזינים את המייל שאיתו נרשמתם למאגר", "הקישור נשלח למייל כדי לוודא שזהו הפרופיל שלכם."],
+            ["02", "מאשרים את שירות Boost", "בלחיצה אחת מאשרים לשלוח ולקבל Boost והפרופיל מתעדכן במערכת."],
             ["03", "רואים ובוחרים", "צופים בהתאמות הפוטנציאליות ומחליטים אם לשלוח Boost."],
           ].map(([number, title, text]) => (
             <article key={number} className="rounded-3xl border border-[#e8dff2] bg-white p-6 shadow-sm">
@@ -124,10 +181,10 @@ export default function MatchBoostLanding() {
           ))}
         </div>
         <div className="mt-10 rounded-3xl bg-[#241257] p-6 text-white sm:p-10">
-          <h2 className="text-2xl font-black sm:text-4xl">מה חשוב לדעת</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-white/80">Boost הוא אפשרות נוספת להתאמות השוטפות שאני ממשיכה לשלוח לכם. הוא נותן לכם יותר בחירה, אבל לא מחליף את השירות הרגיל של המאגר.</p>
+          <h2 className="text-2xl font-black sm:text-4xl">האישור שלכם ל־Boost</h2>
+          <p className="mt-3 max-w-3xl text-base leading-8 text-white/85">Boost הוא שירות נוסף לחברי המאגר, מעבר להתאמות השוטפות שאני ממשיכה לשלוח. האישור פותח את הפרופיל שלכם לאפשרות לשלוח ולקבל בקשות Boost. ההתאמות נוצרות רק לאחר שהאלגוריתם מצא התאמה פוטנציאלית, אך הן אינן עוברות אישור אישי שלי לפני השליחה.</p>
           <div className="mt-6 grid gap-3 text-sm leading-6 sm:grid-cols-2">
-            {["אפשר לראות גם התאמות פוטנציאליות מתחת ל־80% ולבחור בעצמכם.", "אישור הפרופיל מאפשר גם לשלוח וגם לקבל הצעות Boost.", "הצעות Boost אינן עוברות אישור אישי שלי לפני השליחה.", "הפרטים המלאים נפתחים רק אם שני הצדדים מאשרים את ההצעה.", "התשלום הוא 19.99 ₪ רק כאשר בוחרים לשלוח Boost.", "אפשר לצאת מהאפשרות בכל עת דרך האזור האישי."].map(item => (
+            {["אפשר לראות גם התאמות פוטנציאליות מתחת ל־80% ולבחור בעצמכם.", "מי שמאשרים את שירות הבוסט יכולים גם לשלוח וגם לקבל בקשות Boost.", "כל כרטיס מוצג באופן אנונימי, ללא שם, תמונה או פרטי קשר.", "הפרטים המלאים נפתחים רק אם שני הצדדים מאשרים את ההצעה."].map(item => (
               <p key={item} className="flex gap-2 rounded-xl bg-white/8 p-3"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#ffe27c]" />{item}</p>
             ))}
           </div>
@@ -135,7 +192,7 @@ export default function MatchBoostLanding() {
       </section>
 
       <footer className="border-t border-[#e5ddeb] bg-white px-4 py-8 text-center text-xs text-[#766d80]">
-        <p className="font-black text-[#251064]">Match Boost מבית הילית כספי</p>
+        <p className="font-black text-[#251064]">Boost מבית הילית כספי</p>
         <p className="mt-2">אפשרות נוספת לחברי המאגר הפעילים, לפי בחירתכם ובאישור הפרופיל שלכם.</p>
       </footer>
     </main>

@@ -54,7 +54,7 @@ export default function MatchBoostDemo() {
             <p className="mt-2 text-xs leading-5 text-[#555]">שליחת Boost כוללת גם הצטרפות לקבלת הצעות Boost אלגוריתמיות ולהופעה בכרטיס אנונימי לחברים אחרים במסלול. אין הבטחה לאישור הדדי, לחשיפת פרטים, לדייט או לזוגיות.</p>
             <label className="mt-4 flex items-start gap-3 text-xs leading-5 text-[#444]">
               <input type="checkbox" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-[#191265]" />
-              <span>קראתי, הבנתי ואישרתי את <Link href="/terms/match-boost"><span className="font-bold underline">תקנון Match Boost</span></Link>, כולל קבלת הצעות אלגוריתמיות שלא נבדקו ידנית על ידי הילית.</span>
+              <span>קראתי, הבנתי ואישרתי את <Link href="/terms/match-boost"><span className="font-bold underline">תקנון Boost</span></Link>, כולל קבלת הצעות אלגוריתמיות שלא נבדקו ידנית על ידי הילית.</span>
             </label>
             <button
               type="button"

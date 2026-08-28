@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const read = (relative: string) => fs.readFileSync(path.join(process.cwd(), relative), "utf8");
 
-describe("Match Boost personal approval link funnel", () => {
+describe("Boost personal approval link funnel", () => {
   const routerSource = read("server/matchBoostPilotRouter.ts");
   const boostSource = read("server/matchBoostRouter.ts");
   const schemaSource = read("drizzle/schema.ts");
@@ -29,10 +29,13 @@ describe("Match Boost personal approval link funnel", () => {
 
   it("makes the distinction between receiving a link and joining visible", () => {
     expect(appSource).toContain('<Route path="/match-boost" component={MatchBoostLanding} />');
-    expect(pageSource).toContain("האישור עצמו יתבצע רק בקישור האישי");
-    expect(pageSource).toContain("אישור הפרופיל מאפשר גם לשלוח וגם לקבל");
-    expect(pageSource).toContain("אינן עוברות אישור אישי שלי");
-    expect(pageSource).toContain("הפרטים המלאים נפתחים רק אם שני הצדדים מאשרים");
+    expect(routerSource).toContain("https://hilitcaspi.com/match-boost?email=");
+    expect(pageSource).toContain("הקישור נשלח כדי לוודא שזהו הפרופיל שלי במאגר");
+    expect(pageSource).toContain("אישור הצטרפות לשירות Boost");
+    expect(pageSource).toContain("personalStatus");
+    expect(pageSource).toContain("joinPool.mutate");
+    expect(pageSource).toContain("אינן עוברות אישור אישי של הילית");
+    expect(pageSource).toContain("הפרטים ייחשפו רק לאחר הסכמה הדדית");
   });
 
   it("keeps pilot metrics and personal details behind team procedures", () => {

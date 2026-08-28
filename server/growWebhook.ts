@@ -81,7 +81,7 @@ export function detectProductByAmount(sum: number): string | null {
 // Fallback: detect by description
 export function detectProductByDesc(desc: string): string | null {
   const d = (desc || "").toLowerCase();
-  if (d.includes("match boost") || d.includes("match_boost") || d.includes("בוסט התאמה")) return "match_boost";
+  if (d.includes("match boost") || d.includes("match_boost") || d.includes("בוסט התאמה") || d.includes("boost - הצעת התאמה")) return "match_boost";
   if (d.includes("database plus") || d.includes("מאגר פלוס") || d.includes("database+")) return "plus";
   if (d.includes("חבילת שנה חדשה") || d.includes("bundle_new_year") || (d.includes("מאגר") && d.includes("מדריך") && d.includes("קורס"))) return "bundle_new_year";
   // IMPORTANT: bundle_tubav MUST be checked before guide/database because its description contains both "מדריך" and "מאגר"
@@ -500,7 +500,7 @@ async function handleMatchBoost(email: string, transactionId: string, sum: numbe
     amountAgorot: Math.round(sum * 100),
   });
   await notifyOwner({
-    title: result.delivered ? "Match Boost נרכש ונשלח" : "Match Boost נרכש ונשמר כקרדיט",
+    title: result.delivered ? "Boost נרכש ונשלח" : "Boost נרכש ונשמר כקרדיט",
     content: result.delivered
       ? `עסקת Boost בסך ${sum} ש״ח אושרה וההצעה האלגוריתמית נשלחה.`
       : `עסקת Boost בסך ${sum} ש״ח אושרה, אך המועמד/ת לא היו זמינים בבדיקה הסופית. נשמר קרדיט אוטומטי.`,

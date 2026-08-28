@@ -420,7 +420,7 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
         <div className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-bold text-[#8b7420]">Match Boost לחברי המאגר</p>
+              <p className="text-xs font-bold text-[#8b7420]">Boost לחברי המאגר</p>
               <h3 className="mt-1 text-xl font-black text-[#191265]">יותר שליטה בהזדמנויות להיכרות</h3>
             </div>
             <span className="rounded-full bg-[#191265] px-3 py-1 text-[11px] font-black text-white">בהצטרפות יזומה</span>
@@ -467,7 +467,7 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
   if (status.candidateCount === 0 && !status.openRequest) {
     return (
       <section className="rounded-2xl border border-[#d9c05c] bg-white p-5 text-right shadow-sm">
-        <p className="text-xs font-bold text-[#8b7420]">Match Boost פעיל</p>
+        <p className="text-xs font-bold text-[#8b7420]">Boost פעיל</p>
         <h3 className="mt-1 text-lg font-black text-[#191265]">אין כרגע כרטיס שעובר את כל תנאי הסף</h3>
         <p className="mt-2 text-sm leading-6 text-[#555]">נציג כרטיס רק כאשר שני הצדדים פעילים, פנויים, הצטרפו למסלול והפרטים שלהם מלאים.</p>
         {status.creditAvailable && <p className="mt-3 rounded-xl bg-[#f5f2ff] p-3 text-xs font-bold leading-5 text-[#51448c]">קרדיט ה־Boost שלך שמור. ברגע שיופיע כרטיס חדש שעובר את כל תנאי הסף, ניתן יהיה לממש אותו ללא חיוב נוסף.</p>}

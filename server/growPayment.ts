@@ -83,7 +83,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   session:      { description: "פגישת היכרות עם הילית כספי",                          sum: 500,  paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון",            sum: 349,  paymentNum: 1 },
   bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 449, paymentNum: 1 },
-  match_boost:  { description: "Match Boost - הצעת התאמה אלגוריתמית",                 sum: 19.99, paymentNum: 1 },
+  match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית",                       sum: 19.99, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי",                         sum: 99 },
 };
 

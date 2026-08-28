@@ -102,12 +102,12 @@ export const matchBoostPilotRouter = router({
         }});
 
         if (cooldownElapsed) {
-          const approvalUrl = `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken!)}&tab=matches&boost=join`;
+          const approvalUrl = `https://hilitcaspi.com/match-boost?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken!)}`;
           try {
             await sendEmail({
               to: { email, name: single.firstName || undefined },
-              subject: "הקישור האישי שלך לאישור Match Boost",
-              htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#2b1747"><h2 style="color:#191265">אישור הצטרפות ל־Match Boost</h2><p style="line-height:1.8">ביקשת לקבל קישור אישי למסלול Match Boost.</p><p style="line-height:1.8">בקישור יוצגו תנאי השירות ושלוש ההסכמות הנדרשות: קבלת הצעות אלגוריתמיות שלא נבדקו ידנית על ידי הילית, הופעה בכרטיס אנונימי, והבנה שאין הבטחה להסכמה הדדית או לזוגיות.</p><p style="text-align:center;margin:28px 0"><a href="${approvalUrl}" style="display:inline-block;background:#6b176f;color:white;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">לפתיחת דף האישור האישי</a></p><p style="font-size:13px;line-height:1.7;color:#6f627a">הקישור אישי. אין להעביר אותו לאחרים. ההצטרפות מתבצעת רק לאחר אישור התנאים באזור האישי.</p></div>`,
+              subject: "הקישור האישי שלך לאישור שירות Boost",
+              htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#2b1747"><h2 style="color:#191265">אישור הצטרפות לשירות Boost</h2><p style="line-height:1.8">ביקשת לפתוח את הפרופיל שלך לאפשרות לשלוח ולקבל Boost.</p><p style="line-height:1.8">לחיצה על הקישור תפתח את דף האישור האישי. לאחר האישור הפרופיל יתעדכן מיד ותוכלו להיכנס לאזור האישי ולצפות בהתאמות פוטנציאליות, כאשר קיימות.</p><p style="text-align:center;margin:28px 0"><a href="${approvalUrl}" style="display:inline-block;background:#6b176f;color:white;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">לאישור שירות Boost</a></p><p style="font-size:13px;line-height:1.7;color:#6f627a">הקישור אישי ומיועד לחבר או חברת מאגר פעילים. אין להעביר אותו לאחרים.</p></div>`,
             });
           } catch (error) {
             console.error(`[MatchBoost] Failed to send approval link for single ${single.id}`, error);
@@ -116,7 +116,7 @@ export const matchBoostPilotRouter = router({
       }
       return {
         success: true,
-        message: "אם כתובת המייל מקושרת לחבר מאגר פעיל, נשלח אליה קישור אישי לאישור Match Boost. כדאי לבדוק גם בתיקיית קידומי מכירות או בספאם.",
+        message: "אם כתובת המייל מקושרת לחבר מאגר פעיל, נשלח אליה קישור אישי לאישור שירות Boost. כדאי לבדוק גם בתיקיית קידומי מכירות או בספאם.",
       };
     }),
 

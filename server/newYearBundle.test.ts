@@ -69,6 +69,6 @@ describe("New Year holiday bundle", () => {
     expect(landing).toContain("אין מכסה קבועה");
     expect(landing).toContain("אינה מבטיחה התאמה, הסכמה של הצד השני או תוצאה זוגית");
     expect(landing).toContain("Plus אינו מופעל אוטומטית");
-    expect(landing).toContain("Match Boost ו־Plus הם שירותים נפרדים");
+    expect(landing).toContain("Boost ו־Plus הם שירותים נפרדים");
   });
 });

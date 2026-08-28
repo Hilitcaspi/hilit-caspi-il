@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { BOOST_CONSENT_VERSION, buildAnonymousBoostCard, evaluateBoostEligibility } from "./matchBoostRouter";
@@ -257,7 +256,7 @@ describe("match boost privacy and payment gate", () => {
   });
 
   it("opens a one-time 19.99 ILS Grow payment only from the personal Boost card with explicit terms", () => {
-    expect(paymentSource).toContain('match_boost:  { description: "Match Boost - הצעת התאמה אלגוריתמית",');
+    expect(paymentSource).toContain('match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית",');
     expect(paymentSource).toContain("sum: 19.99, paymentNum: 1");
     expect(paymentRouterSource).toContain('"match_boost"');
     expect(paymentRouterSource).toContain("boostTermsAccepted: z.literal(true).optional()");
