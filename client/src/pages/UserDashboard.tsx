@@ -431,6 +431,7 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
 
           <div className="mt-5 space-y-3 rounded-2xl border border-white/30 bg-white p-4 text-[#20113e] shadow-lg sm:p-5">
               <p className="text-sm font-black text-[#20113e]">כדי לפתוח את Boost בפרופיל, מאשרים שלושה דברים:</p>
+              <p className="rounded-xl bg-[#fff8d8] p-3 text-xs font-bold leading-5 text-[#5f4a00]">האישור וההצטרפות לשירות אינם כרוכים בתשלום נוסף. 19.99 ₪ נגבים רק אם בוחרים לשלוח Boost בפועל.</p>
               <label className="flex items-start gap-3 text-xs leading-5 text-[#555]">
                 <input type="checkbox" checked={algorithmicConsent} onChange={event => setAlgorithmicConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#191265]" />
                 <span>אני מסכים או מסכימה לקבל הצעות Boost אלגוריתמיות שלא נבדקו ידנית על ידי הילית.</span>
@@ -460,6 +461,25 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
           </div>
           {resultMessage && <p className="mt-3 rounded-lg bg-[#e8f5e9] p-2 text-center text-xs font-bold text-[#2e7d32]">{resultMessage}</p>}
         </div>
+      </section>
+    );
+  }
+
+  if (!status.profileReady) {
+    return (
+      <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
+        <p className="text-xs font-black text-[#ffe27c]">✓ אישור Boost נשמר בפרופיל</p>
+        <h3 className="mt-2 text-xl font-black text-white">אפשר לשלוח ולקבל Boost לאחר השלמת הפרופיל</h3>
+        <p className="mt-3 text-sm leading-7 text-white/85">ההסכמה שלך כבר מעודכנת במערכת וב־CRM. כדי שהכרטיס האנונימי יוצג לחברי המאגר וכדי לראות התאמות פוטנציאליות, צריך להשלים את הפרטים והשאלון החסרים.</p>
+        <div className="mt-4 rounded-2xl border border-[#ffe27c]/40 bg-white/10 p-4 text-sm leading-6 text-white">
+          <strong className="text-[#ffe27c]">אין תשלום על האישור.</strong> תשלום של 19.99 ₪ מתבצע רק אם בוחרים לשלוח Boost בפועל, לאחר שהפרופיל הושלם ונמצאה התאמה זמינה.
+        </div>
+        <p className="mt-4 rounded-xl bg-[#fff8d8] p-3 text-center text-xs font-bold leading-5 text-[#5f4a00]">האישור נשמר. כרגע הפרופיל אינו מוצג בכרטיסי Boost עד להשלמת החוסרים.</p>
+        <details className="mt-4 text-center text-[11px] text-white/75">
+          <summary className="cursor-pointer font-bold text-white">ניהול מסלול Boost</summary>
+          <button type="button" disabled={leavePool.isPending} onClick={() => leavePool.mutate({ email, token })} className="mt-2 rounded-lg border border-white/25 bg-white/10 px-3 py-2 font-bold text-white disabled:opacity-50">יציאה מהמסלול</button>
+        </details>
+        {resultMessage && <p className="mt-3 rounded-lg bg-[#e8f5e9] p-2 text-center text-xs font-bold text-[#2e7d32]">{resultMessage}</p>}
       </section>
     );
   }
@@ -568,7 +588,7 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
         ) : status.eligible ? (
           <div className="space-y-3">
             <div className="rounded-xl border border-[#d8d0f0] bg-[#f7f4ff] p-3 text-xs leading-5 text-[#51448c]">
-              <strong>לפני התשלום:</strong> זהו Boost אלגוריתמי שלא נבדק ידנית על ידי הילית. באישור התקנון מאשרים גם לקבל הצעות Boost ולהופיע בכרטיס אנונימי לחברים אחרים במסלול. אין הבטחה לאישור הדדי, לחשיפת פרטים, לדייט או לזוגיות.
+              <strong>חשוב לדעת:</strong> האישור וההצטרפות לשירות אינם כרוכים בתשלום נוסף. תשלום של 19.99 ₪ מתבצע רק כאשר בוחרים לשלוח את ה־Boost שמוצג כאן. זהו Boost אלגוריתמי שלא נבדק ידנית על ידי הילית, ואין הבטחה לאישור הדדי, לחשיפת פרטים, לדייט או לזוגיות.
             </div>
             <GrowWallet
               product="match_boost"

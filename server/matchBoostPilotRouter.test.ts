@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildBoostApprovalLinkEmail } from "./matchBoostPilotRouter";
 
 const read = (relative: string) => fs.readFileSync(path.join(process.cwd(), relative), "utf8");
 
@@ -39,6 +40,21 @@ describe("Boost personal approval link funnel", () => {
     expect(dashboardSource).toContain("joinPool.mutate");
     expect(dashboardSource).toContain("אינן עוברות אישור אישי של הילית");
     expect(dashboardSource).toContain("זהות ופרטים נוספים ייחשפו רק לאחר הסכמה הדדית");
+  });
+
+  it("renders a branded Boost email with a human preview and clear free-approval disclosure", () => {
+    const email = buildBoostApprovalLinkEmail({
+      firstName: "הילית",
+      approvalUrl: "https://hilitcaspi.com/my-profile?token=personal-secret",
+    });
+    expect(email.subject).toBe("פותחים את Boost באזור האישי - האישור ללא תשלום");
+    expect(email.preheader).toContain("האישור לשירות Boost ללא תשלום");
+    expect(email.htmlContent).toContain("יותר בחירה בידיים שלכם");
+    expect(email.htmlContent).toContain("19.99 ₪ מתבצע רק אם בוחרים לשלוח Boost בפועל");
+    expect(email.htmlContent).toContain("linear-gradient(135deg,#2a125d");
+    expect(email.htmlContent).toContain("hilit-profile_6821862b.jpg");
+    expect(email.htmlContent).toContain("display:none;max-height:0;overflow:hidden");
+    expect(email.textContent).toContain("האישור וההצטרפות לשירות Boost אינם כרוכים בתשלום נוסף");
   });
 
   it("keeps pilot metrics and personal details behind team procedures", () => {

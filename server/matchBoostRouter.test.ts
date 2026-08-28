@@ -198,6 +198,7 @@ describe("match boost privacy and payment gate", () => {
   const walletSource = fs.readFileSync(path.join(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
   const termsSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/TermsMatchBoost.tsx"), "utf8");
   const demoSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/MatchBoostDemo.tsx"), "utf8");
+  const crmSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/CRMMatchmaking.tsx"), "utf8");
 
   it("returns a sanitized anonymous card to the personal area, not candidate identity", () => {
     const publicReturn = source.slice(source.indexOf("return {\n        eligible:"), source.indexOf("redeemPlusBoost:"));
@@ -253,6 +254,13 @@ describe("match boost privacy and payment gate", () => {
     expect(uiSource).toContain("הצטרפות למסלול Boost");
     expect(uiSource).toContain("שירות נוסף לבחירתכם");
     expect(uiSource).toContain("ניהול או יציאה משירות Boost");
+    expect(source).toContain("consentSavedBeforeProfileCompletion");
+    expect(source).toContain("profileReadiness.ready ? now : null");
+    expect(source).not.toContain("יש להשלים את הפרופיל, התמונה והשאלון המדעי לפני ההצטרפות ל־Boost");
+    expect(uiSource).toContain("✓ אישור Boost נשמר בפרופיל");
+    expect(uiSource).toContain("האישור וההצטרפות לשירות אינם כרוכים בתשלום נוסף");
+    expect(crmSource).toContain("✓ אישר Boost");
+    expect(crmSource).toContain("הופעה בכרטיס אנונימי ושליחת הצעות מותנות בהשלמת הפרופיל ובזכאות תקינה");
   });
 
   it("opens a one-time 19.99 ILS Grow payment only from the personal Boost card with explicit terms", () => {

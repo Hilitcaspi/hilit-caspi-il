@@ -38,6 +38,19 @@ function hasActiveBoostConsent(membership: any) {
   );
 }
 
+function getBoostProfileReadiness(single: any) {
+  const missingFields = getMissingProfileFields(single);
+  const scientificQuestionnaireComplete = Boolean(single.questionnaireCompletedAt);
+  const photoStored = Boolean(single.photoUrl);
+  return {
+    profileComplete: missingFields.length === 0,
+    scientificQuestionnaireComplete,
+    photoStored,
+    ready: missingFields.length === 0 && scientificQuestionnaireComplete && photoStored,
+    missingFieldsCount: missingFields.length,
+  };
+}
+
 const EDUCATION_LABELS: Record<string, string> = {
   high_school: "תיכון",
   vocational: "הכשרה מקצועית",
@@ -310,6 +323,8 @@ async function loadBoostContext(db: any, single: any) {
       && profile.isActive
       && profile.consentMatchmaking
       && getMissingProfileFields(profile).length === 0
+      && Boolean(profile.questionnaireCompletedAt)
+      && Boolean(profile.photoUrl)
       && !unavailableCandidateIds.has(candidateId)
       && hasActiveBoostConsent(candidateMembership)
       && recentActivityAt >= Date.now() - 90 * DAY_MS
@@ -742,6 +757,7 @@ export const matchBoostRouter = router({
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const context = await loadBoostContext(db, single);
       const eligibility = evaluateBoostEligibility({ single, ...context });
+      const profileReadiness = getBoostProfileReadiness(single);
       return {
         eligible: eligibility.eligible,
         blockers: eligibility.blockers,
@@ -777,6 +793,8 @@ export const matchBoostRouter = router({
         creditAvailable: context.requests.some(hasReusablePaidBoostCredit),
         priceAgorot: BOOST_PRICE_AGOROT,
         paymentConfigured: true,
+        profileReady: profileReadiness.ready,
+        missingProfileFieldsCount: profileReadiness.missingFieldsCount,
       };
     }),
 
@@ -795,20 +813,18 @@ export const matchBoostRouter = router({
       if (hasActiveBoostConsent(existingMembership)) {
         return { success: true, status: "active" as const, consentedAt: existingMembership.consentedAt };
       }
-      const missingFields = getMissingProfileFields(single);
       if (!single.isPaid || !single.isActive || !single.consentMatchmaking) {
         throw new TRPCError({ code: "FORBIDDEN", message: "ההצטרפות פתוחה לחברי מאגר פעילים בלבד" });
       }
-      if (missingFields.length > 0 || !single.questionnaireCompletedAt || !single.photoUrl) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "יש להשלים את הפרופיל, התמונה והשאלון המדעי לפני ההצטרפות ל־Boost" });
-      }
 
       const now = Date.now();
+      const profileReadiness = getBoostProfileReadiness(single);
       const eligibilitySnapshot = JSON.stringify({
         paidAndActive: true,
-        profileComplete: true,
-        scientificQuestionnaireComplete: true,
-        photoStored: true,
+        profileComplete: profileReadiness.profileComplete,
+        scientificQuestionnaireComplete: profileReadiness.scientificQuestionnaireComplete,
+        photoStored: profileReadiness.photoStored,
+        consentSavedBeforeProfileCompletion: !profileReadiness.ready,
       });
       await db.transaction(async (tx: any) => {
         await tx.insert(matchBoostMemberships).values({
@@ -822,7 +838,7 @@ export const matchBoostRouter = router({
           optedOutAt: null,
           source: "personal_area",
           pilotCohort: "open_members_2026_09",
-          eligibleAt: now,
+          eligibleAt: profileReadiness.ready ? now : null,
           eligibilitySnapshot,
           lastActiveAt: now,
           createdAt: now,
@@ -837,7 +853,7 @@ export const matchBoostRouter = router({
           optedOutAt: null,
           source: "personal_area",
           pilotCohort: "open_members_2026_09",
-          eligibleAt: now,
+          eligibleAt: profileReadiness.ready ? now : null,
           eligibilitySnapshot,
           lastActiveAt: now,
           updatedAt: now,

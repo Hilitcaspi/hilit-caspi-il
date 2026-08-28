@@ -1043,7 +1043,7 @@ export default function CRMMatchmaking() {
                     {(single as any).boostStatus === "active" && (
                       <span
                         className="rounded-full bg-fuchsia-100 px-2.5 py-1 text-[10px] font-black text-fuchsia-800 ring-1 ring-fuchsia-200"
-                        title="הפרופיל אישר הצעות Boost אלגוריתמיות והופעה בכרטיס אנונימי"
+                        title="הפרופיל אישר את שירות Boost. הופעה בכרטיס אנונימי ושליחת הצעות מותנות בהשלמת הפרופיל ובזכאות תקינה"
                       >
                         ✓ אישר Boost
                       </span>

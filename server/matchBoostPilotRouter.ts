@@ -14,6 +14,58 @@ import { sendEmail } from "./brevo";
 export const BOOST_INTEREST_CONSENT_VERSION = "2026-08-27-interest-v1";
 const BOOST_LINK_COOLDOWN_MS = 10 * 60 * 1000;
 
+function escapeEmailHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+export function buildBoostApprovalLinkEmail(input: { firstName?: string | null; approvalUrl: string }) {
+  const firstName = escapeEmailHtml(String(input.firstName || "").trim());
+  const greeting = firstName ? `היי ${firstName},` : "היי,";
+  const preheader = "האישור לשירות Boost ללא תשלום. 19.99 ₪ נגבים רק אם בוחרים לשלוח Boost.";
+  const subject = "פותחים את Boost באזור האישי - האישור ללא תשלום";
+  const htmlContent = `<!doctype html>
+<html lang="he" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3ecdf;font-family:Arial,'Rubik',sans-serif;color:#24113f;direction:rtl;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${preheader}&#847;&zwnj;&#847;&zwnj;&#847;&zwnj;&#847;&zwnj;&#847;&zwnj;&#847;&zwnj;</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f3ecdf;"><tr><td align="center" style="padding:24px 12px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#ffffff;border-radius:28px;overflow:hidden;box-shadow:0 18px 48px rgba(42,16,70,.16);">
+      <tr><td align="center" style="background:#191265;padding:28px 24px 22px;">
+        <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg" width="72" height="72" alt="הילית כספי" style="display:block;width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #ffe27c;">
+        <p style="margin:12px 0 0;color:#ffe27c;font-size:13px;font-weight:700;">Boost לחברי המאגר</p>
+        <h1 style="margin:8px 0 0;color:#ffffff;font-size:28px;line-height:1.25;font-weight:800;">יותר אפשרויות.<br>יותר בחירה בידיים שלכם.</h1>
+      </td></tr>
+      <tr><td style="padding:30px 28px 14px;text-align:right;">
+        <p style="margin:0 0 14px;font-size:18px;font-weight:700;color:#24113f;">${greeting}</p>
+        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#4b3a59;">ביקשתם יותר התאמות, ואני מקשיבה. Boost מאפשר לראות באזור האישי התאמות פוטנציאליות ולבחור בעצמכם אם לשלוח בקשת התאמה.</p>
+        <div style="background:linear-gradient(135deg,#2a125d 0%,#6f176f 58%,#b1247f 100%);border-radius:22px;padding:24px 22px;color:#ffffff;">
+          <p style="margin:0 0 12px;color:#ffe27c;font-size:14px;font-weight:800;">מה חשוב לדעת לפני האישור</p>
+          <p style="margin:0 0 10px;font-size:15px;line-height:1.7;">✓ האישור וההצטרפות לשירות Boost אינם כרוכים בתשלום נוסף.</p>
+          <p style="margin:0 0 10px;font-size:15px;line-height:1.7;">✓ תשלום של 19.99 ₪ מתבצע רק אם בוחרים לשלוח Boost בפועל.</p>
+          <p style="margin:0;font-size:15px;line-height:1.7;">✓ ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.</p>
+        </div>
+        <p style="margin:18px 0 0;font-size:15px;line-height:1.8;color:#4b3a59;">האישור יכול להישמר גם אם עדיין חסרים פרטים בפרופיל. הפרופיל יצטרף להצעות Boost רק לאחר השלמת הפרטים והשאלון הנדרשים.</p>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding:24px 0 10px;">
+          <a href="${input.approvalUrl}" style="display:inline-block;background:#ffe27c;color:#191265;text-decoration:none;padding:16px 30px;border-radius:14px;font-size:17px;font-weight:800;box-shadow:0 8px 20px rgba(25,18,101,.18);">כניסה לאזור האישי ואישור Boost</a>
+        </td></tr></table>
+        <p style="margin:8px 0 0;text-align:center;font-size:13px;line-height:1.7;color:#7a6c82;">הקישור אישי ומאובטח. אין להעביר אותו לאחרים.</p>
+      </td></tr>
+      <tr><td align="center" style="background:#191265;padding:20px 24px;">
+        <p style="margin:0;color:#ffe27c;font-size:14px;font-weight:700;">הילית כספי</p>
+        <p style="margin:6px 0 0;color:rgba(255,255,255,.72);font-size:12px;">מאמנת למציאת זוגיות ומנהלת המאגר</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+  const textContent = `${greeting}\n\nביקשתם יותר התאמות, ואני מקשיבה. Boost מאפשר לראות באזור האישי התאמות פוטנציאליות ולבחור אם לשלוח בקשת התאמה.\n\nהאישור וההצטרפות לשירות Boost אינם כרוכים בתשלום נוסף. 19.99 ₪ נגבים רק אם בוחרים לשלוח Boost בפועל. ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.\n\nכניסה לאזור האישי ואישור Boost: ${input.approvalUrl}\n\nהקישור אישי ומאובטח. אין להעביר אותו לאחרים.`;
+  return { subject, preheader, htmlContent, textContent };
+}
+
 function countByStatus(rows: Array<{ status: string }>) {
   return rows.reduce<Record<string, number>>((totals, row) => {
     totals[row.status] = (totals[row.status] || 0) + 1;
@@ -103,11 +155,13 @@ export const matchBoostPilotRouter = router({
 
         if (cooldownElapsed) {
           const approvalUrl = `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken!)}&tab=matches&focus=boost`;
+          const emailContent = buildBoostApprovalLinkEmail({ firstName: single.firstName, approvalUrl });
           try {
             await sendEmail({
               to: { email, name: single.firstName || undefined },
-              subject: "הקישור האישי שלך ל־Boost",
-              htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#2b1747"><h2 style="color:#191265">Boost מחכה לך באזור האישי</h2><p style="line-height:1.8">ביקשת לפתוח את הפרופיל שלך לאפשרות לשלוח ולקבל Boost.</p><p style="line-height:1.8">לחיצה על הכפתור תפתח ישירות את אזור Boost באזור האישי. שם אפשר לאשר את השירות ולצפות בהתאמות פוטנציאליות, כאשר קיימות.</p><p style="text-align:center;margin:28px 0"><a href="${approvalUrl}" style="display:inline-block;background:linear-gradient(135deg,#a52178,#5d176d);color:white;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">כניסה ל־Boost באזור האישי</a></p><p style="font-size:13px;line-height:1.7;color:#6f627a">הקישור אישי ומיועד לחבר או חברת מאגר פעילים. אין להעביר אותו לאחרים.</p></div>`,
+              subject: emailContent.subject,
+              htmlContent: emailContent.htmlContent,
+              textContent: emailContent.textContent,
             });
           } catch (error) {
             console.error(`[MatchBoost] Failed to send approval link for single ${single.id}`, error);
