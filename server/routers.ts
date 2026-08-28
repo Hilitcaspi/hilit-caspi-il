@@ -10,14 +10,14 @@ import { getDb } from "./db";
 import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, matchBoostMemberships } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
-import { cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
+import { BOOST_CANDIDATE_NOTE_MARKER, cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
 import { matchBoostPilotRouter } from "./matchBoostPilotRouter";
 import { operationsRouter } from "./operationsRouter";
 import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
 import type { ScoreBreakdown as FullScoreBreakdown } from "./compatibility";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
 import crypto from "crypto";
-import { eq, and, ne, sql, desc, lt, isNull, isNotNull, or, asc, inArray } from "drizzle-orm";
+import { eq, and, ne, sql, desc, lt, isNull, isNotNull, or, asc, inArray, notLike } from "drizzle-orm";
 import { storagePut } from "./storage";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "./_core/notification";
@@ -2432,9 +2432,12 @@ export const appRouter = router({
         if (profile.questionnaireToken !== input.token) return null;
         // Get matches
         const myMatches = await db.select().from(matches)
-          .where(or(
-            eq(matches.singleAId, profile.id),
-            eq(matches.singleBId, profile.id)
+          .where(and(
+            or(
+              eq(matches.singleAId, profile.id),
+              eq(matches.singleBId, profile.id)
+            ),
+            or(isNull(matches.notes), notLike(matches.notes, `%${BOOST_CANDIDATE_NOTE_MARKER}%`)),
           ))
           .orderBy(desc(matches.createdAt))
           .limit(10);
@@ -3828,7 +3831,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!db) return [];
 
       const pendingMatches = await db.select().from(matches)
-        .where(eq(matches.status, "pending"))
+        .where(and(
+          eq(matches.status, "pending"),
+          or(isNull(matches.notes), notLike(matches.notes, `%${BOOST_CANDIDATE_NOTE_MARKER}%`)),
+        ))
         .orderBy(desc(matches.score ?? 0));
 
       return Promise.all(pendingMatches.map(async (m) => {
@@ -4354,6 +4360,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!db) return [];
 
       const rawMatches = await db.select().from(matches)
+        .where(or(isNull(matches.notes), notLike(matches.notes, `%${BOOST_CANDIDATE_NOTE_MARKER}%`)))
         .orderBy(desc(matches.createdAt), desc(matches.score)); // newest first, then by score
 
       // Deduplicate: for each pair (A,B) keep only the row with the highest score.
@@ -6948,12 +6955,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         ga4SessionId: z.string().max(50).optional(),
         personalToken: z.string().min(16).max(200).optional(),
         boostTermsAccepted: z.literal(true).optional(),
+        boostMatchId: z.number().int().positive().optional(),
       }))
       .mutation(async ({ input }) => {
         const { createPaymentProcess, PRODUCT_CONFIGS } = await import("./growPayment");
         const db = await getDb();
 
         let preparedBoostRequestId: number | null = null;
+        let preparedBoostCheckoutReference: string | null = null;
         let verifiedPaymentIdentity: { fullName: string; email: string; phone: string } | null = null;
 
         if (input.product === "match_boost") {
@@ -6964,8 +6973,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             email: input.email,
             token: input.personalToken,
             termsAccepted: true,
+            matchId: input.boostMatchId,
           });
           preparedBoostRequestId = prepared.requestId;
+          preparedBoostCheckoutReference = prepared.checkoutReference;
           verifiedPaymentIdentity = { fullName: prepared.fullName, email: prepared.email, phone: prepared.phone };
         }
 
@@ -7121,6 +7132,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             ...input,
             ...(verifiedPaymentIdentity || {}),
             sum: finalSum,
+            webhookReference: preparedBoostCheckoutReference || undefined,
           });
           return { ...result, boostRequestId: preparedBoostRequestId }; // { authCode, processToken?, boostRequestId? }
         } catch (error: any) {

@@ -83,7 +83,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   session:      { description: "פגישת היכרות עם הילית כספי",                          sum: 500,  paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון",            sum: 349,  paymentNum: 1 },
   bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 449, paymentNum: 1 },
-  match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית",                       sum: 19.99, paymentNum: 1 },
+  match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית",                       sum: 19.90, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי",                         sum: 99 },
 };
 
@@ -97,6 +97,8 @@ export interface CreatePaymentInput {
   sum?: number;
   /** Personal questionnaire token used to return Plus/Boost members to their account. */
   personalToken?: string;
+  /** Signed server-generated reference used to bind a Boost webhook to one request. */
+  webhookReference?: string;
 }
 
 export interface CreatePaymentResult {
@@ -140,7 +142,9 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   }
   params.append("successUrl", successUrl.toString());
   params.append("cancelUrl", `${SITE_BASE}`);
-  params.append("notifyUrl", `${SITE_BASE}/api/grow/webhook`);
+  const notifyUrl = new URL(`${SITE_BASE}/api/grow/webhook`);
+  if (input.webhookReference) notifyUrl.searchParams.set("boost_ref", input.webhookReference);
+  params.append("notifyUrl", notifyUrl.toString());
   params.append("pageField[fullName]", input.fullName);
   params.append("pageField[email]", input.email);
   if (input.phone) params.append("pageField[phone]", input.phone);

@@ -492,12 +492,13 @@ async function handlePlus(email: string, name: string, transactionId: string, su
   await notifyOwner({ title: "מנוי Database Plus חדש", content: `${name} (${email}) הפעיל/ה Plus ב־${sum} ש״ח לחודש.` });
 }
 
-async function handleMatchBoost(email: string, transactionId: string, sum: number) {
+async function handleMatchBoost(email: string, transactionId: string, sum: number, checkoutReference?: string) {
   const { fulfillPaidBoostPayment } = await import("./matchBoostRouter");
   const result = await fulfillPaidBoostPayment({
     email,
     transactionId,
     amountAgorot: Math.round(sum * 100),
+    checkoutReference,
   });
   await notifyOwner({
     title: result.delivered ? "Boost נרכש ונשלח" : "Boost נרכש ונשמר כקרדיט",
@@ -543,7 +544,7 @@ function extractUtmFromWebhook(data: any): { utmSource?: string; utmMedium?: str
 }
 
 // ─── Main webhook handler (exported, registered in index.ts) ──────────────────
-export async function handleGrowWebhook(body: any): Promise<void> {
+export async function handleGrowWebhook(body: any, context: { boostCheckoutReference?: string } = {}): Promise<void> {
   // Support both PaymentLinks (new) and legacy formats
   const data = body?.data ?? body;
   const email: string = (data.payerEmail || data.email || "").trim().toLowerCase();
@@ -745,7 +746,7 @@ export async function handleGrowWebhook(body: any): Promise<void> {
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
-      case "match_boost": await handleMatchBoost(email, transactionId, sum); break;
+      case "match_boost": await handleMatchBoost(email, transactionId, sum, context.boostCheckoutReference); break;
       case "plus": await handlePlus(email, name, transactionId, sum, data); break;
     }
 

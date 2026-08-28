@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BOOST_CONSENT_VERSION, buildAnonymousBoostCard, evaluateBoostEligibility } from "./matchBoostRouter";
+import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, parseBoostCheckoutReference, selectOnDemandBoostCandidates } from "./matchBoostRouter";
 
 const NOW = new Date("2026-08-25T12:00:00Z").getTime();
 
@@ -58,6 +58,50 @@ function activeMembership(overrides: Record<string, unknown> = {}) {
 }
 
 describe("match boost eligibility", () => {
+  it("signs the prepared checkout to the exact request and member and rejects tampering", () => {
+    const previousSecret = process.env.JWT_SECRET;
+    process.env.JWT_SECRET = "boost-checkout-test-secret";
+    try {
+      const reference = createBoostCheckoutReference(321, 654);
+      expect(parseBoostCheckoutReference(reference)).toEqual({ requestId: 321, singleId: 654 });
+      expect(parseBoostCheckoutReference(reference.replace("321", "322"))).toBeNull();
+      expect(parseBoostCheckoutReference("invalid.reference")).toBeNull();
+    } finally {
+      if (previousSecret === undefined) delete process.env.JWT_SECRET;
+      else process.env.JWT_SECRET = previousSecret;
+    }
+  });
+
+  it("creates at most six on-demand choices from mutually consented, recent, eligible members", () => {
+    const single = completeSingle({ seekingGender: "male", religiosity: "secular" });
+    const candidateProfiles = Array.from({ length: 10 }, (_, index) => completeSingle({
+      id: 20 + index,
+      email: `candidate-${index}@example.com`,
+      gender: "male",
+      seekingGender: "female",
+      height: 180,
+      religiosity: "secular",
+    }));
+    const memberships = candidateProfiles.map((candidate, index) => ({
+      ...activeMembership(),
+      singleId: candidate.id,
+      lastActiveAt: index === 1 ? NOW - 91 * 24 * 60 * 60 * 1000 : NOW - 1000,
+    }));
+    const options = selectOnDemandBoostCandidates({
+      single,
+      candidateProfiles,
+      memberships,
+      answersBySingle: new Map(),
+      existingCandidateIds: new Set([20]),
+      now: NOW,
+    });
+    expect(options).toHaveLength(6);
+    expect(options.map(option => option.candidate.id)).not.toContain(20);
+    expect(options.map(option => option.candidate.id)).not.toContain(21);
+    expect(options.every(option => option.score >= 70)).toBe(true);
+    expect(options.map(option => option.score)).toEqual([...options.map(option => option.score)].sort((a, b) => b - a));
+  });
+
   it("allows a complete paid active member with a hidden pending candidate", () => {
     const result = evaluateBoostEligibility({
       single: completeSingle(),
@@ -69,6 +113,24 @@ describe("match boost eligibility", () => {
     expect(result.eligible).toBe(true);
     expect(result.candidateCount).toBe(1);
     expect(result.topScore).toBe(82);
+  });
+
+  it("keeps multiple eligible Boost options sorted by score for an explicit card choice", () => {
+    const result = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [
+        pendingMatch({ id: 201, score: 74 }),
+        pendingMatch({ id: 202, score: 91 }),
+        pendingMatch({ id: 203, score: 83 }),
+      ],
+      membership: activeMembership(),
+      boostRequests: [],
+      now: NOW,
+    });
+    expect(result.eligible).toBe(true);
+    expect(result.candidateCount).toBe(3);
+    expect(result.candidates.map(candidate => candidate.id)).toEqual([202, 203, 201]);
+    expect(result.topScore).toBe(91);
   });
 
   it("does not offer a boost when the hidden candidate is no longer eligible", () => {
@@ -265,16 +327,18 @@ describe("match boost privacy and payment gate", () => {
     expect(crmSource).toContain("הופעה בכרטיס אנונימי ושליחת הצעות מותנות בהשלמת הפרופיל ובזכאות תקינה");
   });
 
-  it("opens a one-time 19.99 ILS Grow payment only from the personal Boost card with explicit terms", () => {
+  it("opens a one-time 19.90 ILS Grow payment only from the selected personal Boost card with explicit terms", () => {
     expect(paymentSource).toContain('match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית",');
-    expect(paymentSource).toContain("sum: 19.99, paymentNum: 1");
+    expect(paymentSource).toContain("sum: 19.90, paymentNum: 1");
     expect(paymentRouterSource).toContain('"match_boost"');
     expect(paymentRouterSource).toContain("boostTermsAccepted: z.literal(true).optional()");
     expect(paymentRouterSource).toContain("preparePaidBoostCheckout");
     expect(uiSource).not.toContain("const regularPaymentReady = false");
     expect(uiSource).toContain('product="match_boost"');
-    expect(uiSource).toContain("שליחת Boost ב־19.99 ₪");
-    expect(boostCardSource.match(/19\.99/g)).toHaveLength(1);
+    expect(uiSource).toContain("שליחת Boost | 19.90 ₪");
+    expect(boostCardSource.match(/19\.90/g)).toHaveLength(1);
+    expect(uiSource).toContain("boostMatchId={option.matchId}");
+    expect(source).toContain("eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)");
     expect(boostCardSource).not.toContain("Plus חודשי");
     expect(boostCardSource).not.toContain("במערכת וב־CRM");
     expect(uiSource).toContain('termsPath="/terms/match-boost"');
@@ -292,14 +356,32 @@ describe("match boost privacy and payment gate", () => {
     expect(source).toContain('eq(matches.status, "pending")');
     expect(source).toContain("boost_credit_available:");
     expect(source).toContain("redeemPaidCredit: publicProcedure");
-    expect(uiSource).toContain("מימוש קרדיט Boost ללא חיוב נוסף");
+    expect(uiSource).toContain("מימוש קרדיט ושליחת Boost");
     expect(webhookSource).toContain('case "match_boost": await handleMatchBoost');
     expect(webhookSource).toContain('product !== "match_boost" && sum >= 19 && sum <= 21');
+    expect(source).toContain("checkoutReference?: string");
+    expect(source).toContain("parseBoostCheckoutReference(input.checkoutReference)");
+    expect(source).toContain("if (!request && !input.checkoutReference)");
+  });
+
+  it("generates anonymous pending choices without sending messages or charging and hides them from Hilit's regular queue", () => {
+    const generationSource = source.slice(source.indexOf("async function ensureBoostCandidatesForSingle"), source.indexOf("const EDUCATION_LABELS"));
+    const routersSource = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
+    expect(source).toContain("refreshOptions: publicProcedure");
+    expect(source).toContain(BOOST_CANDIDATE_NOTE_MARKER);
+    expect(generationSource).toContain('status: "pending"');
+    expect(generationSource).not.toContain("sendEmail(");
+    expect(generationSource).not.toContain("sendInitialMatchWhatsAppsOnce(");
+    expect(generationSource).not.toContain("preparePaidBoostCheckout(");
+    expect(routersSource).toContain("notLike(matches.notes, `%${BOOST_CANDIDATE_NOTE_MARKER}%`)");
+    expect(boostCardSource).toContain("didRefreshOptionsRef");
+    expect(boostCardSource).toContain("refreshOptions.mutate({ email, token })");
+    expect(boostCardSource).toContain("אין כרגע אפשרויות Boost זמינות");
   });
 
   it("provides a clearly labelled non-customer demo of the paid Boost card without opening Grow", () => {
     expect(demoSource).toContain("המחשה בלבד: אין פרטי לקוח ולא מתבצע חיוב");
-    expect(demoSource).toContain("שליחת Boost ב־19.99 ₪");
+    expect(demoSource).toContain("שליחת Boost | 19.90 ₪");
     expect(demoSource).toContain('href="/terms/match-boost"');
     expect(demoSource).not.toContain('product="match_boost"');
     expect(demoSource).not.toContain("questionnaireToken");

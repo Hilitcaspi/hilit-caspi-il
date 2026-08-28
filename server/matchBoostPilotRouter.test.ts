@@ -30,21 +30,22 @@ describe("Boost personal approval link funnel", () => {
     expect(submitFlow).not.toContain("insert(matchBoostMemberships)");
   });
 
-  it("opens the personal-area Boost section and keeps joining as a separate action", () => {
+  it("opens the Boost section inside the personal-area matches tab and keeps joining as a separate action", () => {
     expect(appSource).toContain('<Route path="/match-boost" component={MatchBoostLanding} />');
     expect(routerSource).toContain("https://hilitcaspi.com/my-profile?email=");
-    expect(routerSource).toContain("&tab=boost#boost-card");
-    expect(pageSource).toContain("&tab=boost#boost-card");
+    expect(routerSource).toContain("&tab=matches#boost-card");
+    expect(pageSource).toContain("&tab=matches#boost-card");
     expect(pageSource).toContain("window.location.replace(dashboardUrl)");
     expect(pageSource).toContain("הקישור נשלח כדי לוודא שזהו הפרופיל שלי במאגר");
-    expect(dashboardSource).toContain('{ id: "boost" as const, label: "Boost", icon: "⚡" }');
-    expect(dashboardSource).toContain('activeTab === "boost"');
+    expect(dashboardSource).not.toContain('{ id: "boost" as const, label: "Boost", icon: "⚡" }');
+    expect(dashboardSource).toContain('activeTab === "matches"');
+    expect(dashboardSource).toContain("כל ההזדמנויות להיכרות במקום אחד");
     expect(dashboardSource).toContain('id="boost-card"');
     expect(dashboardSource).toContain('window.location.hash !== "#boost-card"');
     expect(dashboardSource).toContain("didAutoFocusRef");
     expect(dashboardSource).toContain("joinPool.mutate");
     expect(dashboardSource).toContain("אינן עוברות אישור אישי של הילית");
-    expect(dashboardSource).toContain("זהות ופרטים נוספים ייחשפו רק לאחר הסכמה הדדית");
+    expect(dashboardSource).toContain("פרטים מזהים ייחשפו רק לאחר הסכמה הדדית");
   });
 
   it("presents Hilit's professional positioning without an unsupported size claim", () => {
@@ -65,7 +66,7 @@ describe("Boost personal approval link funnel", () => {
     expect(email.preheader).not.toContain("19.99");
     expect(email.htmlContent).toContain("יותר בחירה בידיים שלכם");
     expect(email.htmlContent).not.toContain("19.99");
-    expect(email.htmlContent).toContain("האישור מאפשר לשלוח ולקבל בקשות Boost באזור האישי");
+    expect(email.htmlContent).toContain("חברי מאגר שיאשרו את שירות הבוסט יוכלו לשלוח ולקבל בקשות Boost באזור האישי");
     expect(email.htmlContent).toContain("linear-gradient(135deg,#2a125d");
     expect(email.htmlContent).toContain("hilit-profile_6821862b.jpg");
     expect(email.htmlContent).toContain("display:none;max-height:0;overflow:hidden");

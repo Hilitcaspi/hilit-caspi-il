@@ -8,12 +8,13 @@ import {
   matchBoostMemberships,
   matchBoostPilotInterests,
   matchBoostRequests,
+  matchmakingAnswers,
   matches,
   plusPilotMembers,
   singles,
 } from "../drizzle/schema";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
-import { passesHardFilters } from "./compatibility";
+import { computeFullScore, passesHardFilters } from "./compatibility";
 import { getDb } from "./db";
 import { sendEmail } from "./brevo";
 import { buildMatchProposalEmail } from "./emailTemplates";
@@ -21,11 +22,39 @@ import { getMissingProfileFields } from "./matchmakingMetrics";
 import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-export const BOOST_PRICE_AGOROT = 1999;
+export const BOOST_PRICE_AGOROT = 1990;
+const LEGACY_BOOST_PRICE_AGOROT = 1999;
 const MIN_BOOST_SCORE = 70;
+const MAX_BOOST_OPTIONS = 6;
+export const BOOST_CANDIDATE_NOTE_MARKER = "[BOOST_CANDIDATE]";
 export const BOOST_CONSENT_VERSION = "2026-08-27-v1";
 const OPEN_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
 const REVIEWABLE_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
+
+function boostCheckoutSigningSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("JWT_SECRET unavailable for Boost checkout binding");
+  return secret;
+}
+
+export function createBoostCheckoutReference(requestId: number, singleId: number) {
+  const payload = `${requestId}.${singleId}`;
+  const signature = crypto.createHmac("sha256", boostCheckoutSigningSecret()).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function parseBoostCheckoutReference(reference: string) {
+  const [requestIdRaw, singleIdRaw, signature] = String(reference || "").split(".");
+  const requestId = Number(requestIdRaw);
+  const singleId = Number(singleIdRaw);
+  if (!Number.isInteger(requestId) || requestId <= 0 || !Number.isInteger(singleId) || singleId <= 0 || !signature) return null;
+  const payload = `${requestId}.${singleId}`;
+  const expected = crypto.createHmac("sha256", boostCheckoutSigningSecret()).update(payload).digest("base64url");
+  const actualBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) return null;
+  return { requestId, singleId };
+}
 
 function hasActiveBoostConsent(membership: any) {
   return Boolean(
@@ -49,6 +78,153 @@ function getBoostProfileReadiness(single: any) {
     ready: missingFields.length === 0 && scientificQuestionnaireComplete && photoStored,
     missingFieldsCount: missingFields.length,
   };
+}
+
+function parseAnswersJson(raw: unknown) {
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function selectOnDemandBoostCandidates(input: {
+  single: any;
+  candidateProfiles: any[];
+  memberships: any[];
+  answersBySingle: Map<number, any[]>;
+  existingCandidateIds?: Set<number>;
+  unavailableCandidateIds?: Set<number>;
+  now?: number;
+  limit?: number;
+}) {
+  const now = input.now ?? Date.now();
+  const existingCandidateIds = input.existingCandidateIds ?? new Set<number>();
+  const unavailableCandidateIds = input.unavailableCandidateIds ?? new Set<number>();
+  const membershipBySingle = new Map<number, any>(input.memberships.map((membership: any) => [membership.singleId, membership]));
+  const answersA = input.answersBySingle.get(input.single.id) ?? [];
+
+  return input.candidateProfiles
+    .flatMap((candidate: any) => {
+      if (!candidate || candidate.id === input.single.id || existingCandidateIds.has(candidate.id) || unavailableCandidateIds.has(candidate.id)) return [];
+      const membership = membershipBySingle.get(candidate.id);
+      const recentActivityAt = Number(membership?.lastActiveAt || membership?.consentedAt || 0);
+      if (
+        !candidate.isPaid
+        || !candidate.isActive
+        || !candidate.consentMatchmaking
+        || !getBoostProfileReadiness(candidate).ready
+        || !hasActiveBoostConsent(membership)
+        || recentActivityAt < now - 90 * DAY_MS
+        || !passesHardFilters(input.single, candidate).pass
+        || !passesHardFilters(candidate, input.single).pass
+      ) return [];
+
+      const breakdown = computeFullScore(
+        input.single,
+        candidate,
+        answersA,
+        input.answersBySingle.get(candidate.id) ?? [],
+      );
+      if (breakdown.total < MIN_BOOST_SCORE) return [];
+      return [{ candidate, score: breakdown.total, breakdown }];
+    })
+    .sort((a: any, b: any) => b.score - a.score)
+    .slice(0, input.limit ?? MAX_BOOST_OPTIONS);
+}
+
+async function ensureBoostCandidatesForSingle(db: any, single: any, now = Date.now()) {
+  const [membershipRows, memberMatches, requests] = await Promise.all([
+    db.select().from(matchBoostMemberships).where(eq(matchBoostMemberships.singleId, single.id)).limit(1),
+    db.select().from(matches).where(or(eq(matches.singleAId, single.id), eq(matches.singleBId, single.id))),
+    db.select().from(matchBoostRequests).where(eq(matchBoostRequests.singleId, single.id)).orderBy(desc(matchBoostRequests.requestedAt)).limit(10),
+  ]);
+  const membership = membershipRows[0];
+  if (!hasActiveBoostConsent(membership) || !getBoostProfileReadiness(single).ready) return 0;
+  if (!single.isPaid || !single.isActive || !single.consentMatchmaking) return 0;
+  if (memberMatches.some((match: any) => !match.returnedToPoolAt && ["proposed", "matched"].includes(match.status))) return 0;
+  if (requests.some((request: any) =>
+    OPEN_BOOST_STATUSES.includes(request.status)
+    || (request.status !== "refunded" && request.status !== "cancelled" && request.status !== "awaiting_payment" && Number(request.requestedAt || 0) > now - 30 * DAY_MS)
+  )) return 0;
+
+  await db.update(matchBoostMemberships).set({ lastActiveAt: now, updatedAt: now })
+    .where(eq(matchBoostMemberships.singleId, single.id));
+
+  const memberships = await db.select().from(matchBoostMemberships).where(eq(matchBoostMemberships.status, "active"));
+  const candidateIds = memberships
+    .filter((candidateMembership: any) => candidateMembership.singleId !== single.id && hasActiveBoostConsent(candidateMembership))
+    .map((candidateMembership: any) => candidateMembership.singleId);
+  if (candidateIds.length === 0) return 0;
+
+  const [candidateProfiles, activeMatches, answerRows] = await Promise.all([
+    db.select().from(singles).where(and(
+      inArray(singles.id, candidateIds),
+      eq(singles.isActive, true),
+      eq(singles.isPaid, true),
+      eq(singles.consentMatchmaking, true),
+    )),
+    db.select({ singleAId: matches.singleAId, singleBId: matches.singleBId }).from(matches).where(and(
+      isNull(matches.returnedToPoolAt),
+      inArray(matches.status, ["proposed", "matched"]),
+      or(inArray(matches.singleAId, candidateIds), inArray(matches.singleBId, candidateIds)),
+    )),
+    db.select().from(matchmakingAnswers).where(inArray(matchmakingAnswers.singleId, [single.id, ...candidateIds])),
+  ]);
+
+  const unavailableCandidateIds = new Set<number>();
+  for (const activeMatch of activeMatches as any[]) {
+    if (candidateIds.includes(activeMatch.singleAId)) unavailableCandidateIds.add(activeMatch.singleAId);
+    if (candidateIds.includes(activeMatch.singleBId)) unavailableCandidateIds.add(activeMatch.singleBId);
+  }
+  const existingCandidateIds = new Set<number>(memberMatches.map((match: any) =>
+    match.singleAId === single.id ? match.singleBId : match.singleAId,
+  ));
+  const answersBySingle = new Map<number, any[]>((answerRows as any[]).map((row: any) => [row.singleId, parseAnswersJson(row.answersJson)]));
+  const ranked = selectOnDemandBoostCandidates({
+    single,
+    candidateProfiles,
+    memberships,
+    answersBySingle,
+    existingCandidateIds,
+    unavailableCandidateIds,
+    now,
+  });
+
+  let created = 0;
+  for (const option of ranked) {
+    const candidate = option.candidate;
+    const existing = await db.select({ id: matches.id }).from(matches).where(or(
+      and(eq(matches.singleAId, single.id), eq(matches.singleBId, candidate.id)),
+      and(eq(matches.singleAId, candidate.id), eq(matches.singleBId, single.id)),
+    )).limit(1);
+    if (existing[0]) continue;
+    const [insertResult] = await db.insert(matches).values({
+      singleId: single.id,
+      matchedSingleId: candidate.id,
+      singleAId: single.id,
+      singleBId: candidate.id,
+      score: option.score,
+      scoreBreakdown: JSON.stringify({ ...option.breakdown, algorithm: "v8.0", source: "boost_on_demand" }),
+      notes: `${BOOST_CANDIDATE_NOTE_MARKER} נוצרה כאפשרות אנונימית לפי דרישה; לא נשלחה הודעה ולא בוצע חיוב`,
+      proposedAt: now,
+      status: "pending",
+      updatedAt: now,
+    } as any);
+    const insertedId = Number((insertResult as any)?.insertId || 0);
+    const duplicateRows = await db.select({ id: matches.id }).from(matches).where(or(
+      and(eq(matches.singleAId, single.id), eq(matches.singleBId, candidate.id)),
+      and(eq(matches.singleAId, candidate.id), eq(matches.singleBId, single.id)),
+    )).orderBy(matches.id);
+    if (insertedId && duplicateRows[0]?.id !== insertedId) {
+      await db.delete(matches).where(and(eq(matches.id, insertedId), eq(matches.status, "pending")));
+      continue;
+    }
+    created++;
+  }
+  return created;
 }
 
 const EDUCATION_LABELS: Record<string, string> = {
@@ -253,6 +429,7 @@ export function evaluateBoostEligibility(input: {
     activeMatch,
     positiveOutcome,
     candidateCount: candidates.length,
+    candidates,
     topCandidate: candidates[0] || null,
     topScore: candidates[0] ? Math.round(Number(candidates[0].score || 0)) : null,
     plusActive,
@@ -345,11 +522,15 @@ export async function preparePaidBoostCheckout(input: {
   email: string;
   token: string;
   termsAccepted: true;
+  matchId?: number;
 }) {
   const { db, single } = await getVerifiedSingle(input.email, input.token);
   const context = await loadBoostContext(db, single);
   const eligibility = evaluateBoostEligibility({ single, ...context });
-  if (!eligibility.eligible || !eligibility.topCandidate) {
+  const selectedCandidate = input.matchId
+    ? eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)
+    : eligibility.topCandidate;
+  if (!eligibility.eligible || !selectedCandidate) {
     throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.blockers[0] || "הבוסט אינו זמין כרגע" });
   }
 
@@ -358,7 +539,7 @@ export async function preparePaidBoostCheckout(input: {
   const requestId = await db.transaction(async (tx: any) => {
     const [insertResult] = await tx.insert(matchBoostRequests).values({
       singleId: single.id,
-      matchId: eligibility.topCandidate.id,
+      matchId: selectedCandidate.id,
       source: "paid",
       status: "awaiting_payment",
       amountAgorot: BOOST_PRICE_AGOROT,
@@ -386,6 +567,7 @@ export async function preparePaidBoostCheckout(input: {
   if (!requestId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא ניתן היה לפתוח בקשת Boost" });
   return {
     requestId,
+    checkoutReference: createBoostCheckoutReference(requestId, single.id),
     singleId: single.id,
     fullName: `${single.firstName || ""} ${single.lastName || ""}`.trim(),
     email: String(single.email || input.email).trim().toLowerCase(),
@@ -407,10 +589,11 @@ export async function fulfillPaidBoostPayment(input: {
   email: string;
   transactionId: string;
   amountAgorot: number;
+  checkoutReference?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  if (Math.abs(input.amountAgorot - BOOST_PRICE_AGOROT) > 1) {
+  if (![BOOST_PRICE_AGOROT, LEGACY_BOOST_PRICE_AGOROT].some(amount => Math.abs(input.amountAgorot - amount) <= 1)) {
     throw new Error(`Unexpected Boost payment amount: ${input.amountAgorot}`);
   }
   const normalizedEmail = input.email.trim().toLowerCase();
@@ -422,7 +605,18 @@ export async function fulfillPaidBoostPayment(input: {
         .where(eq(matchBoostRequests.providerTransactionId, input.transactionId)).limit(1)
     : [];
   let request = existingByTransaction;
-  if (!request) {
+  if (!request && input.checkoutReference) {
+    const bound = parseBoostCheckoutReference(input.checkoutReference);
+    if (!bound || bound.singleId !== single.id) throw new Error("Invalid Boost checkout reference");
+    [request] = await db.select().from(matchBoostRequests).where(and(
+      eq(matchBoostRequests.id, bound.requestId),
+      eq(matchBoostRequests.singleId, single.id),
+      eq(matchBoostRequests.source, "paid"),
+      eq(matchBoostRequests.status, "awaiting_payment"),
+    )).limit(1);
+    if (!request) throw new Error("Bound Boost checkout is not awaiting payment");
+  }
+  if (!request && !input.checkoutReference) {
     [request] = await db.select().from(matchBoostRequests).where(and(
       eq(matchBoostRequests.singleId, single.id),
       eq(matchBoostRequests.source, "paid"),
@@ -517,6 +711,7 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
       proposedAt: now,
       ownerApprovedAt: null,
       autoExplanation: "[BOOST] הצעת Boost אלגוריתמית שלא נבדקה ידנית על ידי הילית",
+      notes: "[BOOST_SENT] נשלחה כהצעת Boost אלגוריתמית לאחר חיוב או מימוש קרדיט",
       updatedAt: now,
     }).where(and(eq(matches.id, match.id), eq(matches.status, "pending"), isNull(matches.returnedToPoolAt)));
     const affectedRows = Number((Array.isArray(updateResult) ? updateResult[0] : updateResult)?.affectedRows || 0);
@@ -769,6 +964,10 @@ export const matchBoostRouter = router({
         anonymousCard: eligibility.topCandidate?.candidateProfile
           ? buildAnonymousBoostCard(eligibility.topCandidate.candidateProfile, eligibility.topCandidate)
           : null,
+        options: eligibility.candidates.slice(0, MAX_BOOST_OPTIONS).flatMap((candidate: any) => candidate.candidateProfile ? [{
+          matchId: candidate.id,
+          card: buildAnonymousBoostCard(candidate.candidateProfile, candidate),
+        }] : []),
         consentVersion: BOOST_CONSENT_VERSION,
         membership: context.membership ? {
           status: context.membership.status,
@@ -795,6 +994,20 @@ export const matchBoostRouter = router({
         paymentConfigured: true,
         profileReady: profileReadiness.ready,
         missingProfileFieldsCount: profileReadiness.missingFieldsCount,
+      };
+    }),
+
+  refreshOptions: publicProcedure
+    .input(z.object({ email: z.string().email(), token: z.string().min(16) }))
+    .mutation(async ({ input }) => {
+      const { db, single } = await getVerifiedSingle(input.email, input.token);
+      const created = await ensureBoostCandidatesForSingle(db, single);
+      const context = await loadBoostContext(db, single);
+      const eligibility = evaluateBoostEligibility({ single, ...context });
+      return {
+        created,
+        candidateCount: eligibility.candidateCount,
+        available: eligibility.candidateCount > 0,
       };
     }),
 
@@ -911,7 +1124,7 @@ export const matchBoostRouter = router({
     }),
 
   redeemPlusBoost: publicProcedure
-    .input(z.object({ email: z.string().email(), token: z.string().min(16) }))
+    .input(z.object({ email: z.string().email(), token: z.string().min(16), matchId: z.number().int().positive().optional() }))
     .mutation(async ({ input }) => {
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const context = await loadBoostContext(db, single);
@@ -919,7 +1132,10 @@ export const matchBoostRouter = router({
       if (!eligibility.plusActive || !eligibility.plusBenefitAvailable) {
         throw new TRPCError({ code: "FORBIDDEN", message: "לא נמצאה הטבת בוסט זמינה במחזור Plus הנוכחי" });
       }
-      if (!eligibility.eligible || !eligibility.topCandidate) {
+      const selectedCandidate = input.matchId
+        ? eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)
+        : eligibility.topCandidate;
+      if (!eligibility.eligible || !selectedCandidate) {
         throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.blockers[0] || "הבוסט אינו זמין כרגע" });
       }
 
@@ -930,7 +1146,7 @@ export const matchBoostRouter = router({
         const requestId = await db.transaction(async (tx: any) => {
           const [insertResult] = await tx.insert(matchBoostRequests).values({
             singleId: single.id,
-            matchId: eligibility.topCandidate.id,
+            matchId: selectedCandidate.id,
             source: "plus_included",
             status: "queued",
             amountAgorot: 0,
@@ -957,7 +1173,7 @@ export const matchBoostRouter = router({
     }),
 
   redeemPaidCredit: publicProcedure
-    .input(z.object({ email: z.string().email(), token: z.string().min(16) }))
+    .input(z.object({ email: z.string().email(), token: z.string().min(16), matchId: z.number().int().positive().optional() }))
     .mutation(async ({ input }) => {
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const context = await loadBoostContext(db, single);
@@ -971,13 +1187,16 @@ export const matchBoostRouter = router({
         membership: context.membership,
         boostRequests: context.requests.filter((request: any) => request.id !== credit.id),
       });
-      if (!eligibility.eligible || !eligibility.topCandidate) {
+      const selectedCandidate = input.matchId
+        ? eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)
+        : eligibility.topCandidate;
+      if (!eligibility.eligible || !selectedCandidate) {
         throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.blockers[0] || "אין כרגע התאמה זמינה למימוש הקרדיט" });
       }
 
       const now = Date.now();
       await db.update(matchBoostRequests).set({
-        matchId: eligibility.topCandidate.id,
+        matchId: selectedCandidate.id,
         status: "queued",
         requestedAt: now,
         decisionReason: "boost_credit_redeemed",
@@ -999,7 +1218,7 @@ export const matchBoostRouter = router({
     }),
 
   startPaidBoost: publicProcedure
-    .input(z.object({ email: z.string().email(), token: z.string().min(16), termsAccepted: z.literal(true) }))
+    .input(z.object({ email: z.string().email(), token: z.string().min(16), termsAccepted: z.literal(true), matchId: z.number().int().positive().optional() }))
     .mutation(async ({ input }) => {
       const prepared = await preparePaidBoostCheckout(input);
       return { configured: true, requestId: prepared.requestId, amountAgorot: BOOST_PRICE_AGOROT, product: "match_boost" as const };

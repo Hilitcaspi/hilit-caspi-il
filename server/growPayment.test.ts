@@ -18,9 +18,9 @@ describe("growPayment module", () => {
     }
   });
 
-  it("configures Boost as a one-time 19.99 ILS product", () => {
+  it("configures Boost as a one-time 19.90 ILS product", () => {
     expect(PRODUCT_CONFIGS.match_boost).toMatchObject({
-      sum: 19.99,
+      sum: 19.90,
       paymentNum: 1,
     });
     expect(PRODUCT_CONFIGS.match_boost.description).toContain("Boost");

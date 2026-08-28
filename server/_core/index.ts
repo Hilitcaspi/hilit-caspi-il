@@ -221,7 +221,8 @@ async function startServer() {
     try {
       // Accept ALL webhooks — no key validation at all
       console.log("[GrowWebhook] Received (Content-Type:", req.headers['content-type'], "):", JSON.stringify(req.body).slice(0, 500));
-      await handleGrowWebhook(req.body);
+      const boostCheckoutReference = typeof req.query.boost_ref === "string" ? req.query.boost_ref : undefined;
+      await handleGrowWebhook(req.body, { boostCheckoutReference });
     } catch (err) {
       console.error("[GrowWebhook] Unhandled error:", err);
     }

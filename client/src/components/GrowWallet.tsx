@@ -49,7 +49,7 @@ const PRODUCT_CONFIGS: Record<string, { description: string; sum: number; paymen
   session:      { description: "פגישה בודדת עם הילית כספי", sum: 500, paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון", sum: 349, paymentNum: 1 },
   bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 449, paymentNum: 1 },
-  match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית", sum: 19.99, paymentNum: 1 },
+  match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית", sum: 19.90, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי", sum: 99 },
 };
 
@@ -153,6 +153,7 @@ interface GrowWalletProps {
   onFailure?: (response: any) => void;
   termsPath?: string;
   personalToken?: string;
+  boostMatchId?: number;
   showCoupon?: boolean;
 }
 
@@ -169,6 +170,7 @@ export default function GrowWallet({
   onFailure,
   termsPath,
   personalToken,
+  boostMatchId,
   showCoupon = true,
 }: GrowWalletProps) {
   const [name, setName] = useState(prefillName || "");
@@ -452,6 +454,7 @@ export default function GrowWallet({
         ga4SessionId,
         personalToken,
         boostTermsAccepted: product === "match_boost" ? true : undefined,
+        boostMatchId: product === "match_boost" ? boostMatchId : undefined,
       });
 
       // Save processToken for failure reporting (if SDK payment fails later)
@@ -477,7 +480,7 @@ export default function GrowWallet({
         stage: "createProcess",
       });
     }
-  }, [name, email, phone, product, termsPath, termsAccepted, personalToken, couponApplied]);
+  }, [name, email, phone, product, termsPath, termsAccepted, personalToken, boostMatchId, couponApplied]);
 
   const hasAllDetails = prefillName && prefillEmail;
 
