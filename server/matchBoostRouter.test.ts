@@ -251,8 +251,8 @@ describe("match boost privacy and payment gate", () => {
     expect(source).toContain("leavePool: publicProcedure");
     expect(source).toContain('eventType: "opted_out"');
     expect(uiSource).toContain("הצטרפות למסלול Boost");
-    expect(uiSource).toContain("בהצטרפות יזומה");
-    expect(uiSource).toContain("יציאה ממסלול Boost");
+    expect(uiSource).toContain("שירות נוסף לבחירתכם");
+    expect(uiSource).toContain("ניהול או יציאה משירות Boost");
   });
 
   it("opens a one-time 19.99 ILS Grow payment only from the personal Boost card with explicit terms", () => {

@@ -15,9 +15,9 @@ export default function MatchBoostDemo() {
   const [notice, setNotice] = useState("");
 
   return (
-    <main className="min-h-screen bg-[#f0eadc] px-4 py-8 font-rubik text-[#191265]" dir="rtl">
-      <section className="mx-auto max-w-2xl overflow-hidden rounded-[30px] border border-[#d9c05c] bg-gradient-to-br from-white via-[#fffdf4] to-[#fff3bf] shadow-xl">
-        <div className="bg-[#191265] px-5 py-3 text-center text-sm font-black text-[#ffe27c]">המחשה בלבד: אין פרטי לקוח ולא מתבצע חיוב</div>
+    <main className="min-h-screen bg-[#f0eadc] px-4 py-8 font-rubik text-white" dir="rtl">
+      <section className="mx-auto max-w-2xl overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] shadow-xl shadow-fuchsia-950/20">
+        <div className="border-b border-white/20 bg-white/10 px-5 py-3 text-center text-sm font-black text-[#ffe27c]">המחשה בלבד: אין פרטי לקוח ולא מתבצע חיוב</div>
         <div className="p-5 md:p-7">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="mx-auto flex h-24 w-20 shrink-0 items-center justify-center rounded-2xl bg-[#191265] shadow-md sm:mx-0">
@@ -25,19 +25,19 @@ export default function MatchBoostDemo() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-bold text-[#8b7420]">כרטיס Boost אנונימי</p>
-                <span className="rounded-full bg-[#191265] px-3 py-1 text-xs font-black text-white">82% התאמה</span>
+                <p className="text-xs font-black text-[#ffe27c]">כרטיס Boost אנונימי</p>
+                <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black text-white">82% התאמה</span>
               </div>
               <h1 className="mt-2 text-2xl font-black">לפני תמונה, מכירים את האדם</h1>
-              <p className="mt-2 text-sm leading-6 text-[#555]">הכרטיס מציג מידע כללי וסיבות התאמה, בלי שם, תמונה, עיר מדויקת, מקום עבודה או פרטי קשר.</p>
+              <p className="mt-2 text-sm leading-6 text-white/80">הכרטיס מציג מידע כללי וסיבות התאמה, בלי שם, תמונה, עיר מדויקת, מקום עבודה או פרטי קשר.</p>
             </div>
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {details.map(([label, value]) => (
-              <div key={label} className="rounded-xl border border-[#eadb91] bg-white/85 p-3">
-                <p className="text-[10px] font-bold text-[#8b7420]">{label}</p>
-                <p className="mt-1 text-xs font-black">{value}</p>
+              <div key={label} className="rounded-xl border border-white/20 bg-white/10 p-3 backdrop-blur-sm">
+                <p className="text-[10px] font-bold text-[#ffe27c]">{label}</p>
+                <p className="mt-1 text-xs font-black text-white">{value}</p>
               </div>
             ))}
           </div>
@@ -47,9 +47,9 @@ export default function MatchBoostDemo() {
             <div className="rounded-xl bg-[#fff3e8] p-4 text-xs leading-6 text-[#75431e]"><strong className="block text-[#8a4b17]">מה כדאי לקחת בחשבון</strong>הכרטיס הוא בסיס להחלטה ראשונית. פרטים מזהים נחשפים רק לאחר אישור הדדי.</div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-[#cfc7e8] bg-[#f5f2ff] p-3 text-center text-xs font-black text-[#51448c]">הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית</div>
+          <div className="mt-4 rounded-xl border border-white/25 bg-white/10 p-3 text-center text-xs font-black text-white">הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית</div>
 
-          <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm">
+          <div className="mt-5 rounded-2xl bg-white p-4 text-[#20113e] shadow-lg">
             <p className="text-sm font-black">לפני התשלום</p>
             <p className="mt-2 text-xs leading-5 text-[#555]">שליחת Boost כוללת גם הצטרפות לקבלת הצעות Boost אלגוריתמיות ולהופעה בכרטיס אנונימי לחברים אחרים במסלול. אין הבטחה לאישור הדדי, לחשיפת פרטים, לדייט או לזוגיות.</p>
             <label className="mt-4 flex items-start gap-3 text-xs leading-5 text-[#444]">
@@ -60,7 +60,7 @@ export default function MatchBoostDemo() {
               type="button"
               disabled={!termsAccepted}
               onClick={() => setNotice("בעמוד האישי האמיתי נפתח כאן תשלום Grow מאובטח. בהדגמה לא מתבצע חיוב.")}
-              className="mt-4 w-full rounded-2xl bg-[#ffe27c] py-4 text-lg font-black text-[#191265] shadow-lg transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-4 w-full rounded-2xl bg-gradient-to-l from-[#a52178] to-[#5d176d] py-4 text-lg font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
             >
               שליחת Boost ב־19.99 ₪
             </button>

@@ -9,6 +9,7 @@ describe("Boost personal approval link funnel", () => {
   const boostSource = read("server/matchBoostRouter.ts");
   const schemaSource = read("drizzle/schema.ts");
   const pageSource = read("client/src/pages/MatchBoostLanding.tsx");
+  const dashboardSource = read("client/src/pages/UserDashboard.tsx");
   const operationsSource = read("client/src/components/OperationsSection.tsx");
   const appSource = read("client/src/App.tsx");
 
@@ -27,15 +28,17 @@ describe("Boost personal approval link funnel", () => {
     expect(submitFlow).not.toContain("insert(matchBoostMemberships)");
   });
 
-  it("makes the distinction between receiving a link and joining visible", () => {
+  it("opens the personal-area Boost section and keeps joining as a separate action", () => {
     expect(appSource).toContain('<Route path="/match-boost" component={MatchBoostLanding} />');
-    expect(routerSource).toContain("https://hilitcaspi.com/match-boost?email=");
+    expect(routerSource).toContain("https://hilitcaspi.com/my-profile?email=");
+    expect(routerSource).toContain("&tab=matches&focus=boost");
+    expect(pageSource).toContain("window.location.replace(dashboardUrl)");
     expect(pageSource).toContain("הקישור נשלח כדי לוודא שזהו הפרופיל שלי במאגר");
-    expect(pageSource).toContain("אישור הצטרפות לשירות Boost");
-    expect(pageSource).toContain("personalStatus");
-    expect(pageSource).toContain("joinPool.mutate");
-    expect(pageSource).toContain("אינן עוברות אישור אישי של הילית");
-    expect(pageSource).toContain("הפרטים ייחשפו רק לאחר הסכמה הדדית");
+    expect(dashboardSource).toContain('params.get("focus") === "boost"');
+    expect(dashboardSource).toContain('id="boost-card"');
+    expect(dashboardSource).toContain("joinPool.mutate");
+    expect(dashboardSource).toContain("אינן עוברות אישור אישי של הילית");
+    expect(dashboardSource).toContain("זהות ופרטים נוספים ייחשפו רק לאחר הסכמה הדדית");
   });
 
   it("keeps pilot metrics and personal details behind team procedures", () => {

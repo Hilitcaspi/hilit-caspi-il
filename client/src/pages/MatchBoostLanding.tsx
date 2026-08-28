@@ -20,6 +20,12 @@ export default function MatchBoostLanding() {
     return () => { document.title = previous; };
   }, []);
 
+  useEffect(() => {
+    if (!isPersonalLink) return;
+    const dashboardUrl = `/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=matches&focus=boost`;
+    window.location.replace(dashboardUrl);
+  }, [isPersonalLink, personalEmail, personalToken]);
+
   const interest = trpc.matchBoostPilot.submitInterest.useMutation();
   const utils = trpc.useUtils();
   const personalStatus = trpc.matchBoost.getMyStatus.useQuery(
@@ -43,6 +49,17 @@ export default function MatchBoostLanding() {
       utmContent: params.get("utm_content") || undefined,
     });
   };
+
+  if (isPersonalLink) {
+    return (
+      <main dir="rtl" className="flex min-h-screen items-center justify-center bg-[#241257] px-4 text-white">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#ffe27c] border-t-transparent" />
+          <p className="mt-4 font-black">מעבירים אותך ל־Boost באזור האישי...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main dir="rtl" className="min-h-screen overflow-hidden bg-[#f8f4ff] text-[#20113e]">

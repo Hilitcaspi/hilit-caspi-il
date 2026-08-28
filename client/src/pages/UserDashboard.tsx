@@ -4,7 +4,7 @@
  * Shows: profile summary, match status, DNA results
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import DatabaseExpectations from "@/components/DatabaseExpectations";
 import GrowWallet from "@/components/GrowWallet";
@@ -408,7 +408,7 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
   });
 
   if (statusQuery.isLoading) {
-    return <div className="h-44 animate-pulse rounded-2xl border border-[#e9e8e8] bg-white/70" />;
+    return <div id="boost-card" className="h-44 animate-pulse rounded-[2rem] border border-[#d52b8c]/30 bg-[#241257]" />;
   }
   const status = statusQuery.data;
   if (!status) return null;
@@ -416,21 +416,21 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
   if (!status.membership?.active) {
     const allAccepted = algorithmicConsent && anonymousProfileConsent && termsConsent;
     return (
-      <section className="overflow-hidden rounded-2xl border border-[#d9c05c] bg-gradient-to-br from-white via-[#fffdf4] to-[#fff3bf] text-right shadow-sm">
-        <div className="p-5">
+      <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] text-right text-white shadow-xl shadow-fuchsia-950/20 ring-offset-4 ring-offset-[#f0eadc] target:ring-4 target:ring-[#ffe27c]">
+        <div className="p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-bold text-[#8b7420]">Boost לחברי המאגר</p>
-              <h3 className="mt-1 text-xl font-black text-[#191265]">יותר שליטה בהזדמנויות להיכרות</h3>
+              <p className="text-xs font-black text-[#ffe27c]">Boost לחברי המאגר</p>
+              <h3 className="mt-1 text-2xl font-black text-white">יותר אפשרויות, יותר בחירה בידיים שלכם</h3>
             </div>
-            <span className="rounded-full bg-[#191265] px-3 py-1 text-[11px] font-black text-white">בהצטרפות יזומה</span>
+            <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-black text-white backdrop-blur">שירות נוסף לבחירתכם</span>
           </div>
-          <p className="mt-3 text-sm leading-6 text-[#555]">
-            במסלול Boost אפשר לקבל ולשלוח הצעות התאמה שנבחרו על ידי האלגוריתם. ההצעות אינן נבדקות או מאושרות ידנית על ידי הילית.
+          <p className="mt-3 text-sm font-bold leading-7 text-white/85">
+            Boost מאפשר לראות התאמות פוטנציאליות באזור האישי ולבחור למי לשלוח בקשה. ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.
           </p>
 
-          <div className="mt-4 space-y-3 rounded-2xl border border-[#eadb91] bg-white/85 p-4">
-              <p className="text-xs font-black text-[#191265]">כדי להצטרף, יש לאשר את שלושת הסעיפים:</p>
+          <div className="mt-5 space-y-3 rounded-2xl border border-white/30 bg-white p-4 text-[#20113e] shadow-lg sm:p-5">
+              <p className="text-sm font-black text-[#20113e]">כדי לפתוח את Boost בפרופיל, מאשרים שלושה דברים:</p>
               <label className="flex items-start gap-3 text-xs leading-5 text-[#555]">
                 <input type="checkbox" checked={algorithmicConsent} onChange={event => setAlgorithmicConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#191265]" />
                 <span>אני מסכים או מסכימה לקבל הצעות Boost אלגוריתמיות שלא נבדקו ידנית על ידי הילית.</span>
@@ -453,7 +453,7 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
                   anonymousProfileAccepted: true,
                   termsAccepted: true,
                 })}
-                className="w-full rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white transition-colors hover:bg-[#1800ad] disabled:cursor-not-allowed disabled:opacity-40"
+                className="w-full rounded-xl bg-gradient-to-l from-[#a52178] to-[#5d176d] px-5 py-3.5 text-sm font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {joinPool.isPending ? "שומר/ת הסכמה..." : "הצטרפות למסלול Boost"}
               </button>
@@ -466,12 +466,12 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
 
   if (status.candidateCount === 0 && !status.openRequest) {
     return (
-      <section className="rounded-2xl border border-[#d9c05c] bg-white p-5 text-right shadow-sm">
-        <p className="text-xs font-bold text-[#8b7420]">Boost פעיל</p>
-        <h3 className="mt-1 text-lg font-black text-[#191265]">אין כרגע כרטיס שעובר את כל תנאי הסף</h3>
-        <p className="mt-2 text-sm leading-6 text-[#555]">נציג כרטיס רק כאשר שני הצדדים פעילים, פנויים, הצטרפו למסלול והפרטים שלהם מלאים.</p>
+      <section id="boost-card" className="rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
+        <p className="text-xs font-black text-[#ffe27c]">Boost פעיל</p>
+        <h3 className="mt-1 text-xl font-black text-white">אין כרגע התאמת Boost שממתינה לך</h3>
+        <p className="mt-2 text-sm leading-6 text-white/80">ברגע שתימצא התאמה פוטנציאלית בין שני חברי מאגר פעילים שאישרו Boost, היא תופיע כאן.</p>
         {status.creditAvailable && <p className="mt-3 rounded-xl bg-[#f5f2ff] p-3 text-xs font-bold leading-5 text-[#51448c]">קרדיט ה־Boost שלך שמור. ברגע שיופיע כרטיס חדש שעובר את כל תנאי הסף, ניתן יהיה לממש אותו ללא חיוב נוסף.</p>}
-        <button type="button" disabled={leavePool.isPending} onClick={() => leavePool.mutate({ email, token })} className="mt-4 rounded-lg border border-[#d8d5e3] px-3 py-2 text-xs font-bold text-[#655f74] disabled:opacity-50">יציאה ממסלול Boost</button>
+        <button type="button" disabled={leavePool.isPending} onClick={() => leavePool.mutate({ email, token })} className="mt-4 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">ניהול או יציאה משירות Boost</button>
         {resultMessage && <p className="mt-3 text-xs font-bold text-emerald-700">{resultMessage}</p>}
       </section>
     );
@@ -485,11 +485,11 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
       reviewing: "נדרשת בדיקת חריגה טכנית",
     };
     return (
-      <section className="overflow-hidden rounded-2xl border border-[#d9c05c] bg-gradient-to-br from-white to-[#fff8da] p-5 text-right shadow-sm">
-        <p className="text-xs font-bold text-[#8b7420]">בוסט התאמה</p>
-        <h3 className="mt-1 text-lg font-black text-[#191265]">הבקשה שלך בטיפול</h3>
-        <p className="mt-2 text-sm leading-6 text-[#555]">{labels[status.openRequest.status] || "הבקשה נמצאת בטיפול"}</p>
-        <p className="mt-3 text-xs leading-5 text-[#727272]">לפני השליחה המערכת בודקת שוב ששני הצדדים פעילים, פנויים והסכימו למסלול. זו הצעת Boost אלגוריתמית שאינה נבדקת ידנית על ידי הילית.</p>
+      <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
+        <p className="text-xs font-black text-[#ffe27c]">Boost בתהליך</p>
+        <h3 className="mt-1 text-xl font-black text-white">הבקשה שלך בטיפול</h3>
+        <p className="mt-2 text-sm font-bold leading-6 text-white/90">{labels[status.openRequest.status] || "הבקשה נמצאת בטיפול"}</p>
+        <p className="mt-3 text-xs leading-5 text-white/70">לפני השליחה המערכת בודקת שוב ששני הצדדים פעילים, פנויים והסכימו לשירות. הצעת Boost אינה נבדקת ידנית על ידי הילית.</p>
       </section>
     );
   }
@@ -497,19 +497,19 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
   const primaryBlocker = status.blockers[0];
   const card = status.anonymousCard;
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#d9c05c] bg-gradient-to-br from-white via-[#fffdf4] to-[#fff3bf] text-right shadow-sm">
-      <div className="p-5">
+    <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] text-right text-white shadow-xl shadow-fuchsia-950/20">
+      <div className="p-5 sm:p-7">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="mx-auto flex h-24 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/80 bg-[#191265] shadow-md sm:mx-0">
             <div className="flex h-16 w-14 items-center justify-center rounded-full bg-white/15 text-3xl blur-[1px]">?</div>
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-bold text-[#8b7420]">כרטיס Boost אנונימי</p>
-              {card?.score && <span className="rounded-full bg-[#191265] px-3 py-1 text-xs font-black text-white">{card.score}% התאמה</span>}
+              <p className="text-xs font-black text-[#ffe27c]">כרטיס Boost אנונימי</p>
+              {card?.score && <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black text-white">{card.score}% התאמה</span>}
             </div>
-            <h3 className="mt-2 text-xl font-black text-[#191265]">לפני תמונה, מכירים את האדם</h3>
-            <p className="mt-2 text-sm leading-6 text-[#555]">הכרטיס מציג פרטים שיכולים לעזור להחליט אם לפתוח הזדמנות, בלי שם, תמונה, עיר מדויקת, מקום עבודה או פרטי קשר.</p>
+            <h3 className="mt-2 text-xl font-black text-white">לפני תמונה, מכירים את האדם</h3>
+            <p className="mt-2 text-sm leading-6 text-white/80">הכרטיס מציג פרטים שיכולים לעזור להחליט אם לפתוח הזדמנות, בלי שם, תמונה, עיר מדויקת, מקום עבודה או פרטי קשר.</p>
           </div>
         </div>
 
@@ -522,9 +522,9 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
                 ["מצב משפחתי", card.maritalStatus], ["ילדים", card.hasKids], ["עישון", card.smoking],
                 ["זיקה דתית", card.religiosity], ["כיוון משפחתי", card.relationshipIntent],
               ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-xl border border-[#eadb91] bg-white/85 p-3">
-                  <p className="text-[10px] font-bold text-[#8b7420]">{label}</p>
-                  <p className="mt-1 text-xs font-black text-[#191265]">{value}</p>
+                <div key={String(label)} className="rounded-xl border border-white/20 bg-white/10 p-3 backdrop-blur-sm">
+                  <p className="text-[10px] font-bold text-[#ffe27c]">{label}</p>
+                  <p className="mt-1 text-xs font-black text-white">{value}</p>
                 </div>
               ))}
             </div>
@@ -540,13 +540,13 @@ function MatchBoostCard({ email, token, profile }: { email: string; token: strin
                 ) : <p className="mt-2 text-xs leading-5 text-[#75431e]">לא נמצא פער מהותי בנתונים שהוצגו.</p>}
               </div>
             </div>
-            <div className="rounded-xl border border-[#cfc7e8] bg-[#f5f2ff] p-3 text-center text-xs font-black text-[#51448c]">{card.disclosure}</div>
-            <h3 className="text-center text-lg font-black text-[#191265]">רוצים לשלוח הצעת Boost?</h3>
-            <p className="text-center text-xs leading-5 text-[#666]">לפני המימוש תתבצע בדיקת זכאות סופית. זהות ופרטים נוספים ייחשפו רק לאחר הסכמה הדדית.</p>
+            <div className="rounded-xl border border-white/25 bg-white/10 p-3 text-center text-xs font-black text-white">{card.disclosure}</div>
+            <h3 className="text-center text-lg font-black text-white">רוצים לשלוח הצעת Boost?</h3>
+            <p className="text-center text-xs leading-5 text-white/75">לפני המימוש תתבצע בדיקת זכאות סופית. זהות ופרטים נוספים ייחשפו רק לאחר הסכמה הדדית.</p>
           </div>
         )}
       </div>
-      <div className="border-t border-[#eadb91] bg-white/70 p-4">
+      <div className="border-t border-[#eadb91] bg-white p-4 text-[#20113e]">
         {status.creditAvailable ? (
           <button
             type="button"
@@ -968,6 +968,7 @@ export default function UserDashboard() {
   const token = params.get("token") || "";
 
   const requestedTab = params.get("tab");
+  const shouldFocusBoost = params.get("focus") === "boost";
   const [activeTab, setActiveTab] = useState<"profile" | "matches" | "dna">(
     requestedTab === "matches" || requestedTab === "dna" ? requestedTab : "profile",
   );
@@ -976,6 +977,14 @@ export default function UserDashboard() {
     { email, token },
     { enabled: !!email && !!token, retry: false, refetchInterval: 30000 }
   );
+
+  useEffect(() => {
+    if (!data || activeTab !== "matches" || !shouldFocusBoost) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("boost-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, data, shouldFocusBoost]);
 
   // No email or token in URL → show login form
   if (!email || !token) return <LoginForm />;
