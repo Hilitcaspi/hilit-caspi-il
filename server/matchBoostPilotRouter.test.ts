@@ -47,6 +47,13 @@ describe("Boost personal approval link funnel", () => {
     expect(dashboardSource).toContain("זהות ופרטים נוספים ייחשפו רק לאחר הסכמה הדדית");
   });
 
+  it("presents Hilit's professional positioning without an unsupported size claim", () => {
+    expect(pageSource).toContain("הילית כספי | מאמנת ומרצה למציאת זוגיות");
+    expect(pageSource).toContain("מייסדת מאגר הרווקים החכם בישראל");
+    expect(pageSource).not.toContain("הגדול בישראל");
+    expect(pageSource).toContain("Boost | הילית כספי - מאמנת ומרצה למציאת זוגיות");
+  });
+
   it("renders a branded Boost email with a human preview and clear free-approval disclosure", () => {
     const email = buildBoostApprovalLinkEmail({
       firstName: "הילית",

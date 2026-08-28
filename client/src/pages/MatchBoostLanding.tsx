@@ -16,7 +16,7 @@ export default function MatchBoostLanding() {
 
   useEffect(() => {
     const previous = document.title;
-    document.title = "Boost | הילית כספי";
+    document.title = "Boost | הילית כספי - מאמנת ומרצה למציאת זוגיות";
     return () => { document.title = previous; };
   }, []);
 
@@ -78,9 +78,9 @@ export default function MatchBoostLanding() {
           <div>
             <div className="mb-5 flex items-center gap-3">
               <img src={HILIT_PHOTO} alt="הילית כספי" className="h-20 w-20 rounded-full border-4 border-white/35 object-cover shadow-xl sm:h-24 sm:w-24" />
-              <div>
-                <p className="font-black">הילית כספי</p>
-                <p className="text-sm text-white/70">מאמנת למציאת זוגיות ומנהלת המאגר</p>
+              <div className="max-w-sm">
+                <p className="text-base font-black leading-6 sm:text-lg">הילית כספי | מאמנת ומרצה למציאת זוגיות</p>
+                <p className="mt-1 text-sm font-bold leading-6 text-white/75">מייסדת מאגר הרווקים החכם בישראל</p>
               </div>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#4b235f] shadow-lg">
