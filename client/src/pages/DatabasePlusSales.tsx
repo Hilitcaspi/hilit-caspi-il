@@ -1,37 +1,24 @@
+/**
+ * Design reference: Hilit Caspi's Tu B'Av campaign. A personal, Hebrew-first Plus invitation,
+ * with Hilit leading the first fold and hearts used only as delicate campaign atmosphere.
+ */
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
-import { BadgeCheck, Check, Crown, HeartHandshake, Megaphone, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { motion } from "framer-motion";
+import { Check, ChevronDown, HeartHandshake, Info, Megaphone, Sparkles, Zap } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import GrowWallet from "@/components/GrowWallet";
 import { trpc } from "@/lib/trpc";
 
-const BENEFITS = [
-  {
-    icon: HeartHandshake,
-    title: "לפחות 2 הצעות בחודש",
-    text: "שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב אישי.",
-  },
-  {
-    icon: Sparkles,
-    title: "בוסט אחד כלול בכל מחזור",
-    text: "הצעת Boost אלגוריתמית נוספת, אנונימית ומסומנת, שאינה נספרת במקום שתי ההצעות שנבדקו ידנית.",
-  },
-  {
-    icon: Crown,
-    title: "קדימות בבדיקה האנושית",
-    text: "איתור ובדיקת מועמדים לפני התור הרגיל, תוך שמירה על תנאי הסף החשובים לך.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "שירות Plus אישי",
-    text: "ערוץ שירות לקוחות בעדיפות לשאלות, בקשות ועדכון העדפות דרך המספר העסקי.",
-  },
-  {
-    icon: Megaphone,
-    title: "אפשרות לחשיפה בסושיאל",
-    text: "רק לבחירתך ורק אחרי אישור נפרד שלך לטקסט ולתמונה. פרטי הקשר לעולם לא מפורסמים.",
-  },
-];
+const PROFILE_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
+const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.56, ease: [0.23, 1, 0.32, 1] as const } } };
+
+function HeartIcon({ size = 17, className = "" }: { size?: number; className?: string }) { return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" className={className}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>; }
+function PlusMark({ light = false }: { light?: boolean }) { return <span className={`relative grid h-9 w-9 place-items-center rounded-full border ${light ? "border-white/35 bg-white/10 text-[#ffe27c]" : "border-[#ff9cbb] bg-[#fff2f5] text-[#ff4466]"}`}><HeartIcon size={14} /><span className="absolute -bottom-1 -left-1 grid h-4 w-4 place-items-center rounded-full bg-[#ff4466] text-[11px] font-black text-white">+</span></span>; }
+function FloatingLove() { const items = [{ left: "7%", top: "24%", size: 10, delay: 0 }, { right: "9%", top: "58%", size: 13, delay: 1.4 }, { right: "17%", top: "17%", size: 8, delay: 2.1 }]; return <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">{items.map((item, index) => <motion.span key={index} className="absolute text-[#ff9abb]/65" style={{ left: item.left, right: item.right, top: item.top }} animate={{ y: [0, -12, 0], opacity: [0.3, 0.75, 0.3] }} transition={{ delay: item.delay, duration: 5.8 + index, repeat: Infinity, ease: "easeInOut" }}><HeartIcon size={item.size} /></motion.span>)}</div>; }
+
+const BENEFITS = [{ icon: HeartHandshake, title: "2 התאמות חדשות", text: "לפחות שתי התאמות שנבדקו ונשלחו אלייך בפועל בכל מחזור פעיל." }, { icon: Zap, title: "בוסט אחד מתנה", text: "הזדמנות היכרות נוספת, שמצטרפת לשתי ההתאמות ולא מחליפה אותן." }, { icon: Sparkles, title: "עוד תשומת לב", text: "יותר מקום לפרופיל שלך בתהליך האיתור, המיון ועדכון ההעדפות." }];
 
 export default function DatabasePlusSales() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
@@ -39,141 +26,21 @@ export default function DatabasePlusSales() {
   const token = params.get("token") || "";
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [renewalAccepted, setRenewalAccepted] = useState(false);
+  const [boostAccepted, setBoostAccepted] = useState(false);
+  const [spotlightInterest, setSpotlightInterest] = useState(false);
   const isPersonalLink = Boolean(email && token);
-  const statusQuery = trpc.plusPilot.getMyStatus.useQuery(
-    { email, token },
-    { enabled: isPersonalLink, retry: false },
-  );
+  const statusQuery = trpc.plusPilot.getMyStatus.useQuery({ email, token }, { enabled: isPersonalLink, retry: false });
   const plusData = statusQuery.data;
-  const canPurchase = Boolean(
-    isPersonalLink &&
-    plusData?.paymentConfigured &&
-    (plusData.status === "eligible" || plusData.status === "invited") &&
-    termsAccepted &&
-    renewalAccepted,
-  );
-
-  return (
-    <main className="min-h-screen bg-[#f0eadc] font-rubik text-[#191265]" dir="rtl">
-      <nav className="border-b border-white/10 bg-[#191265]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <Link href="/"><span className="cursor-pointer text-lg font-black text-white">הילית כספי</span></Link>
-          <Link href={isPersonalLink ? `/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}` : "/database"}>
-            <span className="cursor-pointer text-sm font-bold text-white/75 hover:text-[#ffe27c]">חזרה ←</span>
-          </Link>
-        </div>
-      </nav>
-
-      <section className="relative overflow-hidden bg-[#191265] px-5 pb-20 pt-16 text-white">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle at 20% 30%, #ffe27c 0%, transparent 32%), radial-gradient(circle at 85% 75%, #6253d6 0%, transparent 36%)" }} />
-        <div className="relative mx-auto max-w-5xl text-center">
-          <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-[#ffe27c]/40 bg-[#ffe27c]/10 px-4 py-2 text-sm font-bold text-[#ffe27c]">
-            <Sparkles className="h-4 w-4" /> פיילוט מוגבל: 20 נשים ו־20 גברים
-          </div>
-          <h1 className="text-4xl font-black leading-tight md:text-6xl">Database <span className="text-[#ffe27c]">Plus</span></h1>
-          <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-white/80 md:text-xl">
-            יותר עבודה יזומה סביב הפרופיל שלך, לפחות שתי הצעות שנבדקו ידנית בכל מחזור, ובנוסף בוסט אלגוריתמי אחד כלול.
-          </p>
-          <div className="mx-auto mt-8 flex max-w-xl flex-col items-center justify-center gap-3 rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur sm:flex-row">
-            <div className="text-center">
-              <div className="text-5xl font-black text-[#ffe27c]">99 ₪</div>
-              <div className="mt-1 text-sm text-white/70">לחודש · ללא תקופה קבועה · בנוסף לדמי ההצטרפות למאגר</div>
-            </div>
-            <div className="hidden h-14 w-px bg-white/20 sm:block" />
-            <div className="text-sm font-bold leading-7 text-white/85">אפשר לבטל בכל עת<br />החברות הרגילה במאגר נשארת</div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto -mt-8 grid max-w-6xl gap-4 px-5 md:grid-cols-2 lg:grid-cols-5">
-        {BENEFITS.map(({ icon: Icon, title, text }) => (
-          <article key={title} className="rounded-3xl border border-[#e6dfcc] bg-white p-6 shadow-sm">
-            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fff4bd] text-[#191265]"><Icon className="h-6 w-6" /></div>
-            <h2 className="font-black">{title}</h2>
-            <p className="mt-2 text-sm leading-6 text-[#68645d]">{text}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="mx-auto grid max-w-6xl gap-8 px-5 py-16 lg:grid-cols-[1fr_0.9fr]">
-        <div>
-          <p className="text-sm font-black text-[#8b7420]">מה בדיוק נחשב כהצעה?</p>
-          <h2 className="mt-2 text-3xl font-black">הבטחה ברורה. בלי להבטיח את מה שאף אחד לא יכול להבטיח.</h2>
-          <div className="mt-6 space-y-3">
-            {[
-              "הצעה נספרת רק כשהיא חדשה, נבדקה ונשלחה אלייך בפועל במייל וב־SMS.",
-              "שליחה חוזרת של אותו אדם אינה נספרת פעמיים.",
-              "הצעה יכולה להיות גם מתחת ל־80% לאחר בדיקה אנושית, כל עוד היא עומדת בתנאי הסף החשובים של שני הצדדים.",
-              "לא נשלח אדם שסותר תנאי סף מהותיים רק כדי להשלים מכסה.",
-              "אם חסרה הצעה בסוף המחזור, היא נשארת התחייבות שירות ומועברת למחזור הבא.",
-              "אישור הדדי, דייט או זוגיות אינם בשליטתנו ולכן אינם מובטחים.",
-            ].map(item => (
-              <div key={item} className="flex items-start gap-3 rounded-2xl bg-white p-4 text-sm leading-6 shadow-sm">
-                <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><span>{item}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 rounded-3xl border border-[#d9d2ee] bg-[#f8f6ff] p-6">
-            <div className="flex items-center gap-3"><Users className="h-6 w-6" /><h3 className="text-xl font-black">למי זה מתאים?</h3></div>
-            <p className="mt-3 text-sm leading-7 text-[#5f5a70]">לחברים פעילים במאגר עם פרופיל מלא, שמבקשים יותר קדימות ועבודה יזומה סביב החיפוש. Plus אינו מחליף תהליך ליווי אישי ואינו כולל מענה של הילית 24/7.</p>
-          </div>
-        </div>
-
-        <aside id="checkout" className="h-fit rounded-[28px] border border-[#e3cf74] bg-white p-6 shadow-xl lg:sticky lg:top-6">
-          <div className="flex items-center justify-between gap-3">
-            <div><p className="text-xs font-bold text-[#8b7420]">מנוי חודשי</p><h2 className="text-2xl font-black">Database Plus</h2></div>
-            <BadgeCheck className="h-10 w-10 text-[#c6a522]" />
-          </div>
-          <div className="mt-5 rounded-2xl bg-[#191265] p-5 text-center text-white">
-            <span className="text-4xl font-black text-[#ffe27c]">99 ₪</span><span className="mr-2 text-sm text-white/70">לחודש</span>
-            <p className="mt-2 text-xs text-white/60">חיוב מתחדש · ביטול בכל עת</p>
-          </div>
-
-          {!isPersonalLink && (
-            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-              ההצטרפות מיועדת לחברים פעילים במאגר. התשלום ייפתח דרך הקישור האישי באזור האישי לאחר בדיקת זכאות.
-            </div>
-          )}
-
-          <div className="mt-5 space-y-3 text-sm">
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
-              <Checkbox checked={renewalAccepted} onCheckedChange={value => setRenewalAccepted(Boolean(value))} />
-              <span>הבנתי שזהו חיוב חודשי מתחדש של 99 ש״ח ללא מספר חודשים קבוע, עד לביטול, ושניתן לבטל בכל עת.</span>
-            </label>
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
-              <Checkbox checked={termsAccepted} onCheckedChange={value => setTermsAccepted(Boolean(value))} />
-              <span>קראתי ואני מסכים/ה ל<Link href="/terms/plus"><span className="mx-1 cursor-pointer font-bold underline">תקנון Plus ומדיניות הביטול</span></Link>.</span>
-            </label>
-          </div>
-
-          {canPurchase ? (
-            <GrowWallet
-              product="plus"
-              buttonLabel="הצטרפות ל־Plus ב־99 ₪ לחודש"
-              buttonClassName="mt-5 w-full rounded-2xl bg-[#191265] py-4 text-base font-black text-[#ffe27c]"
-              prefillName={`${plusData?.profile.firstName || ""} ${plusData?.profile.lastName || ""}`.trim()}
-              prefillEmail={plusData?.profile.email || email}
-              prefillPhone={plusData?.profile.phone || ""}
-              termsPath="/terms/plus"
-              personalToken={token}
-            />
-          ) : (
-            <button disabled className="mt-5 w-full rounded-2xl bg-[#d9d4c6] py-4 text-base font-black text-[#7a756b]">
-              {!isPersonalLink
-                ? "נדרש קישור אישי מהאזור האישי"
-                : !plusData?.paymentConfigured
-                  ? "החיוב ייפתח לאחר אישור Grow"
-                  : plusData?.status === "active"
-                    ? "המנוי שלך פעיל"
-                    : plusData?.status !== "eligible" && plusData?.status !== "invited"
-                      ? "נדרשת בדיקת זכאות"
-                      : "יש לאשר את שני הסעיפים"}
-            </button>
-          )}
-          <p className="mt-3 text-center text-xs leading-5 text-[#888]">לא יבוצע חיוב ללא קישור אישי, זכאות, אישור תנאי המנוי ועמוד הוראת קבע ייעודי של Grow.</p>
-        </aside>
-      </section>
-    </main>
-  );
+  const canPurchase = Boolean(isPersonalLink && plusData?.paymentConfigured && (plusData.status === "eligible" || plusData.status === "invited") && termsAccepted && renewalAccepted && boostAccepted);
+  const scrollToJoin = () => document.getElementById("join")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  return <main className="min-h-screen overflow-x-hidden bg-[#fff5f5] font-rubik text-[#1a0a2e]" dir="rtl">
+    <section className="relative isolate overflow-hidden bg-[linear-gradient(135deg,#1b092d_0%,#411343_39%,#7b2848_100%)] px-5 pb-16 pt-7 text-white md:px-10 md:pb-20"><div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_19%_85%,rgba(255,68,102,.25),transparent_0_30%),radial-gradient(circle_at_83%_18%,rgba(255,203,137,.15),transparent_0_22%),radial-gradient(circle_at_52%_51%,rgba(255,109,157,.11),transparent_0_38%)]" /><FloatingLove /><header className="relative z-10 mx-auto flex max-w-5xl items-center justify-between"><Link href={isPersonalLink ? `/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}` : "/database"} className="text-sm font-semibold text-white/80 hover:text-[#ffbad0]">חזרה למאגר</Link><Link href="/" className="flex items-center gap-2 text-sm font-bold text-white"><PlusMark light /><span>הילית כספי <span className="font-medium text-white/60">Plus</span></span></Link></header><motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.11 } } }} className="relative z-10 mx-auto max-w-2xl pb-3 pt-14 text-center md:pt-16"><motion.div variants={fadeUp} className="mx-auto w-fit"><img src={PROFILE_IMAGE} alt="הילית כספי" className="h-24 w-24 rounded-full border-4 border-white/35 object-cover shadow-[0_12px_28px_rgba(29,4,28,.28)]" /><p className="mt-3 text-sm font-bold">הילית כספי</p><p className="mt-0.5 text-xs text-white/65">מאמנת למציאת זוגיות</p></motion.div><motion.div variants={fadeUp} className="mt-7 inline-flex items-center gap-2 rounded-full border border-[#ffb2ca]/45 bg-[#ff5d94]/20 px-5 py-2 text-sm font-bold backdrop-blur-sm"><HeartIcon size={14} className="text-[#ffb2ca]" />כבר במאגר? Plus נבנה בשבילך<HeartIcon size={14} className="text-[#ffb2ca]" /></motion.div><motion.h1 variants={fadeUp} className="mt-6 text-4xl font-black leading-[1.13] tracking-[-.045em] md:text-6xl">אני רוצה לתת לפרופיל שלך<br /><span className="text-[#ff91b5]">עוד הזדמנות להיפתח.</span></motion.h1><motion.p variants={fadeUp} className="mx-auto mt-5 max-w-xl text-base leading-8 text-white/84 md:text-lg">מסלול Plus נותן לי יותר מקום לעבוד בשבילך בתוך המאגר. יותר תשומת לב, יותר הזדמנויות, ועוד אפשרות טובה להכיר.</motion.p><motion.div variants={fadeUp} className="mx-auto mt-8 max-w-md rounded-[28px] border border-[#ffb6ce]/45 bg-white/10 px-6 py-6 shadow-[0_20px_50px_rgba(42,5,35,.24)] backdrop-blur-md"><span className="inline-flex items-center gap-1 rounded-full bg-[#ff4466] px-3 py-1 text-[11px] font-black"><HeartIcon size={10} />לחברי המאגר בלבד</span><div className="mt-3 flex items-end justify-center gap-2"><strong className="text-5xl font-black text-[#ffe27c]">99₪</strong><span className="mb-2 text-sm text-white/65">לחודש</span></div><p className="mt-2 text-xs text-white/60">חיוב חודשי מתחדש עד לביטול, בנוסף לחברות במאגר</p></motion.div><motion.div variants={fadeUp} className="mt-7"><button type="button" onClick={scrollToJoin} className="inline-flex items-center gap-3 rounded-full bg-[linear-gradient(90deg,#ff4466,#ff6b9d)] px-10 py-5 text-lg font-black text-white shadow-[0_12px_30px_rgba(255,68,102,.32)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(255,68,102,.43)] active:scale-[.97]">אני רוצה לשמוע עוד<HeartIcon size={19} /></button></motion.div><motion.div variants={fadeUp} className="mt-9 flex flex-wrap justify-center gap-x-6 gap-y-3 border-t border-white/12 pt-6 text-sm text-white/75"><span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />2 התאמות חדשות</span><span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />בוסט מתנה</span><span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />אפשר לבטל בכל עת</span></motion.div></motion.div></section>
+    <section className="relative overflow-hidden bg-[#fff7f8] px-5 py-20 md:px-10 md:py-28"><div className="absolute inset-0 opacity-[.04] [background-image:radial-gradient(#ff4466_1px,transparent_1px)] [background-size:26px_26px]" /><motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="relative mx-auto max-w-5xl text-center"><motion.p variants={fadeUp} className="inline-flex items-center gap-2 text-sm font-bold text-[#ff4466]"><HeartIcon size={13} />מה משתנה ב-Plus?</motion.p><motion.h2 variants={fadeUp} className="mt-3 text-3xl font-black tracking-[-.035em] text-[#2b0a36] md:text-4xl">אני מפנה יותר מקום להיכרות שלך</motion.h2><motion.p variants={fadeUp} className="mx-auto mt-4 max-w-2xl leading-7 text-[#675764]">לא עוד אפליקציה ולא הבטחה ריקה. רק עוד שכבת תשומת לב בתוך תהליך ההתאמה האישי שלי.</motion.p><div className="mt-11 grid gap-5 md:grid-cols-3">{BENEFITS.map(({ icon: Icon, title, text }, index) => <motion.article variants={fadeUp} key={title} className="relative rounded-[28px] border border-[#ffdce5] bg-[linear-gradient(160deg,#fff,#fff4f6)] p-7 text-right shadow-[0_12px_30px_rgba(96,20,47,.06)]"><span className="absolute left-5 top-4 text-5xl font-black leading-none text-[#ff4466]/10">0{index + 1}</span><span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#ff4466] text-white shadow-md shadow-[#ff4466]/20"><Icon className="h-5 w-5" /></span><h3 className="mt-5 text-xl font-black text-[#2b0a36]">{title}</h3><p className="mt-3 text-sm leading-7 text-[#675764]">{text}</p></motion.article>)}</div></motion.div></section>
+    <section className="relative overflow-hidden bg-[linear-gradient(145deg,#fff0f3,#fff8f2)] px-5 py-20 md:px-10 md:py-28"><motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={{ visible: { transition: { staggerChildren: 0.12 } } }} className="relative mx-auto grid max-w-5xl items-center gap-12 md:grid-cols-[.82fr_1.18fr] md:gap-16"><motion.div variants={fadeUp} className="relative mx-auto w-full max-w-xs"><div className="absolute -inset-4 rounded-[32px] bg-[#ff91b5]/20 blur-xl" /><div className="relative rounded-[30px] border border-[#ffb7cb] bg-[linear-gradient(160deg,#4a1942,#782745)] p-8 text-center text-white shadow-xl"><span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/12 text-[#ffbad0]"><Zap className="h-8 w-8" /></span><p className="mt-7 text-sm font-bold text-[#ffbad0]">בוסט אחד מתנה</p><p className="mt-2 text-4xl font-black text-[#ffe27c]">+1</p><div className="mt-6 border-t border-white/15 pt-5 text-xs leading-6 text-white/70">הוא נוסף על שתי ההתאמות של Plus, ולא במקום אחת מהן.</div></div></motion.div><motion.div variants={fadeUp}><p className="inline-flex items-center gap-2 text-sm font-bold text-[#ff4466]"><Sparkles className="h-4 w-4" />אז מה זה בוסט?</p><h2 className="mt-4 text-3xl font-black tracking-[-.035em] text-[#2b0a36] md:text-4xl">עוד דלת קטנה שיכולה להיפתח.</h2><p className="mt-6 text-base leading-8 text-[#5d505c]">בוסט הוא הצעת היכרות נוספת שנוצרת מתוך נתוני הפרופיל וההעדפות שלך. הוא בא להרחיב את האפשרויות שלך ולהביא לך עוד הזדמנות להכיר.</p><p className="mt-4 text-base leading-8 text-[#5d505c]">בוסט עשוי להגיע לפני שעברתי עליו ידנית. לכן הוא מסומן בבירור, והוא לא נספר כאחת משתי ההתאמות שלך. ב-Plus מקבלים בוסט אחד בכל מחזור, בלי תשלום נוסף.</p><div className="mt-7 flex items-start gap-3 rounded-2xl border border-[#ffd5df] bg-white/70 p-4 text-sm leading-7 text-[#5a4e58]"><Info className="mt-1 h-5 w-5 shrink-0 text-[#ff4466]" /><span>ההצטרפות ל-Plus כוללת אישור לקבלת בוסטים ולהבנת המשמעות שלהם.</span></div></motion.div></motion.div></section>
+    <section className="relative bg-[#fff7f8] px-5 py-20 md:px-10 md:py-28"><motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="mx-auto max-w-4xl text-center"><motion.div variants={fadeUp} className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#fff0f4] px-4 py-2 text-sm font-bold text-[#ff4466]"><HeartIcon size={13} />איך אני בוחרת מה לשלוח?</motion.div><motion.h2 variants={fadeUp} className="mt-4 text-3xl font-black tracking-[-.035em] text-[#2b0a36] md:text-4xl">לפעמים יש פוטנציאל, גם כשהמספר פחות מ-80%</motion.h2><motion.p variants={fadeUp} className="mx-auto mt-5 max-w-3xl text-base leading-8 text-[#5d505c]">ציון ההתאמה הוא כלי חשוב, אבל הוא לא הדבר היחיד שאני מסתכלת עליו. כשאני מאמינה שיש התאמה טובה, ששני הצדדים עומדים בתנאים החשובים ושיש סיכוי אמיתי לשיחה טובה, אני יכולה לשלוח אותה גם אם הציון נמוך מ-80%.</motion.p><motion.div variants={fadeUp} className="mt-9 grid gap-4 text-right sm:grid-cols-2"><div className="rounded-2xl border border-[#ffe0e6] bg-white/80 p-5"><Check className="h-5 w-5 text-[#ff4466]" /><p className="mt-3 text-sm leading-7 text-[#5c505b]">שום התאמה לא נשלחת רק כדי למלא מכסה.</p></div><div className="rounded-2xl border border-[#ffe0e6] bg-white/80 p-5"><Check className="h-5 w-5 text-[#ff4466]" /><p className="mt-3 text-sm leading-7 text-[#5c505b]">הבטחת השירות היא לשלוח הזדמנויות, לא להבטיח דייט או זוגיות.</p></div></motion.div></motion.div></section>
+    <section className="relative overflow-hidden bg-[linear-gradient(135deg,#351038,#792344)] px-5 py-20 text-white md:px-10 md:py-24"><FloatingLove /><motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-70px" }} variants={{ visible: { transition: { staggerChildren: 0.12 } } }} className="relative mx-auto grid max-w-5xl items-center gap-8 md:grid-cols-[1.15fr_.85fr]"><motion.div variants={fadeUp}><p className="flex items-center gap-2 text-sm font-bold text-[#ffbad0]"><Megaphone className="h-4 w-4" />למי שרוצה עוד נראות</p><h2 className="mt-4 text-3xl font-black tracking-[-.035em] md:text-4xl">רוצה להופיע בפינת הרווקים?</h2><p className="mt-5 max-w-2xl leading-8 text-white/80">לקוחות Plus שמעוניינים בכך יכולים לבקש חשיפה בפינת הרווקים. זו אפשרות בלבד, לא חובה ולא תנאי לקבלת ההתאמות.</p></motion.div><motion.div variants={fadeUp} className="rounded-3xl border border-white/20 bg-white/10 p-6 backdrop-blur-sm"><HeartIcon className="text-[#ff91b5]" size={24} /><p className="mt-4 text-lg font-black">רק אם בוחרים, ורק באישור סופי.</p><p className="mt-3 text-sm leading-7 text-white/70">גם אם סימנת עניין, שום תמונה או טקסט לא יפורסמו בלי אישור מפורש ונפרד שלך לנוסח הסופי.</p></motion.div></motion.div></section>
+    <section id="join" className="relative overflow-hidden bg-[linear-gradient(150deg,#fff1f4,#fff9f3)] px-5 py-20 md:px-10 md:py-28"><div className="absolute inset-x-0 top-0 h-2 bg-[linear-gradient(90deg,#ff4466,#ff6b9d,#ffe27c,#ff6b9d,#ff4466)]" /><motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-70px" }} variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="relative mx-auto max-w-lg text-center"><motion.div variants={fadeUp} className="flex flex-col items-center"><img src={PROFILE_IMAGE} alt="הילית כספי" className="h-20 w-20 rounded-full border-4 border-white object-cover shadow-[0_10px_26px_rgba(87,20,48,.18)]" /><p className="mt-4 text-sm font-bold text-[#ff4466]">מוכנים לתת לזה עוד צ'אנס?</p><h2 className="mt-2 text-3xl font-black tracking-[-.035em] text-[#2b0a36] md:text-4xl">המסלול שלך ל-Plus</h2></motion.div><motion.div variants={fadeUp} className="mt-8 rounded-3xl border border-[#ffd6e0] bg-white/90 p-6 text-right shadow-[0_16px_42px_rgba(99,31,57,.11)] md:p-8"><div className="flex items-start justify-between border-b border-[#ffe1e7] pb-5"><div><p className="text-xs font-bold text-[#ff4466]">הילית כספי Plus</p><h3 className="mt-1 text-xl font-black text-[#2b0a36]">99 ₪ לחודש</h3></div><PlusMark /></div>{!isPersonalLink && <div className="mt-5 rounded-2xl border border-[#ffd4df] bg-[#fff7f8] p-4 text-sm leading-6 text-[#684e5a]">ההצטרפות מיועדת לחברים פעילים במאגר. התשלום ייפתח דרך הקישור האישי באזור האישי לאחר בדיקת זכאות.</div>}<div className="mt-6 space-y-3 text-sm"><label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#ffe0e6] bg-[#fffafb] p-4 leading-6 text-[#574e59]"><Checkbox checked={renewalAccepted} onCheckedChange={(checked) => setRenewalAccepted(Boolean(checked))} /><span><strong>אני מאשר/ת חיוב חודשי מתחדש.</strong> החיוב יתחדש אוטומטית בכל חודש עד לביטול, וניתן לבטל בכל עת לפי מדיניות הביטול.</span></label><label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#ffe0e6] bg-[#fffafb] p-4 leading-6 text-[#574e59]"><Checkbox checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(Boolean(checked))} /><span><strong>קראתי את תקנון Plus ואני מסכים/ה לו.</strong> קראתי את תנאי שתי ההתאמות בכל מחזור פעיל ואת מדיניות הביטול.</span></label><label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#ffb2c9] bg-[#fff1f5] p-4 leading-6 text-[#574e59]"><Checkbox checked={boostAccepted} onCheckedChange={(checked) => setBoostAccepted(Boolean(checked))} /><span><strong>אני מאשר/ת השתתפות בבוסטים.</strong> ברור לי שהבוסט הוא הצעה נוספת מעבר לשתי ההתאמות, שעשויה להגיע לפני בדיקה ידנית ומסומנת בהתאם.</span></label><label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#ffe0e6] bg-[#fff7f8] p-4 leading-6 text-[#574e59]"><Checkbox checked={spotlightInterest} onCheckedChange={(checked) => setSpotlightInterest(Boolean(checked))} /><span><strong>אשמח לשמוע על פינת הרווקים.</strong> זו בקשת עניין בלבד. לא יפורסם שום תוכן בלי אישור נפרד שלי לתמונה ולטקסט.</span></label></div>{canPurchase ? <GrowWallet product="plus" buttonLabel="להמשך לתשלום המאובטח" buttonClassName="!mt-7 !w-full !rounded-full !bg-gradient-to-r !from-[#ff4466] !to-[#ff6b9d] !py-4 !text-white" prefillName={`${plusData?.profile.firstName || ""} ${plusData?.profile.lastName || ""}`.trim()} prefillEmail={plusData?.profile.email || email} prefillPhone={plusData?.profile.phone || ""} termsPath="/terms/plus" personalToken={token} /> : <button type="button" disabled className="mt-7 inline-flex w-full items-center justify-center gap-3 rounded-full bg-[linear-gradient(90deg,#ff4466,#ff6b9d)] px-7 py-4 font-black text-white disabled:cursor-not-allowed disabled:opacity-45">{!isPersonalLink ? "נדרש קישור אישי מהאזור האישי" : !plusData?.paymentConfigured ? "החיוב ייפתח לאחר חיבור Grow" : plusData?.status === "active" ? "המנוי שלך פעיל" : plusData?.status !== "eligible" && plusData?.status !== "invited" ? "נדרשת בדיקת זכאות" : "יש לאשר את שלוש ההסכמות"}<HeartIcon size={17} /></button>}<p className="mt-4 text-center text-xs leading-5 text-[#857983]">לא יבוצע חיוב לפני מעבר לעמוד התשלום המאובטח ואישור העסקה.</p></motion.div><motion.div variants={fadeUp} className="mt-7 flex justify-center gap-5 text-xs font-medium text-[#765d6a]"><Link href="/terms/plus" className="underline underline-offset-4 hover:text-[#ff4466]">תקנון Plus</Link><Link href="/terms/database" className="underline underline-offset-4 hover:text-[#ff4466]">עדכון תקנון המאגר</Link></motion.div></motion.div></section>
+    <section className="bg-[#fff7f8] px-5 py-20 md:px-10"><motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="mx-auto max-w-3xl"><motion.h2 variants={fadeUp} className="text-center text-3xl font-black tracking-[-.035em] text-[#2b0a36]">שאלות שרצית לשאול</motion.h2><motion.div variants={fadeUp} className="mt-8 rounded-3xl border border-[#ffe0e6] bg-white/75 px-5"><Accordion type="single" collapsible>{[["האם Plus מתאים גם למי שרשום/ה כבר במאגר?", "כן. המסלול נועד בדיוק לחברים ולחברות שכבר נמצאים במאגר עם פרופיל פעיל."], ["האם הבוסט בא במקום ההתאמות?", "לא. הבוסט הוא הזדמנות נוספת, מעבר לשתי ההתאמות של Plus."], ["אפשר לבטל את המסלול?", "כן. אפשר לבקש ביטול בכל עת, והוא יעצור חידושים עתידיים לפי מדיניות הביטול."], ["האם פינת הרווקים היא חובה?", "ממש לא. זו אפשרות נפרדת לחלוטין, ורק באישור מפורש שלך לתמונה ולטקסט."]].map(([question, answer], index) => <AccordionItem key={question} value={`faq-${index}`} className="border-[#ffe0e6]"><AccordionTrigger className="text-right font-bold text-[#2b0a36] hover:no-underline"><span>{question}</span><ChevronDown className="h-4 w-4 text-[#ff4466]" /></AccordionTrigger><AccordionContent className="text-sm leading-7 text-[#625966]">{answer}</AccordionContent></AccordionItem>)}</Accordion></motion.div></motion.div></section>
+    <footer className="bg-[#21082d] px-5 py-8 text-center text-xs text-white/45"><div className="mx-auto flex max-w-lg items-center justify-center gap-2"><PlusMark light /><span>© 2026 הילית כספי | כל הזכויות שמורות</span></div><div className="mt-4 flex justify-center gap-4"><Link href="/terms/plus" className="hover:text-white/70">תקנון Plus</Link><Link href="/terms/database" className="hover:text-white/70">תקנון המאגר</Link></div></footer>
+  </main>;
 }

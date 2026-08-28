@@ -133,10 +133,10 @@
     }
   }
 
-  /* Brand typography classes */
+  /* Brand typography classes. Plus stays Rubik-first to match the Tu B'Av campaign. */
   .font-display-he {
     font-family: 'Rubik', sans-serif;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: -0.02em;
   }
 
