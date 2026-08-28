@@ -33,12 +33,15 @@ import { calculateAgeFromBirthDate } from "../shared/profileValidation";
 import {
   parseMatchOutcomeNotes,
   setAdminOutcome,
+  setFeedbackRequest,
   setLegacyMatchNote,
   setParticipantFeedback,
   PARTICIPANT_OUTCOME_STATUSES,
   PUBLICITY_SCOPES,
 } from "./matchOutcome";
 import { extractApprovedTestimonialSeeds, hydrateApprovedTestimonials } from "./publicTestimonials";
+import { buildOutcomeFeedbackRequestEmail, shouldOfferTestimonialRequest, TESTIMONIAL_REQUEST_COOLDOWN_MS } from "./testimonialRequests";
+import { buildApprovedTestimonialCreativeVariants } from "./testimonialCreative";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -611,6 +614,37 @@ export const appRouter = router({
       return hydrateApprovedTestimonials(seeds, new Map(people.map(person => [person.id, person])))
         .sort((a, b) => b.submittedAt - a.submittedAt)
         .slice(0, 6);
+    }),
+    testimonialCreativeLibrary: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return [];
+
+      const candidateMatches = await db.select({
+        matchId: matches.id,
+        singleAId: matches.singleAId,
+        singleBId: matches.singleBId,
+        notes: matches.notes,
+      })
+        .from(matches)
+        .where(isNotNull(matches.notes))
+        .orderBy(desc(matches.id))
+        .limit(1000);
+      const seeds = candidateMatches.flatMap(extractApprovedTestimonialSeeds);
+      if (seeds.length === 0) return [];
+
+      const personIds = Array.from(new Set(seeds.map(seed => seed.personId)));
+      const people = await db.select({ id: singles.id, firstName: singles.firstName, lastName: singles.lastName, photoUrl: singles.photoUrl })
+        .from(singles)
+        .where(inArray(singles.id, personIds));
+      const testimonials = hydrateApprovedTestimonials(seeds, new Map(people.map(person => [person.id, person])))
+        .sort((a, b) => b.submittedAt - a.submittedAt);
+
+      return testimonials.map(testimonial => ({
+        ...testimonial,
+        variants: buildApprovedTestimonialCreativeVariants(testimonial),
+      }));
     }),
   }),
 
@@ -5212,6 +5246,62 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           updatedAt: Date.now(),
         }).where(eq(matches.id, input.matchId));
         return { success: true };
+      }),
+
+    /** Admin: send a private feedback request after a genuinely positive outcome. */
+    requestOutcomeFeedback: teamProcedure
+      .input(z.object({ matchId: z.number(), side: z.enum(["A", "B"]) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+        if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        const [match] = await db.select().from(matches).where(eq(matches.id, input.matchId)).limit(1);
+        if (!match || (!match.matchedAt && !match.contactRevealedAt)) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "ההתאמה לא נמצאה" });
+        }
+
+        const outcome = parseMatchOutcomeNotes(match.notes);
+        const feedback = input.side === "A" ? outcome.participantA : outcome.participantB;
+        if (!shouldOfferTestimonialRequest({ detailStatus: match.matchDetailStatus, feedback })) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "בקשת עדות נשלחת רק לאחר תוצאה חיובית אמיתית" });
+        }
+
+        const lastRequest = input.side === "A" ? outcome.feedbackRequestA : outcome.feedbackRequestB;
+        const now = Date.now();
+        if (lastRequest && now - lastRequest.requestedAt < TESTIMONIAL_REQUEST_COOLDOWN_MS) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "כבר נשלחה בקשת משוב ב־24 השעות האחרונות" });
+        }
+
+        const participantId = input.side === "A" ? match.singleAId : match.singleBId;
+        const partnerId = input.side === "A" ? match.singleBId : match.singleAId;
+        const people = await db.select({ id: singles.id, firstName: singles.firstName, email: singles.email })
+          .from(singles)
+          .where(inArray(singles.id, [participantId, partnerId]));
+        const peopleMap = new Map(people.map(person => [person.id, person]));
+        const participant = peopleMap.get(participantId);
+        const partner = peopleMap.get(partnerId);
+        const token = input.side === "A" ? match.approvalTokenA : match.approvalTokenB;
+        if (!participant?.email || !token) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "אין כתובת מייל או קישור אישי תקין" });
+        }
+
+        const feedbackUrl = `https://hilitcaspi.com/match/outcome?token=${encodeURIComponent(token)}`;
+        const email = buildOutcomeFeedbackRequestEmail({ firstName: participant.firstName, partnerFirstName: partner?.firstName || "", feedbackUrl });
+        const sent = await sendEmail({ to: { email: participant.email, name: participant.firstName }, ...email });
+        if (!sent.success || sent.messageId === "blocked") {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "בקשת המשוב לא נשלחה" });
+        }
+
+        const notes = setFeedbackRequest(match.notes, input.side, {
+          requestedAt: now,
+          requestedBy: "team",
+          channel: "email",
+          mode: "manual",
+        });
+        await db.update(matches).set({ notes, updatedAt: now }).where(eq(matches.id, match.id));
+        return { success: true, requestedAt: now };
       }),
 
     /**

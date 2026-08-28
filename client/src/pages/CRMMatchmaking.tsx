@@ -5,6 +5,7 @@
 import { useState } from "react";
 import MatchmakingDashboard from "./MatchmakingDashboard";
 import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
+import TestimonialCreativeLibrarySection from "@/components/TestimonialCreativeLibrarySection";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -290,11 +291,11 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "plus">(() => {
+  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "plus" | "testimonials">(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    const allowedTabs = new Set(["singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "plus"]);
+    const allowedTabs = new Set(["singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "plus", "testimonials"]);
     return allowedTabs.has(requestedTab || "")
-      ? requestedTab as "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "plus"
+      ? requestedTab as "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "plus" | "testimonials"
       : "singles";
   });
   // Filter-search tab state
@@ -500,6 +501,14 @@ export default function CRMMatchmaking() {
     onError: () => toast.error("שגיאה בשמירת התוצאה"),
   });
 
+  const requestOutcomeFeedback = (trpc.matchmaking as any).requestOutcomeFeedback.useMutation({
+    onSuccess: (_: unknown, vars: { matchId: number; side: "A" | "B" }) => {
+      refetchMatches();
+      toast.success(`בקשת משוב נשלחה לצד ${vars.side}`);
+    },
+    onError: (error: any) => toast.error(error?.message || "בקשת המשוב לא נשלחה"),
+  });
+
   const sendMatchReminder = (trpc.matchmaking as any).sendMatchReminder.useMutation({
     onSuccess: () => toast.success("תזכורת נשלחה במייל! 📧"),
     onError: (err: any) => toast.error(err?.message || "שגיאה בשליחת תזכורת"),
@@ -613,6 +622,8 @@ export default function CRMMatchmaking() {
     outcomeFeedback?: {
       participantA?: { status: string; rating?: number | null; comment?: string | null; testimonialText?: string | null; publicityScope: string; submittedAt: number } | null;
       participantB?: { status: string; rating?: number | null; comment?: string | null; testimonialText?: string | null; publicityScope: string; submittedAt: number } | null;
+      feedbackRequestA?: { requestedAt: number; mode: "manual" | "automatic" } | null;
+      feedbackRequestB?: { requestedAt: number; mode: "manual" | "automatic" } | null;
       adminNote?: string | null;
       adminVerifiedAt?: number | null;
     };
@@ -901,6 +912,7 @@ export default function CRMMatchmaking() {
             { id: "filter_search" as const, label: "חיפוש מתקדם 🔎", icon: <Search size={14} /> },
             { id: "inactive" as const, label: "לא פעילים", icon: <span>🚫</span> },
             { id: "plus" as const, label: "חברי PLUS", icon: <span className="font-black text-[#8b7420]">＋</span> },
+            { id: "testimonials" as const, label: "עדויות מאושרות", icon: <span>✍️</span> },
             { id: "dashboard" as const, label: "דאשבורד 📊", icon: <BarChart3 size={14} /> },
           ].map(tab => (
             <button
@@ -2046,6 +2058,9 @@ export default function CRMMatchmaking() {
                             </div>
                           )}
                           <div className="rounded-xl border border-[#e9e8e8] bg-[#faf9f6] p-3">
+                            <div className="mb-3 rounded-lg border border-[#d9d2ff] bg-[#f4f1ff] px-3 py-2 text-[11px] leading-5 text-[#191265]">
+                              <strong>בקשת משוב ידנית פעילה.</strong> שליחה אוטומטית לאחר תוצאה חיובית מוכנה כאפשרות, אך נשארת כבויה עד אישור מפורש.
+                            </div>
                             <label className="block text-[11px] font-bold text-[#191265] mb-1">הערת אימות פנימית</label>
                             <textarea
                               value={outcomeNotes[match.id] ?? match.outcomeFeedback?.adminNote ?? ""}
@@ -2080,6 +2095,30 @@ export default function CRMMatchmaking() {
                                 <button type="button" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/match/outcome?token=${match.approvalTokenB}`); toast.success(`קישור משוב הועתק עבור ${match.singleBName?.split(" ")[0]}`); }} className="rounded-lg border border-[#c9c4ef] bg-white px-3 py-1.5 text-xs font-bold text-[#191265]">העתק קישור ל־{match.singleBName?.split(" ")[0]}</button>
                               )}
                             </div>
+                            {(["dating", "met", "together"].includes(match.matchDetailStatus || "") || [match.outcomeFeedback?.participantA?.status, match.outcomeFeedback?.participantB?.status].some(status => ["date_scheduled", "met", "continuing", "relationship"].includes(status || ""))) && (
+                              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                {(["A", "B"] as const).map(side => {
+                                  const name = side === "A" ? match.singleAName : match.singleBName;
+                                  const token = side === "A" ? match.approvalTokenA : match.approvalTokenB;
+                                  const request = side === "A" ? match.outcomeFeedback?.feedbackRequestA : match.outcomeFeedback?.feedbackRequestB;
+                                  const recentlySent = Boolean(request?.requestedAt && Date.now() - request.requestedAt < 24 * 60 * 60 * 1000);
+                                  if (!token) return null;
+                                  return (
+                                    <div key={side} className="rounded-lg border border-[#e5dfcf] bg-white p-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => requestOutcomeFeedback.mutate({ matchId: match.id, side })}
+                                        disabled={requestOutcomeFeedback.isPending || recentlySent}
+                                        className="w-full rounded-lg bg-[#191265] px-3 py-2 text-xs font-bold text-[#ffe27c] disabled:cursor-not-allowed disabled:opacity-50"
+                                      >
+                                        {recentlySent ? "בקשת משוב נשלחה" : `שליחת בקשת משוב ל־${name?.split(" ")[0] || "הצד"}`}
+                                      </button>
+                                      {request?.requestedAt ? <p className="mt-1 text-center text-[10px] text-[#727272]">נשלח: {new Date(request.requestedAt).toLocaleString("he-IL")}</p> : null}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                           {/* Follow-up emails sent info */}
                           {(match.matchWeekFollowupSentAt || match.matchMonthFollowupSentAt) && (
@@ -2991,6 +3030,9 @@ export default function CRMMatchmaking() {
         )}
         {activeTab === "plus" && (
           <PlusPilotAdminSection />
+        )}
+        {activeTab === "testimonials" && (
+          <TestimonialCreativeLibrarySection />
         )}
       </div>
     </div>

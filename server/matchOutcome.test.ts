@@ -3,6 +3,7 @@ import {
   mapParticipantStatusToDetailStatus,
   parseMatchOutcomeNotes,
   setAdminOutcome,
+  setFeedbackRequest,
   setParticipantFeedback,
   type MatchParticipantFeedback,
 } from "./matchOutcome";
@@ -55,6 +56,14 @@ describe("match outcome storage", () => {
     expect(verified.participantA?.status).toBe("relationship");
     expect(verified.adminNote).toBe("אומת בשיחה");
     expect(verified.adminVerifiedAt).toBeTypeOf("number");
+  });
+
+  it("stores manual feedback requests independently for each participant", () => {
+    const afterA = setFeedbackRequest(null, "A", { requestedAt: 100, requestedBy: "team", channel: "email", mode: "manual" });
+    const afterB = setFeedbackRequest(afterA, "B", { requestedAt: 200, requestedBy: "team", channel: "email", mode: "manual" });
+    const parsed = parseMatchOutcomeNotes(afterB);
+    expect(parsed.feedbackRequestA?.requestedAt).toBe(100);
+    expect(parsed.feedbackRequestB?.requestedAt).toBe(200);
   });
 
   it("does not mark a relationship as authoritative unless both sides report it", () => {

@@ -33,11 +33,20 @@ export type MatchParticipantFeedback = {
   source: "participant_portal" | "admin";
 };
 
+export type MatchFeedbackRequest = {
+  requestedAt: number;
+  requestedBy: "team" | "system";
+  channel: "email";
+  mode: "manual" | "automatic";
+};
+
 export type MatchOutcomeRecord = {
   version: 1;
   legacyNote?: string | null;
   participantA?: MatchParticipantFeedback | null;
   participantB?: MatchParticipantFeedback | null;
+  feedbackRequestA?: MatchFeedbackRequest | null;
+  feedbackRequestB?: MatchFeedbackRequest | null;
   adminNote?: string | null;
   adminVerifiedAt?: number | null;
   updatedAt: number;
@@ -55,6 +64,8 @@ export function parseMatchOutcomeNotes(raw: string | null | undefined): MatchOut
         legacyNote: parsed.legacyNote || null,
         participantA: parsed.participantA || null,
         participantB: parsed.participantB || null,
+        feedbackRequestA: parsed.feedbackRequestA || null,
+        feedbackRequestB: parsed.feedbackRequestB || null,
         adminNote: parsed.adminNote || null,
         adminVerifiedAt: parsed.adminVerifiedAt || null,
         updatedAt: Number(parsed.updatedAt) || now,
@@ -79,6 +90,17 @@ export function setParticipantFeedback(
   const current = parseMatchOutcomeNotes(raw);
   if (side === "A") current.participantA = feedback;
   else current.participantB = feedback;
+  return serializeMatchOutcomeNotes(current);
+}
+
+export function setFeedbackRequest(
+  raw: string | null | undefined,
+  side: "A" | "B",
+  request: MatchFeedbackRequest,
+): string {
+  const current = parseMatchOutcomeNotes(raw);
+  if (side === "A") current.feedbackRequestA = request;
+  else current.feedbackRequestB = request;
   return serializeMatchOutcomeNotes(current);
 }
 
