@@ -33,12 +33,15 @@ describe("Boost personal approval link funnel", () => {
   it("opens the personal-area Boost section and keeps joining as a separate action", () => {
     expect(appSource).toContain('<Route path="/match-boost" component={MatchBoostLanding} />');
     expect(routerSource).toContain("https://hilitcaspi.com/my-profile?email=");
-    expect(routerSource).toContain("&tab=boost");
+    expect(routerSource).toContain("&tab=boost#boost-card");
+    expect(pageSource).toContain("&tab=boost#boost-card");
     expect(pageSource).toContain("window.location.replace(dashboardUrl)");
     expect(pageSource).toContain("הקישור נשלח כדי לוודא שזהו הפרופיל שלי במאגר");
     expect(dashboardSource).toContain('{ id: "boost" as const, label: "Boost", icon: "⚡" }');
     expect(dashboardSource).toContain('activeTab === "boost"');
     expect(dashboardSource).toContain('id="boost-card"');
+    expect(dashboardSource).toContain('window.location.hash !== "#boost-card"');
+    expect(dashboardSource).toContain("didAutoFocusRef");
     expect(dashboardSource).toContain("joinPool.mutate");
     expect(dashboardSource).toContain("אינן עוברות אישור אישי של הילית");
     expect(dashboardSource).toContain("זהות ופרטים נוספים ייחשפו רק לאחר הסכמה הדדית");
@@ -54,11 +57,12 @@ describe("Boost personal approval link funnel", () => {
     expect(email.subject).not.toContain("19.99");
     expect(email.preheader).not.toContain("19.99");
     expect(email.htmlContent).toContain("יותר בחירה בידיים שלכם");
-    expect(email.htmlContent).toContain("19.99 ₪ מתבצע רק אם בוחרים לשלוח Boost בפועל");
+    expect(email.htmlContent).not.toContain("19.99");
+    expect(email.htmlContent).toContain("האישור מאפשר לשלוח ולקבל בקשות Boost באזור האישי");
     expect(email.htmlContent).toContain("linear-gradient(135deg,#2a125d");
     expect(email.htmlContent).toContain("hilit-profile_6821862b.jpg");
     expect(email.htmlContent).toContain("display:none;max-height:0;overflow:hidden");
-    expect(email.textContent).toContain("האישור וההצטרפות לשירות Boost אינם כרוכים בתשלום נוסף");
+    expect(email.textContent).toContain("האישור וההצטרפות ל־Boost אינם כרוכים בתשלום");
   });
 
   it("adds Boost consent status to both active and incomplete CRM profile lists", () => {

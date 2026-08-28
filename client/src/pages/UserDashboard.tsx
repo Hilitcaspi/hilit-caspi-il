@@ -4,7 +4,7 @@
  * Shows: profile summary, match status, DNA results
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import DatabaseExpectations from "@/components/DatabaseExpectations";
 import GrowWallet from "@/components/GrowWallet";
@@ -386,13 +386,24 @@ function MatchBoostCard({
   const [algorithmicConsent, setAlgorithmicConsent] = useState(false);
   const [anonymousProfileConsent, setAnonymousProfileConsent] = useState(false);
   const [termsConsent, setTermsConsent] = useState(false);
+  const didAutoFocusRef = useRef(false);
   const statusQuery = trpc.matchBoost.getMyStatus.useQuery(
     { email, token },
     { enabled: Boolean(email && token), retry: false },
   );
+  useEffect(() => {
+    if (didAutoFocusRef.current || !statusQuery.data) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") !== "boost" && window.location.hash !== "#boost-card") return;
+    didAutoFocusRef.current = true;
+    const timeout = window.setTimeout(() => {
+      document.getElementById("boost-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(timeout);
+  }, [statusQuery.data]);
   const redeemPlus = trpc.matchBoost.redeemPlusBoost.useMutation({
     onSuccess: () => {
-      setResultMessage("הבוסט התקבל. הצעת Boost אלגוריתמית תישלח בזרימה הרגילה לאחר בדיקת הזכאות הסופית.");
+      setResultMessage("בקשת ה־Boost התקבלה. לאחר בדיקת הזכאות הסופית היא תישלח לצד השני.");
       utils.matchBoost.getMyStatus.invalidate({ email, token });
     },
     onError: error => setResultMessage(error.message),
@@ -443,7 +454,6 @@ function MatchBoostCard({
 
           <div className="mt-5 space-y-3 rounded-2xl border border-white/30 bg-white p-4 text-[#20113e] shadow-lg sm:p-5">
               <p className="text-sm font-black text-[#20113e]">כדי לפתוח את Boost בפרופיל, מאשרים שלושה דברים:</p>
-              <p className="rounded-xl bg-[#fff8d8] p-3 text-xs font-bold leading-5 text-[#5f4a00]">האישור וההצטרפות לשירות אינם כרוכים בתשלום נוסף. 19.99 ₪ נגבים רק אם בוחרים לשלוח Boost בפועל.</p>
               <label className="flex items-start gap-3 text-xs leading-5 text-[#555]">
                 <input type="checkbox" checked={algorithmicConsent} onChange={event => setAlgorithmicConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#191265]" />
                 <span>אני מסכים או מסכימה לקבל הצעות Boost אלגוריתמיות שלא נבדקו ידנית על ידי הילית.</span>
@@ -470,6 +480,7 @@ function MatchBoostCard({
               >
                 {joinPool.isPending ? "שומר/ת הסכמה..." : "הצטרפות למסלול Boost"}
               </button>
+              <p className="text-center text-[11px] font-bold text-[#777]">האישור וההצטרפות ל־Boost אינם כרוכים בתשלום.</p>
           </div>
           {resultMessage && <p className="mt-3 rounded-lg bg-[#e8f5e9] p-2 text-center text-xs font-bold text-[#2e7d32]">{resultMessage}</p>}
         </div>
@@ -487,7 +498,7 @@ function MatchBoostCard({
       <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
         <p className="text-xs font-black text-[#ffe27c]">✓ אישור Boost נשמר בפרופיל</p>
         <h3 className="mt-2 text-xl font-black text-white">אפשר לשלוח ולקבל Boost לאחר השלמת הפרופיל</h3>
-        <p className="mt-3 text-sm leading-7 text-white/85">ההסכמה שלך כבר מעודכנת במערכת וב־CRM. כדי שהכרטיס האנונימי יוצג לחברי המאגר וכדי לראות התאמות פוטנציאליות, צריך להשלים את הפרטים והשאלון החסרים.</p>
+        <p className="mt-3 text-sm leading-7 text-white/85">האישור שלך כבר נשמר. כדי שהכרטיס האנונימי יוצג לחברי המאגר וכדי לראות אפשרויות Boost, צריך להשלים את הפרטים והשאלון החסרים.</p>
         {missingItems.length > 0 && (
           <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4">
             <p className="text-xs font-black text-[#ffe27c]">מה נדרש להשלים</p>
@@ -501,9 +512,6 @@ function MatchBoostCard({
             </button>
           </div>
         )}
-        <div className="mt-4 rounded-2xl border border-[#ffe27c]/40 bg-white/10 p-4 text-sm leading-6 text-white">
-          <strong className="text-[#ffe27c]">אין תשלום על האישור.</strong> תשלום של 19.99 ₪ מתבצע רק אם בוחרים לשלוח Boost בפועל, לאחר שהפרופיל הושלם ונמצאה התאמה זמינה.
-        </div>
         <p className="mt-4 rounded-xl bg-[#fff8d8] p-3 text-center text-xs font-bold leading-5 text-[#5f4a00]">האישור נשמר. כרגע הפרופיל אינו מוצג בכרטיסי Boost עד להשלמת החוסרים.</p>
         <details className="mt-4 text-center text-[11px] text-white/75">
           <summary className="cursor-pointer font-bold text-white">ניהול מסלול Boost</summary>
@@ -529,10 +537,10 @@ function MatchBoostCard({
 
   if (status.openRequest) {
     const labels: Record<string, string> = {
-      awaiting_payment: "ממתין לתשלום",
-      paid: "התשלום התקבל",
-      queued: "ממתין לשליחה האלגוריתמית",
-      reviewing: "נדרשת בדיקת חריגה טכנית",
+      awaiting_payment: "ממתין להשלמת הפעולה",
+      paid: "הבקשה התקבלה",
+      queued: "הבקשה בדרך לצד השני",
+      reviewing: "הבקשה בבדיקה",
     };
     return (
       <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
@@ -614,13 +622,10 @@ function MatchBoostCard({
             onClick={() => redeemPlus.mutate({ email, token })}
             className="w-full rounded-xl bg-[#191265] px-5 py-3 font-black text-white transition-colors hover:bg-[#1800ad] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {redeemPlus.isPending ? "מפעיל את הבוסט..." : "הפעלת בוסט Plus חודשי ללא תשלום"}
+            {redeemPlus.isPending ? "מפעיל את ה־Boost..." : "שליחת Boost ללא חיוב"}
           </button>
         ) : status.eligible ? (
-          <div className="space-y-3">
-            <div className="rounded-xl border border-[#d8d0f0] bg-[#f7f4ff] p-3 text-xs leading-5 text-[#51448c]">
-              <strong>חשוב לדעת:</strong> האישור וההצטרפות לשירות אינם כרוכים בתשלום נוסף. תשלום של 19.99 ₪ מתבצע רק כאשר בוחרים לשלוח את ה־Boost שמוצג כאן. זהו Boost אלגוריתמי שלא נבדק ידנית על ידי הילית, ואין הבטחה לאישור הדדי, לחשיפת פרטים, לדייט או לזוגיות.
-            </div>
+          <div>
             <GrowWallet
               product="match_boost"
               buttonLabel="שליחת Boost ב־19.99 ₪"
@@ -631,7 +636,7 @@ function MatchBoostCard({
               personalToken={token}
               showCoupon={false}
               onSuccess={() => {
-                setResultMessage("התשלום אושר. המערכת בודקת שוב את זמינות שני הצדדים ושולחת את ההצעה, או שומרת קרדיט אם אין אפשרות לממש.");
+                setResultMessage("בקשת ה־Boost התקבלה. המערכת בודקת את זמינות שני הצדדים ושולחת את ההצעה, או שומרת עבורך אפשרות למימוש חוזר.");
                 setTimeout(() => utils.matchBoost.getMyStatus.invalidate({ email, token }), 1800);
               }}
               onFailure={() => setResultMessage("התשלום לא הושלם ולא יישלח Boost.")}
@@ -643,11 +648,10 @@ function MatchBoostCard({
             disabled
             className="w-full rounded-xl bg-[#191265] px-5 py-3 font-black text-white disabled:cursor-not-allowed disabled:bg-[#bbb]"
           >
-            שליחת Boost ב־19.99 ₪
+            כרגע לא ניתן לשלוח Boost
           </button>
         )}
         {primaryBlocker && <p className="mt-2 text-center text-xs font-medium text-[#9a5b00]">{primaryBlocker}</p>}
-        {!primaryBlocker && !status.plusBenefitAvailable && !status.creditAvailable && <p className="mt-2 text-center text-xs leading-5 text-[#727272]">19.99 ₪ הם עבור שליחת ההצעה בעדיפות לאחר בדיקת זכאות סופית.</p>}
         {resultMessage && <p className="mt-3 rounded-lg bg-[#e8f5e9] p-2 text-center text-xs font-bold text-[#2e7d32]">{resultMessage}</p>}
         <details className="mt-3 text-center text-[11px] text-[#777]">
           <summary className="cursor-pointer font-bold text-[#191265]">ניהול מסלול Boost</summary>
@@ -1168,13 +1172,13 @@ export default function UserDashboard() {
 
       {/* Tab Content */}
 	     <div className="max-w-2xl mx-auto px-4 py-6 pb-16">
-	        <DatabaseExpectations compact showStats={false} className="mb-4" />
-	        <PlusPilotCard email={email} token={token} />
         <AnimatePresence mode="wait">
           {/* ── Profile Tab ── */}
           {activeTab === "profile" && (
             <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="space-y-4">
+              <DatabaseExpectations compact showStats={false} />
+              <PlusPilotCard email={email} token={token} />
               <MissingFieldsBanner profile={profile} onEditClick={() => {
                 // Scroll to update section and click the edit button
                 const section = document.getElementById('update-profile-section');
@@ -1198,6 +1202,10 @@ export default function UserDashboard() {
           {activeTab === "boost" && (
             <motion.div key="boost" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="space-y-4">
+              <div className="rounded-2xl border border-[#ded8ef] bg-white p-4 text-right shadow-sm">
+                <h2 className="font-black text-[#191265]">אפשרויות Boost חדשות לבחירה שלך</h2>
+                <p className="mt-1 text-xs leading-5 text-[#666]">כאן מאשרים את השירות ורואים כרטיסים אנונימיים שאפשר לבחור לשלוח אליהם Boost. התאמות שכבר נשלחו אליך וההיסטוריה שלהן נמצאות בטאב ״התאמות״.</p>
+              </div>
               <MatchBoostCard
                 email={email}
                 token={token}

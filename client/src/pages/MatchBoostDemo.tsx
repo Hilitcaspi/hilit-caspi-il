@@ -29,6 +29,10 @@ export default function MatchBoostDemo() {
             </div>
           ))}
         </div>
+        <div className="mb-4 rounded-2xl border border-[#ded8ef] bg-white p-4 text-right text-[#20113e] shadow-sm">
+          <h1 className="font-black text-[#191265]">אפשרויות Boost חדשות לבחירה שלך</h1>
+          <p className="mt-1 text-xs leading-5 text-[#666]">כאן מופיעים כרטיסים אנונימיים שאפשר לבחור לשלוח אליהם Boost. התאמות שכבר נשלחו וההיסטוריה שלהן נמצאות בטאב ״התאמות״.</p>
+        </div>
         <section className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] shadow-xl shadow-fuchsia-950/20">
         <div className="border-b border-white/20 bg-white/10 px-5 py-3 text-center text-sm font-black text-[#ffe27c]">המחשה בלבד: אין פרטי לקוח ולא מתבצע חיוב</div>
         <div className="p-5 md:p-7">
@@ -63,7 +67,7 @@ export default function MatchBoostDemo() {
           <div className="mt-4 rounded-xl border border-white/25 bg-white/10 p-3 text-center text-xs font-black text-white">הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית</div>
 
           <div className="mt-5 rounded-2xl bg-white p-4 text-[#20113e] shadow-lg">
-            <p className="text-sm font-black">לפני התשלום</p>
+            <p className="text-sm font-black">לפני השליחה</p>
             <p className="mt-2 text-xs leading-5 text-[#555]">שליחת Boost כוללת גם הצטרפות לקבלת הצעות Boost אלגוריתמיות ולהופעה בכרטיס אנונימי לחברים אחרים במסלול. אין הבטחה לאישור הדדי, לחשיפת פרטים, לדייט או לזוגיות.</p>
             <label className="mt-4 flex items-start gap-3 text-xs leading-5 text-[#444]">
               <input type="checkbox" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-[#191265]" />

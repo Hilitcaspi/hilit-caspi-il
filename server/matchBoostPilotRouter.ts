@@ -45,14 +45,14 @@ export function buildBoostApprovalLinkEmail(input: { firstName?: string | null; 
         <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#4b3a59;">ביקשתם יותר התאמות, ואני מקשיבה. Boost מאפשר לראות באזור האישי התאמות פוטנציאליות ולבחור בעצמכם אם לשלוח בקשת התאמה.</p>
         <div style="background:linear-gradient(135deg,#2a125d 0%,#6f176f 58%,#b1247f 100%);border-radius:22px;padding:24px 22px;color:#ffffff;">
           <p style="margin:0 0 12px;color:#ffe27c;font-size:14px;font-weight:800;">מה חשוב לדעת לפני האישור</p>
-          <p style="margin:0 0 10px;font-size:15px;line-height:1.7;">✓ האישור וההצטרפות לשירות Boost אינם כרוכים בתשלום נוסף.</p>
-          <p style="margin:0 0 10px;font-size:15px;line-height:1.7;">✓ תשלום של 19.99 ₪ מתבצע רק אם בוחרים לשלוח Boost בפועל.</p>
+          <p style="margin:0 0 10px;font-size:15px;line-height:1.7;">✓ האישור מאפשר לשלוח ולקבל בקשות Boost באזור האישי.</p>
           <p style="margin:0;font-size:15px;line-height:1.7;">✓ ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.</p>
         </div>
         <p style="margin:18px 0 0;font-size:15px;line-height:1.8;color:#4b3a59;">האישור יכול להישמר גם אם עדיין חסרים פרטים בפרופיל. הפרופיל יצטרף להצעות Boost רק לאחר השלמת הפרטים והשאלון הנדרשים.</p>
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding:24px 0 10px;">
           <a href="${input.approvalUrl}" style="display:inline-block;background:#ffe27c;color:#191265;text-decoration:none;padding:16px 30px;border-radius:14px;font-size:17px;font-weight:800;box-shadow:0 8px 20px rgba(25,18,101,.18);">כניסה לאזור האישי ואישור Boost</a>
         </td></tr></table>
+        <p style="margin:0 0 8px;text-align:center;font-size:12px;line-height:1.7;color:#7a6c82;">האישור וההצטרפות ל־Boost אינם כרוכים בתשלום.</p>
         <p style="margin:8px 0 0;text-align:center;font-size:13px;line-height:1.7;color:#7a6c82;">הקישור אישי ומאובטח. אין להעביר אותו לאחרים.</p>
       </td></tr>
       <tr><td align="center" style="background:#191265;padding:20px 24px;">
@@ -62,7 +62,7 @@ export function buildBoostApprovalLinkEmail(input: { firstName?: string | null; 
     </table>
   </td></tr></table>
 </body></html>`;
-  const textContent = `${greeting}\n\nביקשתם יותר התאמות, ואני מקשיבה. Boost מאפשר לראות באזור האישי התאמות פוטנציאליות ולבחור אם לשלוח בקשת התאמה.\n\nהאישור וההצטרפות לשירות Boost אינם כרוכים בתשלום נוסף. 19.99 ₪ נגבים רק אם בוחרים לשלוח Boost בפועל. ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.\n\nכניסה לאזור האישי ואישור Boost: ${input.approvalUrl}\n\nהקישור אישי ומאובטח. אין להעביר אותו לאחרים.`;
+  const textContent = `${greeting}\n\nביקשתם יותר התאמות, ואני מקשיבה. Boost מאפשר לראות באזור האישי התאמות פוטנציאליות ולבחור אם לשלוח בקשת התאמה.\n\nהאישור מאפשר לשלוח ולקבל בקשות Boost. ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.\n\nכניסה לאזור האישי ואישור Boost: ${input.approvalUrl}\n\nהאישור וההצטרפות ל־Boost אינם כרוכים בתשלום. הקישור אישי ומאובטח ואין להעביר אותו לאחרים.`;
   return { subject, preheader, htmlContent, textContent };
 }
 
@@ -154,7 +154,7 @@ export const matchBoostPilotRouter = router({
         }});
 
         if (cooldownElapsed) {
-          const approvalUrl = `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken!)}&tab=boost`;
+          const approvalUrl = `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken!)}&tab=boost#boost-card`;
           const emailContent = buildBoostApprovalLinkEmail({ firstName: single.firstName, approvalUrl });
           try {
             await sendEmail({

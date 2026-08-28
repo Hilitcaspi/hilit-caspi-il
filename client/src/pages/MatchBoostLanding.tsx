@@ -22,7 +22,7 @@ export default function MatchBoostLanding() {
 
   useEffect(() => {
     if (!isPersonalLink) return;
-    const dashboardUrl = `/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=boost`;
+    const dashboardUrl = `/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=boost#boost-card`;
     window.location.replace(dashboardUrl);
   }, [isPersonalLink, personalEmail, personalToken]);
 
@@ -134,7 +134,7 @@ export default function MatchBoostLanding() {
                     <CheckCircle2 className="mx-auto h-9 w-9" />
                     <h3 className="mt-3 text-lg font-black">שירות Boost פעיל בפרופיל שלכם</h3>
                     <p className="mt-2 text-sm leading-6">האישור נשמר והפרופיל עודכן. מעכשיו אפשר לשלוח ולקבל בקשות Boost.</p>
-                    <a href={`/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=boost`} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white">כניסה ל־Boost באזור האישי<ArrowLeft className="h-4 w-4" /></a>
+                    <a href={`/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=boost#boost-card`} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white">כניסה ל־Boost באזור האישי<ArrowLeft className="h-4 w-4" /></a>
                   </div>
                 ) : (
                   <div>
@@ -161,7 +161,7 @@ export default function MatchBoostLanding() {
               <div className="mt-5">
                 <h3 className="text-xl font-black">פותחים את הפרופיל ל־Boost</h3>
                 <p className="mt-2 text-sm leading-6 text-[#6f627a]">השירות מיועד לחברי מאגר פעילים. הזינו את כתובת המייל שאיתו נרשמתם למאגר, ונשלח אליה קישור אישי לאישור השירות ולכניסה לאזור האישי.</p>
-                <p className="mt-3 rounded-xl bg-[#fff8d8] p-3 text-xs font-bold leading-5 text-[#5f4a00]">האישור וההצטרפות לשירות אינם כרוכים בתשלום נוסף. 19.99 ₪ נגבים רק אם בוחרים לשלוח Boost בפועל.</p>
+                <p className="mt-3 rounded-xl bg-[#fff8d8] p-3 text-xs font-bold leading-5 text-[#5f4a00]">האישור וההצטרפות ל־Boost אינם כרוכים בתשלום.</p>
                 <div className="relative mt-4">
                   <Mail className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a52178]" />
                   <input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="המייל שאיתו נרשמתם למאגר" className="w-full rounded-xl border border-[#ddd4eb] bg-white py-3 pl-4 pr-11 text-sm outline-none focus:border-[#a52178]" />

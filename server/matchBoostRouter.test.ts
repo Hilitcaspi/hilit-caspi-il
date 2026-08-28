@@ -199,6 +199,7 @@ describe("match boost privacy and payment gate", () => {
   const termsSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/TermsMatchBoost.tsx"), "utf8");
   const demoSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/MatchBoostDemo.tsx"), "utf8");
   const crmSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/CRMMatchmaking.tsx"), "utf8");
+  const boostCardSource = uiSource.slice(uiSource.indexOf("function MatchBoostCard"), uiSource.indexOf("function DnaSection"));
 
   it("returns a sanitized anonymous card to the personal area, not candidate identity", () => {
     const publicReturn = source.slice(source.indexOf("return {\n        eligible:"), source.indexOf("redeemPlusBoost:"));
@@ -258,7 +259,8 @@ describe("match boost privacy and payment gate", () => {
     expect(source).toContain("profileReadiness.ready ? now : null");
     expect(source).not.toContain("יש להשלים את הפרופיל, התמונה והשאלון המדעי לפני ההצטרפות ל־Boost");
     expect(uiSource).toContain("✓ אישור Boost נשמר בפרופיל");
-    expect(uiSource).toContain("האישור וההצטרפות לשירות אינם כרוכים בתשלום נוסף");
+    expect(uiSource).toContain("האישור וההצטרפות ל־Boost אינם כרוכים בתשלום");
+    expect(uiSource).not.toContain("במערכת וב־CRM");
     expect(crmSource).toContain("✓ אישור Boost פעיל");
     expect(crmSource).toContain("הופעה בכרטיס אנונימי ושליחת הצעות מותנות בהשלמת הפרופיל ובזכאות תקינה");
   });
@@ -272,6 +274,9 @@ describe("match boost privacy and payment gate", () => {
     expect(uiSource).not.toContain("const regularPaymentReady = false");
     expect(uiSource).toContain('product="match_boost"');
     expect(uiSource).toContain("שליחת Boost ב־19.99 ₪");
+    expect(boostCardSource.match(/19\.99/g)).toHaveLength(1);
+    expect(boostCardSource).not.toContain("Plus חודשי");
+    expect(boostCardSource).not.toContain("במערכת וב־CRM");
     expect(uiSource).toContain('termsPath="/terms/match-boost"');
     expect(walletSource).toContain('boostTermsAccepted: product === "match_boost" ? true : undefined');
     expect(walletSource).toContain("כולל קבלת הצעות Boost אלגוריתמיות שלא נבדקו ידנית על ידי הילית");
