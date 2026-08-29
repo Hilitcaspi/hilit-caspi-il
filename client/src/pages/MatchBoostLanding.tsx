@@ -97,7 +97,7 @@ export default function MatchBoostLanding() {
             <div className="mt-7 grid gap-3 sm:grid-cols-3">
               {[
                 [Zap, "יותר אפשרויות", "בנוסף להתאמות השוטפות שאני שולחת"],
-                [UserRoundCheck, "בחירה שלכם", "אפשרויות של 60% ומעלה לפי האלגוריתם"],
+                [UserRoundCheck, "בחירה שלכם", "אפשרויות נוספות שנמצאו מתאימות לפי האלגוריתם"],
                 [Heart, "לשלוח ולקבל", "חברי מאגר שיאשרו את שירות הבוסט יוכלו לשלוח ולקבל בקשות Boost"],
               ].map(([Icon, title, text]: any) => (
                 <div key={title} className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
@@ -200,7 +200,7 @@ export default function MatchBoostLanding() {
         </div>
         <div className="mt-10 rounded-3xl bg-[#241257] p-6 text-white sm:p-10">
           <h2 className="text-2xl font-black sm:text-4xl">האישור שלכם ל־Boost</h2>
-          <p className="mt-3 max-w-3xl text-base leading-8 text-white/85">Boost הוא שירות נוסף לחברי המאגר. אפשרויות של 60% ומעלה מצביעות על פוטנציאל לפי הנתונים והשאלונים, אך אינן מבטיחות הצלחה ואינן עוברות אישור אישי שלי.</p>
+          <p className="mt-3 max-w-3xl text-base leading-8 text-white/85">Boost הוא שירות נוסף לחברי המאגר. האפשרויות מצביעות על פוטנציאל לפי הנתונים והשאלונים, אך אינן מבטיחות הצלחה ואינן עוברות אישור אישי שלי.</p>
           <div className="mt-6 grid gap-3 text-sm leading-6 sm:grid-cols-2">
             {["במסלול הרגיל אני בוחנת כל הצעה אישית ומעדיפה את ההתאמות הגבוהות ביותר.", "Boost מאפשר לבחור ולשלוח הזדמנות נוספת בעצמכם.", "השם והתמונה מוסתרים מטעמי פרטיות וכדי להכיר מעבר למראה.", "הפרטים המלאים נפתחים רק אם שני הצדדים מאשרים את ההצעה."].map(item => (
               <p key={item} className="flex gap-2 rounded-xl bg-white/8 p-3"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#ffe27c]" />{item}</p>

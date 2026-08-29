@@ -478,7 +478,7 @@ function MatchBoostCard({
             <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-black text-white backdrop-blur">שירות נוסף לבחירתכם</span>
           </div>
           <p className="mt-3 text-sm font-bold leading-7 text-white/85">
-            Boost פותח לבחירתכם אפשרויות התאמה של 60% ומעלה. האפשרויות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.
+            Boost פותח לבחירתכם אפשרויות התאמה נוספות שנוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.
           </p>
 
           <div className="mt-5 space-y-3 rounded-2xl border border-white/30 bg-white p-4 text-[#20113e] shadow-lg sm:p-5">
@@ -596,85 +596,86 @@ function MatchBoostCard({
           </span>
         </div>
         <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm leading-6 text-white/85">
-          <p><strong className="text-[#ffe27c]">60% ומעלה</strong> מצביעים על פוטנציאל התאמה לפי הנתונים והשאלונים. ככל שהציון גבוה יותר, האלגוריתם מצא התאמה חזקה יותר, אך אין בכך הבטחה להצלחה.</p>
-          <p className="mt-2">במסלול הרגיל הילית מעדיפה את ההתאמות הגבוהות ביותר ובודקת כל הצעה אישית. Boost מאפשר לבחור הזדמנות נוספת בעצמכם.</p>
-          <p className="mt-2">השם והתמונה מוסתרים מטעמי פרטיות ומתוך רצון להכיר קודם את האדם, מעבר למראה.</p>
+          <p><strong className="text-[#ffe27c]">אפשרויות נוספות לבחירתכם.</strong> ככל שאחוז ההתאמה גבוה יותר, האלגוריתם מצא יותר נקודות חיבור בנתונים ובשאלונים.</p>
+          <p className="mt-2">השם והתמונה מוסתרים כדי לשמור על הפרטיות ולאפשר להכיר קודם את האדם, מעבר למראה.</p>
         </div>
 
         <div className="mt-5 space-y-5">
           {options.map((option: any, index: number) => {
             const card = option.card;
             return (
-              <article key={option.matchId || index} className="overflow-hidden rounded-[1.6rem] border border-white/30 bg-white/10 p-4 backdrop-blur-sm sm:p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <AnonymousBoostSilhouette className="mx-auto h-24 w-20 shrink-0 sm:mx-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-black text-[#ffe27c]">אפשרות Boost {index + 1}</p>
-                      {card.score !== null && card.score !== undefined && <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black text-white">{card.score}% התאמה</span>}
+              <details key={option.matchId || index} className="group overflow-hidden rounded-[1.75rem] border border-white/25 bg-[linear-gradient(145deg,rgba(49,20,91,.98),rgba(115,36,123,.98))] shadow-[0_18px_45px_rgba(17,5,45,.28)] [&>summary::-webkit-details-marker]:hidden">
+                <summary className="cursor-pointer list-none p-4 outline-none transition-colors hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ffe27c] sm:p-5">
+                  <div className="flex items-center gap-4">
+                    <AnonymousBoostSilhouette className="h-24 w-20 shrink-0 sm:h-28 sm:w-24" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-black text-[#ffe27c]">אפשרות Boost {index + 1}</p>
+                      {card.score !== null && card.score !== undefined && (
+                        <div className="mt-1 flex items-end gap-2">
+                          <span className="text-4xl font-black leading-none text-white sm:text-5xl">{card.score}%</span>
+                          <span className="pb-1 text-xs font-bold text-white/65">התאמה</span>
+                        </div>
+                      )}
+                      <h4 className="mt-2 text-base font-black text-white sm:text-lg">יש כאן חיבור ששווה להכיר</h4>
+                      <p className="mt-1 text-xs leading-5 text-white/70">פתחו לפרטים האנונימיים ולסיבות ההתאמה</p>
                     </div>
-                    <h4 className="mt-2 text-xl font-black text-white">לפני תמונה, מכירים את האדם</h4>
-                    <p className="mt-2 text-sm leading-6 text-white/80">האפשרות פתוחה ל־Boost כי שני הצדדים אישרו את השירות ועומדים כעת בתנאי הזכאות.</p>
+                    <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/25 bg-white/10 text-xl font-black text-[#ffe27c] transition-transform duration-200 group-open:rotate-180">⌄</span>
                   </div>
-                </div>
-                <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {[
-                    ["גיל", card.age], ["אזור", card.region], ["תחום עיסוק", card.occupation],
-                    ["השכלה", card.education], ["גובה", card.height ? `${card.height} ס״מ` : "לא צוין"],
-                    ["מצב משפחתי", card.maritalStatus], ["ילדים", card.hasKids], ["עישון", card.smoking],
-                    ["זיקה דתית", card.religiosity], ["כיוון משפחתי", card.relationshipIntent],
-                  ].map(([label, value]) => (
-                    <div key={String(label)} className="rounded-xl border border-white/20 bg-white/10 p-3">
-                      <p className="text-[10px] font-bold text-[#ffe27c]">{label}</p>
-                      <p className="mt-1 text-xs font-black text-white">{value || "לא צוין"}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-[#eef9f1] p-4">
-                    <p className="text-xs font-black text-[#24613a]">למה האלגוריתם מצא כאן פוטנציאל</p>
-                    <p className="mt-1 text-[11px] leading-5 text-[#477154]">נקודות החיבור שבלטו בנתונים ובשאלונים:</p>
-                    <ul className="mt-2 space-y-1.5 text-xs leading-5 text-[#315d3f]">{(card.reasons || []).map((reason: string) => <li key={reason}>✓ {reason}</li>)}</ul>
-                  </div>
-                  <div className="rounded-xl bg-[#fff3e8] p-4">
-                    <p className="text-xs font-black text-[#8a4b17]">מה כדאי לקחת בחשבון</p>
-                    {(card.considerations || []).length > 0 ? (
-                      <ul className="mt-2 space-y-1.5 text-xs leading-5 text-[#75431e]">{card.considerations.map((item: string) => <li key={item}>• {item}</li>)}</ul>
-                    ) : <p className="mt-2 text-xs leading-5 text-[#75431e]">לא נמצא פער מהותי בנתונים שהוצגו.</p>}
-                  </div>
-                </div>
-                <div className="mt-4 rounded-xl border border-white/25 bg-white/10 p-3 text-center text-xs font-black text-white">{card.disclosure}</div>
-                <p className="mt-3 text-center text-xs leading-5 text-white/75">לפני השליחה המערכת תבדוק שוב ששני הצדדים פעילים, פנויים ואישרו Boost. פרטים מזהים ייחשפו רק לאחר הסכמה הדדית.</p>
+                </summary>
 
-                <div className="mt-4">
-                  {status.creditAvailable ? (
-                    <button type="button" disabled={!status.eligible || redeemCredit.isPending} onClick={() => redeemCredit.mutate({ email, token, matchId: option.matchId })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
-                      {redeemCredit.isPending ? "מפעיל את הקרדיט..." : "מימוש קרדיט ושליחת Boost"}
-                    </button>
-                  ) : status.plusBenefitAvailable ? (
-                    <button type="button" disabled={!status.eligible || redeemPlus.isPending} onClick={() => redeemPlus.mutate({ email, token, matchId: option.matchId })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
-                      {redeemPlus.isPending ? "שולח את ה־Boost..." : "שליחת Boost"}
-                    </button>
-                  ) : status.eligible ? (
-                    <GrowWallet
-                      product="match_boost"
-                      buttonLabel="שליחת Boost | 19.90 ₪"
-                      prefillName={`${profile.firstName || ""} ${profile.lastName || ""}`.trim()}
-                      prefillEmail={profile.email || email}
-                      prefillPhone={profile.phone || ""}
-                      termsPath="/terms/match-boost"
-                      personalToken={token}
-                      boostMatchId={option.matchId}
-                      showCoupon={false}
-                      onSuccess={() => {
-                        setResultMessage("התשלום התקבל וה־Boost נשלח לצד השני. אין צורך לאשר שוב. אם תהיה הסכמה, השם והתמונה ייחשפו לשניכם.");
-                        setTimeout(() => utils.matchBoost.getMyStatus.invalidate({ email, token }), 1800);
-                      }}
-                      onFailure={() => setResultMessage("התשלום לא הושלם ולא יישלח Boost.")}
-                    />
-                  ) : null}
+                <div className="border-t border-white/15 px-4 pb-5 pt-4 sm:px-5">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {[
+                      ["גיל", card.age], ["אזור", card.region], ["תחום עיסוק", card.occupation],
+                      ["השכלה", card.education], ["גובה", card.height ? `${card.height} ס״מ` : "לא צוין"],
+                      ["מצב משפחתי", card.maritalStatus], ["ילדים", card.hasKids], ["עישון", card.smoking],
+                      ["זיקה דתית", card.religiosity], ["כיוון משפחתי", card.relationshipIntent],
+                    ].map(([label, value]) => (
+                      <div key={String(label)} className="rounded-xl border border-white/15 bg-white/[0.08] p-3">
+                        <p className="text-[10px] font-bold text-[#ffe27c]">{label}</p>
+                        <p className="mt-1 text-xs font-black text-white">{value || "לא צוין"}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 rounded-2xl bg-[#f0fbf3] p-4 text-[#244b31]">
+                    <p className="text-sm font-black">למה האלגוריתם מצא כאן פוטנציאל</p>
+                    <p className="mt-1 text-xs leading-5 text-[#52705b]">נקודות החיבור שבלטו ב־DNA הזוגי ובשאלונים:</p>
+                    <ul className="mt-3 space-y-2 text-xs leading-5">{(card.reasons || []).map((reason: string) => <li key={reason} className="flex gap-2"><span className="font-black text-[#2f8050]">✓</span><span>{reason}</span></li>)}</ul>
+                  </div>
+                  <div className="mt-3 rounded-xl border border-[#ffe27c]/30 bg-[#ffe27c]/10 p-3 text-center text-xs font-bold leading-5 text-[#fff4c4]">{card.participationReason}</div>
+                  <p className="mt-3 text-center text-[11px] leading-5 text-white/65">{card.disclosure}. פרטים מזהים ייחשפו רק לאחר הסכמה הדדית.</p>
+
+                  <div className="mt-4">
+                    {status.creditAvailable ? (
+                      <button type="button" disabled={!status.eligible || redeemCredit.isPending} onClick={() => redeemCredit.mutate({ email, token, matchId: option.matchId })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
+                        {redeemCredit.isPending ? "מפעיל את הקרדיט..." : "מימוש קרדיט ושליחת Boost"}
+                      </button>
+                    ) : status.plusBenefitAvailable ? (
+                      <button type="button" disabled={!status.eligible || redeemPlus.isPending} onClick={() => redeemPlus.mutate({ email, token, matchId: option.matchId })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
+                        {redeemPlus.isPending ? "שולח את ה־Boost..." : "שליחת Boost"}
+                      </button>
+                    ) : status.eligible ? (
+                      <GrowWallet
+                        product="match_boost"
+                        buttonLabel="שליחת Boost | 19.90 ₪"
+                        prefillName={`${profile.firstName || ""} ${profile.lastName || ""}`.trim()}
+                        prefillEmail={profile.email || email}
+                        prefillPhone={profile.phone || ""}
+                        termsPath="/terms/match-boost"
+                        personalToken={token}
+                        boostMatchId={option.matchId}
+                        showCoupon={false}
+                        onSuccess={() => {
+                          setResultMessage("התשלום התקבל וה־Boost נשלח לצד השני. אין צורך לאשר שוב. אם תהיה הסכמה, השם והתמונה ייחשפו לשניכם.");
+                          setTimeout(() => utils.matchBoost.getMyStatus.invalidate({ email, token }), 1800);
+                        }}
+                        onFailure={() => setResultMessage("התשלום לא הושלם ולא יישלח Boost.")}
+                      />
+                    ) : null}
+                  </div>
                 </div>
-              </article>
+              </details>
             );
           })}
         </div>
@@ -1119,7 +1120,11 @@ export default function UserDashboard() {
   }
 
   const activeMatches = myMatches.filter((m: any) => (m.status === "proposed" || m.status === "matched") && !m.returnedToPoolAt);
-  const pendingMatches = myMatches.filter((m: any) => m.status === "pending" && !m.returnedToPoolAt);
+  const allPendingMatches = myMatches
+    .filter((m: any) => m.status === "pending" && !m.returnedToPoolAt)
+    .sort((a: any, b: any) => Number(b.score || 0) - Number(a.score || 0));
+  const preferredPendingMatches = allPendingMatches.filter((m: any) => Number(m.score || 0) >= 65);
+  const pendingMatches = preferredPendingMatches.length > 0 ? preferredPendingMatches : allPendingMatches;
   const historyMatches = myMatches.filter((m: any) => m.status === "rejected" || m.status === "expired" || m.returnedToPoolAt);
 
   return (
@@ -1243,7 +1248,7 @@ export default function UserDashboard() {
 
               <div className="rounded-2xl border border-[#ded8ef] bg-white p-4 text-right shadow-sm">
                 <p className="text-xs font-black text-[#a52178]">אפשרויות Boost לבחירה עצמאית</p>
-                <p className="mt-1 text-xs leading-5 text-[#666]">כאן אפשר לבחור התאמות אלגוריתמיות של 60% ומעלה. הן מופיעות רק כששני הצדדים אישרו Boost, פנויים ועומדים בתנאי ההתאמה.</p>
+                <p className="mt-1 text-xs leading-5 text-[#666]">כאן אפשר לבחור אפשרויות התאמה אלגוריתמיות נוספות. הן מופיעות רק כששני הצדדים אישרו Boost, פנויים ועומדים בתנאי ההתאמה.</p>
               </div>
               <MatchBoostCard
                 email={email}
@@ -1255,7 +1260,8 @@ export default function UserDashboard() {
 
               <div id="regular-matches" className="scroll-mt-24 rounded-2xl border border-[#e9e8e8] bg-white p-4 text-right shadow-sm">
                 <p className="text-xs font-black text-[#191265]">התאמות שהילית בוחנת ושולחת</p>
-                <p className="mt-1 text-xs leading-5 text-[#727272]">במסלול הרגיל הילית מעדיפה את ההתאמות הגבוהות ביותר, ובוחנת אישית את הזמינות וההתאמה האנושית לפני שליחת הצעה.</p>
+                <p className="mt-1 text-xs leading-5 text-[#727272]">במסלול הרגיל הילית מעדיפה תחילה את ההתאמות הגבוהות יותר ובוחנת אישית זמינות, סטטוס נוכחי והתאמה אנושית לפני שליחת הצעה. התאמה שמופיעה כאן עדיין יכולה להיות בבדיקה, בהמתנה או לא לעבור לשליחה.</p>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#51448c]">המסלול הרגיל כולל גם חברי מאגר שבחרו לא להשתתף ב־Boost, ולכן עשויות להיות בו אפשרויות נוספות שאינן מופיעות בכרטיסי Boost.</p>
               </div>
               {myMatches.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#e9e8e8] p-8 text-center">

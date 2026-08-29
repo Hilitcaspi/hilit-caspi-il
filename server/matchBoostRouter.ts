@@ -278,39 +278,49 @@ function parseScoreBreakdown(raw: unknown): Record<string, number> {
   }
 }
 
-export function buildAnonymousBoostCard(candidate: any, match: any) {
+const DNA_CONNECTION_TONES: Record<string, string> = {
+  leader: "הובלה וביטחון",
+  anchor: "יציבות ושקט",
+  romantic: "עומק ורגש",
+  free_spirit: "חופש וסקרנות",
+};
+
+function buildDnaConnectionReason(candidate: any, viewer?: any) {
+  const candidateTone = DNA_CONNECTION_TONES[String(candidate?.dnaType || "")];
+  const viewerTone = DNA_CONNECTION_TONES[String(viewer?.dnaType || "")];
+  if (!candidateTone || !viewerTone) return "סגנונות ה־DNA הזוגי מצביעים על פוטנציאל לחיבור משלים";
+  if (candidateTone === viewerTone) return `סגנונות ה־DNA הזוגי שלכם חולקים דגש על ${candidateTone}`;
+  return `ה־DNA הזוגי מחבר בין ${viewerTone} לבין ${candidateTone}`;
+}
+
+export function buildAnonymousBoostCard(candidate: any, match: any, viewer?: any) {
   const scores = parseScoreBreakdown(match?.scoreBreakdown);
   const dimensions: Array<[string, string]> = [
-    ["questionnaire", "התאמה חזקה בשאלון המדעי"],
-    ["general", "התאמה טובה בדפוסי זוגיות"],
-    ["dna", "חיבור משלים בסגנון הזוגי"],
-    ["lifeStage", "שלב חיים דומה"],
-    ["age", "התאמה הדדית בטווחי הגיל"],
-    ["religiosity", "זיקה דתית ואורח חיים תואמים"],
-    ["kids", "כיוון דומה בנושא משפחה וילדים"],
-    ["city", "התאמה בהעדפות המרחק"],
-    ["practicality", "התאמה טובה בתנאים המעשיים"],
-    ["education", "רקע לימודי תואם"],
+    ["questionnaire", "השאלון המדעי מצא חיבור משמעותי בדפוסי הזוגיות"],
+    ["general", "הצרכים והנטיות הזוגיות משתלבים היטב"],
+    ["lifeStage", "נמצאה התאמה טובה בשלב החיים"],
+    ["age", "טווחי הגיל מתאימים באופן הדדי"],
+    ["religiosity", "הגישה לאורח חיים ולזיקה דתית קרובה"],
+    ["kids", "הכיוון בנושא משפחה וילדים דומה"],
+    ["city", "העדפות המרחק מאפשרות היכרות מעשית"],
+    ["practicality", "התנאים המעשיים תומכים באפשרות להיכרות"],
+    ["education", "נמצא חיבור ברקע הלימודי"],
   ];
-  const reasons = dimensions
+  const reasons: string[] = [];
+  if (Number(scores.dna || 0) >= 60) reasons.push(buildDnaConnectionReason(candidate, viewer));
+  reasons.push(...dimensions
     .filter(([key]) => Number(scores[key] || 0) >= 70)
     .sort(([a], [b]) => Number(scores[b] || 0) - Number(scores[a] || 0))
     .map(([, label]) => label)
-    .slice(0, 4);
+    .slice(0, 4));
   const fallbackReasons = [
     "עברתם את כל תנאי הסף ההדדיים",
-    "שניכם משתתפים באופן פעיל במסלול Boost",
     "הפרופילים והשאלונים שלכם מלאים",
   ];
   for (const reason of fallbackReasons) {
     if (reasons.length >= 3) break;
     reasons.push(reason);
   }
-  const considerations = dimensions
-    .filter(([key]) => scores[key] > 0 && scores[key] < 60)
-    .sort(([a], [b]) => Number(scores[a] || 0) - Number(scores[b] || 0))
-    .map(([, label]) => label.replace("התאמה חזקה", "פער מסוים").replace("התאמה טובה", "פער מסוים").replace("תואמים", "דורשים פתיחות"))
-    .slice(0, 2);
 
   return {
     age: candidate.age,
@@ -322,10 +332,10 @@ export function buildAnonymousBoostCard(candidate: any, match: any) {
     hasKids: candidate.hasKids ? "יש ילדים" : "ללא ילדים",
     smoking: SMOKING_LABELS[candidate.smokingStatus] || "לא צוין",
     religiosity: RELIGIOSITY_LABELS[candidate.religiosity] || "לא צוין",
-    relationshipIntent: WANTS_KIDS_LABELS[candidate.wantsKids] || "מחפש/ת קשר רציני",
+    relationshipIntent: WANTS_KIDS_LABELS[candidate.wantsKids] || "קשר רציני",
     score: Math.round(Number(match?.score || 0)),
-    reasons,
-    considerations,
+    reasons: Array.from(new Set(reasons)).slice(0, 4),
+    participationReason: "שני הצדדים אישרו Boost ולכן האפשרות פתוחה לבחירה עצמאית",
     disclosure: "הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית",
   };
 }
@@ -740,11 +750,11 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   if (!proposalClaimed) throw new TRPCError({ code: "CONFLICT", message: "ההתאמה כבר נשלחה או אינה זמינה עוד" });
 
   const score = Math.round(Number(match.score || 0));
-  const cardA = buildAnonymousBoostCard(partyA, match);
-  const cardB = buildAnonymousBoostCard(partyB, match);
+  const cardA = buildAnonymousBoostCard(partyA, match, partyB);
+  const cardB = buildAnonymousBoostCard(partyB, match, partyA);
   const reasonText = (card: ReturnType<typeof buildAnonymousBoostCard>) => [
     ...card.reasons,
-    ...(card.considerations.length ? [`כדאי לקחת בחשבון: ${card.considerations.join("; ")}`] : []),
+    card.participationReason,
   ].join(". ");
   const baseUrl = "https://hilitcaspi.com";
   const emailA = buildMatchProposalEmail({
@@ -1015,11 +1025,11 @@ export const matchBoostRouter = router({
         plusBenefitAvailable: eligibility.plusBenefitAvailable,
         plusBenefitUsed: eligibility.plusBenefitUsed,
         anonymousCard: eligibility.topCandidate?.candidateProfile
-          ? buildAnonymousBoostCard(eligibility.topCandidate.candidateProfile, eligibility.topCandidate)
+          ? buildAnonymousBoostCard(eligibility.topCandidate.candidateProfile, eligibility.topCandidate, single)
           : null,
         options: eligibility.candidates.slice(0, MAX_BOOST_OPTIONS).flatMap((candidate: any) => candidate.candidateProfile ? [{
           matchId: candidate.id,
-          card: buildAnonymousBoostCard(candidate.candidateProfile, candidate),
+          card: buildAnonymousBoostCard(candidate.candidateProfile, candidate, single),
         }] : []),
         consentVersion: BOOST_CONSENT_VERSION,
         membership: context.membership ? {

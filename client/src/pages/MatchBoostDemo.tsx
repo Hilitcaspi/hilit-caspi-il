@@ -9,8 +9,7 @@ const options = [
       ["גיל", "38"], ["אזור", "מרכז והשפלה"], ["תחום עיסוק", "ניהול ועסקים"],
       ["השכלה", "תואר ראשון"], ["מצב משפחתי", "רווקות"], ["כיוון משפחתי", "קשר רציני"],
     ],
-    reasons: ["ערכים דומים בנושא קשר", "שלב חיים דומה", "התאמה בדפוסי זוגיות"],
-    consideration: "יש פער מסוים בהעדפת המרחק, ולכן כדאי להישאר פתוחים לפני שמחליטים.",
+    reasons: ["ה־DNA הזוגי מחבר בין יציבות ושקט לבין הובלה וביטחון", "השאלון המדעי מצא חיבור משמעותי בדפוסי הזוגיות", "נמצאה התאמה טובה בשלב החיים"],
   },
   {
     score: 78,
@@ -18,13 +17,12 @@ const options = [
       ["גיל", "40"], ["אזור", "השרון"], ["תחום עיסוק", "טכנולוגיה והנדסה"],
       ["השכלה", "תואר שני"], ["מצב משפחתי", "גרושות"], ["כיוון משפחתי", "קשר רציני"],
     ],
-    reasons: ["עברתם את תנאי הסף ההדדיים", "כיוון משפחתי דומה", "התאמה טובה באורח החיים"],
-    consideration: "הכרטיס הוא בסיס להחלטה ראשונית. פרטים מזהים נחשפים רק לאחר אישור הדדי.",
+    reasons: ["סגנונות ה־DNA הזוגי מצביעים על פוטנציאל לחיבור משלים", "הכיוון בנושא משפחה וילדים דומה", "הגישה לאורח החיים קרובה"],
   },
 ];
 
 export default function MatchBoostDemo() {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -59,31 +57,28 @@ export default function MatchBoostDemo() {
               <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black">2 אפשרויות זמינות</span>
             </div>
             <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm leading-6 text-white/85">
-              <p><strong className="text-[#ffe27c]">60% ומעלה</strong> מצביעים על פוטנציאל התאמה לפי הנתונים והשאלונים. ככל שהציון גבוה יותר, האלגוריתם מצא התאמה חזקה יותר, אך אין בכך הבטחה להצלחה.</p>
-              <p className="mt-2">השם והתמונה מוסתרים מטעמי פרטיות ומתוך רצון להכיר קודם את האדם, מעבר למראה.</p>
+              <p><strong className="text-[#ffe27c]">אפשרויות נוספות לבחירתכם.</strong> ככל שאחוז ההתאמה גבוה יותר, האלגוריתם מצא יותר נקודות חיבור בנתונים ובשאלונים.</p>
+              <p className="mt-2">השם והתמונה מוסתרים כדי לשמור על הפרטיות ולאפשר להכיר קודם את האדם, מעבר למראה.</p>
             </div>
 
             <div className="mt-5 space-y-4">
               {options.map((option, index) => {
                 const selected = selectedIndex === index;
                 return (
-                  <article key={option.score} className={`rounded-[1.6rem] border p-4 transition-colors sm:p-5 ${selected ? "border-[#ffe27c] bg-white/15" : "border-white/25 bg-white/10"}`}>
-                    <div className="flex items-start gap-3">
-                      <AnonymousBoostSilhouette className="h-20 w-16 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-xs font-black text-[#ffe27c]">אפשרות Boost {index + 1}</p>
-                          <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black">{option.score}% התאמה</span>
+                  <details key={option.score} className="group overflow-hidden rounded-[1.7rem] border border-white/25 bg-[linear-gradient(145deg,rgba(49,20,91,.98),rgba(115,36,123,.98))] shadow-[0_18px_45px_rgba(17,5,45,.25)] [&>summary::-webkit-details-marker]:hidden">
+                    <summary className="cursor-pointer list-none p-4 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ffe27c] sm:p-5">
+                      <div className="flex items-center gap-4">
+                        <AnonymousBoostSilhouette className="h-24 w-20 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-black text-[#ffe27c]">אפשרות Boost {index + 1}</p>
+                          <div className="mt-1 flex items-end gap-2"><span className="text-4xl font-black leading-none">{option.score}%</span><span className="pb-1 text-xs text-white/65">התאמה</span></div>
+                          <h3 className="mt-2 text-base font-black">יש כאן חיבור ששווה להכיר</h3>
+                          <p className="mt-1 text-xs text-white/70">פתחו לפרטים ולסיבות ההתאמה</p>
                         </div>
-                        <h3 className="mt-2 text-xl font-black">לפני תמונה, מכירים את האדם</h3>
-                        <button type="button" onClick={() => { setSelectedIndex(index); setNotice(""); }} className={`mt-3 rounded-xl px-4 py-2 text-xs font-black transition-transform active:scale-[0.97] ${selected ? "bg-[#ffe27c] text-[#191265]" : "border border-white/30 bg-white/10 text-white"}`}>
-                          {selected ? "✓ האפשרות נבחרה" : "בחירה באפשרות זו"}
-                        </button>
+                        <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/25 bg-white/10 text-xl font-black text-[#ffe27c] transition-transform group-open:rotate-180">⌄</span>
                       </div>
-                    </div>
-
-                    {selected && (
-                      <div className="mt-5">
+                    </summary>
+                    <div className="border-t border-white/15 px-4 pb-5 pt-4 sm:px-5">
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                           {option.details.map(([label, value]) => (
                             <div key={label} className="rounded-xl border border-white/20 bg-white/10 p-3">
@@ -92,13 +87,13 @@ export default function MatchBoostDemo() {
                             </div>
                           ))}
                         </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-xl bg-[#eef9f1] p-4 text-xs leading-6 text-[#315d3f]"><strong className="block text-[#24613a]">למה האלגוריתם מצא כאן פוטנציאל</strong><span className="block text-[11px] text-[#477154]">נקודות החיבור שבלטו בנתונים ובשאלונים:</span>{option.reasons.map(reason => <span key={reason} className="block">✓ {reason}</span>)}</div>
-                          <div className="rounded-xl bg-[#fff3e8] p-4 text-xs leading-6 text-[#75431e]"><strong className="block text-[#8a4b17]">מה כדאי לקחת בחשבון</strong>{option.consideration}</div>
-                        </div>
-                      </div>
-                    )}
-                  </article>
+                        <div className="mt-4 rounded-2xl bg-[#eef9f1] p-4 text-xs leading-6 text-[#315d3f]"><strong className="block text-[#24613a]">למה האלגוריתם מצא כאן פוטנציאל</strong><span className="block text-[11px] text-[#477154]">נקודות החיבור שבלטו ב־DNA הזוגי ובשאלונים:</span>{option.reasons.map(reason => <span key={reason} className="block">✓ {reason}</span>)}</div>
+                        <div className="mt-3 rounded-xl border border-[#ffe27c]/30 bg-[#ffe27c]/10 p-3 text-center text-xs font-bold text-[#fff4c4]">שני הצדדים אישרו Boost ולכן האפשרות פתוחה לבחירה עצמאית</div>
+                        <button type="button" onClick={() => { setSelectedIndex(index); setNotice(""); }} className={`mt-4 w-full rounded-xl px-4 py-3 text-sm font-black transition-transform active:scale-[0.97] ${selected ? "bg-[#ffe27c] text-[#191265]" : "border border-white/30 bg-white/10 text-white"}`}>
+                          {selected ? "✓ האפשרות נבחרה" : "בחירה באפשרות זו"}
+                        </button>
+                    </div>
+                  </details>
                 );
               })}
             </div>
@@ -111,7 +106,7 @@ export default function MatchBoostDemo() {
                 <input type="checkbox" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-[#191265]" />
                 <span>קראתי ואישרתי את <Link href="/terms/match-boost"><span className="font-bold underline">תקנון Boost</span></Link>, כולל קבלת הצעות אלגוריתמיות שלא נבדקו ידנית על ידי הילית.</span>
               </label>
-              <button type="button" disabled={!termsAccepted} onClick={() => setNotice("בעמוד האישי האמיתי נפתח כאן תשלום Grow מאובטח. השלמת התשלום מהווה אישור שלך ושולחת את ה־Boost לצד השני. בהדגמה לא מתבצע חיוב.")} className="mt-4 w-full rounded-2xl bg-gradient-to-l from-[#a52178] to-[#5d176d] py-4 text-lg font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" disabled={!termsAccepted || selectedIndex === null} onClick={() => setNotice("בעמוד האישי האמיתי נפתח כאן תשלום Grow מאובטח. השלמת התשלום מהווה אישור שלך ושולחת את ה־Boost לצד השני. בהדגמה לא מתבצע חיוב.")} className="mt-4 w-full rounded-2xl bg-gradient-to-l from-[#a52178] to-[#5d176d] py-4 text-lg font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50">
                 שליחת Boost | 19.90 ₪
               </button>
               {notice && <p className="mt-3 rounded-xl bg-[#e8f5e9] p-3 text-center text-xs font-bold text-[#2e7d32]">{notice}</p>}
@@ -122,7 +117,7 @@ export default function MatchBoostDemo() {
         <section id="regular-demo" className="mt-5 scroll-mt-6 rounded-2xl border border-[#ded8ef] bg-white p-5 text-right shadow-sm">
           <p className="text-xs font-black text-[#191265]">התאמות שהילית בוחנת ושולחת</p>
           <h2 className="mt-1 text-lg font-black text-[#20113e]">מסלול ההתאמות הרגיל ממשיך בנפרד</h2>
-          <p className="mt-2 text-xs leading-5 text-[#666]">במסלול הרגיל הילית מעדיפה את ההתאמות הגבוהות ביותר, ובוחנת אישית את הזמינות וההתאמה האנושית לפני שליחת הצעה.</p>
+          <p className="mt-2 text-xs leading-5 text-[#666]">במסלול הרגיל הילית מעדיפה תחילה את ההתאמות הגבוהות יותר ובוחנת אישית זמינות והתאמה אנושית. המסלול כולל גם אנשים שבחרו לא להשתתף ב־Boost ולכן עשויות להופיע בו אפשרויות נוספות.</p>
           <div className="mt-4 rounded-xl border border-[#e9e8e8] bg-[#faf8f2] p-4">
             <div className="flex items-center justify-between gap-3"><strong className="text-sm text-[#191265]">התאמה פוטנציאלית בבדיקה</strong><span className="rounded-full bg-[#eee9ff] px-3 py-1 text-xs font-black text-[#51448c]">86%</span></div>
             <p className="mt-2 text-xs leading-5 text-[#727272]">עדיין לא נשלחה הצעה. הילית בוחנת התאמה וזמינות לפני המשך.</p>

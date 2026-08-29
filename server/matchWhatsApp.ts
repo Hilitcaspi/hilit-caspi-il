@@ -34,9 +34,9 @@ export type MatchWhatsAppPayload = MakeWhatsAppPayload & {
 export function buildMatchWhatsAppMessage(firstName: string, matchFirstName: string, score: number, proposalSource: "manual" | "boost" = "manual", boostRole: BoostRecipientRole = "recipient"): string {
   if (proposalSource === "boost") {
     if (boostRole === "sender") {
-      return `היי ${firstName}\n\nשלחת התאמת Boost של ${score}%. הבקשה נשלחה לצד השני ואין צורך לאשר שוב.\n\nאם תהיה הסכמה מהצד השני, השם, התמונה והפרטים המלאים יישלחו לשניכם במייל.\n\nצוות הילית כספי 💛`;
+      return `היי ${firstName}\n\nבקשת ה־Boost שלך, עם ${score}% התאמה, נשלחה לצד השני במסגרת מסלול Boost. אין צורך לאשר שוב.\n\nאם תהיה הסכמה מהצד השני, השם, התמונה והפרטים המלאים יישלחו לשניכם במייל.\n\nצוות הילית כספי 💛`;
     }
-    return `היי ${firstName}\n\nקיבלת התאמת Boost של ${score}%. בקשת היכרות חדשה הגיעה דרך שירות Boost, והיא לא נבדקה ידנית על ידי הילית.\n\nכל הפרטים מחכים במייל, גם בספאם ובתיקיית השיווק. השם והתמונה ייחשפו רק לאחר אישור הדדי.\n\nצוות הילית כספי 💛`;
+    return `היי ${firstName}\n\nמחכה לך התאמת Boost מיוחדת עם ${score}% התאמה. ההצעה נוצרה על ידי אלגוריתם ההתאמה ונשלחה במסגרת מסלול Boost. היא לא נבחרה או נבדקה אישית על ידי הילית.\n\nהפרטים האנונימיים והסיבות להתאמה מחכים במייל, גם בספאם ובתיקיית השיווק. השם והתמונה ייחשפו רק לאחר אישור הדדי.\n\nצוות הילית כספי 💛`;
   }
   return `היי ${firstName}\n\nשלחתי לך מייל עם התאמה של ${score}% מיוחדת שבחרתי עבורך, ${matchFirstName} מחכה לתשובתך!\n\nכדאי לבדוק את תיבת המייל (גם ספאם והשיווק) וללחוץ על הקישור.\n\nהילית 💛`;
 }

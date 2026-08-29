@@ -1356,12 +1356,12 @@ export function buildMatchProposalEmail(params: {
       <p style="font-size:13px; color:#191265; font-weight:700; margin:0;">📌 את התגובה יש להזין בתחתית המייל</p>
     </div>
 
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? (isBoostSender ? "ה־Boost ששלחת יצא לדרך" : "מחכה לך התאמת Boost") : "יש לך הצעה"}, ${params.firstName} 💛</h2>
+    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה" : "מחכה לך התאמת Boost מיוחדת") : "יש לך הצעה"}, ${params.firstName} 💛</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
       ${isBoost
         ? (isBoostSender
-          ? `הבקשה נשלחה לצד השני. בחירת הכרטיס והשלמת התשלום מהוות את האישור שלך להצעה, ולכן אין צורך לאשר שוב. <strong>ההצעה נוצרה על ידי האלגוריתם ולא נבדקה ידנית על ידי הילית.</strong>`
-          : `בקשת היכרות חדשה הגיעה דרך Boost. ההצעה נוצרה על בסיס בדיקת האלגוריתם ותנאי הסף שהוגדרו. <strong>היא לא נבדקה ולא אושרה ידנית על ידי הילית.</strong>`)
+          ? `כרטיס ה־Boost שבחרת נשלח לצד השני במסגרת מסלול Boost. בחירת הכרטיס והשלמת התשלום מהוות את האישור שלך, ולכן אין צורך לאשר שוב. <strong>ההצעה נוצרה על ידי האלגוריתם ולא נבחרה או נבדקה אישית על ידי הילית.</strong>`
+          : `הצעה חדשה נשלחה אליך במסגרת מסלול Boost. היא נוצרה על בסיס אלגוריתם ההתאמה והנתונים שמילאו שני הצדדים. <strong>היא לא נבחרה או נבדקה אישית על ידי הילית.</strong>`)
         : `מצאתי עבורך התאמה שחשבתי עליה הרבה לפני שהחלטתי לשלוח אותה ${isFemale ? "אלייך" : "אליך"}. לא כל ההצעות מגיעות ${isFemale ? "אלייך" : "אליך"}, רק אלו שאני מאמינה בהן.`}
     </p>
 
@@ -1395,13 +1395,13 @@ export function buildMatchProposalEmail(params: {
         אני יודעת שההתאמה הזו מתחת לרף ה-80% שאני בדרך כלל שומרת עליו — אבל היא קפצה לי, ואני מאמינה בה.
         לפעמים יש ירידה קלה באחוזים בגלל דברים פחות מהותיים בעיני, ואני בוחרת לשחרר אותה כי אני מוצאת בה קסם ופוטנציאל אמיתי.
         <br><br>
-        <strong>ציון מעל 60% מצביע על פוטנציאל לפי הנתונים שנבדקו באלגוריתם</strong> — ובמקרה הזה בחרתי לעבור על ההתאמה ולאשר אותה באופן אישי. 💛
+        <strong>אחוז ההתאמה הוא נקודת פתיחה, לא כל הסיפור</strong>. במקרה הזה בחרתי לעבור על הנתונים ולאשר את ההצעה באופן אישי. 💛
       </p>
       <p style="font-size:12px; color:#727272; margin:10px 0 0; text-align:left;">הילית כספי</p>
     </div>` : ""}
     ${isBoost ? `
     <div style="background:#f5f2ff; border-right:4px solid #6b57b9; border-radius:8px; padding:20px 24px; margin:20px 0;">
-      <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">⚡ למה האלגוריתם סימן התאמה</p>
+      <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">⚡ למה האלגוריתם מצא כאן פוטנציאל</p>
       <p style="font-size:15px; color:#333; line-height:1.9; margin:0;">${params.hilitsNote}</p>
       <p style="font-size:12px; color:#727272; margin:12px 0 0;">הצעת Boost אלגוריתמית. לא נבדקה ידנית על ידי הילית.</p>
     </div>` : `
@@ -1442,13 +1442,13 @@ export function buildMatchProposalEmail(params: {
   return {
     subject: isBoost
       ? (isBoostSender
-        ? `⚡ ה־Boost ששלחת יצא לדרך · ${params.compatibilityScore}%`
-        : `⚡ התאמת Boost חדשה מחכה לך · ${params.compatibilityScore}%`)
+        ? `⚡ בקשת ה־Boost שלך נשלחה · ${params.compatibilityScore}%`
+        : `⚡ התאמת Boost מיוחדת מחכה לך · ${params.compatibilityScore}%`)
       : `💛 יש לך התאמה שמחכה לך! ${params.compatibilityScore}%`,
     htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
     textBody: isBoostSender
-      ? `שלום ${params.firstName},\n\nשלחת התאמת Boost אלגוריתמית של ${params.compatibilityScore}%. הבקשה נשלחה לצד השני ואין צורך לאשר שוב. אם תהיה הסכמה מהצד השני, השם, התמונה והפרטים המלאים יישלחו לשניכם.\n\nהילית כספי`
-      : `שלום ${params.firstName},\n\n${isBoost ? "מחכה לך התאמת Boost אלגוריתמית שלא נבדקה ידנית על ידי הילית" : "יש לך הצעת התאמה חדשה"}.\n\nאחוז התאמה: ${params.compatibilityScore}%\nהתאמה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}\n\nלאישור: ${params.yesUrl}\nלדחייה: ${params.noUrl}\n\nהילית כספי`,
+      ? `שלום ${params.firstName},\n\nבקשת ה־Boost שלך עם ${params.compatibilityScore}% התאמה נשלחה לצד השני במסגרת מסלול Boost. אין צורך לאשר שוב. ההצעה נוצרה על ידי האלגוריתם ולא נבחרה או נבדקה אישית על ידי הילית. אם תהיה הסכמה מהצד השני, השם, התמונה והפרטים המלאים יישלחו לשניכם.\n\nצוות הילית כספי`
+      : `שלום ${params.firstName},\n\n${isBoost ? "מחכה לך התאמת Boost מיוחדת שנוצרה על ידי האלגוריתם ונשלחה במסגרת מסלול Boost. היא לא נבחרה או נבדקה אישית על ידי הילית" : "יש לך הצעת התאמה חדשה"}.\n\nאחוז התאמה: ${params.compatibilityScore}%\nהתאמה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}\n\nלאישור: ${params.yesUrl}\nלדחייה: ${params.noUrl}\n\nצוות הילית כספי`,
   };
 }
 

@@ -4133,7 +4133,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const alreadyResponded = isA ? !!match.tokenAUsedAt : !!match.tokenBUsedAt;
         const myDecision = isA ? match.approvedByA : match.approvedByB;
         const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
-        const anonymousPartner = partner && isBoost ? buildAnonymousBoostCard(partner, match) : null;
+        const anonymousPartner = partner && isBoost ? buildAnonymousBoostCard(partner, match, me) : null;
 
         return {
           matchId: match.id,
@@ -4154,7 +4154,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             photoUrl: null,
             religiosity: anonymousPartner?.religiosity,
             reasons: anonymousPartner?.reasons || [],
-            considerations: anonymousPartner?.considerations || [],
+            considerations: [],
             isAnonymous: true,
           } : {
             firstName: partner.firstName,

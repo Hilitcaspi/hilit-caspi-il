@@ -21,9 +21,10 @@ const baseParams = {
 describe("Boost role-specific messaging", () => {
   it("tells the recipient that a Boost was sent and keeps the card anonymous", () => {
     const email = buildMatchProposalEmail({ ...baseParams, boostRole: "recipient" });
-    expect(email.subject).toContain("התאמת Boost חדשה מחכה לך");
-    expect(email.htmlBody).toContain("מחכה לך התאמת Boost");
-    expect(email.htmlBody).toContain("בקשת היכרות חדשה הגיעה דרך Boost");
+    expect(email.subject).toContain("התאמת Boost מיוחדת מחכה לך");
+    expect(email.htmlBody).toContain("מחכה לך התאמת Boost מיוחדת");
+    expect(email.htmlBody).toContain("נשלחה אליך במסגרת מסלול Boost");
+    expect(email.htmlBody).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
     expect(email.htmlBody).toContain(baseParams.yesUrl);
     expect(email.htmlBody).not.toContain(baseParams.matchPhotoUrl);
     expect(email.htmlBody).not.toContain(baseParams.matchFirstName);
@@ -31,9 +32,9 @@ describe("Boost role-specific messaging", () => {
 
   it("confirms the sent Boost without asking the sender to approve again", () => {
     const email = buildMatchProposalEmail({ ...baseParams, boostRole: "sender" });
-    expect(email.subject).toContain("ה־Boost ששלחת יצא לדרך");
+    expect(email.subject).toContain("בקשת ה־Boost שלך נשלחה");
     expect(email.htmlBody).toContain("אין צורך לאשר שוב");
-    expect(email.textBody).toContain("שלחת התאמת Boost");
+    expect(email.textBody).toContain("בקשת ה־Boost שלך");
     expect(email.htmlBody).not.toContain(baseParams.yesUrl);
     expect(email.htmlBody).not.toContain(baseParams.noUrl);
     expect(email.htmlBody).not.toContain(baseParams.matchPhotoUrl);
