@@ -23,6 +23,7 @@ import rateLimit from "express-rate-limit";
 import multer from "multer";
 import { storagePut } from "../storage";
 import { sendErrorAlert, installProcessErrorAlerts } from "./errorAlert";
+import { buildBoostEnrollmentNewsletter } from "../boostNewsletter";
 
 // Install process-level error alerts (uncaughtException / unhandledRejection).
 installProcessErrorAlerts();
@@ -87,6 +88,19 @@ async function startServer() {
   // OAuth callback under /api/oauth/callback
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+
+  // Safe public preview for approval only. This route never sends an email.
+  app.get("/api/preview/boost-newsletter", (_req, res) => {
+    const preview = buildBoostEnrollmentNewsletter({
+      firstName: "",
+      enrollmentUrl: "https://hilitcaspi.com/match-boost?utm_source=brevo&utm_medium=email&utm_campaign=boost_launch&utm_content=primary_cta",
+      unsubscribeUrl: "https://hilitcaspi.com/unsubscribe",
+    });
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    res.status(200).send(preview.htmlContent);
+  });
 
   // ─── WhatsApp Group Redirect with Source Tracking ─────────────────────────
   // IMPORTANT: Must be registered early, before serveStatic catch-all
