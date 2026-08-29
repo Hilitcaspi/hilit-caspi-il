@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, parseBoostCheckoutReference, selectOnDemandBoostCandidates } from "./matchBoostRouter";
+import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, MIN_BOOST_SCORE, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, parseBoostCheckoutReference, selectOnDemandBoostCandidates } from "./matchBoostRouter";
 
 const NOW = new Date("2026-08-25T12:00:00Z").getTime();
 
@@ -98,8 +98,25 @@ describe("match boost eligibility", () => {
     expect(options).toHaveLength(6);
     expect(options.map(option => option.candidate.id)).not.toContain(20);
     expect(options.map(option => option.candidate.id)).not.toContain(21);
-    expect(options.every(option => option.score >= 70)).toBe(true);
+    expect(options.every(option => option.score >= MIN_BOOST_SCORE)).toBe(true);
     expect(options.map(option => option.score)).toEqual([...options.map(option => option.score)].sort((a, b) => b - a));
+  });
+
+  it("opens Boost choices at 60 percent and excludes scores below the threshold", () => {
+    expect(MIN_BOOST_SCORE).toBe(60);
+    const result = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [
+        pendingMatch({ id: 301, score: 59 }),
+        pendingMatch({ id: 302, score: 60 }),
+        pendingMatch({ id: 303, score: 78 }),
+      ],
+      membership: activeMembership(),
+      boostRequests: [],
+      now: NOW,
+    });
+    expect(result.eligible).toBe(true);
+    expect(result.candidates.map(candidate => candidate.id)).toEqual([303, 302]);
   });
 
   it("allows a complete paid active member with a hidden pending candidate", () => {
@@ -260,6 +277,7 @@ describe("match boost privacy and payment gate", () => {
   const walletSource = fs.readFileSync(path.join(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
   const termsSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/TermsMatchBoost.tsx"), "utf8");
   const demoSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/MatchBoostDemo.tsx"), "utf8");
+  const landingSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/MatchBoostLanding.tsx"), "utf8");
   const crmSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/CRMMatchmaking.tsx"), "utf8");
   const boostCardSource = uiSource.slice(uiSource.indexOf("function MatchBoostCard"), uiSource.indexOf("function DnaSection"));
 
@@ -385,6 +403,15 @@ describe("match boost privacy and payment gate", () => {
     expect(demoSource).toContain('href="/terms/match-boost"');
     expect(demoSource).not.toContain('product="match_boost"');
     expect(demoSource).not.toContain("questionnaireToken");
+  });
+
+  it("explains the 60 percent threshold without unsupported research or success promises", () => {
+    expect(boostCardSource).toContain("60% ומעלה");
+    expect(boostCardSource).toContain("אין בכך הבטחה להצלחה");
+    expect(boostCardSource).toContain("השם והתמונה מוסתרים מטעמי פרטיות");
+    expect(landingSource).toContain("אפשרויות של 60% ומעלה");
+    expect(demoSource).toContain("60% ומעלה");
+    expect(`${boostCardSource}\n${landingSource}\n${demoSource}`).not.toContain("לפי המחקרים");
   });
 
   it("never exposes candidate identity in the personal-area Boost card", () => {

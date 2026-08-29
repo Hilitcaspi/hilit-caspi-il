@@ -57,7 +57,10 @@ export default function MatchBoostDemo() {
               </div>
               <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black">2 אפשרויות זמינות</span>
             </div>
-            <p className="mt-3 text-sm leading-6 text-white/80">שני הכרטיסים אנונימיים. אפשר להשוות ביניהם, לבחור ורק אז להמשיך לשליחה.</p>
+            <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm leading-6 text-white/85">
+              <p><strong className="text-[#ffe27c]">60% ומעלה</strong> מצביעים על פוטנציאל התאמה לפי הנתונים והשאלונים. ככל שהציון גבוה יותר, האלגוריתם מצא התאמה חזקה יותר, אך אין בכך הבטחה להצלחה.</p>
+              <p className="mt-2">השם והתמונה מוסתרים מטעמי פרטיות ומתוך רצון להכיר קודם את האדם, מעבר למראה.</p>
+            </div>
 
             <div className="mt-5 space-y-4">
               {options.map((option, index) => {
@@ -118,7 +121,7 @@ export default function MatchBoostDemo() {
         <section id="regular-demo" className="mt-5 scroll-mt-6 rounded-2xl border border-[#ded8ef] bg-white p-5 text-right shadow-sm">
           <p className="text-xs font-black text-[#191265]">התאמות שהילית בוחנת ושולחת</p>
           <h2 className="mt-1 text-lg font-black text-[#20113e]">מסלול ההתאמות הרגיל ממשיך בנפרד</h2>
-          <p className="mt-2 text-xs leading-5 text-[#666]">אחוז ההתאמה הוא נקודת פתיחה. הילית בוחנת גם את מצב שני הצדדים, הזמינות וההתאמה האנושית לפני שליחת הצעה.</p>
+          <p className="mt-2 text-xs leading-5 text-[#666]">במסלול הרגיל הילית מעדיפה את ההתאמות הגבוהות ביותר, ובוחנת אישית את הזמינות וההתאמה האנושית לפני שליחת הצעה.</p>
           <div className="mt-4 rounded-xl border border-[#e9e8e8] bg-[#faf8f2] p-4">
             <div className="flex items-center justify-between gap-3"><strong className="text-sm text-[#191265]">התאמה פוטנציאלית בבדיקה</strong><span className="rounded-full bg-[#eee9ff] px-3 py-1 text-xs font-black text-[#51448c]">86%</span></div>
             <p className="mt-2 text-xs leading-5 text-[#727272]">עדיין לא נשלחה הצעה. הילית בוחנת התאמה וזמינות לפני המשך.</p>

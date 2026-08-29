@@ -24,7 +24,7 @@ import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const BOOST_PRICE_AGOROT = 1990;
 const LEGACY_BOOST_PRICE_AGOROT = 1999;
-const MIN_BOOST_SCORE = 70;
+export const MIN_BOOST_SCORE = 60;
 const MAX_BOOST_OPTIONS = 6;
 export const BOOST_CANDIDATE_NOTE_MARKER = "[BOOST_CANDIDATE]";
 export const BOOST_CONSENT_VERSION = "2026-08-27-v1";

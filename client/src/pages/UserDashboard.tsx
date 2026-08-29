@@ -466,7 +466,7 @@ function MatchBoostCard({
             <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-black text-white backdrop-blur">שירות נוסף לבחירתכם</span>
           </div>
           <p className="mt-3 text-sm font-bold leading-7 text-white/85">
-            Boost מאפשר לראות התאמות פוטנציאליות באזור האישי ולבחור למי לשלוח בקשה. ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.
+            Boost פותח לבחירתכם אפשרויות התאמה של 60% ומעלה. האפשרויות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.
           </p>
 
           <div className="mt-5 space-y-3 rounded-2xl border border-white/30 bg-white p-4 text-[#20113e] shadow-lg sm:p-5">
@@ -568,7 +568,11 @@ function MatchBoostCard({
             {status.candidateCount} אפשרויות זמינות
           </span>
         </div>
-        <p className="mt-3 text-sm leading-6 text-white/80">כל כרטיס מציג מידע שעוזר להחליט אם לפתוח הזדמנות, בלי שם, תמונה, עיר מדויקת, מקום עבודה או פרטי קשר.</p>
+        <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm leading-6 text-white/85">
+          <p><strong className="text-[#ffe27c]">60% ומעלה</strong> מצביעים על פוטנציאל התאמה לפי הנתונים והשאלונים. ככל שהציון גבוה יותר, האלגוריתם מצא התאמה חזקה יותר, אך אין בכך הבטחה להצלחה.</p>
+          <p className="mt-2">במסלול הרגיל הילית מעדיפה את ההתאמות הגבוהות ביותר ובודקת כל הצעה אישית. Boost מאפשר לבחור הזדמנות נוספת בעצמכם.</p>
+          <p className="mt-2">השם והתמונה מוסתרים מטעמי פרטיות ומתוך רצון להכיר קודם את האדם, מעבר למראה.</p>
+        </div>
 
         <div className="mt-5 space-y-5">
           {options.map((option: any, index: number) => {
@@ -1213,7 +1217,7 @@ export default function UserDashboard() {
 
               <div className="rounded-2xl border border-[#ded8ef] bg-white p-4 text-right shadow-sm">
                 <p className="text-xs font-black text-[#a52178]">אפשרויות Boost לבחירה עצמאית</p>
-                <p className="mt-1 text-xs leading-5 text-[#666]">כפתור Boost מופיע רק כאשר שני חברי המאגר אישרו את השירות, פנויים ועומדים בתנאי ההתאמה. ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.</p>
+                <p className="mt-1 text-xs leading-5 text-[#666]">כאן אפשר לבחור התאמות אלגוריתמיות של 60% ומעלה. הן מופיעות רק כששני הצדדים אישרו Boost, פנויים ועומדים בתנאי ההתאמה.</p>
               </div>
               <MatchBoostCard
                 email={email}
@@ -1225,7 +1229,7 @@ export default function UserDashboard() {
 
               <div id="regular-matches" className="scroll-mt-24 rounded-2xl border border-[#e9e8e8] bg-white p-4 text-right shadow-sm">
                 <p className="text-xs font-black text-[#191265]">התאמות שהילית בוחנת ושולחת</p>
-                <p className="mt-1 text-xs leading-5 text-[#727272]">אחוז ההתאמה הוא נקודת פתיחה. הילית בוחנת גם את מצב שני הצדדים, הזמינות וההתאמה האנושית לפני שליחת הצעה.</p>
+                <p className="mt-1 text-xs leading-5 text-[#727272]">במסלול הרגיל הילית מעדיפה את ההתאמות הגבוהות ביותר, ובוחנת אישית את הזמינות וההתאמה האנושית לפני שליחת הצעה.</p>
               </div>
               {myMatches.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#e9e8e8] p-8 text-center">
