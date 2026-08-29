@@ -17,7 +17,7 @@ import { calculateCompatibility, findMatches, findMatchesWithText, computeFullSc
 import type { ScoreBreakdown as FullScoreBreakdown } from "./compatibility";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
 import crypto from "crypto";
-import { eq, and, ne, sql, desc, lt, isNull, isNotNull, or, asc, inArray, notLike } from "drizzle-orm";
+import { eq, and, ne, sql, desc, lt, gt, isNull, isNotNull, or, asc, inArray, notLike } from "drizzle-orm";
 import { storagePut } from "./storage";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "./_core/notification";
@@ -56,6 +56,8 @@ export function addToPaymentLogBuffer(msg: string): void {
 export function getPaymentLogBuffer(last = 50): string[] {
   return PAYMENT_LOG_BUFFER.slice(-last);
 }
+
+const PERSONAL_AREA_LINK_COOLDOWN_MS = 5 * 60 * 1000;
 
 // ─── DNA type compatibility map ───────────────────────────────────────────────
 const COMPATIBLE_TYPES: Record<string, string> = {
@@ -2531,22 +2533,48 @@ export const appRouter = router({
      * Send a magic link to the user's email for dashboard access.
      */
     sendDashboardLink: publicProcedure
-      .input(z.object({ email: z.string().email(), origin: z.string() }))
+      .input(z.object({ email: z.string().trim().email().max(320), origin: z.string().optional() }))
       .mutation(async ({ input }) => {
         const db = await getDb();
-        if (!db) return { success: false };
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא ניתן לשלוח קישור כרגע" });
         const normalizedEmail = input.email.trim().toLowerCase();
         const [profile] = await db.select().from(singles)
           .where(sql`LOWER(${singles.email}) = ${normalizedEmail}`)
           .limit(1);
-        if (!profile) return { success: false, notFound: true };
-        const dashboardUrl = `${input.origin}/my-profile?email=${encodeURIComponent(profile.email || normalizedEmail)}&token=${profile.questionnaireToken || ''}`;
-        await sendEmail({
-          to: { email: input.email, name: profile.firstName },
+        const genericResult = { success: true } as const;
+        if (!profile?.isActive || !profile.isPaid) return genericResult;
+
+        const now = Date.now();
+        const [recentRequest] = await db.select({ id: analyticsEvents.id }).from(analyticsEvents).where(and(
+          eq(analyticsEvents.eventType, "button_click"),
+          eq(analyticsEvents.email, normalizedEmail),
+          eq(analyticsEvents.page, "/my-profile/login-link"),
+          gt(analyticsEvents.createdAt, now - PERSONAL_AREA_LINK_COOLDOWN_MS),
+        )).orderBy(desc(analyticsEvents.createdAt)).limit(1);
+        if (recentRequest) return genericResult;
+
+        let dashboardToken = profile.questionnaireToken?.trim();
+        if (!dashboardToken) {
+          dashboardToken = crypto.randomBytes(32).toString("hex");
+          await db.update(singles).set({ questionnaireToken: dashboardToken, updatedAt: now }).where(eq(singles.id, profile.id));
+        }
+        const dashboardUrl = `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(profile.email || normalizedEmail)}&token=${encodeURIComponent(dashboardToken)}`;
+        const sendResult = await sendEmail({
+          to: { email: profile.email || normalizedEmail, name: profile.firstName },
           subject: 'הקישור שלך לאזור האישי',
-          htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:32px;text-align:center;"><h1 style="color:#ffe27c;font-size:24px;margin:0;">האזור האישי שלך 💛</h1></div><div style="padding:32px;"><p style="font-size:17px;color:#191265;">שלום ${profile.firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;">לחץ/י על הכפתור כדי להיכנס לאזור האישי שלך.</p><div style="text-align:center;margin:32px 0;"><a href="${dashboardUrl}" style="display:inline-block;background:#ffe27c;color:#191265;font-size:17px;font-weight:bold;padding:14px 36px;border-radius:12px;text-decoration:none;">כניסה לאזור האישי</a></div><p style="font-size:13px;color:#888;">הקישור תקף ל-48 שעות.</p><p style="font-size:15px;color:#191265;font-weight:bold;">הילית כספי</p></div></div></body></html>`,
-        }).catch(err => console.error('[Dashboard] Email failed:', err));
-        return { success: true };
+          htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:24px;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 12px 34px rgba(25,18,101,.12);"><div style="background:linear-gradient(135deg,#191265,#4d1b76);padding:34px;text-align:center;"><p style="color:#ffe27c;font-size:13px;font-weight:bold;margin:0 0 8px;">הילית כספי</p><h1 style="color:#fff;font-size:25px;margin:0;">האזור האישי שלך</h1></div><div style="padding:34px;"><p style="font-size:17px;color:#191265;font-weight:bold;">שלום ${profile.firstName},</p><p style="font-size:15px;color:#555;line-height:1.8;">כאן אפשר לצפות בהתאמות, לנהל Boost, לעדכן את הפרופיל ולראות את תוצאות השאלונים.</p><div style="text-align:center;margin:30px 0;"><a href="${dashboardUrl}" style="display:inline-block;background:#ffe27c;color:#191265;font-size:17px;font-weight:bold;padding:15px 38px;border-radius:14px;text-decoration:none;">כניסה לאזור האישי</a></div><p style="font-size:13px;color:#777;line-height:1.7;text-align:center;">הקישור אישי. לשמירה על הפרטיות אין להעביר אותו לאחרים.</p><p style="font-size:15px;color:#191265;font-weight:bold;margin-top:24px;">הילית כספי</p></div></div></body></html>`,
+          textContent: `שלום ${profile.firstName},\n\nהכניסה לאזור האישי שלך:\n${dashboardUrl}\n\nהקישור אישי. לשמירה על הפרטיות אין להעביר אותו לאחרים.\n\nהילית כספי`,
+        });
+        if (sendResult.success && sendResult.messageId !== "blocked") {
+          await db.insert(analyticsEvents).values({
+            eventType: "button_click",
+            email: normalizedEmail,
+            page: "/my-profile/login-link",
+            metadata: JSON.stringify({ source: "personal_area_login" }),
+            createdAt: now,
+          });
+        }
+        return genericResult;
       }),
     /**
      * Get questionnaire link by email - used on thank-you page so user can go directly to questionnaire
@@ -4248,6 +4276,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
           if (singleA && singleB) {
             const score = match.score ?? 0;
+            const dashboardUrlA = singleA.questionnaireToken
+              ? `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(singleA.email || "")}&token=${encodeURIComponent(singleA.questionnaireToken)}&tab=matches`
+              : "https://hilitcaspi.com/my-profile";
+            const dashboardUrlB = singleB.questionnaireToken
+              ? `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(singleB.email || "")}&token=${encodeURIComponent(singleB.questionnaireToken)}&tab=matches`
+              : "https://hilitcaspi.com/my-profile";
             const tipFemale = `בחרי מקום שקט שמאפשר שיחה אמיתית. בואי פתוחה, בלי ציפיות מוגדרות מראש. תני לשיחה לזרום באופן טבעי   הסקרנות האמיתית שלך היא הנכס הגדול ביותר שלך.`;
             const tipMale = `בחר מקום שקט שמאפשר שיחה אמיתית. בוא סקרן, לא מוכן. שאל שאלות אמיתיות ותקשיב   לא כדי לענות, אלא כדי להבין. הנוכחות שלך היא מה שתזכר.`;
 
@@ -4266,6 +4300,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               preDateTip: singleA.gender === "female" ? tipFemale : tipMale,
               recipientEmail: singleA.email!,
               singleId: singleA.id,
+              dashboardUrl: dashboardUrlA,
+              proposalSource: isBoost ? "boost" : "regular",
             });
 
             const emailRevealB = buildContactRevealEmailTemplate({
@@ -4283,6 +4319,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               preDateTip: singleB.gender === "female" ? tipFemale : tipMale,
               recipientEmail: singleB.email!,
               singleId: singleB.id,
+              dashboardUrl: dashboardUrlB,
+              proposalSource: isBoost ? "boost" : "regular",
             });
 
             // Send contact reveal emails to both

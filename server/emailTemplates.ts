@@ -1472,7 +1472,10 @@ export function buildContactRevealEmail(params: {
   preDateTip: string;
   recipientEmail: string;
   singleId: number;
+  dashboardUrl: string;
+  proposalSource?: "regular" | "boost";
 }): EmailTemplate {
+  const isBoost = params.proposalSource === "boost";
   const dnaProfile = params.matchDnaType ? DNA_PROFILES[params.matchDnaType] : null;
   const dnaSection = dnaProfile ? `
     <div style="background:#f0f4ff; border-right:4px solid #191265; border-radius:8px; padding:16px 20px; margin:16px 0;">
@@ -1481,7 +1484,7 @@ export function buildContactRevealEmail(params: {
     </div>` : "";
 
   const content = `
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">זה קרה! שניכם אמרתם כן 💛</h2>
+    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? "התאמת ה־Boost אושרה" : "זה קרה! שניכם אמרתם כן"} 💛</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
       ${params.firstName}, אני שמחה לשתף אותך   גם הצד השני מעוניין.
       הנה הפרטים המלאים של ההתאמה שלך:
@@ -1513,6 +1516,11 @@ export function buildContactRevealEmail(params: {
 
     ${dnaSection}
 
+    <a href="${params.dashboardUrl}" style="display:block; background:#191265; color:#fff !important; font-weight:700; font-size:16px; text-align:center; padding:14px 28px; border-radius:12px; text-decoration:none; margin:20px 0;">
+      כניסה לאזור האישי
+    </a>
+    <p style="font-size:13px;color:#727272;line-height:1.7;text-align:center;margin:0 0 18px;">באזור האישי אפשר לצפות בהתאמה, לעדכן את הפרופיל ולנהל את סטטוס ההתאמות במקום אחד.</p>
+
     <!-- Pre-date tip -->
     <div style="background:#fff8e1; border-right:4px solid #ffe27c; border-radius:8px; padding:20px 24px; margin:20px 0;">
       <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">💡 טיפ שלי לפני הפגישה הראשונה</p>
@@ -1531,7 +1539,7 @@ export function buildContactRevealEmail(params: {
 
     <div style="background:#f5f5f5; border-radius:8px; padding:16px 20px; margin:16px 0;">
       <p style="font-size:13px; color:#666; line-height:1.7; margin:0;">
-        💡 <strong>לא הסתדר?</strong> אפשר לשחרר את ההתאמה בכל שלב דרך <a href="https://hilitcaspi.com/my" style="color:#191265;">האזור האישי</a> שלך (בטאב "התאמות"), או לשלוח לי הודעה בוואטסאפ.
+        💡 <strong>לא הסתדר?</strong> אפשר לשחרר את ההתאמה בכל שלב דרך <a href="${params.dashboardUrl}" style="color:#191265;">האזור האישי</a> שלך, בטאב "התאמות", או לשלוח לי הודעה בוואטסאפ.
         לאחר השחרור, שניכם חוזרים למאגר ויכולים לקבל התאמות חדשות.
       </p>
     </div>
@@ -1540,9 +1548,11 @@ export function buildContactRevealEmail(params: {
   `;
 
   return {
-    subject: `שניכם אמרתם כן! הנה הפרטים של ${params.matchFirstName} 💛`,
+    subject: isBoost
+      ? `התאמת ה־Boost אושרה! הנה הפרטים של ${params.matchFirstName} 💛`
+      : `שניכם אמרתם כן! הנה הפרטים של ${params.matchFirstName} 💛`,
     htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\nשניכם אמרתם כן!\n\nשם: ${params.matchFirstName}${params.matchLastName ? " " + params.matchLastName : ""}\nטלפון: ${params.matchPhone}\nמייל: ${params.matchEmail}\n\nטיפ לפני הפגישה: ${params.preDateTip}\n\nהילית כספי`,
+    textBody: `שלום ${params.firstName},\n\n${isBoost ? "התאמת ה־Boost אושרה" : "שניכם אמרתם כן"}!\n\nשם: ${params.matchFirstName}${params.matchLastName ? " " + params.matchLastName : ""}\nטלפון: ${params.matchPhone}\nמייל: ${params.matchEmail}\n\nכניסה לאזור האישי: ${params.dashboardUrl}\n\nטיפ לפני הפגישה: ${params.preDateTip}\n\nהילית כספי`,
   };
 }
 

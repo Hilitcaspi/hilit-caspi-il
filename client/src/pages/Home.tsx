@@ -258,6 +258,10 @@ export default function Home() {
                 📊 CRM
               </a>
             )}
+            <a href="/my-profile"
+              className="border border-white/35 bg-white/10 text-white font-bold px-4 py-2.5 rounded-full text-sm hover:bg-white/20 transition-all duration-200 active:scale-[.97]">
+              האזור האישי
+            </a>
             <a href="/single-session"
               className="bg-[#ffe27c] text-[#191265] font-bold px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105">
            ♡ פגישת היכרות
@@ -283,6 +287,7 @@ export default function Home() {
                 <a href="/database" className="text-right hover:text-[#ffe27c] transition-colors py-1">מאגר רווקים</a>
                 <a href="/blog" className="text-right hover:text-[#ffe27c] transition-colors py-1">מאמרים</a>
                 <a href="/speaking" className="text-right hover:text-[#ffe27c] transition-colors py-1">הזמנת הרצאה</a>
+                <a href="/my-profile" className="rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-center font-bold text-[#ffe27c]">כניסה לאזור האישי</a>
                 {user?.role === "admin" && (
                   <a href="/crm" className="text-[#ffe27c] font-semibold py-1 text-right">
                     📊 ניהול CRM
@@ -953,6 +958,7 @@ export default function Home() {
               <h4 className="text-[#ffe27c] font-bold mb-4">קישורים מהירים</h4>
               <div className="flex flex-col gap-2 text-white/70 text-sm">
                 <a href="/single-session" className="hover:text-[#ffe27c] transition-colors">פגישת היכרות</a>
+                <a href="/my-profile" className="hover:text-[#ffe27c] transition-colors">האזור האישי</a>
                 <a href={LINKS.waGroup} target="_blank" rel="noopener noreferrer" className="hover:text-[#ffe27c] transition-colors">קבוצת וואטסאפ</a>
                 <a href={LINKS.spotify} target="_blank" rel="noopener noreferrer" className="hover:text-[#ffe27c] transition-colors">פודקאסט - Spotify</a>
                 <a href={LINKS.apple} target="_blank" rel="noopener noreferrer" className="hover:text-[#ffe27c] transition-colors">פודקאסט - Apple</a>

@@ -268,20 +268,14 @@ function LoginForm() {
   const [error, setError] = useState("");
 
   const sendLink = trpc.singles.sendDashboardLink.useMutation({
-    onSuccess: (data) => {
-      if (data.success) {
-        setSent(true);
-      } else {
-        setError("לא מצאנו חשבון עם כתובת המייל הזו. בדוק/י שהמייל נכון.");
-      }
-    },
-    onError: () => setError("אירעה שגיאה. נסה/י שוב."),
+    onSuccess: () => setSent(true),
+    onError: () => setError("לא הצלחנו לשלוח כרגע. אפשר לנסות שוב בעוד כמה דקות."),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    sendLink.mutate({ email, origin: window.location.origin });
+    sendLink.mutate({ email });
   };
 
   if (sent) {
@@ -289,13 +283,12 @@ function LoginForm() {
       <div className="min-h-screen bg-[#f0eadc] flex items-center justify-center px-4" dir="rtl">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-          <div className="text-5xl mb-4">💛</div>
-          <h2 className="text-2xl font-black text-[#191265] mb-3">הקישור נשלח!</h2>
+          <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-full bg-[#fff4c4] text-3xl">💛</div>
+          <h2 className="text-2xl font-black text-[#191265] mb-3">בדקו את תיבת המייל</h2>
           <p className="text-[#727272] leading-relaxed">
-            שלחנו קישור כניסה לאזור האישי שלך ל-<strong className="text-[#191265]">{email}</strong>.
-            בדוק/י את תיבת הדואר הנכנס.
+            אם הכתובת <strong className="text-[#191265]">{email}</strong> משויכת לחברות פעילה במאגר, נשלח אליה קישור אישי ומאובטח.
           </p>
-          <p className="text-xs text-[#aaa] mt-4">לא קיבלת? בדוק/י בתיקיית הספאם.</p>
+          <p className="text-xs text-[#888] mt-4">לא הגיע? בדקו גם בספאם או בתיקיית קידומי המכירות. אפשר לבקש שוב בעוד כמה דקות.</p>
           <a href={`https://wa.me/972552442334?text=${encodeURIComponent('היי הילית, לא קיבלתי את הקישור לאזור האישי')}`}
             target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 mt-4 bg-[#25D366] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-[#1da851] transition-colors">
@@ -309,11 +302,13 @@ function LoginForm() {
   return (
     <div className="min-h-screen bg-[#f0eadc] flex items-center justify-center px-4" dir="rtl">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full">
+        className="relative overflow-hidden bg-white rounded-[28px] shadow-[0_20px_60px_rgba(25,18,101,.14)] border border-white p-8 max-w-md w-full">
+        <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-l from-[#191265] via-[#8b2c83] to-[#ffe27c]" />
         <div className="text-center mb-6">
-          <div className="text-4xl mb-3">💛</div>
+          <a href="/" className="mb-5 inline-block text-sm font-black text-[#191265]">הילית כספי</a>
+          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#fff4c4] text-3xl">🔐</div>
           <h1 className="text-2xl font-black text-[#191265]">האזור האישי שלך</h1>
-          <p className="text-[#727272] text-sm mt-2">הכנס/י את כתובת המייל שלך ונשלח לך קישור כניסה</p>
+          <p className="text-[#727272] text-sm leading-6 mt-2">נכנסים בלי סיסמה. מזינים את המייל של המאגר ומקבלים קישור אישי.</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
@@ -324,9 +319,10 @@ function LoginForm() {
           {error && <p className="text-red-500 text-sm text-right">{error}</p>}
           <button type="submit" disabled={sendLink.isPending}
             className="w-full bg-[#191265] text-white font-black text-base py-3.5 rounded-xl hover:bg-[#1800ad] transition-all disabled:opacity-60">
-            {sendLink.isPending ? "שולח..." : "שלח/י לי קישור כניסה ←"}
+            {sendLink.isPending ? "שולחים קישור..." : "שליחת קישור כניסה"}
           </button>
         </form>
+        <p className="mt-5 text-center text-xs leading-5 text-[#888]">הכניסה מיועדת לחברי המאגר הפעילים. הקישור יישלח רק לכתובת הרשומה.</p>
       </motion.div>
     </div>
   );
