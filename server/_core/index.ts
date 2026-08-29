@@ -734,10 +734,14 @@ async function startServer() {
 
   app.post("/api/scheduled/boost-newsletter-wave", express.json(), async (req, res) => {
     try {
-      const cronTaskUid = String(req.headers["x-manus-cron-task-uid"] || "").trim();
+      let cronTaskUid = String(req.headers["x-manus-cron-task-uid"] || "").trim();
+      if (!cronTaskUid) {
+        const user = await sdk.authenticateRequest(req as any);
+        if (user.isCron && user.taskUid) cronTaskUid = user.taskUid;
+      }
       const wave = String(req.body?.wave || "") as BoostNewsletterWaveKey;
       if (!cronTaskUid || !["0700", "0800", "0900"].includes(wave)) {
-        res.status(401).json({ error: "Unauthorized" });
+        res.status(403).json({ error: "cron-only" });
         return;
       }
       const result = await processBoostNewsletterWave({ waveKey: wave, cronTaskUid });
@@ -746,7 +750,12 @@ async function startServer() {
     } catch (error) {
       console.error("[BoostNewsletterWave] Error:", error);
       void sendErrorAlert({ source: "express:boost-newsletter-wave", error, context: { route: req.path } });
-      res.status(500).json({ error: String(error) });
+      res.status(500).json({
+        error: String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { url: req.originalUrl },
+        timestamp: new Date().toISOString(),
+      });
     }
   });
 

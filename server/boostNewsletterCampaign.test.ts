@@ -93,6 +93,8 @@ describe("Boost newsletter campaign", () => {
     expect(brevoSource).toContain("headers: { idempotencyKey: input.idempotencyKey }");
     expect(brevoSource).toContain("input.versions.length > 1000");
     expect(indexSource).toContain('req.headers["x-manus-cron-task-uid"]');
+    expect(indexSource).toContain("await sdk.authenticateRequest(req as any)");
+    expect(indexSource).toContain("user.isCron && user.taskUid");
   });
 
   it("turns off marketing consent for signed member unsubscriptions", () => {
