@@ -366,7 +366,7 @@ describe("match boost privacy and payment gate", () => {
     expect(uiSource).toContain('termsPath="/terms/match-boost"');
     expect(walletSource).toContain('boostTermsAccepted: product === "match_boost" ? true : undefined');
     expect(walletSource).toContain("כולל קבלת הצעות Boost אלגוריתמיות שלא נבדקו ידנית על ידי הילית");
-    expect(termsSource).toContain("באישור התקנון מאשרים גם לקבל הצעות Boost אלגוריתמיות");
+    expect(termsSource).toContain("באישור התנאים מאשרים גם לקבל בקשות Boost");
     expect(source).toContain("הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית");
     expect(uiSource).toContain("card.disclosure");
   });
@@ -472,5 +472,28 @@ describe("match boost privacy and payment gate", () => {
     expect(thankYouSource).toContain("אם תהיה הסכמה, השם, התמונה והפרטים המלאים יישלחו לשניכם");
     expect(boostCardSource).toContain("טוענים את אפשרויות ה־Boost");
     expect(boostCardSource).toContain("לא הצלחנו לטעון את Boost כרגע");
+  });
+
+  it("shows the waiting banner only while exactly one side still needs to respond", () => {
+    expect(source).toContain('latestRequestMatch?.status === "proposed"');
+    expect(source).toContain("!latestRequestMatch?.returnedToPoolAt");
+    expect(source).toContain("Boolean(latestRequestMatch?.approvedByA) !== Boolean(latestRequestMatch?.approvedByB)");
+    expect(source).toContain("awaitingRecipientResponse");
+    expect(boostCardSource).toContain("status.awaitingRecipientResponse");
+    expect(boostCardSource).not.toContain('status.latestRequest?.status === "approved"');
+  });
+
+  it("matches the refund terms to delivery, rejection and automatic credit behavior", () => {
+    expect(termsSource).toContain("דחייה של הצד השני, אי־תגובה, פקיעת ההצעה");
+    expect(termsSource).toContain("אינם מזכים בהחזר כספי");
+    expect(termsSource).toContain("הכול בכפוף לזכויות שלא ניתן להתנות עליהן לפי דין");
+    expect(termsSource).toContain("עומדות 48 שעות להגיב");
+    expect(termsSource).toContain("נשמר אוטומטית קרדיט Boost");
+    expect(termsSource).toContain("חיוב כפול");
+    expect(source).toContain("recipientDeliverySucceeded");
+    expect(source).toContain("boost_recipient_delivery_failed");
+    expect(source).toContain("boost_credit_available:");
+    expect(source).toContain('status: "reviewing"');
+    expect(source).toContain('status: "approved"');
   });
 });

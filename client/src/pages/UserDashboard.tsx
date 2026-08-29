@@ -536,7 +536,7 @@ function MatchBoostCard({
     );
   }
 
-  if (status.candidateCount === 0 && !status.openRequest && status.latestRequest?.status === "approved") {
+  if (status.candidateCount === 0 && !status.openRequest && status.awaitingRecipientResponse) {
     return (
       <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
         <div className="flex items-center gap-4">

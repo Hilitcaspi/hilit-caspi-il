@@ -728,10 +728,9 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     const affectedRows = Number((Array.isArray(updateResult) ? updateResult[0] : updateResult)?.affectedRows || 0);
     if (affectedRows < 1) return false;
     await tx.update(matchBoostRequests).set({
-      status: "approved",
-      decidedAt: now,
-      fulfilledAt: now,
-      decisionReason: "algorithmic_boost_auto_dispatch",
+      status: "reviewing",
+      reviewStartedAt: now,
+      decisionReason: "algorithmic_boost_dispatching",
       updatedAt: now,
     }).where(eq(matchBoostRequests.id, request.id));
     await tx.update(crmTeamTasks).set({ status: "cancelled", completedAt: now, updatedAt: now })
@@ -792,11 +791,11 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     proposalSource: "boost",
     boostRole: senderIsA ? "recipient" : "sender",
   });
-  await Promise.all([
+  const [emailAResult, emailBResult] = await Promise.all([
     sendEmail({ to: { email: partyA.email, name: partyA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
     sendEmail({ to: { email: partyB.email, name: partyB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
   ]);
-  await sendInitialMatchWhatsAppsOnce(db, {
+  const whatsAppResult = await sendInitialMatchWhatsAppsOnce(db, {
     matchId: match.id,
     score,
     proposalSource: "boost",
@@ -804,6 +803,36 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     recipientA: { phone: partyA.phone, firstName: partyA.firstName, matchFirstName: "התאמה אנונימית" },
     recipientB: { phone: partyB.phone, firstName: partyB.firstName, matchFirstName: "התאמה אנונימית" },
   });
+  const recipientDeliverySucceeded = senderIsA
+    ? Boolean(emailBResult.success || whatsAppResult.sentB)
+    : Boolean(emailAResult.success || whatsAppResult.sentA);
+  if (!recipientDeliverySucceeded) {
+    await db.transaction(async (tx: any) => {
+      await tx.update(matches).set({
+        status: "pending",
+        approvalTokenA: null,
+        approvalTokenB: null,
+        approvedByA: false,
+        approvedByB: false,
+        tokenAUsedAt: null,
+        tokenBUsedAt: null,
+        approvalExpiresAt: null,
+        proposedAt: null,
+        autoExplanation: null,
+        notes: `${BOOST_CANDIDATE_NOTE_MARKER} הוחזר לאחר כשל מסירה טכני לפני מימוש Boost`,
+        waSentAt: null,
+        updatedAt: Date.now(),
+      }).where(and(eq(matches.id, match.id), eq(matches.status, "proposed")));
+    });
+    throw new Error("boost_recipient_delivery_failed");
+  }
+  await db.update(matchBoostRequests).set({
+    status: "approved",
+    decidedAt: now,
+    fulfilledAt: now,
+    decisionReason: "algorithmic_boost_auto_dispatch",
+    updatedAt: Date.now(),
+  }).where(and(eq(matchBoostRequests.id, request.id), eq(matchBoostRequests.status, "reviewing")));
   return { success: true, requestId, matchId: match.id, status: "approved" as const, alreadySent: false };
 }
 
@@ -967,6 +996,16 @@ export const matchBoostRouter = router({
       const context = await loadBoostContext(db, single);
       const eligibility = evaluateBoostEligibility({ single, ...context });
       const profileReadiness = getBoostProfileReadiness(single);
+      const latestRequest = context.requests[0] || null;
+      const latestRequestMatch = latestRequest
+        ? context.memberMatches.find((match: any) => match.id === latestRequest.matchId)
+        : null;
+      const awaitingRecipientResponse = Boolean(
+        latestRequest?.status === "approved"
+        && latestRequestMatch?.status === "proposed"
+        && !latestRequestMatch?.returnedToPoolAt
+        && Boolean(latestRequestMatch?.approvedByA) !== Boolean(latestRequestMatch?.approvedByB),
+      );
       return {
         eligible: eligibility.eligible,
         blockers: eligibility.blockers,
@@ -996,13 +1035,14 @@ export const matchBoostRouter = router({
           source: eligibility.openRequest.source,
           requestedAt: eligibility.openRequest.requestedAt,
         } : null,
-        latestRequest: context.requests[0] ? {
-          id: context.requests[0].id,
-          status: context.requests[0].status,
-          source: context.requests[0].source,
-          requestedAt: context.requests[0].requestedAt,
-          fulfilledAt: context.requests[0].fulfilledAt,
+        latestRequest: latestRequest ? {
+          id: latestRequest.id,
+          status: latestRequest.status,
+          source: latestRequest.source,
+          requestedAt: latestRequest.requestedAt,
+          fulfilledAt: latestRequest.fulfilledAt,
         } : null,
+        awaitingRecipientResponse,
         creditAvailable: context.requests.some(hasReusablePaidBoostCredit),
         priceAgorot: BOOST_PRICE_AGOROT,
         paymentConfigured: true,
