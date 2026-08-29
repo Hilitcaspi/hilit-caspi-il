@@ -615,6 +615,7 @@ export async function processMatchFollowUps(): Promise<number> {
       if (!singleA || !singleB) continue;
 
       let emailsSent = 0;
+      const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
 
       // Send to A if they haven't responded
       if (!match.approvedByA && match.approvalTokenA && singleA.email) {
@@ -632,6 +633,7 @@ export async function processMatchFollowUps(): Promise<number> {
           feedbackUrl,
           recipientEmail: singleA.email,
           singleId: singleA.id,
+          proposalSource: isBoost ? "boost" : "regular",
         });
 
         const result = await sendEmail({
@@ -663,6 +665,7 @@ export async function processMatchFollowUps(): Promise<number> {
           feedbackUrl,
           recipientEmail: singleB.email,
           singleId: singleB.id,
+          proposalSource: isBoost ? "boost" : "regular",
         });
 
         const result = await sendEmail({
@@ -765,12 +768,12 @@ export async function retryUnsentMatchEmails(): Promise<number> {
         : [];
       const emailA = buildEmail({
         firstName: singleA.firstName,
-        matchFirstName: isBoost ? "התאמה אנונימית" : singleB.firstName,
+        matchFirstName: singleB.firstName,
         matchAge: singleB.age ?? 0,
-        matchCity: isBoost ? "אזור כללי" : (singleB.city ?? ""),
-        matchOccupation: isBoost ? "תחום מקצועי" : (singleB.occupation ?? undefined),
+        matchCity: singleB.city ?? "",
+        matchOccupation: singleB.occupation ?? undefined,
         matchDnaType: singleB.dnaType ?? undefined,
-        matchPhotoUrl: isBoost ? undefined : (singleB.photoUrl ?? undefined),
+        matchPhotoUrl: singleB.photoUrl ?? undefined,
         matchEducation: singleB.education ?? undefined,
         matchHasKids: singleB.hasKids ?? undefined,
         matchNumKids: singleB.numKids ?? undefined,
@@ -787,12 +790,12 @@ export async function retryUnsentMatchEmails(): Promise<number> {
       });
       const emailB = buildEmail({
         firstName: singleB.firstName,
-        matchFirstName: isBoost ? "התאמה אנונימית" : singleA.firstName,
+        matchFirstName: singleA.firstName,
         matchAge: singleA.age ?? 0,
-        matchCity: isBoost ? "אזור כללי" : (singleA.city ?? ""),
-        matchOccupation: isBoost ? "תחום מקצועי" : (singleA.occupation ?? undefined),
+        matchCity: singleA.city ?? "",
+        matchOccupation: singleA.occupation ?? undefined,
         matchDnaType: singleA.dnaType ?? undefined,
-        matchPhotoUrl: isBoost ? undefined : (singleA.photoUrl ?? undefined),
+        matchPhotoUrl: singleA.photoUrl ?? undefined,
         matchEducation: singleA.education ?? undefined,
         matchHasKids: singleA.hasKids ?? undefined,
         matchNumKids: singleA.numKids ?? undefined,

@@ -4133,7 +4133,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const alreadyResponded = isA ? !!match.tokenAUsedAt : !!match.tokenBUsedAt;
         const myDecision = isA ? match.approvedByA : match.approvedByB;
         const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
-        const anonymousPartner = partner && isBoost ? buildAnonymousBoostCard(partner, match, me) : null;
+        const boostPartnerCard = partner && isBoost ? buildAnonymousBoostCard(partner, match, me) : null;
 
         return {
           matchId: match.id,
@@ -4144,18 +4144,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           myDecision,
           proposalSource: isBoost ? "boost" as const : "manual" as const,
           partner: partner ? (isBoost ? {
-            firstName: "התאמה אנונימית",
-            age: anonymousPartner?.age,
-            city: anonymousPartner?.region,
-            height: anonymousPartner?.height,
-            education: anonymousPartner?.education,
-            occupation: anonymousPartner?.occupation,
-            about: null,
-            photoUrl: null,
-            religiosity: anonymousPartner?.religiosity,
-            reasons: anonymousPartner?.reasons || [],
+            firstName: partner.firstName,
+            age: partner.age,
+            city: partner.city,
+            height: partner.height,
+            education: partner.education,
+            occupation: partner.occupation,
+            about: partner.about,
+            photoUrl: partner.photoUrl,
+            religiosity: partner.religiosity,
+            reasons: boostPartnerCard?.reasons || [],
             considerations: [],
-            isAnonymous: true,
+            isAnonymous: false,
           } : {
             firstName: partner.firstName,
             age: partner.age,
@@ -4226,7 +4226,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             await syncBoostRequestAfterMatchDecision(db, {
               matchId: match.id,
               decision: "rejected",
-              reason: "boost_recipient_declined",
+              reason: "boost_participant_declined",
               now,
             });
           }

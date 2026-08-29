@@ -27,7 +27,7 @@ const LEGACY_BOOST_PRICE_AGOROT = 1999;
 export const MIN_BOOST_SCORE = 60;
 const MAX_BOOST_OPTIONS = 6;
 export const BOOST_CANDIDATE_NOTE_MARKER = "[BOOST_CANDIDATE]";
-export const BOOST_CONSENT_VERSION = "2026-08-27-v1";
+export const BOOST_CONSENT_VERSION = "2026-08-29-v2";
 const OPEN_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
 const REVIEWABLE_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
 
@@ -724,10 +724,10 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
       status: "proposed",
       approvalTokenA: tokenA,
       approvalTokenB: tokenB,
-      approvedByA: senderIsA ? true : Boolean(match.approvedByA),
-      approvedByB: senderIsA ? Boolean(match.approvedByB) : true,
-      tokenAUsedAt: senderIsA ? now : match.tokenAUsedAt,
-      tokenBUsedAt: senderIsA ? match.tokenBUsedAt : now,
+      approvedByA: false,
+      approvedByB: false,
+      tokenAUsedAt: null,
+      tokenBUsedAt: null,
       approvalExpiresAt: expiresAt,
       proposedAt: now,
       ownerApprovedAt: null,
@@ -760,10 +760,12 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   const emailA = buildMatchProposalEmail({
     firstName: partyA.firstName,
     recipientGender: partyA.gender ?? undefined,
-    matchFirstName: "התאמה אנונימית",
+    matchFirstName: partyB.firstName,
     matchAge: cardB.age,
     matchCity: cardB.region,
     matchOccupation: cardB.occupation,
+    matchDnaType: partyB.dnaType ?? undefined,
+    matchPhotoUrl: partyB.photoUrl ?? undefined,
     matchEducation: cardB.education,
     matchHasKids: partyB.hasKids,
     matchNumKids: partyB.numKids,
@@ -782,10 +784,12 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   const emailB = buildMatchProposalEmail({
     firstName: partyB.firstName,
     recipientGender: partyB.gender ?? undefined,
-    matchFirstName: "התאמה אנונימית",
+    matchFirstName: partyA.firstName,
     matchAge: cardA.age,
     matchCity: cardA.region,
     matchOccupation: cardA.occupation,
+    matchDnaType: partyA.dnaType ?? undefined,
+    matchPhotoUrl: partyA.photoUrl ?? undefined,
     matchEducation: cardA.education,
     matchHasKids: partyA.hasKids,
     matchNumKids: partyA.numKids,
@@ -810,13 +814,12 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     score,
     proposalSource: "boost",
     boostSenderSide: senderIsA ? "A" : "B",
-    recipientA: { phone: partyA.phone, firstName: partyA.firstName, matchFirstName: "התאמה אנונימית" },
-    recipientB: { phone: partyB.phone, firstName: partyB.firstName, matchFirstName: "התאמה אנונימית" },
+    recipientA: { phone: partyA.phone, firstName: partyA.firstName, matchFirstName: partyB.firstName },
+    recipientB: { phone: partyB.phone, firstName: partyB.firstName, matchFirstName: partyA.firstName },
   });
-  const recipientDeliverySucceeded = senderIsA
-    ? Boolean(emailBResult.success || whatsAppResult.sentB)
-    : Boolean(emailAResult.success || whatsAppResult.sentA);
-  if (!recipientDeliverySucceeded) {
+  const bothSidesReceivedAtLeastOneChannel = Boolean(emailAResult.success || whatsAppResult.sentA)
+    && Boolean(emailBResult.success || whatsAppResult.sentB);
+  if (!bothSidesReceivedAtLeastOneChannel) {
     await db.transaction(async (tx: any) => {
       await tx.update(matches).set({
         status: "pending",
@@ -1014,7 +1017,7 @@ export const matchBoostRouter = router({
         latestRequest?.status === "approved"
         && latestRequestMatch?.status === "proposed"
         && !latestRequestMatch?.returnedToPoolAt
-        && Boolean(latestRequestMatch?.approvedByA) !== Boolean(latestRequestMatch?.approvedByB),
+        && !(Boolean(latestRequestMatch?.approvedByA) && Boolean(latestRequestMatch?.approvedByB)),
       );
       return {
         eligible: eligibility.eligible,

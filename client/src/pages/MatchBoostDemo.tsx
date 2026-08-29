@@ -101,12 +101,12 @@ export default function MatchBoostDemo() {
             <div className="mt-4 rounded-xl border border-white/25 bg-white/10 p-3 text-center text-xs font-black">הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית</div>
             <div className="mt-5 rounded-2xl bg-white p-4 text-[#20113e] shadow-lg">
               <p className="text-sm font-black">לפני השליחה</p>
-              <p className="mt-2 text-xs leading-5 text-[#555]">שליחת Boost אינה מבטיחה אישור הדדי, חשיפת פרטים, דייט או זוגיות. הפרטים ייחשפו רק אם שני הצדדים יאשרו.</p>
+              <p className="mt-2 text-xs leading-5 text-[#555]">לאחר השליחה שני הצדדים יקבלו במייל שם, תמונה ופרטי פרופיל עם כפתורי אישור. התשלום אינו אישור להתאמה, ופרטי הקשר יישלחו רק לאחר ששני הצדדים יאשרו.</p>
               <label className="mt-4 flex items-start gap-3 text-xs leading-5 text-[#444]">
                 <input type="checkbox" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-[#191265]" />
-                <span>קראתי ואישרתי את <Link href="/terms/match-boost"><span className="font-bold underline">תקנון Boost</span></Link>, כולל קבלת הצעות אלגוריתמיות שלא נבדקו ידנית על ידי הילית.</span>
+                <span>קראתי ואישרתי את <Link href="/terms/match-boost"><span className="font-bold underline">תקנון Boost</span></Link>, כולל שליחת פרטי הפרופיל לשני הצדדים ואישור נפרד של כל צד.</span>
               </label>
-              <button type="button" disabled={!termsAccepted || selectedIndex === null} onClick={() => setNotice("בעמוד האישי האמיתי נפתח כאן תשלום Grow מאובטח. השלמת התשלום מהווה אישור שלך ושולחת את ה־Boost לצד השני. בהדגמה לא מתבצע חיוב.")} className="mt-4 w-full rounded-2xl bg-gradient-to-l from-[#a52178] to-[#5d176d] py-4 text-lg font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" disabled={!termsAccepted || selectedIndex === null} onClick={() => setNotice("בעמוד האישי האמיתי נפתח כאן תשלום Grow מאובטח. לאחר התשלום נשלח לשני הצדדים מייל עם פרטי ההתאמה וכפתורי אישור. התשלום אינו אישור להתאמה. בהדגמה לא מתבצע חיוב.")} className="mt-4 w-full rounded-2xl bg-gradient-to-l from-[#a52178] to-[#5d176d] py-4 text-lg font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50">
                 שליחת Boost | 19.90 ₪
               </button>
               {notice && <p className="mt-3 rounded-xl bg-[#e8f5e9] p-3 text-center text-xs font-bold text-[#2e7d32]">{notice}</p>}

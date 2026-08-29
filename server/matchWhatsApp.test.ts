@@ -64,18 +64,18 @@ describe("match WhatsApp delivery via Make", () => {
     });
   });
 
-  it("builds distinct anonymous Boost messages for the sender and recipient", () => {
+  it("tells both Boost sides to approve separately in email without naming the match", () => {
     const senderMessage = buildMatchWhatsAppMessage("דנה", "שם שלא אמור להופיע", 85, "boost", "sender");
     expect(senderMessage).toContain("בקשת ה־Boost שלך");
-    expect(senderMessage).toContain("במסגרת מסלול Boost");
-    expect(senderMessage).toContain("אין צורך לאשר שוב");
-    expect(senderMessage).toContain("אם תהיה הסכמה מהצד השני");
+    expect(senderMessage).toContain("נשלחה לשני הצדדים");
+    expect(senderMessage).toContain("אינם אישור להתאמה");
+    expect(senderMessage).toContain("לאשר או לדחות במייל");
     expect(senderMessage).not.toContain("שם שלא אמור להופיע");
 
     const recipientMessage = buildMatchWhatsAppMessage("דנה", "שם שלא אמור להופיע", 85, "boost", "recipient");
-    expect(recipientMessage).toContain("מחכה לך התאמת Boost מיוחדת");
+    expect(recipientMessage).toContain("נשלחה אליך התאמת Boost מיוחדת");
     expect(recipientMessage).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
-    expect(recipientMessage).toContain("רק לאחר אישור הדדי");
+    expect(recipientMessage).toContain("לאשר או לדחות במייל");
     expect(recipientMessage).not.toContain("שם שלא אמור להופיע");
     expect(recipientMessage).not.toContain("שבחרתי עבורך");
 
@@ -109,7 +109,7 @@ describe("match WhatsApp delivery via Make", () => {
     const sideA = payloads.find(payload => payload.recipientSide === "A");
     const sideB = payloads.find(payload => payload.recipientSide === "B");
     expect(sideA).toMatchObject({ boostRole: "recipient" });
-    expect(sideA.message).toContain("מחכה לך התאמת Boost מיוחדת");
+    expect(sideA.message).toContain("נשלחה אליך התאמת Boost מיוחדת");
     expect(sideB).toMatchObject({ boostRole: "sender" });
     expect(sideB.message).toContain("בקשת ה־Boost שלך");
   });

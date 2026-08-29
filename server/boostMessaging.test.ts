@@ -18,26 +18,29 @@ const baseParams = {
   proposalSource: "boost" as const,
 };
 
-describe("Boost role-specific messaging", () => {
-  it("tells the recipient that a Boost was sent and keeps the card anonymous", () => {
+describe("Boost dual-approval messaging", () => {
+  it("sends the recipient a full profile with separate approval controls", () => {
     const email = buildMatchProposalEmail({ ...baseParams, boostRole: "recipient" });
-    expect(email.subject).toContain("התאמת Boost מיוחדת מחכה לך");
-    expect(email.htmlBody).toContain("מחכה לך התאמת Boost מיוחדת");
-    expect(email.htmlBody).toContain("נשלחה אליך במסגרת מסלול Boost");
+    expect(email.subject).toContain("נשלחה אליך התאמת Boost לאישור");
+    expect(email.htmlBody).toContain("נשלחה אליך התאמת Boost שמחכה לאישור שלך");
+    expect(email.htmlBody).toContain("נשלחה אליך התאמה במסגרת מסלול Boost");
     expect(email.htmlBody).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
     expect(email.htmlBody).toContain(baseParams.yesUrl);
-    expect(email.htmlBody).not.toContain(baseParams.matchPhotoUrl);
-    expect(email.htmlBody).not.toContain(baseParams.matchFirstName);
+    expect(email.htmlBody).toContain(baseParams.noUrl);
+    expect(email.htmlBody).toContain(baseParams.matchPhotoUrl);
+    expect(email.htmlBody).toContain(baseParams.matchFirstName);
+    expect(email.htmlBody).toContain("פרטי יצירת הקשר נחשפים רק אחרי אישור הדדי");
   });
 
-  it("confirms the sent Boost without asking the sender to approve again", () => {
+  it("asks the paying sender to approve separately and shows the same full profile", () => {
     const email = buildMatchProposalEmail({ ...baseParams, boostRole: "sender" });
-    expect(email.subject).toContain("בקשת ה־Boost שלך נשלחה");
-    expect(email.htmlBody).toContain("אין צורך לאשר שוב");
-    expect(email.textBody).toContain("בקשת ה־Boost שלך");
-    expect(email.htmlBody).not.toContain(baseParams.yesUrl);
-    expect(email.htmlBody).not.toContain(baseParams.noUrl);
-    expect(email.htmlBody).not.toContain(baseParams.matchPhotoUrl);
-    expect(email.htmlBody).not.toContain(baseParams.matchFirstName);
+    expect(email.subject).toContain("בקשת ה־Boost שלך נשלחה ומחכה לאישור");
+    expect(email.htmlBody).toContain("בקשת ה־Boost שלך נשלחה לשני הצדדים");
+    expect(email.htmlBody).toContain("התשלום ושליחת ה־Boost אינם אישור להתאמה");
+    expect(email.textBody).toContain("גם האישור שלך עדיין נדרש במייל");
+    expect(email.htmlBody).toContain(baseParams.yesUrl);
+    expect(email.htmlBody).toContain(baseParams.noUrl);
+    expect(email.htmlBody).toContain(baseParams.matchPhotoUrl);
+    expect(email.htmlBody).toContain(baseParams.matchFirstName);
   });
 });

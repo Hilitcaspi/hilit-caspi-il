@@ -1356,12 +1356,12 @@ export function buildMatchProposalEmail(params: {
       <p style="font-size:13px; color:#191265; font-weight:700; margin:0;">📌 את התגובה יש להזין בתחתית המייל</p>
     </div>
 
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה" : "מחכה לך התאמת Boost מיוחדת") : "יש לך הצעה"}, ${params.firstName} 💛</h2>
+    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה ומחכה לאישור שלך" : "נשלחה אליך התאמת Boost שמחכה לאישור שלך") : "יש לך הצעה"}, ${params.firstName} 💛</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
       ${isBoost
         ? (isBoostSender
-          ? `כרטיס ה־Boost שבחרת נשלח לצד השני במסגרת מסלול Boost. בחירת הכרטיס והשלמת התשלום מהוות את האישור שלך, ולכן אין צורך לאשר שוב. <strong>ההצעה נוצרה על ידי האלגוריתם ולא נבחרה או נבדקה אישית על ידי הילית.</strong>`
-          : `הצעה חדשה נשלחה אליך במסגרת מסלול Boost. היא נוצרה על בסיס אלגוריתם ההתאמה והנתונים שמילאו שני הצדדים. <strong>היא לא נבחרה או נבדקה אישית על ידי הילית.</strong>`)
+          ? `בקשת ה־Boost שלך נשלחה לשני הצדדים. היא נוצרה על בסיס אלגוריתם ההתאמה והנתונים שמילאו שני הצדדים. <strong>התשלום ושליחת ה־Boost אינם אישור להתאמה. גם האישור שלך עדיין נדרש במייל.</strong> ההצעה לא נבחרה או נבדקה אישית על ידי הילית.`
+          : `נשלחה אליך התאמה במסגרת מסלול Boost. היא נוצרה על בסיס אלגוריתם ההתאמה והנתונים שמילאו שני הצדדים. <strong>ההתאמה ממתינה לאישור שלך במייל.</strong> ההצעה לא נבחרה או נבדקה אישית על ידי הילית.`)
         : `מצאתי עבורך התאמה שחשבתי עליה הרבה לפני שהחלטתי לשלוח אותה ${isFemale ? "אלייך" : "אליך"}. לא כל ההצעות מגיעות ${isFemale ? "אלייך" : "אליך"}, רק אלו שאני מאמינה בהן.`}
     </p>
 
@@ -1374,10 +1374,10 @@ export function buildMatchProposalEmail(params: {
 
     <!-- Match profile (no last name, no phone) -->
     <div style="background:#f9f6f0; border-radius:14px; padding:24px 28px; margin:20px 0;">
-      <p style="color:#191265; font-size:13px; font-weight:700; margin:0 0 12px; letter-spacing:0.5px;">${isBoost ? "⚡ כרטיס Boost אנונימי" : "✨ ההתאמה שלך"}</p>
+      <p style="color:#191265; font-size:13px; font-weight:700; margin:0 0 12px; letter-spacing:0.5px;">${isBoost ? "⚡ התאמת Boost" : "✨ ההתאמה שלך"}</p>
       <div style="background:#191265; border-radius:12px; padding:20px 24px; text-align:center;">
-        ${!isBoost && params.matchPhotoUrl ? `<a href="${params.matchPhotoUrl}" target="_blank" rel="noopener noreferrer" style="display:block; margin-bottom:16px; text-decoration:none;"><img src="${params.matchPhotoUrl}" alt="${params.matchFirstName}" style="width:200px; height:200px; border-radius:16px; object-fit:cover; object-position:center 20%; border:3px solid #ffe27c; display:block; margin-left:auto; margin-right:auto;" /></a>` : ""}
-        <p style="color:#ffffff; font-size:22px; font-weight:800; margin:0 0 4px;">${isBoost ? "כרטיס התאמה אנונימי" : params.matchFirstName}</p>
+        ${params.matchPhotoUrl ? `<a href="${params.matchPhotoUrl}" target="_blank" rel="noopener noreferrer" style="display:block; margin-bottom:16px; text-decoration:none;"><img src="${params.matchPhotoUrl}" alt="${params.matchFirstName}" style="width:200px; height:200px; border-radius:16px; object-fit:cover; object-position:center 20%; border:3px solid #ffe27c; display:block; margin-left:auto; margin-right:auto;" /></a>` : ""}
+        <p style="color:#ffffff; font-size:22px; font-weight:800; margin:0 0 4px;">${params.matchFirstName}</p>
         <p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">🎂 ${params.matchAge} · 📍 ${params.matchCity}</p>
         ${occupationLine}
         ${educationLine}
@@ -1412,14 +1412,9 @@ export function buildMatchProposalEmail(params: {
       <p style="font-size:13px; color:#727272; margin:12px 0 0; text-align:left;">הילית כספי</p>
     </div>`}
 
-    ${isBoostSender ? `
-    <div style="background:#eef9f1; border:1px solid #cfe7d5; border-radius:12px; padding:18px 20px; margin:20px 0; text-align:center;">
-      <p style="color:#24613a; font-size:16px; font-weight:800; margin:0 0 6px;">ה־Boost נשלח בהצלחה</p>
-      <p style="color:#315d3f; font-size:14px; line-height:1.8; margin:0;">אם תהיה הסכמה מהצד השני, השם, התמונה והפרטים המלאים יישלחו לשניכם.</p>
-    </div>` : `
     <p style="color:#444; font-size:15px; line-height:1.8; margin:20px 0;">
-      ${isBoost ? "אם ההצעה מעניינת, אפשר ללחוץ על \"כן, מעניין אותי\"." : `אם ההצעה מעניינת ${isFemale ? "אותך" : "אותך"}, ${isFemale ? "לחצי" : "לחץ"} על "כן, מעניין אותי".`}
-      אם שני הצדדים מאשרים, הפרטים המלאים נשלחים לשניהם.
+      ${isBoost ? "אם ההצעה מעניינת, אפשר ללחוץ על \"כן, מעניין אותי\". גם מי ששלח את ה־Boost נדרש לאשר בנפרד." : `אם ההצעה מעניינת ${isFemale ? "אותך" : "אותך"}, ${isFemale ? "לחצי" : "לחץ"} על "כן, מעניין אותי".`}
+      אם שני הצדדים מאשרים, פרטי יצירת הקשר נשלחים לשניהם.
       <br><br>
       <strong>אין מחויבות. אין לחץ. רק הזדמנות.</strong>
     </p>
@@ -1429,10 +1424,10 @@ export function buildMatchProposalEmail(params: {
     </a>
     <a href="${params.noUrl}" style="display:block; border:2px solid #ddd; color:#727272 !important; font-weight:500; font-size:15px; text-align:center; padding:12px 24px; border-radius:12px; text-decoration:none; margin:8px 0;">
       לא בשלב הזה
-    </a>`}
+    </a>
 
     <p style="color:#aaa; font-size:12px; text-align:center; margin-top:16px;">
-      ההצעה תקפה ל-48 שעות. הפרטים האישיים נחשפים רק אחרי אישור הדדי.
+      ההצעה תקפה ל-48 שעות. פרטי יצירת הקשר נחשפים רק אחרי אישור הדדי.
     </p>
 
     ${emailSignature()}
@@ -1442,13 +1437,11 @@ export function buildMatchProposalEmail(params: {
   return {
     subject: isBoost
       ? (isBoostSender
-        ? `⚡ בקשת ה־Boost שלך נשלחה · ${params.compatibilityScore}%`
-        : `⚡ התאמת Boost מיוחדת מחכה לך · ${params.compatibilityScore}%`)
+        ? `⚡ בקשת ה־Boost שלך נשלחה ומחכה לאישור · ${params.compatibilityScore}%`
+        : `⚡ נשלחה אליך התאמת Boost לאישור · ${params.compatibilityScore}%`)
       : `💛 יש לך התאמה שמחכה לך! ${params.compatibilityScore}%`,
     htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: isBoostSender
-      ? `שלום ${params.firstName},\n\nבקשת ה־Boost שלך עם ${params.compatibilityScore}% התאמה נשלחה לצד השני במסגרת מסלול Boost. אין צורך לאשר שוב. ההצעה נוצרה על ידי האלגוריתם ולא נבחרה או נבדקה אישית על ידי הילית. אם תהיה הסכמה מהצד השני, השם, התמונה והפרטים המלאים יישלחו לשניכם.\n\nצוות הילית כספי`
-      : `שלום ${params.firstName},\n\n${isBoost ? "מחכה לך התאמת Boost מיוחדת שנוצרה על ידי האלגוריתם ונשלחה במסגרת מסלול Boost. היא לא נבחרה או נבדקה אישית על ידי הילית" : "יש לך הצעת התאמה חדשה"}.\n\nאחוז התאמה: ${params.compatibilityScore}%\nהתאמה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}\n\nלאישור: ${params.yesUrl}\nלדחייה: ${params.noUrl}\n\nצוות הילית כספי`,
+    textBody: `שלום ${params.firstName},\n\n${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה לשני הצדדים. התשלום והשליחה אינם אישור להתאמה, וגם האישור שלך עדיין נדרש במייל" : "נשלחה אליך התאמה במסגרת מסלול Boost והיא ממתינה לאישור שלך במייל") : "יש לך הצעת התאמה חדשה"}. ${isBoost ? "ההצעה נוצרה על ידי האלגוריתם ולא נבחרה או נבדקה אישית על ידי הילית." : ""}\n\nאחוז התאמה: ${params.compatibilityScore}%\nהתאמה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}\n\nלאישור: ${params.yesUrl}\nלדחייה: ${params.noUrl}\n\nצוות הילית כספי`,
   };
 }
 
@@ -2185,17 +2178,19 @@ export function buildMatchFollowUpEmail(params: {
   singleId: number;
   feedbackUrl: string;
   gender?: string;
+  proposalSource?: "regular" | "boost";
 }): EmailTemplate {
   const isMale = params.gender === 'male';
+  const isBoost = params.proposalSource === "boost";
   // Gender-specific text
   const feelText = isMale ? 'מרגיש לגביה' : 'מרגישה לגביו';
   const sawText = isMale ? 'לא ראית את המייל' : 'לא ראית את המייל';
   const spokeText = isMale ? 'לא דיבר אליך' : 'לא דיבר אליך';
   const respondedText = isMale ? 'שלא הגבת עדיין' : 'שלא הגבת עדיין';
   const content = `
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">שבוע עבר, ${params.firstName} 💛</h2>
+    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? "התאמת ה־Boost עדיין ממתינה לאישור שלך" : "שבוע עבר"}, ${params.firstName} 💛</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      לפני שבוע שלחתי לך הצעה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}.
+      ${isBoost ? "לפני כמה ימים נשלחה אליך במסגרת מסלול Boost התאמה עם" : "לפני שבוע שלחתי לך הצעה:"} ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}.
     </p>
     <p style="color:#444; font-size:16px; line-height:1.8;">
       רציתי לבדוק איך אתה ${feelText}.
@@ -2214,7 +2209,7 @@ export function buildMatchFollowUpEmail(params: {
       <p style="font-size:14px; color:#191265; font-weight:700; margin:0 0 12px;">שאלה אחת קצרה (לא חובה)</p>
       <p style="font-size:15px; color:#444; line-height:1.8; margin:0 0 16px;">
         מה הסיבה העיקרית ${respondedText}?
-        התשובה שלך עוזרת לי להציע לך התאמות טובות יותר בעתיד.
+        התשובה שלך עוזרת לשפר את ההתאמות שיוצגו לך בעתיד.
       </p>
       <a href="${params.feedbackUrl}&reason=timing" style="display:block; border:1.5px solid #ddd; color:#444 !important; font-size:14px; text-align:center; padding:10px 20px; border-radius:10px; text-decoration:none; background:#fff; margin-bottom:8px;">
         ⏰ הרגע לא מתאים לי עכשיו
@@ -2230,14 +2225,14 @@ export function buildMatchFollowUpEmail(params: {
       </a>
     </div>
     <p style="color:#aaa; font-size:13px; text-align:center; margin-top:8px;">
-      הפרטים האישיים נחשפים רק אחרי אישור הדדי. אין מחויבות.
+      פרטי יצירת הקשר נחשפים רק אחרי אישור הדדי. אין מחויבות.
     </p>
     ${emailSignature()}
   `;
   return {
-    subject: `${params.firstName}, ההצעה עדיין ממתינה לך 💛`,
+    subject: `${params.firstName}, ${isBoost ? "התאמת ה־Boost" : "ההצעה"} עדיין ממתינה לך 💛`,
     htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\nלפני שבוע שלחתי לך הצעה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}.\n\nהכפתורים עדיין פעילים:\nכן: ${params.yesUrl}\nלא: ${params.noUrl}\n\nהילית כספי`,
+    textBody: `שלום ${params.firstName},\n\n${isBoost ? "נשלחה אליך במסגרת מסלול Boost התאמה עם" : "לפני שבוע נשלחה אליך הצעה:"} ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}.\n\nהכפתורים עדיין פעילים:\nכן: ${params.yesUrl}\nלא: ${params.noUrl}\n\nצוות הילית כספי`,
   };
 }
 

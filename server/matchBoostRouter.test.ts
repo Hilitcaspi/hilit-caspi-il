@@ -283,6 +283,7 @@ describe("match boost privacy and payment gate", () => {
   const thankYouSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/ThankYouMatchBoost.tsx"), "utf8");
   const routersSource = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
   const crmSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/CRMMatchmaking.tsx"), "utf8");
+  const automationSource = fs.readFileSync(path.join(process.cwd(), "server/automation.ts"), "utf8");
   const boostCardSource = uiSource.slice(uiSource.indexOf("function MatchBoostCard"), uiSource.indexOf("function DnaSection"));
 
   it("returns a sanitized anonymous card to the personal area, not candidate identity", () => {
@@ -323,6 +324,8 @@ describe("match boost privacy and payment gate", () => {
   });
 
   it("allows every active database member to opt in with all three explicit consents and records opt-in and opt-out events", () => {
+    expect(BOOST_CONSENT_VERSION).toBe("2026-08-29-v2");
+    expect(source).toContain("membership.consentVersion === BOOST_CONSENT_VERSION");
     expect(source).toContain("inviteMember: teamProcedure");
     expect(source).toContain('status: "invited"');
     expect(operationsSource).toContain("פתיחת הזמנה אישית");
@@ -344,6 +347,8 @@ describe("match boost privacy and payment gate", () => {
     expect(source).not.toContain("יש להשלים את הפרופיל, התמונה והשאלון המדעי לפני ההצטרפות ל־Boost");
     expect(uiSource).toContain("✓ אישור Boost נשמר בפרופיל");
     expect(uiSource).toContain("האישור וההצטרפות ל־Boost אינם כרוכים בתשלום");
+    expect(uiSource).toContain("השם, התמונה ופרטי הפרופיל יישלחו לשני הצדדים במייל");
+    expect(landingSource).toContain("פרטי הקשר נשלחים רק לאחר ששני הצדדים מאשרים");
     expect(uiSource).not.toContain("במערכת וב־CRM");
     expect(crmSource).toContain("✓ אישור Boost פעיל");
     expect(crmSource).toContain("הופעה בכרטיס אנונימי ושליחת הצעות מותנות בהשלמת הפרופיל ובזכאות תקינה");
@@ -365,8 +370,8 @@ describe("match boost privacy and payment gate", () => {
     expect(boostCardSource).not.toContain("במערכת וב־CRM");
     expect(uiSource).toContain('termsPath="/terms/match-boost"');
     expect(walletSource).toContain('boostTermsAccepted: product === "match_boost" ? true : undefined');
-    expect(walletSource).toContain("כולל קבלת הצעות Boost אלגוריתמיות שלא נבדקו ידנית על ידי הילית");
-    expect(termsSource).toContain("באישור התנאים מאשרים גם לקבל בקשות Boost");
+    expect(walletSource).toContain("שליחת שם, תמונה ופרטי פרופיל לשני הצדדים בעת שליחת ההצעה");
+    expect(termsSource).toContain("התשלום אינו מהווה אישור של ההתאמה מצד המשלם");
     expect(source).toContain("הצעת Boost אלגוריתמית, לא נבדקה ידנית על ידי הילית");
     expect(uiSource).toContain("card.disclosure");
   });
@@ -407,6 +412,9 @@ describe("match boost privacy and payment gate", () => {
     expect(demoSource).toContain('href="/terms/match-boost"');
     expect(demoSource).not.toContain('product="match_boost"');
     expect(demoSource).not.toContain("questionnaireToken");
+    expect(demoSource).toContain("התשלום אינו אישור להתאמה");
+    expect(demoSource).toContain("כפתורי אישור");
+    expect(demoSource).not.toContain("השלמת התשלום מהווה אישור שלך");
   });
 
   it("keeps the 60 percent eligibility rule without highlighting it in the personal-area sales copy", () => {
@@ -433,37 +441,44 @@ describe("match boost privacy and payment gate", () => {
     expect(source).toContain('decisionReason: "algorithmic_boost_auto_dispatch"');
   });
 
-  it("labels Boost email and WhatsApp as algorithmic and hides name and photo until mutual consent", () => {
+  it("labels Boost as algorithmic while sending name and photo to both sides for separate approval", () => {
     expect(emailSource).toContain('proposalSource?: "manual" | "boost"');
     expect(emailSource).toContain('boostRole?: "sender" | "recipient"');
-    expect(emailSource).toContain("מחכה לך התאמת Boost מיוחדת");
-    expect(emailSource).toContain("בקשת ה־Boost שלך נשלחה");
+    expect(emailSource).toContain("בקשת ה־Boost שלך נשלחה ומחכה לאישור שלך");
+    expect(emailSource).toContain("נשלחה אליך התאמת Boost שמחכה לאישור שלך");
+    expect(emailSource).toContain("התשלום ושליחת ה־Boost אינם אישור להתאמה");
     expect(emailSource).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
-    expect(emailSource).toContain("!isBoost && params.matchPhotoUrl");
-    expect(emailSource).toContain('isBoost ? "כרטיס התאמה אנונימי" : params.matchFirstName');
+    expect(emailSource).toContain("${params.matchPhotoUrl ?");
+    expect(source).toContain("matchPhotoUrl: partyB.photoUrl ?? undefined");
+    expect(source).toContain("matchPhotoUrl: partyA.photoUrl ?? undefined");
     expect(whatsappSource).toContain('proposalSource === "boost"');
     expect(whatsappSource).toContain("בקשת ה־Boost שלך");
-    expect(whatsappSource).toContain("מחכה לך התאמת Boost מיוחדת");
+    expect(whatsappSource).toContain("נשלחה אליך התאמת Boost מיוחדת");
     expect(whatsappSource).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
+    expect(automationSource).toContain('proposalSource: isBoost ? "boost" : "regular"');
+    expect(emailSource).toContain('proposalSource?: "regular" | "boost"');
+    expect(emailSource).toContain("התאמת ה־Boost עדיין ממתינה לאישור שלך");
+    expect(emailSource).not.toContain("לפני שבוע שלחתי לך הצעה: ${params.matchFirstName}");
   });
 
-  it("treats paid Boost sending as sender approval and keeps the recipient response anonymous", () => {
-    expect(source).toContain("approvedByA: senderIsA ? true");
-    expect(source).toContain("approvedByB: senderIsA ? Boolean(match.approvedByB) : true");
-    expect(source).toContain("tokenAUsedAt: senderIsA ? now");
+  it("requires separate approval from both Boost sides and shows the full profile without contact details", () => {
+    expect(source).toContain("approvedByA: false");
+    expect(source).toContain("approvedByB: false");
+    expect(source).toContain("tokenAUsedAt: null");
+    expect(source).toContain("tokenBUsedAt: null");
     expect(source).toContain("boostSenderSide: senderIsA ? \"A\" : \"B\"");
     expect(routersSource).toContain("buildAnonymousBoostCard(partner, match, me)");
-    expect(routersSource).toContain("photoUrl: null");
+    expect(routersSource).toContain("photoUrl: partner.photoUrl");
+    expect(routersSource).toContain("isAnonymous: false");
     expect(responseSource).toContain("קיבלת התאמת Boost");
-    expect(responseSource).toContain("AnonymousBoostSilhouette");
-    expect(responseSource).toContain("השולח כבר אישר את ההצעה בעת השליחה");
-    expect(routersSource).toContain('reason: "boost_recipient_declined"');
+    expect(responseSource).toContain("התשלום ושליחת ה־Boost אינם אישור להתאמה");
+    expect(routersSource).toContain('reason: "boost_participant_declined"');
     expect(source).toContain('["paid", "queued", "reviewing", "approved"] as const');
   });
 
   it("uses an anonymous silhouette instead of a question mark and confirms reveal only after mutual consent", () => {
     expect(silhouetteSource).toContain("צללית אנונימית");
-    expect(silhouetteSource).toContain("התמונה תיחשף רק לאחר אישור הדדי");
+    expect(silhouetteSource).toContain("התמונה תישלח לשני הצדדים במייל לאחר שליחת Boost");
     expect(boostCardSource).toContain("AnonymousBoostSilhouette");
     expect(boostCardSource).not.toContain('blur-[1px]\">?</div>');
     expect(boostCardSource).toContain("למה האלגוריתם מצא כאן פוטנציאל");
@@ -473,15 +488,15 @@ describe("match boost privacy and payment gate", () => {
     expect(boostCardSource).toContain("card.participationReason");
     expect(uiSource).toContain("preferredPendingMatches.length > 0 ? preferredPendingMatches : allPendingMatches");
     expect(thankYouSource).toContain("שלחת Boost");
-    expect(thankYouSource).toContain("אם תהיה הסכמה, השם, התמונה והפרטים המלאים יישלחו לשניכם");
+    expect(thankYouSource).toContain("התשלום אינו אישור להתאמה");
     expect(boostCardSource).toContain("טוענים את אפשרויות ה־Boost");
     expect(boostCardSource).toContain("לא הצלחנו לטעון את Boost כרגע");
   });
 
-  it("shows the waiting banner only while exactly one side still needs to respond", () => {
+  it("shows the waiting banner while one or both Boost sides still need to respond", () => {
     expect(source).toContain('latestRequestMatch?.status === "proposed"');
     expect(source).toContain("!latestRequestMatch?.returnedToPoolAt");
-    expect(source).toContain("Boolean(latestRequestMatch?.approvedByA) !== Boolean(latestRequestMatch?.approvedByB)");
+    expect(source).toContain("!(Boolean(latestRequestMatch?.approvedByA) && Boolean(latestRequestMatch?.approvedByB))");
     expect(source).toContain("awaitingRecipientResponse");
     expect(boostCardSource).toContain("status.awaitingRecipientResponse");
     expect(boostCardSource).not.toContain('status.latestRequest?.status === "approved"');
@@ -494,7 +509,7 @@ describe("match boost privacy and payment gate", () => {
     expect(termsSource).toContain("עומדות 48 שעות להגיב");
     expect(termsSource).toContain("נשמר אוטומטית קרדיט Boost");
     expect(termsSource).toContain("חיוב כפול");
-    expect(source).toContain("recipientDeliverySucceeded");
+    expect(source).toContain("bothSidesReceivedAtLeastOneChannel");
     expect(source).toContain("boost_recipient_delivery_failed");
     expect(source).toContain("boost_credit_available:");
     expect(source).toContain('status: "reviewing"');

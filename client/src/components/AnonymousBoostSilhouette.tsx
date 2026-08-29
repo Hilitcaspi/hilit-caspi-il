@@ -2,7 +2,7 @@ export default function AnonymousBoostSilhouette({ className = "" }: { className
   return (
     <div
       role="img"
-      aria-label="צללית אנונימית. התמונה תיחשף רק לאחר אישור הדדי"
+      aria-label="צללית אנונימית. התמונה תישלח לשני הצדדים במייל לאחר שליחת Boost"
       className={`relative overflow-hidden rounded-2xl border border-white/45 bg-[radial-gradient(circle_at_50%_18%,rgba(255,226,124,0.45),transparent_28%),linear-gradient(155deg,#70408f_0%,#2c175f_58%,#160b3d_100%)] shadow-md ${className}`}
     >
       <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent_25%,rgba(255,255,255,0.16)_48%,transparent_70%)]" />

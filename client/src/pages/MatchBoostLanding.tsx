@@ -142,7 +142,7 @@ export default function MatchBoostLanding() {
                     <p className="mt-2 text-sm leading-6 text-[#6f627a]">בלחיצה על האישור, הפרופיל יתעדכן מיד ותוכלו לשלוח ולקבל בקשות Boost באזור האישי.</p>
                     <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl bg-[#f7f3ff] p-4 text-sm leading-6 text-[#51475d]">
                       <input type="checkbox" checked={personalConsent} onChange={event => setPersonalConsent(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-[#a52178]" />
-                      <span>אישור זה מצרף את הפרופיל לשירות Boost, מאפשר להופיע בכרטיס אנונימי ולשלוח ולקבל בקשות התאמה שנוצרו על ידי האלגוריתם ואינן עוברות אישור אישי של הילית. הפרטים ייחשפו רק לאחר הסכמה הדדית.</span>
+                      <span>האישור מצרף את הפרופיל לשירות Boost ומאפשר להופיע בכרטיס אנונימי. כאשר נשלחת התאמת Boost, שני הצדדים מקבלים במייל שם, תמונה ופרטי פרופיל לצורך החלטה. פרטי הקשר נשלחים רק לאחר ששני הצדדים מאשרים.</span>
                     </label>
                     <button type="button" disabled={!personalConsent || joinPool.isPending} onClick={() => joinPool.mutate({ email: personalEmail, token: personalToken, algorithmicDisclosureAccepted: true, anonymousProfileAccepted: true, termsAccepted: true })} className="mt-4 w-full rounded-xl bg-gradient-to-l from-[#a52178] to-[#5d176d] px-5 py-4 text-sm font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45">
                       {joinPool.isPending ? "מאשרים..." : "אישור הצטרפות לשירות Boost"}
@@ -202,7 +202,7 @@ export default function MatchBoostLanding() {
           <h2 className="text-2xl font-black sm:text-4xl">האישור שלכם ל־Boost</h2>
           <p className="mt-3 max-w-3xl text-base leading-8 text-white/85">Boost הוא שירות נוסף לחברי המאגר. האפשרויות מצביעות על פוטנציאל לפי הנתונים והשאלונים, אך אינן מבטיחות הצלחה ואינן עוברות אישור אישי שלי.</p>
           <div className="mt-6 grid gap-3 text-sm leading-6 sm:grid-cols-2">
-            {["במסלול הרגיל אני בוחנת כל הצעה אישית ומעדיפה את ההתאמות הגבוהות ביותר.", "Boost מאפשר לבחור ולשלוח הזדמנות נוספת בעצמכם.", "השם והתמונה מוסתרים מטעמי פרטיות וכדי להכיר מעבר למראה.", "הפרטים המלאים נפתחים רק אם שני הצדדים מאשרים את ההצעה."].map(item => (
+            {["במסלול הרגיל אני בוחנת כל הצעה אישית ומעדיפה את ההתאמות הגבוהות ביותר.", "Boost מאפשר לבחור ולשלוח הזדמנות נוספת בעצמכם.", "לפני השליחה הכרטיס אנונימי. לאחר השליחה שני הצדדים מקבלים שם, תמונה ופרטי פרופיל במייל.", "פרטי הקשר נשלחים רק אם שני הצדדים מאשרים את ההצעה."].map(item => (
               <p key={item} className="flex gap-2 rounded-xl bg-white/8 p-3"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#ffe27c]" />{item}</p>
             ))}
           </div>

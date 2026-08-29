@@ -401,14 +401,14 @@ function MatchBoostCard({
   }, [statusQuery.data]);
   const redeemPlus = trpc.matchBoost.redeemPlusBoost.useMutation({
     onSuccess: () => {
-      setResultMessage("ה־Boost נשלח לצד השני. אין צורך לאשר שוב. אם תהיה הסכמה, השם והתמונה ייחשפו לשניכם.");
+      setResultMessage("התאמת ה־Boost נשלחה לשני הצדדים. עכשיו חשוב לפתוח את המייל ולאשר או לדחות את ההתאמה.");
       utils.matchBoost.getMyStatus.invalidate({ email, token });
     },
     onError: error => setResultMessage(error.message),
   });
   const redeemCredit = trpc.matchBoost.redeemPaidCredit.useMutation({
     onSuccess: () => {
-      setResultMessage("קרדיט ה־Boost מומש והבקשה נשלחה לצד השני. אם תהיה הסכמה, השם והתמונה ייחשפו לשניכם.");
+      setResultMessage("קרדיט ה־Boost מומש וההתאמה נשלחה לשני הצדדים. עכשיו חשוב לפתוח את המייל ולאשר או לדחות.");
       utils.matchBoost.getMyStatus.invalidate({ email, token });
     },
     onError: error => setResultMessage(error.message),
@@ -489,11 +489,11 @@ function MatchBoostCard({
               </label>
               <label className="flex items-start gap-3 text-xs leading-5 text-[#555]">
                 <input type="checkbox" checked={anonymousProfileConsent} onChange={event => setAnonymousProfileConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#191265]" />
-                <span>אני מאשר או מאשרת הצגת כרטיס אנונימי עם גיל, אזור כללי, תחום עיסוק, השכלה, אורח חיים וסיבות התאמה, ללא שם, תמונה או פרטי קשר.</span>
+                <span>אני מאשר או מאשרת הצגת כרטיס אנונימי באזור Boost. אם תישלח התאמת Boost, השם, התמונה ופרטי הפרופיל יישלחו לשני הצדדים במייל לצורך החלטה, ללא פרטי קשר.</span>
               </label>
               <label className="flex items-start gap-3 text-xs leading-5 text-[#555]">
                 <input type="checkbox" checked={termsConsent} onChange={event => setTermsConsent(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#191265]" />
-                <span>קראתי והבנתי שאין הבטחה להסכמת הצד השני, לחשיפת פרטים, לדייט או לזוגיות, ושאפשר לצאת מהמסלול בכל עת.</span>
+                <span>קראתי והבנתי שכל צד נדרש לאשר את ההתאמה בנפרד, שפרטי הקשר נחשפים רק לאחר שני אישורים, ושאין הבטחה להסכמה, לדייט או לזוגיות.</span>
               </label>
               <button
                 type="button"
@@ -539,8 +539,8 @@ function MatchBoostCard({
           <AnonymousBoostSilhouette className="h-24 w-20 shrink-0" />
           <div>
             <p className="text-xs font-black text-[#ffe27c]">Boost נשלח</p>
-            <h3 className="mt-1 text-xl font-black text-white">הבקשה ממתינה לתשובת הצד השני</h3>
-            <p className="mt-2 text-sm leading-6 text-white/80">התשלום והשליחה מהווים את האישור שלך, ואין צורך לאשר שוב. אם תהיה הסכמה, השם, התמונה והפרטים המלאים יישלחו לשניכם.</p>
+            <h3 className="mt-1 text-xl font-black text-white">ההתאמה ממתינה לאישור שני הצדדים</h3>
+            <p className="mt-2 text-sm leading-6 text-white/80">מייל עם התמונה, פרטי ההתאמה וכפתורי האישור נשלח לשני הצדדים. גם מי ששלח את ה־Boost צריך לאשר במייל. פרטי הקשר יישלחו רק לאחר שני אישורים.</p>
           </div>
         </div>
       </section>
@@ -667,7 +667,7 @@ function MatchBoostCard({
                         boostMatchId={option.matchId}
                         showCoupon={false}
                         onSuccess={() => {
-                          setResultMessage("התשלום התקבל וה־Boost נשלח לצד השני. אין צורך לאשר שוב. אם תהיה הסכמה, השם והתמונה ייחשפו לשניכם.");
+                          setResultMessage("התשלום התקבל והתאמת ה־Boost נשלחה לשני הצדדים. עכשיו חשוב לפתוח את המייל ולאשר או לדחות את ההתאמה.");
                           setTimeout(() => utils.matchBoost.getMyStatus.invalidate({ email, token }), 1800);
                         }}
                         onFailure={() => setResultMessage("התשלום לא הושלם ולא יישלח Boost.")}
