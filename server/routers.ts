@@ -10,7 +10,8 @@ import { getDb } from "./db";
 import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, matchBoostMemberships } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
-import { BOOST_CANDIDATE_NOTE_MARKER, buildAnonymousBoostCard, cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
+import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, buildAnonymousBoostCard, cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
+import { getBoostAdminState, summarizeBoostMembers } from "./boostAdmin";
 import { matchBoostPilotRouter } from "./matchBoostPilotRouter";
 import { operationsRouter } from "./operationsRouter";
 import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
@@ -4389,6 +4390,51 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         boostConsentedAt: boostBySingle.get(single.id)?.consentedAt ?? null,
         boostConsentVersion: boostBySingle.get(single.id)?.consentVersion ?? null,
       }));
+    }),
+
+    boostMembersOverview: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const membershipRows = await db.select({
+        membershipId: matchBoostMemberships.id,
+        singleId: matchBoostMemberships.singleId,
+        membershipStatus: matchBoostMemberships.status,
+        consentVersion: matchBoostMemberships.consentVersion,
+        algorithmicDisclosureAccepted: matchBoostMemberships.algorithmicDisclosureAccepted,
+        anonymousProfileAccepted: matchBoostMemberships.anonymousProfileAccepted,
+        termsAccepted: matchBoostMemberships.termsAccepted,
+        consentedAt: matchBoostMemberships.consentedAt,
+        optedOutAt: matchBoostMemberships.optedOutAt,
+        source: matchBoostMemberships.source,
+        pilotCohort: matchBoostMemberships.pilotCohort,
+        lastActiveAt: matchBoostMemberships.lastActiveAt,
+        membershipUpdatedAt: matchBoostMemberships.updatedAt,
+        firstName: singles.firstName,
+        lastName: singles.lastName,
+        email: singles.email,
+        phone: singles.phone,
+        gender: singles.gender,
+        age: singles.age,
+        city: singles.city,
+        isActive: singles.isActive,
+        isPaid: singles.isPaid,
+      }).from(matchBoostMemberships)
+        .innerJoin(singles, eq(matchBoostMemberships.singleId, singles.id))
+        .where(eq(singles.isSeed, false))
+        .orderBy(desc(matchBoostMemberships.consentedAt), desc(matchBoostMemberships.updatedAt));
+
+      const rows = membershipRows.map(row => ({
+        ...row,
+        state: getBoostAdminState(row, BOOST_CONSENT_VERSION),
+      }));
+      return {
+        consentVersion: BOOST_CONSENT_VERSION,
+        counts: summarizeBoostMembers(membershipRows, BOOST_CONSENT_VERSION),
+        rows,
+      };
     }),
 
     /**

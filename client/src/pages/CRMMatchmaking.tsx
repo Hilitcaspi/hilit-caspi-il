@@ -5,6 +5,7 @@
 import { useState } from "react";
 import MatchmakingDashboard from "./MatchmakingDashboard";
 import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
+import BoostMembersAdminSection from "@/components/BoostMembersAdminSection";
 import TestimonialCreativeLibrarySection from "@/components/TestimonialCreativeLibrarySection";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -12,7 +13,7 @@ import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3 } from "lucide-react";
+import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 const RELIGIOSITY_LABELS: Record<string, string> = {
@@ -291,11 +292,11 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "plus" | "testimonials">(() => {
+  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials">(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    const allowedTabs = new Set(["singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "plus", "testimonials"]);
+    const allowedTabs = new Set(["singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "testimonials"]);
     return allowedTabs.has(requestedTab || "")
-      ? requestedTab as "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "plus" | "testimonials"
+      ? requestedTab as "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials"
       : "singles";
   });
   // Filter-search tab state
@@ -813,7 +814,7 @@ export default function CRMMatchmaking() {
     });
 
   return (
-    <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">
+    <div className="min-h-screen overflow-x-hidden bg-[#f0eadc] font-rubik" dir="rtl">
       {/* Photo Lightbox */}
       <Dialog open={!!lightboxUrl} onOpenChange={(open) => { if (!open) setLightboxUrl(null); }}>
         <DialogContent className="max-w-2xl bg-black border-0 p-2" showCloseButton>
@@ -848,7 +849,7 @@ export default function CRMMatchmaking() {
 
       {/* Header */}
       <div className="bg-[#191265] text-white px-4 py-4 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+        <div className="mx-auto flex w-full max-w-6xl min-w-0 items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-lg font-bold">💛 ניהול מאגר הרווקים</h1>
             <p className="text-white/60 text-xs">{activeCount} פעילים · {pendingCount} ממתינים לאישור · {matchedCount} התאמות</p>
@@ -881,9 +882,9 @@ export default function CRMMatchmaking() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-4">
+      <div className="mx-auto w-full max-w-6xl min-w-0 px-4 py-4">
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-2 mb-4">
+        <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-4">
           {[
             { label: "חברי מאגר", value: typedSingles.length, icon: "👥", color: "text-[#191265]" },
             { label: "פעילים", value: activeCount, icon: "✅", color: "text-green-600" },
@@ -899,7 +900,7 @@ export default function CRMMatchmaking() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-4 overflow-x-auto rounded-xl bg-white p-1 shadow-sm scroll-smooth [scrollbar-width:thin]">
+        <div className="flex max-w-full gap-2 mb-4 overflow-x-auto rounded-xl bg-white p-1 shadow-sm scroll-smooth [scrollbar-width:thin]">
           {[
             { id: "singles" as const, label: "חברי המאגר", icon: <Users size={14} /> },
             { id: "matches" as const, label: `התאמות (${pendingCount} ממתינות)`, icon: <Heart size={14} /> },
@@ -911,6 +912,7 @@ export default function CRMMatchmaking() {
             { id: "compatibility" as const, label: "בדיקת התאמה 🔍", icon: <Zap size={14} /> },
             { id: "filter_search" as const, label: "חיפוש מתקדם 🔎", icon: <Search size={14} /> },
             { id: "inactive" as const, label: "לא פעילים", icon: <span>🚫</span> },
+            { id: "boost" as const, label: "מאושרי Boost", icon: <Sparkles size={14} /> },
             { id: "plus" as const, label: "חברי PLUS", icon: <span className="font-black text-[#8b7420]">＋</span> },
             { id: "testimonials" as const, label: "עדויות מאושרות", icon: <span>✍️</span> },
             { id: "dashboard" as const, label: "דאשבורד 📊", icon: <BarChart3 size={14} /> },
@@ -3036,6 +3038,9 @@ export default function CRMMatchmaking() {
         )}
         {activeTab === "dashboard" && (
           <MatchmakingDashboard />
+        )}
+        {activeTab === "boost" && (
+          <BoostMembersAdminSection />
         )}
         {activeTab === "plus" && (
           <PlusPilotAdminSection />
