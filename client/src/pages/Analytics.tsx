@@ -20,6 +20,7 @@ const JOURNEY_LABELS: Record<string, { label: string; icon: string; color: strin
   men_guide:                 { label: "מדריך - גברים", icon: "📘", color: "#0369a1" },
   women_course:              { label: "קורס - נשים", icon: "🎓", color: "#7c3aed" },
   men_course:                { label: "קורס - גברים", icon: "🎓", color: "#5b21b6" },
+  boost_launch_2026_08_30:   { label: "ניוזלטר Boost - בדיקת שעת שליחה", icon: "↗", color: "#8b2a8c" },
   women_transformation:      { label: "טרנספורמציה - נשים", icon: "✨", color: "#db2777" },
   men_transformation:        { label: "טרנספורמציה - גברים", icon: "✨", color: "#9333ea" },
   abandoned_guide:           { label: "נטישת עגלה - מדריך", icon: "🛒", color: "#ef4444" },

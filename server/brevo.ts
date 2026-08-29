@@ -121,6 +121,46 @@ export async function sendEmail({
   }
 }
 
+export async function sendEmailBatch(input: {
+  subject: string;
+  textContent?: string;
+  versions: Array<{
+    to: Array<{ email: string; name?: string }>;
+    htmlContent: string;
+  }>;
+  idempotencyKey: string;
+}): Promise<{ success: boolean; messageIds?: string[]; duplicate?: boolean; error?: string }> {
+  try {
+    if (input.versions.length === 0) return { success: true, messageIds: [] };
+    if (input.versions.length > 1000) return { success: false, error: "Batch exceeds 1000 message versions" };
+    const deliverable = input.versions.filter((version) =>
+      version.to.every((recipient) => !isPermanentlyBlockedEmail(recipient.email)),
+    );
+    if (deliverable.length === 0) return { success: true, messageIds: [] };
+
+    const response = await brevoFetch("/smtp/email", {
+      method: "POST",
+      body: JSON.stringify({
+        sender: SENDER,
+        subject: input.subject,
+        htmlContent: "<html><body></body></html>",
+        textContent: input.textContent,
+        headers: { idempotencyKey: input.idempotencyKey },
+        messageVersions: deliverable,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const serialized = JSON.stringify(data);
+      if (serialized.includes("duplicate_parameter")) return { success: true, duplicate: true, messageIds: [] };
+      return { success: false, error: serialized };
+    }
+    return { success: true, messageIds: Array.isArray(data.messageIds) ? data.messageIds : [] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
 /**
  * Get or create a Brevo contact list by name
  */

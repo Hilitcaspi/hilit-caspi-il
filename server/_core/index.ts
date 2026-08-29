@@ -24,6 +24,7 @@ import multer from "multer";
 import { storagePut } from "../storage";
 import { sendErrorAlert, installProcessErrorAlerts } from "./errorAlert";
 import { buildBoostEnrollmentNewsletter } from "../boostNewsletter";
+import { processBoostNewsletterWave, type BoostNewsletterWaveKey } from "../boostNewsletterCampaign";
 
 // Install process-level error alerts (uncaughtException / unhandledRejection).
 installProcessErrorAlerts();
@@ -728,6 +729,24 @@ async function startServer() {
         context: { url: req.originalUrl, taskUid: req.headers["x-manus-cron-task-uid"] || null },
         timestamp: new Date().toISOString(),
       });
+    }
+  });
+
+  app.post("/api/scheduled/boost-newsletter-wave", express.json(), async (req, res) => {
+    try {
+      const cronTaskUid = String(req.headers["x-manus-cron-task-uid"] || "").trim();
+      const wave = String(req.body?.wave || "") as BoostNewsletterWaveKey;
+      if (!cronTaskUid || !["0700", "0800", "0900"].includes(wave)) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const result = await processBoostNewsletterWave({ waveKey: wave, cronTaskUid });
+      console.log("[BoostNewsletterWave]", result);
+      res.json({ ok: true, result });
+    } catch (error) {
+      console.error("[BoostNewsletterWave] Error:", error);
+      void sendErrorAlert({ source: "express:boost-newsletter-wave", error, context: { route: req.path } });
+      res.status(500).json({ error: String(error) });
     }
   });
 

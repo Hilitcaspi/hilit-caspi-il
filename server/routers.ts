@@ -26,6 +26,7 @@ import { startJourney, getJourneyKey } from "./automation";
 import { ga4GenerateLead, ga4SignUp, clientIdFromEmail } from "./_core/ga4";
 import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as buildMatchProposalEmailTemplate, buildContactRevealEmail as buildContactRevealEmailTemplate, buildMatchRejectionAckEmail, buildOwnerMatchApprovalEmail, buildConsolationEmail, WOMEN_MATCHMAKING_EMAIL_1, MEN_MATCHMAKING_EMAIL_1, DNA_PROFILES, buildMatchFollowUpEmail } from "./emailTemplates";
 import { sendEmail } from "./brevo";
+import { unsubscribeBoostNewsletterMember, verifyBoostNewsletterUnsubscribeToken } from "./boostNewsletterCampaign";
 import { sendSMS } from "./vibrate";
 import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
@@ -3146,6 +3147,16 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        const boostNewsletterToken = verifyBoostNewsletterUnsubscribeToken(input.token);
+        if (boostNewsletterToken) {
+          const success = await unsubscribeBoostNewsletterMember(
+            boostNewsletterToken.singleId,
+            boostNewsletterToken.email,
+          );
+          if (!success) throw new TRPCError({ code: "BAD_REQUEST", message: "טוקן לא תקין" });
+          return { success: true, email: boostNewsletterToken.email };
+        }
 
         let leadId: number;
         let email: string;
