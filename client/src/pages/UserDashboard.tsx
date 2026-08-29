@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import DatabaseExpectations from "@/components/DatabaseExpectations";
 import GrowWallet from "@/components/GrowWallet";
+import AnonymousBoostSilhouette from "@/components/AnonymousBoostSilhouette";
 import { trpc } from "@/lib/trpc";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -404,14 +405,14 @@ function MatchBoostCard({
   }, [statusQuery.data]);
   const redeemPlus = trpc.matchBoost.redeemPlusBoost.useMutation({
     onSuccess: () => {
-      setResultMessage("בקשת ה־Boost התקבלה. לאחר בדיקת הזכאות הסופית היא תישלח לצד השני.");
+      setResultMessage("ה־Boost נשלח לצד השני. אין צורך לאשר שוב. אם תהיה הסכמה, השם והתמונה ייחשפו לשניכם.");
       utils.matchBoost.getMyStatus.invalidate({ email, token });
     },
     onError: error => setResultMessage(error.message),
   });
   const redeemCredit = trpc.matchBoost.redeemPaidCredit.useMutation({
     onSuccess: () => {
-      setResultMessage("קרדיט ה־Boost מומש וההצעה האלגוריתמית נשלחה לשני הצדדים.");
+      setResultMessage("קרדיט ה־Boost מומש והבקשה נשלחה לצד השני. אם תהיה הסכמה, השם והתמונה ייחשפו לשניכם.");
       utils.matchBoost.getMyStatus.invalidate({ email, token });
     },
     onError: error => setResultMessage(error.message),
@@ -448,7 +449,22 @@ function MatchBoostCard({
   }, [email, token, statusQuery.data]);
 
   if (statusQuery.isLoading) {
-    return <div id="boost-card" className="h-44 animate-pulse rounded-[2rem] border border-[#d52b8c]/30 bg-[#241257]" />;
+    return (
+      <section id="boost-card" className="rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
+        <p className="text-xs font-black text-[#ffe27c]">Boost</p>
+        <h3 className="mt-2 text-xl font-black text-white">טוענים את אפשרויות ה־Boost...</h3>
+        <p className="mt-2 text-sm leading-6 text-white/75">עוד רגע יוצגו כאן האפשרויות והסטטוס המעודכן.</p>
+      </section>
+    );
+  }
+  if (statusQuery.isError) {
+    return (
+      <section id="boost-card" className="rounded-[2rem] border border-[#e6d8a3] bg-white p-6 text-right shadow-sm">
+        <h3 className="text-lg font-black text-[#191265]">לא הצלחנו לטעון את Boost כרגע</h3>
+        <p className="mt-2 text-sm leading-6 text-[#666]">אפשר לנסות שוב בעוד רגע. לא נשלחה בקשה ולא בוצע חיוב.</p>
+        <button type="button" onClick={() => statusQuery.refetch()} className="mt-4 rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white">ניסיון נוסף</button>
+      </section>
+    );
   }
   const status = statusQuery.data;
   if (!status) return null;
@@ -520,6 +536,21 @@ function MatchBoostCard({
     );
   }
 
+  if (status.candidateCount === 0 && !status.openRequest && status.latestRequest?.status === "approved") {
+    return (
+      <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
+        <div className="flex items-center gap-4">
+          <AnonymousBoostSilhouette className="h-24 w-20 shrink-0" />
+          <div>
+            <p className="text-xs font-black text-[#ffe27c]">Boost נשלח</p>
+            <h3 className="mt-1 text-xl font-black text-white">הבקשה ממתינה לתשובת הצד השני</h3>
+            <p className="mt-2 text-sm leading-6 text-white/80">התשלום והשליחה מהווים את האישור שלך, ואין צורך לאשר שוב. אם תהיה הסכמה, השם, התמונה והפרטים המלאים יישלחו לשניכם.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   if (status.candidateCount === 0 && !status.openRequest) {
     return (
       <section id="boost-card" className="rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
@@ -580,9 +611,7 @@ function MatchBoostCard({
             return (
               <article key={option.matchId || index} className="overflow-hidden rounded-[1.6rem] border border-white/30 bg-white/10 p-4 backdrop-blur-sm sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <div className="mx-auto flex h-24 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/80 bg-[#191265] shadow-md sm:mx-0">
-                    <div className="flex h-16 w-14 items-center justify-center rounded-full bg-white/15 text-3xl blur-[1px]">?</div>
-                  </div>
+                  <AnonymousBoostSilhouette className="mx-auto h-24 w-20 shrink-0 sm:mx-0" />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs font-black text-[#ffe27c]">אפשרות Boost {index + 1}</p>
@@ -607,7 +636,8 @@ function MatchBoostCard({
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-[#eef9f1] p-4">
-                    <p className="text-xs font-black text-[#24613a]">למה האלגוריתם סימן התאמה</p>
+                    <p className="text-xs font-black text-[#24613a]">למה האלגוריתם מצא כאן פוטנציאל</p>
+                    <p className="mt-1 text-[11px] leading-5 text-[#477154]">נקודות החיבור שבלטו בנתונים ובשאלונים:</p>
                     <ul className="mt-2 space-y-1.5 text-xs leading-5 text-[#315d3f]">{(card.reasons || []).map((reason: string) => <li key={reason}>✓ {reason}</li>)}</ul>
                   </div>
                   <div className="rounded-xl bg-[#fff3e8] p-4">
@@ -641,7 +671,7 @@ function MatchBoostCard({
                       boostMatchId={option.matchId}
                       showCoupon={false}
                       onSuccess={() => {
-                        setResultMessage("בקשת ה־Boost התקבלה. המערכת בודקת את זמינות שני הצדדים ושולחת את ההצעה, או שומרת עבורך אפשרות למימוש חוזר.");
+                        setResultMessage("התשלום התקבל וה־Boost נשלח לצד השני. אין צורך לאשר שוב. אם תהיה הסכמה, השם והתמונה ייחשפו לשניכם.");
                         setTimeout(() => utils.matchBoost.getMyStatus.invalidate({ email, token }), 1800);
                       }}
                       onFailure={() => setResultMessage("התשלום לא הושלם ולא יישלח Boost.")}

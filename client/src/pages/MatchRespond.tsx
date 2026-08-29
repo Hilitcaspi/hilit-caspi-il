@@ -5,6 +5,7 @@
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import AnonymousBoostSilhouette from "@/components/AnonymousBoostSilhouette";
 
 const EDUCATION_LABELS: Record<string, string> = {
   high_school: "תיכון",
@@ -99,7 +100,8 @@ export default function MatchRespond() {
     );
   }
 
-  const { partner, myName, alreadyResponded, myDecision, status } = data;
+  const { partner, myName, alreadyResponded, myDecision, status, proposalSource, score } = data;
+  const isBoost = proposalSource === "boost";
 
   // ── Already responded (token used) ───────────────────────────────────────
   if (alreadyResponded && resultStatus === "idle") {
@@ -195,7 +197,9 @@ export default function MatchRespond() {
         <div className="bg-[#191265] px-6 py-5 text-center">
           <div className="text-3xl mb-1">💛</div>
           <h1 className="text-white font-black text-xl">
-            {myName ? `${myName}, יש לך הצעת התאמה!` : "יש לך הצעת התאמה!"}
+            {isBoost
+              ? (myName ? `${myName}, קיבלת התאמת Boost` : "קיבלת התאמת Boost")
+              : (myName ? `${myName}, יש לך הצעת התאמה!` : "יש לך הצעת התאמה!")}
           </h1>
           <p className="text-white/70 text-sm mt-1">הילית כספי | מאמנת למציאת זוגיות</p>
         </div>
@@ -205,7 +209,9 @@ export default function MatchRespond() {
           {partner ? (
             <>
               <div className="flex items-center gap-4 mb-5">
-                {partner.photoUrl ? (
+                {partner.isAnonymous ? (
+                  <AnonymousBoostSilhouette className="h-20 w-20 shrink-0" />
+                ) : partner.photoUrl ? (
                   <img
                     src={partner.photoUrl}
                     alt={partner.firstName}
@@ -222,6 +228,7 @@ export default function MatchRespond() {
                     {partner.age ? `בן/בת ${partner.age}` : ""}
                     {partner.city ? ` · ${partner.city}` : ""}
                   </p>
+                  {isBoost && score != null && <span className="mt-2 inline-block rounded-full bg-[#f7e7f1] px-3 py-1 text-xs font-black text-[#8c1763]">{score}% התאמה</span>}
                 </div>
               </div>
 
@@ -245,13 +252,22 @@ export default function MatchRespond() {
                   <p className="text-[#191265] text-sm leading-relaxed">{partner.about}</p>
                 </div>
               )}
+              {isBoost && (partner.reasons || []).length > 0 && (
+                <div className="mb-5 rounded-xl bg-[#eef9f1] p-4 text-right">
+                  <p className="text-sm font-black text-[#24613a]">למה האלגוריתם מצא כאן פוטנציאל</p>
+                  <p className="mt-1 text-xs leading-5 text-[#477154]">נקודות החיבור שבלטו בנתונים ובשאלונים:</p>
+                  <ul className="mt-2 space-y-1 text-sm leading-6 text-[#315d3f]">
+                    {partner.reasons.map((reason: string) => <li key={reason}>✓ {reason}</li>)}
+                  </ul>
+                </div>
+              )}
             </>
           ) : (
             <p className="text-[#727272] text-center py-4">לא נמצאו פרטים על ההתאמה</p>
           )}
 
           <p className="text-[#727272] text-sm text-center mb-5 leading-relaxed">
-            אם שניכם תאמרו כן, אשלח לשניכם את פרטי הקשר המלאים.
+            {isBoost ? "השולח כבר אישר את ההצעה בעת השליחה. אם גם ההצעה מעניינת אותך, השם, התמונה ופרטי הקשר יישלחו לשני הצדדים." : "אם שניכם תאמרו כן, אשלח לשניכם את פרטי הקשר המלאים."}
             <br />
             ההחלטה שלך נשמרת בסודיות מוחלטת.
           </p>

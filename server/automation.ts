@@ -11,7 +11,7 @@
  */
 
 import { getDb, resetDb } from "./db";
-import { emailLog, crmLeads, productAccessTokens, matches, singles } from "../drizzle/schema";
+import { emailLog, crmLeads, productAccessTokens, matches, singles, matchBoostRequests } from "../drizzle/schema";
 import { and, eq, lt, gt, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { sendEmail, addContactToList } from "./brevo";
 import { sendWhatsAppViaMake } from "./whatsappWebhook";
@@ -759,6 +759,10 @@ export async function retryUnsentMatchEmails(): Promise<number> {
       const score = match.score ?? 0;
       const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]");
       const boostExplanation = String(match.autoExplanation || "").replace(/^\[BOOST\]\s*/, "");
+      const [boostRequest] = isBoost
+        ? await db.select({ singleId: matchBoostRequests.singleId }).from(matchBoostRequests)
+            .where(eq(matchBoostRequests.matchId, match.id)).limit(1)
+        : [];
       const emailA = buildEmail({
         firstName: singleA.firstName,
         matchFirstName: isBoost ? "התאמה אנונימית" : singleB.firstName,
@@ -779,6 +783,7 @@ export async function retryUnsentMatchEmails(): Promise<number> {
         singleId: singleA.id,
         trackingPixelUrl: `${SITE_BASE}/api/match-open?token=${match.approvalTokenA}&side=a`,
         proposalSource: isBoost ? "boost" : "manual",
+        boostRole: isBoost ? (boostRequest?.singleId === singleA.id ? "sender" : "recipient") : undefined,
       });
       const emailB = buildEmail({
         firstName: singleB.firstName,
@@ -800,6 +805,7 @@ export async function retryUnsentMatchEmails(): Promise<number> {
         singleId: singleB.id,
         trackingPixelUrl: `${SITE_BASE}/api/match-open?token=${match.approvalTokenB}&side=b`,
         proposalSource: isBoost ? "boost" : "manual",
+        boostRole: isBoost ? (boostRequest?.singleId === singleB.id ? "sender" : "recipient") : undefined,
       });
       const [resA, resB] = await Promise.all([
         sendEmail({ to: { email: singleA.email, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),

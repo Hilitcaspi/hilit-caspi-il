@@ -64,22 +64,53 @@ describe("match WhatsApp delivery via Make", () => {
     });
   });
 
-  it("builds a clearly labeled anonymous Boost message without attributing it to Hilit", () => {
-    const message = buildMatchWhatsAppMessage("דנה", "שם שלא אמור להופיע", 85, "boost");
-    expect(message).toContain("הצעת Boost אלגוריתמית");
-    expect(message).toContain("לא נבדקה ידנית על ידי הילית");
-    expect(message).toContain("רק לאחר הסכמה הדדית");
-    expect(message).not.toContain("שם שלא אמור להופיע");
-    expect(message).not.toContain("שבחרתי עבורך");
+  it("builds distinct anonymous Boost messages for the sender and recipient", () => {
+    const senderMessage = buildMatchWhatsAppMessage("דנה", "שם שלא אמור להופיע", 85, "boost", "sender");
+    expect(senderMessage).toContain("שלחת התאמת Boost");
+    expect(senderMessage).toContain("אין צורך לאשר שוב");
+    expect(senderMessage).toContain("אם תהיה הסכמה מהצד השני");
+    expect(senderMessage).not.toContain("שם שלא אמור להופיע");
+
+    const recipientMessage = buildMatchWhatsAppMessage("דנה", "שם שלא אמור להופיע", 85, "boost", "recipient");
+    expect(recipientMessage).toContain("קיבלת התאמת Boost");
+    expect(recipientMessage).toContain("לא נבדקה ידנית על ידי הילית");
+    expect(recipientMessage).toContain("רק לאחר אישור הדדי");
+    expect(recipientMessage).not.toContain("שם שלא אמור להופיע");
+    expect(recipientMessage).not.toContain("שבחרתי עבורך");
 
     const payload = buildMatchWhatsAppPayload({
       matchId: 43,
       score: 85,
       proposalSource: "boost",
+      boostRole: "recipient",
       recipient: { side: "A", phone: "0559348719", firstName: "דנה", matchFirstName: "שם שלא אמור להופיע" },
     });
     expect(payload?.message).not.toContain("שם שלא אמור להופיע");
-    expect(payload).toMatchObject({ proposalSource: "boost" });
+    expect(payload).toMatchObject({ proposalSource: "boost", boostRole: "recipient" });
+  });
+
+  it("routes Boost sender and recipient roles to the correct WhatsApp sides", async () => {
+    const where = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    const update = vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendInitialMatchWhatsAppsOnce({ update } as any, {
+      matchId: 88,
+      score: 75,
+      proposalSource: "boost",
+      boostSenderSide: "B",
+      recipientA: { phone: "0559348719", firstName: "דנה", matchFirstName: "התאמה אנונימית" },
+      recipientB: { phone: "0541234567", firstName: "עידו", matchFirstName: "התאמה אנונימית" },
+    });
+
+    const payloads = fetchMock.mock.calls.map((call) => JSON.parse(call[1].body));
+    const sideA = payloads.find(payload => payload.recipientSide === "A");
+    const sideB = payloads.find(payload => payload.recipientSide === "B");
+    expect(sideA).toMatchObject({ boostRole: "recipient" });
+    expect(sideA.message).toContain("קיבלת התאמת Boost");
+    expect(sideB).toMatchObject({ boostRole: "sender" });
+    expect(sideB.message).toContain("שלחת התאמת Boost");
   });
 
   it("posts JSON to Make and handles rejection without throwing", async () => {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import AnonymousBoostSilhouette from "@/components/AnonymousBoostSilhouette";
 
 const options = [
   {
@@ -68,7 +69,7 @@ export default function MatchBoostDemo() {
                 return (
                   <article key={option.score} className={`rounded-[1.6rem] border p-4 transition-colors sm:p-5 ${selected ? "border-[#ffe27c] bg-white/15" : "border-white/25 bg-white/10"}`}>
                     <div className="flex items-start gap-3">
-                      <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#191265] shadow-md"><span className="text-3xl blur-[1px]">?</span></div>
+                      <AnonymousBoostSilhouette className="h-20 w-16 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-xs font-black text-[#ffe27c]">אפשרות Boost {index + 1}</p>
@@ -92,7 +93,7 @@ export default function MatchBoostDemo() {
                           ))}
                         </div>
                         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-xl bg-[#eef9f1] p-4 text-xs leading-6 text-[#315d3f]"><strong className="block text-[#24613a]">למה האלגוריתם סימן התאמה</strong>{option.reasons.map(reason => <span key={reason} className="block">✓ {reason}</span>)}</div>
+                          <div className="rounded-xl bg-[#eef9f1] p-4 text-xs leading-6 text-[#315d3f]"><strong className="block text-[#24613a]">למה האלגוריתם מצא כאן פוטנציאל</strong><span className="block text-[11px] text-[#477154]">נקודות החיבור שבלטו בנתונים ובשאלונים:</span>{option.reasons.map(reason => <span key={reason} className="block">✓ {reason}</span>)}</div>
                           <div className="rounded-xl bg-[#fff3e8] p-4 text-xs leading-6 text-[#75431e]"><strong className="block text-[#8a4b17]">מה כדאי לקחת בחשבון</strong>{option.consideration}</div>
                         </div>
                       </div>
@@ -110,7 +111,7 @@ export default function MatchBoostDemo() {
                 <input type="checkbox" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-[#191265]" />
                 <span>קראתי ואישרתי את <Link href="/terms/match-boost"><span className="font-bold underline">תקנון Boost</span></Link>, כולל קבלת הצעות אלגוריתמיות שלא נבדקו ידנית על ידי הילית.</span>
               </label>
-              <button type="button" disabled={!termsAccepted} onClick={() => setNotice("בעמוד האישי האמיתי נפתח כאן תשלום Grow מאובטח. בהדגמה לא מתבצע חיוב.")} className="mt-4 w-full rounded-2xl bg-gradient-to-l from-[#a52178] to-[#5d176d] py-4 text-lg font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" disabled={!termsAccepted} onClick={() => setNotice("בעמוד האישי האמיתי נפתח כאן תשלום Grow מאובטח. השלמת התשלום מהווה אישור שלך ושולחת את ה־Boost לצד השני. בהדגמה לא מתבצע חיוב.")} className="mt-4 w-full rounded-2xl bg-gradient-to-l from-[#a52178] to-[#5d176d] py-4 text-lg font-black text-white shadow-lg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50">
                 שליחת Boost | 19.90 ₪
               </button>
               {notice && <p className="mt-3 rounded-xl bg-[#e8f5e9] p-3 text-center text-xs font-bold text-[#2e7d32]">{notice}</p>}

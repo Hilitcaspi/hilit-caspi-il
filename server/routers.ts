@@ -10,7 +10,7 @@ import { getDb } from "./db";
 import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, matchBoostMemberships } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
-import { BOOST_CANDIDATE_NOTE_MARKER, cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
+import { BOOST_CANDIDATE_NOTE_MARKER, buildAnonymousBoostCard, cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
 import { matchBoostPilotRouter } from "./matchBoostPilotRouter";
 import { operationsRouter } from "./operationsRouter";
 import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
@@ -4104,14 +4104,31 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
         const alreadyResponded = isA ? !!match.tokenAUsedAt : !!match.tokenBUsedAt;
         const myDecision = isA ? match.approvedByA : match.approvedByB;
+        const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
+        const anonymousPartner = partner && isBoost ? buildAnonymousBoostCard(partner, match) : null;
 
         return {
           matchId: match.id,
+          score: Math.round(Number(match.score || 0)),
           status: match.status,
           isExpired: !!isExpired,
           alreadyResponded,
           myDecision,
-          partner: partner ? {
+          proposalSource: isBoost ? "boost" as const : "manual" as const,
+          partner: partner ? (isBoost ? {
+            firstName: "התאמה אנונימית",
+            age: anonymousPartner?.age,
+            city: anonymousPartner?.region,
+            height: anonymousPartner?.height,
+            education: anonymousPartner?.education,
+            occupation: anonymousPartner?.occupation,
+            about: null,
+            photoUrl: null,
+            religiosity: anonymousPartner?.religiosity,
+            reasons: anonymousPartner?.reasons || [],
+            considerations: anonymousPartner?.considerations || [],
+            isAnonymous: true,
+          } : {
             firstName: partner.firstName,
             age: partner.age,
             city: partner.city,
@@ -4121,7 +4138,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             about: partner.about,
             photoUrl: partner.photoUrl,
             religiosity: partner.religiosity,
-          } : null,
+            reasons: [],
+            considerations: [],
+            isAnonymous: false,
+          }) : null,
           myName: me?.firstName ?? "",
         };
       }),
@@ -4148,6 +4168,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         ).limit(1);
 
         if (!match) throw new TRPCError({ code: "NOT_FOUND", message: "קישור לא תקין" });
+        const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
         if (match.approvalExpiresAt && Date.now() > match.approvalExpiresAt) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "הקישור פג תוקף" });
         }
@@ -4173,6 +4194,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           if (isA) rejectData.approvedByA = false;
           else rejectData.approvedByB = false;
           await db.update(matches).set(rejectData).where(eq(matches.id, match.id));
+          if (isBoost) {
+            await syncBoostRequestAfterMatchDecision(db, {
+              matchId: match.id,
+              decision: "rejected",
+              reason: "boost_recipient_declined",
+              now,
+            });
+          }
           // If the other party already said yes, send them a consolation email
           const otherAlreadyApproved = isA ? match.approvedByB : match.approvedByA;
           if (otherAlreadyApproved) {

@@ -12,6 +12,7 @@ export { normalizeWhatsAppPhone } from "./whatsappWebhook";
 
 type AppDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type MatchSide = "A" | "B";
+export type BoostRecipientRole = "sender" | "recipient";
 
 export type MatchWhatsAppRecipient = {
   side: MatchSide;
@@ -27,11 +28,15 @@ export type MatchWhatsAppPayload = MakeWhatsAppPayload & {
   recipientName: string;
   matchFirstName: string;
   score: number;
+  boostRole?: BoostRecipientRole;
 };
 
-export function buildMatchWhatsAppMessage(firstName: string, matchFirstName: string, score: number, proposalSource: "manual" | "boost" = "manual"): string {
+export function buildMatchWhatsAppMessage(firstName: string, matchFirstName: string, score: number, proposalSource: "manual" | "boost" = "manual", boostRole: BoostRecipientRole = "recipient"): string {
   if (proposalSource === "boost") {
-    return `היי ${firstName}\n\nמחכה לך במייל הצעת Boost אלגוריתמית של ${score}%. ההצעה נשלחה במסגרת שירות Boost ולא נבדקה ידנית על ידי הילית.\n\nכדאי לבדוק את תיבת המייל, גם בספאם ובתיקיית השיווק, ולבחור אם ההצעה מעניינת אותך. הפרטים המלאים ייחשפו רק לאחר הסכמה הדדית.\n\nצוות הילית כספי 💛`;
+    if (boostRole === "sender") {
+      return `היי ${firstName}\n\nשלחת התאמת Boost של ${score}%. הבקשה נשלחה לצד השני ואין צורך לאשר שוב.\n\nאם תהיה הסכמה מהצד השני, השם, התמונה והפרטים המלאים יישלחו לשניכם במייל.\n\nצוות הילית כספי 💛`;
+    }
+    return `היי ${firstName}\n\nקיבלת התאמת Boost של ${score}%. בקשת היכרות חדשה הגיעה דרך שירות Boost, והיא לא נבדקה ידנית על ידי הילית.\n\nכל הפרטים מחכים במייל, גם בספאם ובתיקיית השיווק. השם והתמונה ייחשפו רק לאחר אישור הדדי.\n\nצוות הילית כספי 💛`;
   }
   return `היי ${firstName}\n\nשלחתי לך מייל עם התאמה של ${score}% מיוחדת שבחרתי עבורך, ${matchFirstName} מחכה לתשובתך!\n\nכדאי לבדוק את תיבת המייל (גם ספאם והשיווק) וללחוץ על הקישור.\n\nהילית 💛`;
 }
@@ -41,13 +46,14 @@ export function buildMatchWhatsAppPayload(input: {
   score: number;
   recipient: MatchWhatsAppRecipient;
   proposalSource?: "manual" | "boost";
+  boostRole?: BoostRecipientRole;
 }): MatchWhatsAppPayload | null {
   if (!input.recipient.phone) return null;
   return buildMakeWhatsAppPayload({
     event: "match_proposal_sent",
     idempotencyKey: `match-${input.matchId}-${input.recipient.side}`,
     phone: input.recipient.phone,
-    message: buildMatchWhatsAppMessage(input.recipient.firstName, input.recipient.matchFirstName, input.score, input.proposalSource),
+    message: buildMatchWhatsAppMessage(input.recipient.firstName, input.recipient.matchFirstName, input.score, input.proposalSource, input.boostRole),
     metadata: {
       matchId: input.matchId,
       recipientSide: input.recipient.side,
@@ -55,6 +61,7 @@ export function buildMatchWhatsAppPayload(input: {
       matchFirstName: input.recipient.matchFirstName,
       score: input.score,
       proposalSource: input.proposalSource || "manual",
+      ...(input.boostRole ? { boostRole: input.boostRole } : {}),
     },
   }) as MatchWhatsAppPayload | null;
 }
@@ -74,6 +81,7 @@ export async function sendInitialMatchWhatsAppsOnce(
     recipientA: Omit<MatchWhatsAppRecipient, "side">;
     recipientB: Omit<MatchWhatsAppRecipient, "side">;
     proposalSource?: "manual" | "boost";
+    boostSenderSide?: MatchSide;
   },
 ) {
   try {
@@ -89,8 +97,20 @@ export async function sendInitialMatchWhatsAppsOnce(
       return { skipped: true, sentA: false, sentB: false };
     }
 
-    const payloadA = buildMatchWhatsAppPayload({ matchId: input.matchId, score: input.score, recipient: { ...input.recipientA, side: "A" }, proposalSource: input.proposalSource });
-    const payloadB = buildMatchWhatsAppPayload({ matchId: input.matchId, score: input.score, recipient: { ...input.recipientB, side: "B" }, proposalSource: input.proposalSource });
+    const payloadA = buildMatchWhatsAppPayload({
+      matchId: input.matchId,
+      score: input.score,
+      recipient: { ...input.recipientA, side: "A" },
+      proposalSource: input.proposalSource,
+      boostRole: input.proposalSource === "boost" ? (input.boostSenderSide === "A" ? "sender" : "recipient") : undefined,
+    });
+    const payloadB = buildMatchWhatsAppPayload({
+      matchId: input.matchId,
+      score: input.score,
+      recipient: { ...input.recipientB, side: "B" },
+      proposalSource: input.proposalSource,
+      boostRole: input.proposalSource === "boost" ? (input.boostSenderSide === "B" ? "sender" : "recipient") : undefined,
+    });
     const [sentA, sentB] = await Promise.all([
       payloadA ? postMatchWhatsAppWebhook(payloadA) : Promise.resolve(false),
       payloadB ? postMatchWhatsAppWebhook(payloadB) : Promise.resolve(false),

@@ -335,6 +335,9 @@ export async function syncBoostRequestAfterMatchDecision(
   input: { matchId: number; decision: "approved" | "rejected"; reason?: string; now?: number },
 ) {
   const now = input.now ?? Date.now();
+  const statusFilter = input.decision === "rejected"
+    ? inArray(matchBoostRequests.status, ["paid", "queued", "reviewing", "approved"] as const)
+    : inArray(matchBoostRequests.status, REVIEWABLE_BOOST_STATUSES);
   await db.transaction(async (tx: any) => {
     await tx.update(matchBoostRequests).set({
       status: input.decision,
@@ -346,7 +349,7 @@ export async function syncBoostRequestAfterMatchDecision(
       updatedAt: now,
     }).where(and(
       eq(matchBoostRequests.matchId, input.matchId),
-      inArray(matchBoostRequests.status, [...REVIEWABLE_BOOST_STATUSES]),
+      statusFilter,
     ));
     await tx.update(crmTeamTasks).set({
       status: "done",
@@ -683,6 +686,10 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   const partyA = singleA[0];
   const partyB = singleB[0];
   if (!partyA || !partyB) throw new TRPCError({ code: "NOT_FOUND", message: "אחד הפרופילים אינו זמין" });
+  const senderIsA = request.singleId === match.singleAId;
+  if (!senderIsA && request.singleId !== match.singleBId) {
+    throw new TRPCError({ code: "CONFLICT", message: "לא ניתן לזהות את שולח ה־Boost" });
+  }
   const membershipBySingle = new Map<number, any>((memberships as any[]).map((row: any) => [row.singleId, row]));
   const bothConsented = [partyA, partyB].every((party: any) => {
     const membership = membershipBySingle.get(party.id);
@@ -707,6 +714,10 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
       status: "proposed",
       approvalTokenA: tokenA,
       approvalTokenB: tokenB,
+      approvedByA: senderIsA ? true : Boolean(match.approvedByA),
+      approvedByB: senderIsA ? Boolean(match.approvedByB) : true,
+      tokenAUsedAt: senderIsA ? now : match.tokenAUsedAt,
+      tokenBUsedAt: senderIsA ? match.tokenBUsedAt : now,
       approvalExpiresAt: expiresAt,
       proposedAt: now,
       ownerApprovedAt: null,
@@ -757,6 +768,7 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     singleId: partyA.id,
     trackingPixelUrl: `${baseUrl}/api/match-open?token=${tokenA}&side=a`,
     proposalSource: "boost",
+    boostRole: senderIsA ? "sender" : "recipient",
   });
   const emailB = buildMatchProposalEmail({
     firstName: partyB.firstName,
@@ -778,6 +790,7 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     singleId: partyB.id,
     trackingPixelUrl: `${baseUrl}/api/match-open?token=${tokenB}&side=b`,
     proposalSource: "boost",
+    boostRole: senderIsA ? "recipient" : "sender",
   });
   await Promise.all([
     sendEmail({ to: { email: partyA.email, name: partyA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
@@ -787,6 +800,7 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     matchId: match.id,
     score,
     proposalSource: "boost",
+    boostSenderSide: senderIsA ? "A" : "B",
     recipientA: { phone: partyA.phone, firstName: partyA.firstName, matchFirstName: "התאמה אנונימית" },
     recipientB: { phone: partyB.phone, firstName: partyB.firstName, matchFirstName: "התאמה אנונימית" },
   });

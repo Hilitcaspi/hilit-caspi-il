@@ -278,6 +278,10 @@ describe("match boost privacy and payment gate", () => {
   const termsSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/TermsMatchBoost.tsx"), "utf8");
   const demoSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/MatchBoostDemo.tsx"), "utf8");
   const landingSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/MatchBoostLanding.tsx"), "utf8");
+  const responseSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/MatchRespond.tsx"), "utf8");
+  const silhouetteSource = fs.readFileSync(path.join(process.cwd(), "client/src/components/AnonymousBoostSilhouette.tsx"), "utf8");
+  const thankYouSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/ThankYouMatchBoost.tsx"), "utf8");
+  const routersSource = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
   const crmSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/CRMMatchmaking.tsx"), "utf8");
   const boostCardSource = uiSource.slice(uiSource.indexOf("function MatchBoostCard"), uiSource.indexOf("function DnaSection"));
 
@@ -432,11 +436,41 @@ describe("match boost privacy and payment gate", () => {
 
   it("labels Boost email and WhatsApp as algorithmic and hides name and photo until mutual consent", () => {
     expect(emailSource).toContain('proposalSource?: "manual" | "boost"');
+    expect(emailSource).toContain('boostRole?: "sender" | "recipient"');
+    expect(emailSource).toContain("מחכה לך התאמת Boost");
+    expect(emailSource).toContain("ה־Boost ששלחת יצא לדרך");
     expect(emailSource).toContain("לא נבדקה ולא אושרה ידנית על ידי הילית");
     expect(emailSource).toContain("!isBoost && params.matchPhotoUrl");
     expect(emailSource).toContain('isBoost ? "כרטיס התאמה אנונימי" : params.matchFirstName');
     expect(whatsappSource).toContain('proposalSource === "boost"');
-    expect(whatsappSource).toContain("הצעת Boost אלגוריתמית");
+    expect(whatsappSource).toContain("שלחת התאמת Boost");
+    expect(whatsappSource).toContain("קיבלת התאמת Boost");
     expect(whatsappSource).toContain("לא נבדקה ידנית על ידי הילית");
+  });
+
+  it("treats paid Boost sending as sender approval and keeps the recipient response anonymous", () => {
+    expect(source).toContain("approvedByA: senderIsA ? true");
+    expect(source).toContain("approvedByB: senderIsA ? Boolean(match.approvedByB) : true");
+    expect(source).toContain("tokenAUsedAt: senderIsA ? now");
+    expect(source).toContain("boostSenderSide: senderIsA ? \"A\" : \"B\"");
+    expect(routersSource).toContain("buildAnonymousBoostCard(partner, match)");
+    expect(routersSource).toContain("photoUrl: null");
+    expect(responseSource).toContain("קיבלת התאמת Boost");
+    expect(responseSource).toContain("AnonymousBoostSilhouette");
+    expect(responseSource).toContain("השולח כבר אישר את ההצעה בעת השליחה");
+    expect(routersSource).toContain('reason: "boost_recipient_declined"');
+    expect(source).toContain('["paid", "queued", "reviewing", "approved"] as const');
+  });
+
+  it("uses an anonymous silhouette instead of a question mark and confirms reveal only after mutual consent", () => {
+    expect(silhouetteSource).toContain("צללית אנונימית");
+    expect(silhouetteSource).toContain("התמונה תיחשף רק לאחר אישור הדדי");
+    expect(boostCardSource).toContain("AnonymousBoostSilhouette");
+    expect(boostCardSource).not.toContain('blur-[1px]\">?</div>');
+    expect(boostCardSource).toContain("למה האלגוריתם מצא כאן פוטנציאל");
+    expect(thankYouSource).toContain("שלחת Boost");
+    expect(thankYouSource).toContain("אם תהיה הסכמה, השם, התמונה והפרטים המלאים יישלחו לשניכם");
+    expect(boostCardSource).toContain("טוענים את אפשרויות ה־Boost");
+    expect(boostCardSource).toContain("לא הצלחנו לטעון את Boost כרגע");
   });
 });
