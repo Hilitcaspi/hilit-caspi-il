@@ -105,6 +105,13 @@ export const GA_PRODUCTS = {
     price: 449,
     currency: "ILS",
   },
+  match_boost: {
+    item_id: "match_boost_1990",
+    item_name: "Boost - שליחת הצעת התאמה",
+    item_category: "matchmaking",
+    price: 19.9,
+    currency: "ILS",
+  },
 } as const;
 
 export type ProductKey = keyof typeof GA_PRODUCTS;

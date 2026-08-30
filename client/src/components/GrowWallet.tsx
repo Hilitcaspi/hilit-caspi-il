@@ -18,6 +18,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { gaBeginCheckout } from "@/lib/ga";
+import { trackInitiateCheckout } from "@/lib/metaPixel";
+import { track } from "@/lib/track";
 
 // ─── Grow config from VITE env vars ──────────────────────────────────────────
 const GROW_ENV = "PRODUCTION" as string; // "DEV" for sandbox, "PRODUCTION" for live
@@ -294,6 +297,12 @@ export default function GrowWallet({
     if (termsPath && !termsAccepted) {
       toast.error("יש לאשר את התקנון לפני התשלום.");
       return;
+    }
+
+    if (product === "match_boost") {
+      gaBeginCheckout("match_boost");
+      trackInitiateCheckout({ value: 19.9, currency: "ILS", content_name: "Boost - שליחת הצעת התאמה" });
+      track({ eventType: "button_click", metadata: { product: "match_boost", action: "initiate_checkout", value: 19.9 } });
     }
 
     setWalletLoading(true);

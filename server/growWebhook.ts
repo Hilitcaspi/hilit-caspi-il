@@ -800,7 +800,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     }
 
     // Fire GA4 purchase event server-side via Measurement Protocol
-    const GA4_KEYS = ["guide", "course", "coaching", "session", "database", "bundle_new_year"] as const;
+    const GA4_KEYS = ["guide", "course", "coaching", "session", "database", "bundle_new_year", "match_boost"] as const;
     type GA4Key = typeof GA4_KEYS[number];
     if (GA4_KEYS.includes(product as GA4Key)) {
       // Prefer the real browser client_id (from _ga cookie) for accurate DebugView stitching

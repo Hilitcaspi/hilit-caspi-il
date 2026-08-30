@@ -72,6 +72,7 @@ const NewYearLoveBundle = lazy(() => import("@/pages/NewYearLoveBundle"));
 const ThankYouNewYearBundle = lazy(() => import("@/pages/ThankYouNewYearBundle"));
 const TermsNewYearBundle = lazy(() => import("@/pages/TermsNewYearBundle"));
 const MatchBoostLanding = lazy(() => import("@/pages/MatchBoostLanding"));
+const BoostSalesLanding = lazy(() => import("@/pages/BoostSalesLanding"));
 const TermsMatchBoost = lazy(() => import("@/pages/TermsMatchBoost"));
 const ThankYouMatchBoost = lazy(() => import("@/pages/ThankYouMatchBoost"));
 const MatchBoostDemo = lazy(() => import("@/pages/MatchBoostDemo"));
@@ -286,6 +287,7 @@ function HeRouter() {
           <Route path="/terms/new-year-love" component={TermsNewYearBundle} />
           <Route path="/thank-you/new-year-love" component={ThankYouNewYearBundle} />
           <Route path="/match-boost" component={MatchBoostLanding} />
+          <Route path="/boost-now" component={BoostSalesLanding} />
           <Route path="/match-boost/demo" component={MatchBoostDemo} />
           <Route path="/terms/match-boost" component={TermsMatchBoost} />
           <Route path="/thank-you/match-boost" component={ThankYouMatchBoost} />
