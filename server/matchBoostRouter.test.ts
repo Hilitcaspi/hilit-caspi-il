@@ -448,7 +448,8 @@ describe("match boost privacy and payment gate", () => {
     expect(emailSource).toContain("נשלחה אליך התאמת Boost שמחכה לאישור שלך");
     expect(emailSource).toContain("התשלום ושליחת ה־Boost אינם אישור להתאמה");
     expect(emailSource).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
-    expect(emailSource).toContain("${params.matchPhotoUrl ?");
+    expect(emailSource).toContain("const matchPhotoUrl = toEmailImageUrl(params.matchPhotoUrl)");
+    expect(emailSource).toContain("${matchPhotoUrl ?");
     expect(source).toContain("matchPhotoUrl: partyB.photoUrl ?? undefined");
     expect(source).toContain("matchPhotoUrl: partyA.photoUrl ?? undefined");
     expect(whatsappSource).toContain('proposalSource === "boost"');

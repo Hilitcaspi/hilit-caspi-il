@@ -6,6 +6,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { registerEmailImageProxy } from "./emailImageProxy";
 import { registerGrowProxy } from "./growProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -88,6 +89,7 @@ async function startServer() {
 
   // OAuth callback under /api/oauth/callback
   registerStorageProxy(app);
+  registerEmailImageProxy(app);
   registerOAuthRoutes(app);
 
   // Safe public preview for approval only. This route never sends an email.

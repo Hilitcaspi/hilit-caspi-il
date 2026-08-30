@@ -4,6 +4,8 @@
  * Men: הצעד הראשון, 5 הסודות (מדריך), המאגר הבלעדי, מסע הטרנספורמציה
  */
 
+import { toEmailImageUrl } from "./emailImages";
+
 export type EmailTemplate = {
   subject: string;
   htmlBody: string;
@@ -1322,6 +1324,7 @@ export function buildMatchProposalEmail(params: {
   proposalSource?: "manual" | "boost";
   boostRole?: "sender" | "recipient";
 }): EmailTemplate {
+  const matchPhotoUrl = toEmailImageUrl(params.matchPhotoUrl);
   const isFemale = params.recipientGender === "female";
   const isMale = params.recipientGender === "male";
   const isBoost = params.proposalSource === "boost";
@@ -1376,7 +1379,7 @@ export function buildMatchProposalEmail(params: {
     <div style="background:#f9f6f0; border-radius:14px; padding:24px 28px; margin:20px 0;">
       <p style="color:#191265; font-size:13px; font-weight:700; margin:0 0 12px; letter-spacing:0.5px;">${isBoost ? "⚡ התאמת Boost" : "✨ ההתאמה שלך"}</p>
       <div style="background:#191265; border-radius:12px; padding:20px 24px; text-align:center;">
-        ${params.matchPhotoUrl ? `<a href="${params.matchPhotoUrl}" target="_blank" rel="noopener noreferrer" style="display:block; margin-bottom:16px; text-decoration:none;"><img src="${params.matchPhotoUrl}" alt="${params.matchFirstName}" style="width:200px; height:200px; border-radius:16px; object-fit:cover; object-position:center 20%; border:3px solid #ffe27c; display:block; margin-left:auto; margin-right:auto;" /></a>` : ""}
+        ${matchPhotoUrl ? `<a href="${matchPhotoUrl}" target="_blank" rel="noopener noreferrer" style="display:block; margin:0 auto 16px; width:200px; height:200px; border-radius:16px; overflow:hidden; background:#2a1b7a; text-decoration:none;"><img src="${matchPhotoUrl}" alt="" width="200" height="200" style="width:200px; height:200px; border-radius:16px; object-fit:cover; object-position:center 20%; border:3px solid #ffe27c; box-sizing:border-box; display:block; background:#2a1b7a; color:transparent;" /></a>` : ""}
         <p style="color:#ffffff; font-size:22px; font-weight:800; margin:0 0 4px;">${params.matchFirstName}</p>
         <p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">🎂 ${params.matchAge} · 📍 ${params.matchCity}</p>
         ${occupationLine}
@@ -1600,6 +1603,8 @@ export function buildOwnerMatchApprovalEmail(params: {
   rejectUrl: string;
   matchId: number;
 }): { subject: string; htmlBody: string; textBody: string } {
+  const singleAPhotoUrl = toEmailImageUrl(params.singleAPhotoUrl);
+  const singleBPhotoUrl = toEmailImageUrl(params.singleBPhotoUrl);
   const dnaLabelA = params.singleADna ? (DNA_PROFILES[params.singleADna]?.label_f ?? params.singleADna) : "";
   const dnaLabelB = params.singleBDna ? (DNA_PROFILES[params.singleBDna]?.label_f ?? params.singleBDna) : "";
   const content = `
@@ -1614,7 +1619,7 @@ export function buildOwnerMatchApprovalEmail(params: {
       </tr>
       <tr>
         <td style="padding:12px; border:1px solid #e0d8cc; vertical-align:top; text-align:center;">
-          ${params.singleAPhotoUrl ? `<a href="${params.singleAPhotoUrl}" target="_blank" rel="noopener noreferrer"><img src="${params.singleAPhotoUrl}" alt="${params.singleAFirstName}" style="width:140px; height:140px; border-radius:12px; object-fit:cover; object-position:center 20%; border:2px solid #191265; margin-bottom:8px; display:block; margin-left:auto; margin-right:auto;" /></a>` : ""}
+          ${singleAPhotoUrl ? `<a href="${singleAPhotoUrl}" target="_blank" rel="noopener noreferrer" style="display:block; width:140px; height:140px; margin:0 auto 8px; border-radius:12px; overflow:hidden; background:#f0eadc;"><img src="${singleAPhotoUrl}" alt="" width="140" height="140" style="width:140px; height:140px; border-radius:12px; object-fit:cover; object-position:center 20%; border:2px solid #191265; box-sizing:border-box; display:block; background:#f0eadc; color:transparent;" /></a>` : ""}
           <strong>${params.singleAFirstName}</strong><br/>
           גיל: ${params.singleAAge}<br/>
           עיר: ${params.singleACity}<br/>
@@ -1622,7 +1627,7 @@ export function buildOwnerMatchApprovalEmail(params: {
           ${dnaLabelA ? `DNA: ${dnaLabelA}` : ""}
         </td>
         <td style="padding:12px; border:1px solid #e0d8cc; vertical-align:top; text-align:center;">
-          ${params.singleBPhotoUrl ? `<a href="${params.singleBPhotoUrl}" target="_blank" rel="noopener noreferrer"><img src="${params.singleBPhotoUrl}" alt="${params.singleBFirstName}" style="width:140px; height:140px; border-radius:12px; object-fit:cover; object-position:center 20%; border:2px solid #191265; margin-bottom:8px; display:block; margin-left:auto; margin-right:auto;" /></a>` : ""}
+          ${singleBPhotoUrl ? `<a href="${singleBPhotoUrl}" target="_blank" rel="noopener noreferrer" style="display:block; width:140px; height:140px; margin:0 auto 8px; border-radius:12px; overflow:hidden; background:#f0eadc;"><img src="${singleBPhotoUrl}" alt="" width="140" height="140" style="width:140px; height:140px; border-radius:12px; object-fit:cover; object-position:center 20%; border:2px solid #191265; box-sizing:border-box; display:block; background:#f0eadc; color:transparent;" /></a>` : ""}
           <strong>${params.singleBFirstName}</strong><br/>
           גיל: ${params.singleBAge}<br/>
           עיר: ${params.singleBCity}<br/>
