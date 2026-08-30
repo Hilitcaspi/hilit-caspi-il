@@ -96,15 +96,15 @@ export default function BoostSalesLanding() {
 
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 pb-16 pt-6 sm:px-6 sm:pb-24 lg:grid-cols-[1.03fr_.97fr] lg:gap-16 lg:px-8 lg:pt-12">
           <div className="relative z-10 order-2 lg:order-1">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#4b235f] shadow-lg"><Sparkles className="h-4 w-4" />יותר אפשרויות. יותר בחירה.</div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#4b235f] shadow-lg"><Sparkles className="h-4 w-4" />ביקשתם יותר אפשרויות. אני מקשיבה לכם.</div>
             <h1 className="mt-6 max-w-3xl text-5xl font-black leading-[1.02] tracking-[-.045em] sm:text-6xl lg:text-7xl">
-              אולי ההתאמה הבאה
-              <span className="block bg-gradient-to-l from-[#ffe27c] via-white to-[#ff9fd1] bg-clip-text text-transparent">כבר מחכה באזור האישי שלך.</span>
+              שירות Boost החדש
+              <span className="block bg-gradient-to-l from-[#ffe27c] via-white to-[#ff9fd1] bg-clip-text text-transparent">והבחירה גם בידיים שלכם.</span>
             </h1>
-            <p className="mt-6 max-w-2xl text-lg font-bold leading-8 text-white/86 sm:text-xl">Boost מאפשר לבדוק אפשרויות נוספות שנמצאו מתאימות לפי האלגוריתם, לבחור מה מסקרן ולשלוח בקשת התאמה בעצמכם.</p>
+            <p className="mt-6 max-w-2xl text-lg font-bold leading-8 text-white/86 sm:text-xl">באמצעות Boost אפשר לראות באזור האישי אפשרויות נוספות שנמצאו מתאימות לפי האלגוריתם, ולבחור בעצמכם למי לשלוח בקשת התאמה.</p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button type="button" onClick={() => openPersonalArea("hero")} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#ff3f9f,#d72b91)] px-7 py-4 text-base font-black text-white shadow-[0_16px_40px_rgba(255,63,159,.34)] transition duration-200 hover:-translate-y-0.5 active:scale-[.97]">לראות מה מחכה לי <ArrowLeft className="h-5 w-5" /></button>
-              <p className="text-center text-xs font-bold leading-5 text-white/65 sm:text-right">19.90 ₪ רק כשבוחרים לשלוח<br />האישור לשירות עצמו בחינם</p>
+              <button type="button" onClick={() => openPersonalArea("hero")} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#ff3f9f,#d72b91)] px-7 py-4 text-base font-black text-white shadow-[0_16px_40px_rgba(255,63,159,.34)] transition duration-200 hover:-translate-y-0.5 active:scale-[.97]">לראות את האפשרויות שלי <ArrowLeft className="h-5 w-5" /></button>
+              <p className="text-center text-xs font-bold leading-5 text-white/65 sm:text-right">האישור לשירות עצמו בחינם<br />התשלום מופיע רק כשבוחרים לשלוח</p>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-5 gap-y-3 text-xs font-bold text-white/76">
               <span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />כרטיס אנונימי לפני השליחה</span>
@@ -127,7 +127,7 @@ export default function BoostSalesLanding() {
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-xs font-black uppercase tracking-[.2em] text-[#a52178]">כך Boost נראה בפועל</p>
-          <h2 className="mt-3 text-3xl font-black tracking-[-.035em] sm:text-5xl">מספיק לראות פרט אחד שמסקרן כדי לפתוח אפשרות חדשה.</h2>
+          <h2 className="mt-3 text-3xl font-black tracking-[-.035em] sm:text-5xl">פותחים כרטיס, בודקים ובוחרים בעצמכם.</h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-[#675b72]">הכרטיס מציג מידע מרכזי ואחוז התאמה בלי לחשוף זהות. התשלום מתבצע רק מתוך כרטיס אישי שעומד בתנאי הזכאות.</p>
         </div>
         <div className="mx-auto mt-11 max-w-2xl"><ProductCard /></div>
@@ -155,7 +155,7 @@ export default function BoostSalesLanding() {
           </div>
           <div>
             <p className="text-xs font-black uppercase tracking-[.2em] text-[#ffe27c]">ארבעה צעדים פשוטים</p>
-            <h2 className="mt-3 text-3xl font-black tracking-[-.035em] sm:text-5xl">לא מחכים. בודקים. בוחרים.</h2>
+            <h2 className="mt-3 text-3xl font-black tracking-[-.035em] sm:text-5xl">רואים. בודקים. בוחרים בעצמכם.</h2>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {steps.map(([number, title, text]) => (
                 <article key={number} className="rounded-2xl border border-white/15 bg-white/[.08] p-5 backdrop-blur">
@@ -172,10 +172,10 @@ export default function BoostSalesLanding() {
       <section className="px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
         <div className="mx-auto max-w-4xl overflow-hidden rounded-[2.25rem] bg-[radial-gradient(circle_at_14%_10%,#fd73bd_0,transparent_30%),linear-gradient(145deg,#180b43,#6f1d78)] p-7 text-center text-white shadow-[0_28px_80px_rgba(59,19,85,.24)] sm:p-12">
           <ShieldCheck className="mx-auto h-10 w-10 text-[#ffe27c]" />
-          <h2 className="mt-4 text-3xl font-black sm:text-5xl">האפשרות הבאה מתחילה בבדיקה אחת.</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-white/82">אם יש כרטיס Boost זמין באזור האישי, אפשר לפתוח אותו, לראות את הפרטים האנונימיים ולהחליט אם לשלוח. אין הבטחה לאישור, לדייט או לזוגיות.</p>
+          <h2 className="mt-4 text-3xl font-black sm:text-5xl">רוצים לראות אילו אפשרויות מחכות לכם?</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-white/82">אם יש כרטיס Boost זמין באזור האישי, אפשר לפתוח אותו, לראות את הפרטים האנונימיים ולבחור אם תרצו לשלוח בקשת התאמה.</p>
           <button type="button" onClick={() => openPersonalArea("final_cta")} className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#ffe27c] px-8 py-4 text-base font-black text-[#3f174d] shadow-xl transition duration-200 hover:-translate-y-0.5 active:scale-[.97]">לבדוק את אפשרויות ה־Boost שלי <ArrowLeft className="h-5 w-5" /></button>
-          <p className="mt-4 text-xs font-bold text-white/60">לחברי המאגר שאישרו את השירות. כל שליחה בתשלום חד פעמי של 19.90 ₪.</p>
+          <p className="mt-4 text-xs font-bold text-white/60">לחברי המאגר שאישרו את השירות. התשלום מופיע רק בעת בחירת כרטיס לשליחה.</p>
         </div>
       </section>
 
@@ -186,7 +186,7 @@ export default function BoostSalesLanding() {
       </footer>
 
       <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-2xl border border-white/20 bg-[#241257]/95 p-3 shadow-2xl backdrop-blur sm:hidden">
-        <button type="button" onClick={() => openPersonalArea("mobile_sticky")} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(90deg,#ff3f9f,#d72b91)] px-5 py-3.5 text-sm font-black text-white active:scale-[.97]">לראות מה מחכה לי <ArrowLeft className="h-4 w-4" /></button>
+        <button type="button" onClick={() => openPersonalArea("mobile_sticky")} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(90deg,#ff3f9f,#d72b91)] px-5 py-3.5 text-sm font-black text-white active:scale-[.97]">לראות את האפשרויות שלי <ArrowLeft className="h-4 w-4" /></button>
       </div>
     </main>
   );
