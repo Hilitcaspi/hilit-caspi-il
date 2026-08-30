@@ -13,6 +13,7 @@ export const PERMANENTLY_BLOCKED_EMAILS = new Set([
   "michalbs5921@gmail.com",
   "tomy.23@gmail.com",
   "alonrozenstain@gmail.com",
+  "noy.linevitz31@gmail.com",
 ]);
 
 export function isPermanentlyBlockedEmail(email: string): boolean {
