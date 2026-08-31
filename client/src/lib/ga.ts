@@ -64,10 +64,17 @@ export const GA_PRODUCTS = {
     currency: "ILS",
   },
   coaching: {
-    item_id: "coaching_2900",
+    item_id: "coaching_2960",
     item_name: "ליווי אישי 8 פגישות",
     item_category: "coaching",
-    price: 2900,
+    price: 2960,
+    currency: "ILS",
+  },
+  coaching_mas: {
+    item_id: "coaching_mas_4200",
+    item_name: "ליווי אישי 12 פגישות",
+    item_category: "coaching",
+    price: 4200,
     currency: "ILS",
   },
   guide: {
@@ -110,6 +117,13 @@ export const GA_PRODUCTS = {
     item_name: "Boost - שליחת הצעת התאמה",
     item_category: "matchmaking",
     price: 19.9,
+    currency: "ILS",
+  },
+  plus: {
+    item_id: "plus_99",
+    item_name: "Database Plus",
+    item_category: "subscription",
+    price: 99,
     currency: "ILS",
   },
 } as const;

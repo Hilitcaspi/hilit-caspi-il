@@ -16,8 +16,8 @@ import {
   Sprout,
 } from "lucide-react";
 import GrowWallet from "@/components/GrowWallet";
-import { gaBeginCheckout, gaViewItem } from "@/lib/ga";
-import { trackInitiateCheckout, trackViewContent } from "@/lib/metaPixel";
+import { gaViewItem } from "@/lib/ga";
+import { trackViewContent } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import { trpc } from "@/lib/trpc";
 
@@ -211,9 +211,7 @@ export default function NewYearLoveBundle() {
   }, []);
 
   const openPayment = (placement: string) => {
-    gaBeginCheckout("bundle_new_year");
-    trackInitiateCheckout({ value: 449, currency: "ILS", content_name: "חבילת חגי תשרי" });
-    track({ eventType: "button_click", page: "/new-year-love", metadata: { action: "scroll_to_payment", placement } });
+    track({ eventType: "product_click", page: "/new-year-love", metadata: { product: "bundle_new_year", action: "scroll_to_payment", placement } });
     paymentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
@@ -242,9 +240,9 @@ export default function NewYearLoveBundle() {
             <h1 className="max-w-3xl text-[2.85rem] font-black leading-[0.98] tracking-[-0.045em] text-white md:text-6xl lg:text-7xl">
               בחגים האלה לא
               <span className="mt-2 block bg-gradient-to-l from-[#fff0b4] via-[#f5c76a] to-[#f49ab0] bg-clip-text text-transparent">רק מאחלים אהבה.</span>
-              <span className="mt-2 block">מתחילים לפעול בשבילה.</span>
+              <span className="mt-2 block">פותחים לה מקום.</span>
             </h1>
-            <p className="mt-7 max-w-2xl text-lg font-bold leading-8 text-[#fff1ef]/92 md:text-2xl md:leading-9">לא כדי להבטיח תוצאה. כדי לתת להזדמנות, לבהירות ולתנועה מקום אמיתי בתוך השנה החדשה.</p>
+            <p className="mt-7 max-w-2xl text-lg font-bold leading-8 text-[#fff1ef]/92 md:text-2xl md:leading-9">לא כדי להבטיח תוצאה. כדי לתת ליותר הזדמנויות, לבחירה מדויקת ולתנועה מקום אמיתי בתוך השנה החדשה.</p>
             <p className="mt-4 max-w-xl text-base leading-7 text-white/67 md:text-lg">מאגר הרווקים והרווקות, המדריך ״לבחור נכון״ והקורס ״המסע״. שלושה כלים משלימים במסלול אחד, במחיר חג אחד.</p>
 
             <div className="mt-8 max-w-xl"><PricePanel /></div>

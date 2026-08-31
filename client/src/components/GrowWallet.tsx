@@ -299,11 +299,18 @@ export default function GrowWallet({
       return;
     }
 
-    if (product === "match_boost") {
-      gaBeginCheckout("match_boost");
-      trackInitiateCheckout({ value: 19.9, currency: "ILS", content_name: "Boost - שליחת הצעת התאמה" });
-      track({ eventType: "button_click", metadata: { product: "match_boost", action: "initiate_checkout", value: 19.9 } });
-    }
+    const baseCheckoutPrice = PRODUCT_CONFIGS[product]?.sum ?? 0;
+    const trackedCheckoutPrice = couponApplied?.fixedPrice
+      ?? (couponApplied?.discountAmount
+        ? Math.max(1, baseCheckoutPrice - couponApplied.discountAmount)
+        : couponApplied?.discountPercent
+          ? Math.max(1, Math.round(baseCheckoutPrice * (1 - couponApplied.discountPercent / 100)))
+          : baseCheckoutPrice);
+    const checkoutDescription = PRODUCT_CONFIGS[product]?.description ?? product;
+
+    gaBeginCheckout(product);
+    trackInitiateCheckout({ value: trackedCheckoutPrice, currency: "ILS", content_name: checkoutDescription });
+    track({ eventType: "button_click", metadata: { product, action: "initiate_checkout", value: trackedCheckoutPrice } });
 
     setWalletLoading(true);
 
