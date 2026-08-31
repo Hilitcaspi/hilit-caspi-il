@@ -19,3 +19,9 @@
 - [x] Accept an Instagram username with or without a leading `@` and normalize it before validation.
 - [x] Surface form validation feedback beside the relevant inputs before a submission is sent.
 - [x] Add regression coverage for the Instagram normalization and short self-description validation.
+- [x] Upload the provided Hilit Caspi portrait as a managed static asset and use it only in the public brand introduction.
+- [x] Redesign the public application page in Hilit Caspi’s deep indigo, warm gold, and clean white brand language.
+- [x] Apply the brand’s Hebrew display and supporting typography hierarchy, including right-to-left mobile layout refinements.
+- [x] Preserve all form, privacy, upload, and consent behavior while changing the public visual design.
+- [x] Verify the redesigned public page on desktop and mobile, then run regression tests and a production build.
+- [ ] Save a redesigned-page checkpoint and synchronize it with the designated GitHub repository.
