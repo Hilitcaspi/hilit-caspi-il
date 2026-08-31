@@ -39,4 +39,4 @@
 - [x] Replace the Instagram follow wording with the requested story-tagging explanation.
 - [x] Unify all public-page typography under Hilit’s preferred headline style and remove the serif treatment.
 - [x] Verify the revised public page in desktop and mobile and run TypeScript, regression-test, and production-build checks.
-- [ ] Save and synchronize the next checkpoint.
+- [x] Save and synchronize the next checkpoint.
