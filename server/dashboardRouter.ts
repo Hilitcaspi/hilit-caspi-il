@@ -18,7 +18,7 @@ const PRODUCT_PRICES: Record<string, number> = {
   coaching: 2960,
   coaching_mas: 4200,
   bundle_tubav: 349,
-  bundle_new_year: 449,
+  bundle_new_year: 399,
 };
 
 /**

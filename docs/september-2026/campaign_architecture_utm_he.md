@@ -76,7 +76,7 @@ Meta תומכת רשמית ב־`{{campaign.id}}`, `{{adset.id}}`, `{{ad.id}}`, `
 | `feed_holiday_action_bundle_v1` | Feed, מסר ״לא רק מאחלים אהבה״ |
 | `story_holiday_table_future_v1` | Story, שולחן חג ועתיד זוגי בלי הבטחה |
 | `reel_holiday_hilit_explains_v1` | Reels, הילית מסבירה את החבילה |
-| `feed_value_stack_1245_to_449_v1` | Feed, פירוט ערך ומחיר |
+| `feed_value_stack_1245_to_399_v1` | Feed, פירוט ערך ומחיר |
 | `story_success_anonymous_match85_v1` | Story, סיפור הצלחה אנונימי אם יש הרשאה לטקסט |
 | `reel_quantity_vs_quality_data_v1` | Reels, מענה להתנגדות לכמות |
 | `feed_database_science_human_v1` | Feed, אלגוריתם ובדיקה אנושית |

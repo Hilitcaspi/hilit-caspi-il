@@ -64,7 +64,7 @@ const GROW_LINK_TO_PRODUCT: Record<string, string> = {
 // Fallback: detect by payment amount
 export function detectProductByAmount(sum: number): string | null {
   if (sum >= 19 && sum <= 21) return "match_boost";
-  if (sum === 449) return "bundle_new_year";
+  if (sum === 399 || sum === 449) return "bundle_new_year";
   if (sum === 349) return "bundle_tubav"; // Tu B'Av bundle: database + guide
   if (sum >= 3800 && sum <= 4500) return "coaching_mas"; // המסע full price (4200) or with coupon
   if (sum >= 400 && sum <= 460) return "coaching_mas"; // המסע installment (4200/10 = 420)
@@ -407,14 +407,14 @@ async function handleBundleTuBav(email: string, name: string, phone: string, tra
 }
 
 // ─── New Year Bundle handler ──────────────────────────────────────────────────
-async function handleBundleNewYear(email: string, name: string, phone: string, transactionId: string = "") {
+async function handleBundleNewYear(email: string, name: string, phone: string, transactionId: string = "", amount: number = 399) {
   // The course handler grants both course and guide access. This creates two
   // customer emails in total: database onboarding and one digital-access email.
   await handleDatabase(email, name, phone, transactionId);
   await handleCourse(email, name);
   await notifyOwner({
     title: "רכישת חבילת שנה חדשה",
-    content: `${name} (${email}) רכש/ה את חבילת השנה החדשה (מאגר + מדריך + קורס) ב־449 ₪. Transaction: ${transactionId || "N/A"}`,
+    content: `${name} (${email}) רכש/ה את חבילת השנה החדשה (מאגר + מדריך + קורס) ב־${amount} ₪. Transaction: ${transactionId || "N/A"}`,
   });
   console.log(`[GrowWebhook] New Year bundle completed for ${email} (database + guide + course)`);
 }
@@ -648,8 +648,8 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     console.log(`[GrowWebhook] Overriding product from ${product} to bundle_tubav based on sum=349`);
     product = "bundle_tubav";
   }
-  if (product !== "bundle_new_year" && sum === 449) {
-    console.log(`[GrowWebhook] Overriding product from ${product || "unknown"} to bundle_new_year based on sum=449`);
+  if (product !== "bundle_new_year" && (sum === 399 || sum === 449)) {
+    console.log(`[GrowWebhook] Overriding product from ${product || "unknown"} to bundle_new_year based on sum=${sum}`);
     product = "bundle_new_year";
   }
   if (product !== "match_boost" && sum >= 19 && sum <= 21) {
@@ -744,7 +744,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       case "session":  await handleSession(email, name); break;
       case "database": await handleDatabase(email, name, phone, transactionId); break;
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
-      case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId); break;
+      case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId, sum); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
       case "match_boost": await handleMatchBoost(email, transactionId, sum, context.boostCheckoutReference); break;
       case "plus": await handlePlus(email, name, transactionId, sum, data); break;

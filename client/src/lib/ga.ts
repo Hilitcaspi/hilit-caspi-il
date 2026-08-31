@@ -106,10 +106,10 @@ export const GA_PRODUCTS = {
     currency: "ILS",
   },
   bundle_new_year: {
-    item_id: "bundle_new_year_449",
+    item_id: "bundle_new_year_399",
     item_name: "חבילת שנה חדשה - מאגר + מדריך + קורס",
     item_category: "bundle",
-    price: 449,
+    price: 399,
     currency: "ILS",
   },
   match_boost: {

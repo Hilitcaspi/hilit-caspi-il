@@ -51,7 +51,7 @@ const PRODUCT_CONFIGS: Record<string, { description: string; sum: number; paymen
   coaching_mas: { description: "ליווי אישי - תהליך המסע (12 פגישות) עם הילית כספי", sum: 4200, maxPaymentNum: 10 },
   session:      { description: "פגישה בודדת עם הילית כספי", sum: 500, paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון", sum: 349, paymentNum: 1 },
-  bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 449, paymentNum: 1 },
+  bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 399, paymentNum: 1 },
   match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית", sum: 19.90, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי", sum: 99 },
 };

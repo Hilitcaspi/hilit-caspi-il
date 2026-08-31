@@ -6,7 +6,8 @@ const readProjectFile = (relativePath: string) =>
   readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
 describe("New Year holiday bundle", () => {
-  it("detects the 449 ILS bundle without breaking existing amount routes", () => {
+  it("detects the current 399 ILS bundle and historical 449 ILS callbacks", () => {
+    expect(detectProductByAmount(399)).toBe("bundle_new_year");
     expect(detectProductByAmount(449)).toBe("bundle_new_year");
     expect(detectProductByAmount(349)).toBe("bundle_tubav");
     expect(detectProductByAmount(420)).toBe("coaching_mas");

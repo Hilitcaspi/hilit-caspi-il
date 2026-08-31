@@ -27,9 +27,9 @@ describe("growPayment module", () => {
     expect(PRODUCT_CONFIGS.match_boost.description).toContain("אלגוריתמית");
   });
 
-  it("configures the New Year bundle as a single 449 ILS charge", () => {
+  it("configures the New Year bundle as a single 399 ILS charge", () => {
     expect(PRODUCT_CONFIGS.bundle_new_year).toMatchObject({
-      sum: 449,
+      sum: 399,
       paymentNum: 1,
     });
     expect(PRODUCT_CONFIGS.bundle_new_year.description).toContain("מאגר");

@@ -15,9 +15,9 @@ export default function ThankYouNewYearBundle() {
     const params = new URLSearchParams(window.location.search);
     const txId = params.get("transactionId") || params.get("trxId") || `client-bundle-new-year-${Date.now()}`;
     const eventID = `grow-${txId}`;
-    trackPurchase({ value: 449, currency: "ILS", content_name: "חבילת שנה חדשה: מאגר + מדריך + קורס", eventID });
+    trackPurchase({ value: 399, currency: "ILS", content_name: "חבילת שנה חדשה: מאגר + מדריך + קורס", eventID });
     gaPurchase("bundle_new_year", txId);
-    track({ eventType: "purchase", page: "/thank-you/new-year-love", metadata: { product: "bundle_new_year", value: 449 } });
+    track({ eventType: "purchase", page: "/thank-you/new-year-love", metadata: { product: "bundle_new_year", value: 399 } });
   }, []);
 
   return (

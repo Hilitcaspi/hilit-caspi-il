@@ -10,7 +10,7 @@ describe("September holiday campaign landing and checkout tracking", () => {
   it("uses the approved holiday message and the connected bundle product", () => {
     expect(holidayPage).toContain("פותחים לה מקום.");
     expect(holidayPage).toContain('product="bundle_new_year"');
-    expect(holidayPage).toContain("449 ₪");
+    expect(holidayPage).toContain("399 ₪");
   });
 
   it("treats landing CTA clicks as product interest rather than completed checkout", () => {

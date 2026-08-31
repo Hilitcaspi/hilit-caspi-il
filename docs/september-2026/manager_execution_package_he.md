@@ -3,7 +3,7 @@
 **סטטוס:** מוכן להקמה כטיוטה. עמוד הבאנדל חי; העלאת הקמפיינים ל־Active מותנית באישור הילית וב־QA מדידה.  
 **עמוד נחיתה:** [https://hilitcaspi.com/new-year-love](https://hilitcaspi.com/new-year-love)  
 **תקנון:** [https://hilitcaspi.com/terms/new-year-love](https://hilitcaspi.com/terms/new-year-love)  
-**מחיר:** 449 ₪ בתשלום חד־פעמי.  
+**מחיר:** 399 ₪ בתשלום חד־פעמי.
 **הרכב:** הצטרפות למאגר + ״לבחור נכון״ + ״המסע״.  
 **שווי מקור מוצג:** 1,245 ₪. מחיר נוכחי של המוצרים בנפרד: 697 ₪.
 
@@ -19,7 +19,7 @@
 |---|---:|---:|---:|---:|---:|---:|
 | **מאגר, רצפה** | **299 ₪** | **350** | **104,650 ₪** | **28.57 ₪** | **28.57 ₪** | **10.47** |
 | **מאגר, יעד עבודה** | **299 ₪** | **400** | **119,600 ₪** | **25 ₪** | **28.57 ₪** | **11.96** |
-| **באנדל חג** | **449 ₪** | **110** | **49,390 ₪** | **75 ₪** | **100 ₪** | **4.5** |
+| **באנדל חג** | **399 ₪** | **110** | **43,890 ₪** | **75 ₪** | **100 ₪** | **3.99** |
 | פגישת היכרות | 500 ₪ | 10 | 5,000 ₪ | 100 ₪ | 150 ₪ | 3.3 |
 | מדריך | 149 ₪ | 10 | 1,490 ₪ | 25 ₪ | 40 ₪ | 3.7 |
 | קורס | 249 ₪ | 8 | 1,992 ₪ | 45 ₪ | 65 ₪ | 3.8 |
@@ -54,7 +54,7 @@
 | `sep26_database_retarget` | `rt_database_30d_no_purchase` | מבקרי מאגר, מתחילי תשלום, עוקבים ולידים ללא רכישה | מסר תהליך, איזון וכמות התאמות ללא הבטחה | Purchase |
 | `sep26_holiday_bundle_cold` | `cold_f_35_54_broad` | נשים 35–54, Broad | `feed_holiday_action_bundle_v1` | Purchase |
 | `sep26_holiday_bundle_cold` | `cold_m_25_44_broad` | גברים 25–44, Broad | `story_holiday_table_future_v1` | Purchase |
-| `sep26_holiday_bundle_cold` | `cold_m_45_54_broad` | גברים 45–54, Broad | `feed_value_stack_1245_to_449_v1` | Purchase |
+| `sep26_holiday_bundle_cold` | `cold_m_45_54_broad` | גברים 45–54, Broad | `feed_value_stack_1245_to_399_v1` | Purchase |
 | `sep26_holiday_bundle_cold` | `cold_all_25_54_broad` | כלל הקהל 25–54, ללא רוכשים | `reel_holiday_hilit_explains_v1` | Purchase |
 | `sep26_holiday_retarget` | `rt_holiday_page_30d_no_purchase` | מבקרי עמוד, Checkout ללא Purchase, Engagers | `reel_quantity_vs_quality_data_v1` | Purchase |
 | `sep26_ig_boost_holiday` | `ig_engagers_and_followers` | עוקבים ו־Engagers | `ig_boost_holiday_action_v1` | LPV ואז Purchase |
@@ -67,7 +67,7 @@
 |---|---|---|
 | Feed עוגן, פעולה לשנה החדשה | `sep26-holiday-feed-hero.png` | `/manus-storage/sep26-holiday-feed-hero_d85b4394.png` |
 | Story ו־Reels, מסר רגשי | `sep26-holiday-story-future.png` | `/manus-storage/sep26-holiday-story-future_e2798693.png` |
-| Feed, פירוט ערך 1,245→449 | `sep26-holiday-feed-value.png` | `/manus-storage/sep26-holiday-feed-value_3099f3f9.png` |
+| Feed, פירוט ערך 1,245→399 | `september-holiday-feed-4x5-399.png` | קובץ סופי בחבילת הקמפיין המעודכנת |
 | Feed, נתוני מאגר חיים | `sep26-holiday-feed-data.png` | `/manus-storage/sep26-holiday-feed-data_c744976d.png` |
 | Reels Cover, כמות מול דיוק | `sep26-quantity-reels-cover.png` | `/manus-storage/sep26-quantity-reels-cover_73fa2b42.png` |
 
@@ -82,7 +82,7 @@
 | `feed_holiday_action_bundle_v1` | `https://hilitcaspi.com/new-year-love` | `utm_source=meta&utm_medium=paid_social&utm_campaign=sep26_holiday_bundle_cold&utm_term={{adset.name}}&utm_content={{ad.name}}&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source_name={{site_source_name}}` |
 | `story_holiday_table_future_v1` | `https://hilitcaspi.com/new-year-love` | `utm_source=meta&utm_medium=paid_social&utm_campaign=sep26_holiday_bundle_cold&utm_term={{adset.name}}&utm_content={{ad.name}}&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source_name={{site_source_name}}` |
 | `reel_holiday_hilit_explains_v1` | `https://hilitcaspi.com/new-year-love` | `utm_source=meta&utm_medium=paid_social&utm_campaign=sep26_holiday_bundle_cold&utm_term={{adset.name}}&utm_content={{ad.name}}&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source_name={{site_source_name}}` |
-| `feed_value_stack_1245_to_449_v1` | `https://hilitcaspi.com/new-year-love` | `utm_source=meta&utm_medium=paid_social&utm_campaign=sep26_holiday_bundle_cold&utm_term={{adset.name}}&utm_content={{ad.name}}&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source_name={{site_source_name}}` |
+| `feed_value_stack_1245_to_399_v1` | `https://hilitcaspi.com/new-year-love` | `utm_source=meta&utm_medium=paid_social&utm_campaign=sep26_holiday_bundle_cold&utm_term={{adset.name}}&utm_content={{ad.name}}&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source_name={{site_source_name}}` |
 | `reel_quantity_vs_quality_data_v1` | `https://hilitcaspi.com/new-year-love#how-it-works` | `utm_source=meta&utm_medium=paid_social&utm_campaign=sep26_holiday_retarget&utm_term={{adset.name}}&utm_content={{ad.name}}&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source_name={{site_source_name}}` |
 | `ig_boost_holiday_action_v1` | `https://hilitcaspi.com/new-year-love` | `utm_source=instagram&utm_medium=paid_social&utm_campaign=sep26_ig_boost_holiday&utm_term=ig_engagers_and_followers&utm_content=ig_boost_holiday_action_v1&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source_name={{site_source_name}}` |
 

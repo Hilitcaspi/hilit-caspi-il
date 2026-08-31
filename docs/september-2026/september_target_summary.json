@@ -15,12 +15,12 @@
     "boost_requests": 0
   },
   "offer_assumption": {
-    "holiday_bundle_price": 449.0,
+    "holiday_bundle_price": 399.0,
     "holiday_bundle_contents": "מאגר + מדריך + קורס; חלופת מסר ומחיר לאישור לפני בנייה",
     "holiday_bundle_original_value": 1245.0,
     "holiday_bundle_current_standalone_value": 697.0,
-    "holiday_bundle_saving_vs_original": 796.0,
-    "holiday_bundle_saving_vs_current": 248.0,
+    "holiday_bundle_saving_vs_original": 846.0,
+    "holiday_bundle_saving_vs_current": 298.0,
     "coaching_average_price": 3360.0,
     "plus_and_boost_revenue_is_conditional": true
   },
@@ -63,15 +63,15 @@
       "meta_budget": 18000.0,
       "core_units": 430,
       "gated_units": 50,
-      "core_revenue": 144200.0,
+      "core_revenue": 141200.0,
       "conditional_grow_revenue": 1789.6,
-      "total_revenue_if_grow_live": 145989.6,
-      "revenue_vs_august_30d_pct": 36.1,
+      "total_revenue_if_grow_live": 142989.6,
+      "revenue_vs_august_30d_pct": 33.3,
       "budget_vs_august_30d_pct": 14.6,
-      "blended_revenue_to_ad_spend": 8.11,
+      "blended_revenue_to_ad_spend": 7.94,
       "fixed_costs_excluding_media": 23500.0,
       "total_costs_including_media": 41500.0,
-      "operating_surplus_before_vat_tax_fees_refunds": 104489.6
+      "operating_surplus_before_vat_tax_fees_refunds": 101489.6
     },
     {
       "scenario": "base",
@@ -79,15 +79,15 @@
       "meta_budget": 20000.0,
       "core_units": 541,
       "gated_units": 105,
-      "core_revenue": 187552.0,
+      "core_revenue": 182052.0,
       "conditional_grow_revenue": 4074.2,
-      "total_revenue_if_grow_live": 191626.2,
-      "revenue_vs_august_30d_pct": 78.6,
+      "total_revenue_if_grow_live": 186126.2,
+      "revenue_vs_august_30d_pct": 73.5,
       "budget_vs_august_30d_pct": 27.3,
-      "blended_revenue_to_ad_spend": 9.58,
+      "blended_revenue_to_ad_spend": 9.31,
       "fixed_costs_excluding_media": 23500.0,
       "total_costs_including_media": 43500.0,
-      "operating_surplus_before_vat_tax_fees_refunds": 148126.2
+      "operating_surplus_before_vat_tax_fees_refunds": 142626.2
     },
     {
       "scenario": "stretch",
@@ -95,15 +95,15 @@
       "meta_budget": 24000.0,
       "core_units": 655,
       "gated_units": 175,
-      "core_revenue": 232053.0,
+      "core_revenue": 224053.0,
       "conditional_grow_revenue": 6263.6,
-      "total_revenue_if_grow_live": 238316.6,
-      "revenue_vs_august_30d_pct": 122.2,
+      "total_revenue_if_grow_live": 230316.6,
+      "revenue_vs_august_30d_pct": 114.7,
       "budget_vs_august_30d_pct": 52.8,
-      "blended_revenue_to_ad_spend": 9.93,
+      "blended_revenue_to_ad_spend": 9.6,
       "fixed_costs_excluding_media": 23500.0,
       "total_costs_including_media": 47500.0,
-      "operating_surplus_before_vat_tax_fees_refunds": 190816.6
+      "operating_surplus_before_vat_tax_fees_refunds": 182816.6
     }
   ]
 }
