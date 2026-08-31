@@ -24,4 +24,4 @@
 - [x] Apply the brand’s Hebrew display and supporting typography hierarchy, including right-to-left mobile layout refinements.
 - [x] Preserve all form, privacy, upload, and consent behavior while changing the public visual design.
 - [x] Verify the redesigned public page on desktop and mobile, then run regression tests and a production build.
-- [ ] Save a redesigned-page checkpoint and synchronize it with the designated GitHub repository.
+- [x] Save a redesigned-page checkpoint and synchronize it with the designated GitHub repository.
