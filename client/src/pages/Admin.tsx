@@ -37,7 +37,7 @@ export default function Admin() {
     const response = await exportRows.refetch();
     if (!response.data?.length) return;
     const rows = [
-      ["מזהה", "שם מלא", "גיל", "עיר/אזור", "טלפון", "סטטוס זוגי", "ילדים", "אינסטגרם", "על עצמי", "מה מחפש/ת", "סטטוס בדיקה", "נשלח בתאריך", "תמונה"],
+      ["מזהה", "שם מלא", "גיל", "עיר/אזור", "טלפון", "סטטוס זוגי", "ילדים", "תוצאת DNA", "אינסטגרם", "על עצמי", "מה מחפש/ת", "סטטוס בדיקה", "נשלח בתאריך", "תמונה"],
       ...response.data.map(item => [
         item.id,
         item.fullName,
@@ -46,6 +46,7 @@ export default function Admin() {
         item.phone,
         relationshipStatusLabels[item.relationshipStatus],
         item.hasChildren ? "כן" : "לא",
+        item.dnaResult,
         `@${item.instagramUsername}`,
         item.selfDescription,
         item.desiredPartner,
@@ -129,10 +130,11 @@ export default function Admin() {
                       </div>
                       <p className="text-xs text-[#9a8580]">נשלח: {new Date(item.submittedAt).toLocaleString("he-IL")}</p>
                     </div>
-                    <div className="mt-5 grid gap-4 text-sm leading-6 lg:grid-cols-2">
-                      <div><p className="font-bold text-[#674944]">עליי</p><p className="mt-1 whitespace-pre-wrap text-[#61504a]">{item.selfDescription}</p></div>
-                      <div><p className="font-bold text-[#674944]">מה חשוב לי להכיר</p><p className="mt-1 whitespace-pre-wrap text-[#61504a]">{item.desiredPartner}</p></div>
-                    </div>
+                      <div className="mt-5 grid gap-4 text-sm leading-6 lg:grid-cols-2">
+                        <div><p className="font-bold text-[#674944]">עליי</p><p className="mt-1 whitespace-pre-wrap text-[#61504a]">{item.selfDescription}</p></div>
+                        <div><p className="font-bold text-[#674944]">מה חשוב לי להכיר</p><p className="mt-1 whitespace-pre-wrap text-[#61504a]">{item.desiredPartner}</p></div>
+                      </div>
+                      {item.dnaResult && <p className="mt-4 rounded-xl bg-[#f7f0ec] px-3 py-2 text-sm text-[#674944]"><span className="font-bold">תוצאת DNA:</span> {item.dnaResult}</p>}
                     <div className="mt-5 flex flex-col gap-3 border-t border-[#f0e7e1] pt-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold text-[#745d57]">
                         <a href={`https://instagram.com/${item.instagramUsername}`} target="_blank" rel="noreferrer" className="text-[#914e60] underline underline-offset-4">@{item.instagramUsername}</a>

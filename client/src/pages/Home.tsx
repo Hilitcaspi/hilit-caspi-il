@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { Check, ChevronLeft, Heart, ImagePlus, Instagram, LoaderCircle, LockKeyhole, Sparkles } from "lucide-react";
+import { Check, ChevronLeft, Heart, ImagePlus, Instagram, LoaderCircle, Sparkles } from "lucide-react";
 import { FormEvent, useState } from "react";
 
 const instagramUrl = "https://www.instagram.com/hilitcaspi_relationship/";
@@ -15,13 +15,14 @@ type FormValues = {
   desiredPartner: string;
   relationshipStatus: "single" | "divorced" | "widowed" | "separated" | "other";
   hasChildren: "yes" | "no";
+  dnaResult: string;
   instagramUsername: string;
   databaseMembershipConsent: boolean;
   instagramFollowConsent: boolean;
   publicationConsent: boolean;
 };
 
-type FieldErrors = Partial<Pick<FormValues, "selfDescription" | "instagramUsername">>;
+type FieldErrors = Partial<Pick<FormValues, "selfDescription" | "desiredPartner" | "instagramUsername">>;
 
 const initialForm: FormValues = {
   fullName: "",
@@ -32,6 +33,7 @@ const initialForm: FormValues = {
   desiredPartner: "",
   relationshipStatus: "single",
   hasChildren: "no",
+  dnaResult: "",
   instagramUsername: "",
   databaseMembershipConsent: false,
   instagramFollowConsent: false,
@@ -77,7 +79,7 @@ export default function Home() {
 
   const setText = (field: keyof FormValues, value: string | boolean) => {
     setForm(current => ({ ...current, [field]: value }) as FormValues);
-    if (field === "selfDescription" || field === "instagramUsername") {
+    if (field === "selfDescription" || field === "desiredPartner" || field === "instagramUsername") {
       setFieldErrors(current => ({ ...current, [field]: undefined }));
     }
   };
@@ -103,6 +105,7 @@ export default function Home() {
     const normalizedInstagramUsername = form.instagramUsername.trim().replace(/^@+/, "");
     const nextErrors: FieldErrors = {};
     if (form.selfDescription.trim().length < 10) nextErrors.selfDescription = "כתבו לפחות 10 תווים בכמה מילים על עצמכם.";
+    if (form.desiredPartner.trim().length < 10) nextErrors.desiredPartner = "כתבו לפחות 10 תווים על האדם או הקשר שאתם מחפשים.";
     if (!/^[A-Za-z0-9._]{1,30}$/.test(normalizedInstagramUsername)) nextErrors.instagramUsername = "אפשר לכתוב שם משתמש באנגלית, מספרים, נקודה או קו תחתון בלבד.";
     if (Object.keys(nextErrors).length) {
       setFieldErrors(nextErrors);
@@ -166,13 +169,8 @@ export default function Home() {
           </div>
           <div className="order-1 text-center lg:order-2 lg:text-right">
             <p className="brand-kicker text-brand-gold"><Sparkles className="h-4 w-4" /> פינת רווק/ת השבוע</p>
-            <h1 className="brand-display mt-4 max-w-3xl text-5xl leading-[1.02] text-brand-white sm:text-6xl lg:text-7xl">יש מקום לסיפור<br /><span className="text-brand-gold">שלכם להיפגש.</span></h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-brand-white/80 lg:text-xl">פעם בשבוע אני בוחרת סיפור אחד ששווה להכיר. אם זה מרגיש נכון, זה המקום לספר מי אתם ומה אתם מחפשים.</p>
+            <h1 className="brand-display mt-4 max-w-3xl text-4xl leading-[1.12] text-brand-white sm:text-5xl lg:text-6xl">פינת רווק/ת השבוע<br /><span className="text-brand-gold">אישור השתתפות</span></h1>
           </div>
-          <aside className="order-3 hero-note">
-            <LockKeyhole className="h-5 w-5 text-brand-gold" />
-            <div><h2>פרטיות לפני הכול</h2><p>ההגשה נשמרת לצפייה פרטית שלי בלבד. פרסום ייעשה רק לפי ההסכמה המפורשת שלכם.</p></div>
-          </aside>
         </div>
       </section>
 
@@ -180,7 +178,7 @@ export default function Home() {
         <div className="mx-auto max-w-5xl">
           <div className="form-brand-intro">
             <div className="gold-line" />
-            <div><p className="brand-kicker">הצעד הראשון מתחיל כאן</p><h2 className="brand-display mt-2 text-3xl text-brand-navy sm:text-4xl">הפרטים שחשוב לי להכיר</h2></div>
+            <div><p className="brand-kicker">הצעד הראשון מתחיל כאן</p><h2 className="brand-display mt-2 text-3xl text-brand-navy sm:text-4xl">הפרטים שחשוב שאני אכיר עליכם</h2></div>
             <span className="required-note"><b>*</b> שדה חובה</span>
           </div>
 
@@ -188,16 +186,17 @@ export default function Home() {
             <section className="form-chapter">
               <div className="chapter-heading"><span className="chapter-number">01</span><div><h3>קצת עליכם</h3><p>פרטים קצרים שיעזרו לי להכיר את התמונה המלאה.</p></div></div>
               <div className="mt-7 grid gap-x-6 gap-y-5 md:grid-cols-2">
-                <label><span className="field-label">שם מלא <span>*</span></span><input className="field-control" required autoComplete="name" value={form.fullName} onChange={e => setText("fullName", e.target.value)} placeholder="איך נעים לכם שנכיר אתכם?" /></label>
+                <label><span className="field-label">שם פרטי <span>*</span></span><input className="field-control" required autoComplete="given-name" value={form.fullName} onChange={e => setText("fullName", e.target.value)} placeholder="שם פרטי" /></label>
                 <label><span className="field-label">גיל <span>*</span></span><input className="field-control" required type="number" min="18" max="99" inputMode="numeric" value={form.age} onChange={e => setText("age", e.target.value)} placeholder="18 ומעלה" /></label>
                 <label><span className="field-label">עיר או אזור מגורים <span>*</span></span><input className="field-control" required autoComplete="address-level2" value={form.city} onChange={e => setText("city", e.target.value)} placeholder="למשל: תל אביב והסביבה" /></label>
                 <label><span className="field-label">טלפון <span>*</span></span><input className="field-control" required type="tel" dir="ltr" autoComplete="tel" value={form.phone} onChange={e => setText("phone", e.target.value)} placeholder="050-0000000" /></label>
                 <label><span className="field-label">סטטוס זוגי <span>*</span></span><select className="field-control" value={form.relationshipStatus} onChange={e => setText("relationshipStatus", e.target.value)}>{relationshipStatuses.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
                 <label><span className="field-label">האם יש ילדים? <span>*</span></span><select className="field-control" value={form.hasChildren} onChange={e => setText("hasChildren", e.target.value)}><option value="no">לא</option><option value="yes">כן</option></select></label>
+                <label className="md:col-span-2"><span className="field-label">אם אתם זוכרים, מה יצא לכם בשאלון ה־DNA? <em>לא חובה</em></span><input className="field-control" maxLength={100} value={form.dnaResult} onChange={e => setText("dnaResult", e.target.value)} placeholder="למשל: עוגן, רומנטיקן או כל תוצאה שאתם זוכרים" /></label>
               </div>
               <div className="mt-5 grid gap-5">
                 <label><span className="field-label">כמה מילים עליי <span>*</span></span><textarea className="field-control min-h-32 resize-y" required maxLength={800} aria-invalid={Boolean(fieldErrors.selfDescription)} aria-describedby={fieldErrors.selfDescription ? "self-description-error" : undefined} value={form.selfDescription} onChange={e => setText("selfDescription", e.target.value)} placeholder="מה חשוב שנדע עליכם? מה מעורר בכם סקרנות, שמחה או תשוקה?" />{fieldErrors.selfDescription && <p id="self-description-error" className="field-error">{fieldErrors.selfDescription}</p>}</label>
-                <label><span className="field-label">מי מתאים לי להכיר? <span>*</span></span><textarea className="field-control min-h-32 resize-y" required maxLength={800} value={form.desiredPartner} onChange={e => setText("desiredPartner", e.target.value)} placeholder="ספרו בקצרה מה חשוב לכם בקשר ובאדם שמולכם." /></label>
+                <label><span className="field-label">מי מתאים לי להכיר? <span>*</span></span><textarea className="field-control min-h-32 resize-y" required maxLength={800} aria-invalid={Boolean(fieldErrors.desiredPartner)} aria-describedby={fieldErrors.desiredPartner ? "desired-partner-error" : undefined} value={form.desiredPartner} onChange={e => setText("desiredPartner", e.target.value)} placeholder="ספרו בקצרה מה חשוב לכם בקשר ובאדם שמולכם." />{fieldErrors.desiredPartner && <p id="desired-partner-error" className="field-error">{fieldErrors.desiredPartner}</p>}</label>
               </div>
             </section>
 
@@ -214,7 +213,7 @@ export default function Home() {
                 </div>
                 <div className="instagram-panel">
                   <div className="flex items-center gap-2 text-brand-indigo"><Instagram className="h-5 w-5" /><span className="font-bold">החשבון שלכם באינסטגרם</span></div>
-                  <p className="mt-3 text-sm leading-7 text-brand-ink/75">לפני שמגישים, חשוב לעקוב אחרי <a href={instagramUrl} target="_blank" rel="noreferrer" className="font-bold text-brand-indigo underline decoration-brand-gold decoration-2 underline-offset-4">@hilitcaspi_relationship</a>.</p>
+                  <p className="mt-3 text-sm leading-7 text-brand-ink/75">רק אם אתם עוקבים אחריי, אוכל לתייג אתכם בסטורי. אז חשוב שתעקבו :) <a href={instagramUrl} target="_blank" rel="noreferrer" className="font-bold text-brand-indigo underline decoration-brand-gold decoration-2 underline-offset-4">@hilitcaspi_relationship</a></p>
                   <label className="mt-6 block"><span className="field-label">שם משתמש לצורך תיוג <span>*</span></span><div className="relative"><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-bold text-brand-indigo">@</span><input className="field-control pr-8" required dir="ltr" aria-invalid={Boolean(fieldErrors.instagramUsername)} aria-describedby={fieldErrors.instagramUsername ? "instagram-error" : undefined} value={form.instagramUsername} onChange={e => setText("instagramUsername", e.target.value)} placeholder="your_username" /></div>{fieldErrors.instagramUsername && <p id="instagram-error" className="field-error">{fieldErrors.instagramUsername}</p>}</label>
                 </div>
               </div>

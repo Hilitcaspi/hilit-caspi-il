@@ -25,3 +25,18 @@
 - [x] Preserve all form, privacy, upload, and consent behavior while changing the public visual design.
 - [x] Verify the redesigned public page on desktop and mobile, then run regression tests and a production build.
 - [x] Save a redesigned-page checkpoint and synchronize it with the designated GitHub repository.
+- [x] Replace the public hero title with “פינת רווק/ת השבוע | אישור השתתפות” and remove low-contrast black supporting text.
+- [x] Change the form introduction heading to “הפרטים שחשוב שאני אכיר עליכם”.
+- [x] Add a clear Instagram follow explanation that tagging is unavailable unless the applicant follows @hilitcaspi_relationship.
+- [x] Add an optional DNA questionnaire result field and persist it safely with each application.
+- [x] Investigate and fix the reported submission failure, then add regression coverage for the corrected flow.
+- [x] Verify the revised public page and submission path through desktop/mobile visual review, server regression tests, and a production build.
+- [x] Add a regression test for rejecting a too-short desired-partner description before any photo storage occurs.
+- [x] Exercise and document a successful full application submission with the revised schema and verify the success result.
+- [x] Save and synchronize the refined page checkpoint to GitHub.
+- [x] Remove the introductory privacy block from the public hero.
+- [x] Replace the full-name field wording with “שם פרטי” and remove the accompanying introductory helper text.
+- [x] Replace the Instagram follow wording with the requested story-tagging explanation.
+- [x] Unify all public-page typography under Hilit’s preferred headline style and remove the serif treatment.
+- [x] Verify the revised public page in desktop and mobile and run TypeScript, regression-test, and production-build checks.
+- [ ] Save and synchronize the next checkpoint.

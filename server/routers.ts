@@ -26,6 +26,7 @@ const submissionInput = z.object({
   desiredPartner: z.string().trim().min(10, "כתבו מה חשוב לכם בקשר").max(800),
   relationshipStatus: z.enum(["single", "divorced", "widowed", "separated", "other"]),
   hasChildren: z.boolean(),
+  dnaResult: z.string().trim().max(100).optional().transform(value => value || undefined),
   instagramUsername: z
     .string()
     .trim()
@@ -94,6 +95,7 @@ export const appRouter = router({
           desiredPartner: input.desiredPartner,
           relationshipStatus: input.relationshipStatus,
           hasChildren: input.hasChildren,
+          dnaResult: input.dnaResult,
           instagramUsername: input.instagramUsername,
           photoKey: photo.key,
           photoUrl: photo.url,

@@ -1,0 +1,1 @@
+ALTER TABLE `single_of_week_applications` ADD `dnaResult` varchar(100);

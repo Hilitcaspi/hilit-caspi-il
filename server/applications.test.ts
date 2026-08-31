@@ -85,6 +85,13 @@ describe("applications router", () => {
     expect(createSingleOfWeekApplication).not.toHaveBeenCalledWith(expect.objectContaining({ photoBase64: expect.anything() }));
   });
 
+  it("stores an optional DNA questionnaire result when supplied", async () => {
+    const result = await appRouter.createCaller(createContext()).applications.submit({ ...validSubmission, dnaResult: "עוגן" });
+
+    expect(result).toEqual({ id: 19 });
+    expect(createSingleOfWeekApplication).toHaveBeenCalledWith(expect.objectContaining({ dnaResult: "עוגן" }));
+  });
+
   it("accepts an Instagram username with a leading at-sign and stores its normalized value", async () => {
     await appRouter.createCaller(createContext()).applications.submit({ ...validSubmission, instagramUsername: "@test_account" });
 
@@ -93,6 +100,11 @@ describe("applications router", () => {
 
   it("rejects a self-description shorter than ten characters before storage", async () => {
     await expect(appRouter.createCaller(createContext()).applications.submit({ ...validSubmission, selfDescription: "קצר" })).rejects.toMatchObject<Partial<TRPCError>>({ code: "BAD_REQUEST" });
+    expect(storagePut).not.toHaveBeenCalled();
+  });
+
+  it("rejects a desired-partner description shorter than ten characters before storage", async () => {
+    await expect(appRouter.createCaller(createContext()).applications.submit({ ...validSubmission, desiredPartner: "קצר" })).rejects.toMatchObject<Partial<TRPCError>>({ code: "BAD_REQUEST" });
     expect(storagePut).not.toHaveBeenCalled();
   });
 

@@ -15,6 +15,13 @@
       "when": 1787865042469,
       "tag": "0001_fancy_adam_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1788190138489,
+      "tag": "0002_yellow_peter_parker",
+      "breakpoints": true
     }
   ]
 }

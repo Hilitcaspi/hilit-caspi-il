@@ -35,6 +35,7 @@ export const singleOfWeekApplications = mysqlTable("single_of_week_applications"
   desiredPartner: text("desiredPartner").notNull(),
   relationshipStatus: mysqlEnum("relationshipStatus", ["single", "divorced", "widowed", "separated", "other"]).notNull(),
   hasChildren: boolean("hasChildren").notNull(),
+  dnaResult: varchar("dnaResult", { length: 100 }),
   instagramUsername: varchar("instagramUsername", { length: 30 }).notNull(),
   photoKey: varchar("photoKey", { length: 512 }).notNull(),
   photoUrl: varchar("photoUrl", { length: 1024 }).notNull(),
