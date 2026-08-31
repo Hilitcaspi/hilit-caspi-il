@@ -72,4 +72,15 @@ describe("New Year holiday bundle", () => {
     expect(landing).toContain("Plus אינו מופעל אוטומטית");
     expect(landing).toContain("Boost ו־Plus הם שירותים נפרדים");
   });
+
+  it("keeps only two Hilit photos and replaces repeated portraits with substantive content", () => {
+    const landing = readProjectFile("client/src/pages/NewYearLoveBundle.tsx");
+
+    expect(landing).toContain("hilit-bundle-standing_b180bb60.jpeg");
+    expect(landing).toContain("hilit-bundle-close-portrait_85abe6c9.jpeg");
+    expect(landing).not.toContain("hilit-bundle-sofa-portrait_663387dc.jpeg");
+    expect(landing).not.toContain("hilit-bundle-sofa-landscape_640c46ae.jpeg");
+    expect(landing).toContain("יצרתי עבורכם דרך לעבוד גם בלעדיי");
+    expect(landing).toContain("באלפי פגישות ליווי");
+  });
 });

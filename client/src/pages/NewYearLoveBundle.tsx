@@ -26,8 +26,6 @@ import { trpc } from "@/lib/trpc";
 
 const HERO_IMG = "/manus-storage/hilit-bundle-standing_b180bb60.jpeg";
 const CLOSE_PORTRAIT = "/manus-storage/hilit-bundle-close-portrait_85abe6c9.jpeg";
-const SOFA_PORTRAIT = "/manus-storage/hilit-bundle-sofa-portrait_663387dc.jpeg";
-const SOFA_LANDSCAPE = "/manus-storage/hilit-bundle-sofa-landscape_640c46ae.jpeg";
 const WHATSAPP_URL =
   "https://wa.me/972552442334?text=" +
   encodeURIComponent("היי הילית, ראיתי את חבילת חגי תשרי ויש לי שאלה");
@@ -330,8 +328,19 @@ export default function NewYearLoveBundle() {
         <section className="relative overflow-hidden bg-[#eee7df] px-5 py-18 md:px-8 md:py-26">
           <FlowerField subtle />
           <Reveal className="relative mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[0.86fr_1.14fr] md:gap-16">
-            <motion.div variants={fadeUp} className="relative overflow-hidden rounded-[2rem] bg-[#d8cec4] p-2 shadow-[0_24px_60px_rgba(60,45,35,0.15)]"><img src={SOFA_LANDSCAPE} alt="הילית כספי" className="aspect-[4/5] w-full rounded-[1.6rem] object-cover" /><div className="absolute bottom-6 right-6 rounded-full bg-[#211b17]/90 px-4 py-2 text-xs font-black text-white">נולד מתוך הפגישות</div></motion.div>
-            <motion.div variants={fadeUp}><p className="text-sm font-black text-[#806650]">למה יצרתי את הבאנדל</p><h2 className="mt-3 max-w-3xl text-3xl font-black leading-[1.08] tracking-[-0.03em] text-[#29211c] md:text-5xl">ידעתי שלא אוכל לפגוש את כולם באופן אישי.</h2><p className="mt-6 max-w-2xl text-lg leading-9 text-[#5f5148]">במאות פגישות ליווי ראיתי אנשים מדהימים שבאמת רוצים אהבה. לפעמים לא חסר רצון ולא חסרות הזדמנויות. חסרה מפה. דרך להבין למה חוזרים לאותם דפוסים, למי נותנים הזדמנות, ומהי הזוגיות שבאמת נכונה לנו.</p><p className="mt-5 max-w-2xl text-lg leading-9 text-[#5f5148]">לכן לקחתי את השאלות, התרגילים, המיפוי והעבודה שאני מביאה לפגישות, ובניתי מהם כלים שאפשר לעבור גם באופן עצמאי ובקצב שלכם.</p><div className="mt-6 rounded-2xl border-r-4 border-[#92745c] bg-white/75 p-5 text-base font-black leading-8 text-[#3d3028] shadow-sm">הכלים אינם מחליפים פגישה אישית. הם מאפשרים לעשות לבד חלק משמעותי מעבודת ההכנה והבירור, ולהגיע הרבה יותר ממוקדים להיכרות או לפגישה עתידית.</div></motion.div>
+            <motion.div variants={fadeUp} className="relative overflow-hidden rounded-[2rem] border border-[#806650]/15 bg-[linear-gradient(150deg,#fbf8f2_0%,#e5d9cc_55%,#c8b39e_100%)] p-7 shadow-[0_24px_60px_rgba(60,45,35,0.13)] md:p-9">
+              <div className="absolute -left-10 -top-10 h-36 w-36 rounded-full bg-white/55 blur-2xl" />
+              <WhiteFlower className="absolute -left-4 bottom-5 w-20 opacity-80" />
+              <div className="relative">
+                <div className="flex items-center justify-between gap-4"><span className="rounded-full bg-[#2b241f] px-4 py-2 text-xs font-black text-white">נולד מתוך הפגישות</span><Sparkles className="h-5 w-5 text-[#7e6957]" /></div>
+                <p className="mt-8 text-3xl font-black leading-tight tracking-[-0.03em] text-[#2d241e]">יצרתי עבורכם דרך לעבוד גם בלעדיי.</p>
+                <div className="mt-7 grid gap-3">
+                  {[{ icon: NotebookPen, label: "שאלות שמגיעות לעומק" }, { icon: Route, label: "תרגילים שמזהים דפוסים" }, { icon: Map, label: "מפה שמחברת הכול לדרך" }].map(({ icon: Icon, label }) => <div key={label} className="flex items-center gap-3 rounded-2xl border border-white/55 bg-white/70 px-4 py-3 text-sm font-black text-[#46382f] shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#69715d] text-white"><Icon className="h-4 w-4" /></span>{label}</div>)}
+                </div>
+                <p className="mt-7 border-t border-[#6c5848]/15 pt-5 text-sm font-bold leading-7 text-[#5d4c40]">אותה חשיבה שמלווה את הפגישות, בתוך תהליך שאפשר לעבור באופן עצמאי ובקצב שלכם.</p>
+              </div>
+            </motion.div>
+            <motion.div variants={fadeUp}><p className="text-sm font-black text-[#806650]">למה יצרתי את הבאנדל</p><h2 className="mt-3 max-w-3xl text-3xl font-black leading-[1.08] tracking-[-0.03em] text-[#29211c] md:text-5xl">ידעתי שלא אוכל לפגוש את כולם באופן אישי.</h2><p className="mt-6 max-w-2xl text-lg leading-9 text-[#5f5148]">באלפי פגישות ליווי ראיתי אנשים מדהימים שבאמת רוצים אהבה. לפעמים לא חסר רצון ולא חסרות הזדמנויות. חסרה מפה. דרך להבין למה חוזרים לאותם דפוסים, למי נותנים הזדמנות, ומהי הזוגיות שבאמת נכונה לנו.</p><p className="mt-5 max-w-2xl text-lg leading-9 text-[#5f5148]">לכן לקחתי את השאלות, התרגילים, המיפוי והעבודה שאני מביאה לפגישות, ובניתי מהם כלים שאפשר לעבור גם באופן עצמאי ובקצב שלכם.</p><div className="mt-6 rounded-2xl border-r-4 border-[#92745c] bg-white/75 p-5 text-base font-black leading-8 text-[#3d3028] shadow-sm">הכלים אינם מחליפים פגישה אישית. הם מאפשרים לעשות לבד חלק משמעותי מעבודת ההכנה והבירור, ולהגיע הרבה יותר ממוקדים להיכרות או לפגישה עתידית.</div></motion.div>
           </Reveal>
         </section>
 
@@ -365,7 +374,17 @@ export default function NewYearLoveBundle() {
 
         <section className="relative overflow-hidden bg-[#eee7df] px-5 py-20 md:px-8 md:py-28">
           <Reveal className="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[0.92fr_1.08fr] md:gap-16">
-            <motion.div variants={fadeUp} className="relative order-2 md:order-1"><img src={SOFA_PORTRAIT} alt="הילית כספי" className="aspect-[4/5] w-full rounded-[2rem] object-cover shadow-[0_26px_60px_rgba(54,42,33,0.18)]" /><WhiteFlower className="absolute -bottom-7 -right-6 w-24 drop-shadow-lg" /></motion.div>
+            <motion.div variants={fadeUp} className="relative order-2 overflow-hidden rounded-[2rem] border border-[#715b49]/14 bg-[#25231d] p-7 text-white shadow-[0_26px_60px_rgba(54,42,33,0.16)] md:order-1 md:p-9">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(255,255,255,.14),transparent_28%),linear-gradient(145deg,transparent_0%,rgba(105,113,93,.58)_100%)]" />
+              <WhiteFlower className="absolute -bottom-7 -right-6 w-24 opacity-90 drop-shadow-lg" />
+              <div className="relative">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/18 bg-white/10"><HeartHandshake className="h-7 w-7 text-[#efe4d7]" /></div>
+                <p className="mt-8 text-xs font-black text-[#d7c4b0]">מהתוצאה אל החיים עצמם</p>
+                <p className="mt-3 text-3xl font-black leading-tight">ה־DNA הוא נקודת הפתיחה.</p>
+                <div className="mt-7 grid grid-cols-3 gap-2 text-center text-xs font-black"><span className="rounded-xl bg-white/10 px-2 py-3">להבין</span><span className="rounded-xl bg-white/10 px-2 py-3">למפות</span><span className="rounded-xl bg-white/10 px-2 py-3">להתקדם</span></div>
+                <p className="mt-7 border-t border-white/12 pt-5 text-sm leading-7 text-white/72">המדריך והקורס לוקחים את התובנות ומתרגמים אותן לשאלות, תרגול ומפה שאפשר לעבוד איתה.</p>
+              </div>
+            </motion.div>
             <motion.div variants={fadeUp} className="order-1 md:order-2"><p className="text-sm font-black text-[#806650]">למי שהתחברו לשאלון ה־DNA הזוגי</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.035em] text-[#29211c] md:text-5xl">השאלון הוא נקודת פתיחה. כאן התובנות מתחילות לעבוד.</h2><p className="mt-6 text-lg leading-9 text-[#5f5148]">המדריך והקורס נותנים שכבה נוספת של הבנה על עצמכם, על הבחירות שלכם ועל מה שחסר בדרך למציאת זוגיות. לא רק לקרוא את התוצאה, אלא לבדוק, לכתוב, לתרגל ולבנות מפה שאפשר לקחת לחיים.</p><div className="mt-7 grid gap-3 sm:grid-cols-2">{["שאלות שמחברות בין התוצאה לחיים", "תרגילים שחושפים דפוסים חוזרים", "מפה אישית שאפשר לחזור אליה", "הכנה ממוקדת יותר להיכרות ולפגישה"].map((item) => <div key={item} className="flex items-start gap-3 rounded-2xl bg-white/75 p-4 text-sm font-bold leading-6 text-[#473930]"><NotebookPen className="mt-0.5 h-5 w-5 shrink-0 text-[#806650]" />{item}</div>)}</div></motion.div>
           </Reveal>
         </section>
