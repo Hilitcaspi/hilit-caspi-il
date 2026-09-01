@@ -40,3 +40,7 @@
 - [x] Unify all public-page typography under Hilit’s preferred headline style and remove the serif treatment.
 - [x] Verify the revised public page in desktop and mobile and run TypeScript, regression-test, and production-build checks.
 - [x] Save and synchronize the next checkpoint.
+- [x] Add ofrivaturi@gmail.com to the server-side allowlist for private application management access.
+- [x] Ensure the authenticated management interface recognizes the allowlisted account as authorized.
+- [x] Add regression tests proving allowlisted access is granted while non-allowlisted access is denied.
+- [ ] Verify the authorization change, save a checkpoint, and synchronize it to GitHub.

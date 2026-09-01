@@ -3,6 +3,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { canManageSingleOfWeekApplications } from "@shared/managementAccess";
 import { Download, ExternalLink, FileImage, LoaderCircle, LockKeyhole, RefreshCw, ShieldAlert } from "lucide-react";
 
 const statusLabels = {
@@ -25,7 +26,7 @@ const csvEscape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '"
 export default function Admin() {
   const { user, loading, isAuthenticated } = useAuth();
   const utils = trpc.useUtils();
-  const isOwner = isAuthenticated && user?.role === "admin";
+  const isOwner = isAuthenticated && canManageSingleOfWeekApplications(user);
   const applications = trpc.applications.list.useQuery(undefined, { enabled: isOwner });
   const exportRows = trpc.applications.exportRows.useQuery(undefined, { enabled: false });
   const applicationList = applications.data ?? [];

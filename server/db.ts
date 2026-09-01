@@ -7,6 +7,7 @@ import {
   singleOfWeekApplications,
   users,
 } from "../drizzle/schema";
+import { isAllowlistedManagementEmail } from "../shared/managementAccess";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -58,12 +59,12 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
     }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
+    if (user.openId === ENV.ownerOpenId || isAllowlistedManagementEmail(user.email)) {
       values.role = 'admin';
       updateSet.role = 'admin';
+    } else if (user.role !== undefined) {
+      values.role = user.role;
+      updateSet.role = user.role;
     }
 
     if (!values.lastSignedIn) {

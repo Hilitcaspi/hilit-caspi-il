@@ -17,14 +17,14 @@ import { appRouter } from "./routers";
 import { storagePut } from "./storage";
 import type { TrpcContext } from "./_core/context";
 
-function createContext(role: "admin" | "user" | null = null): TrpcContext {
+function createContext(role: "admin" | "user" | null = null, email = "test@example.com"): TrpcContext {
   return {
     user: role
       ? {
           id: 1,
           openId: "test-user",
           name: "Test User",
-          email: "test@example.com",
+          email,
           loginMethod: "manus",
           role,
           createdAt: new Date(),
@@ -130,6 +130,13 @@ describe("applications router", () => {
 
     await expect(appRouter.createCaller(createContext("user")).applications.list()).rejects.toMatchObject<Partial<TRPCError>>({ code: "FORBIDDEN" });
     await expect(appRouter.createCaller(createContext("admin")).applications.list()).resolves.toEqual([]);
+    expect(listSingleOfWeekApplications).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows the explicitly allowlisted manager email to list private applications", async () => {
+    vi.mocked(listSingleOfWeekApplications).mockResolvedValue([]);
+
+    await expect(appRouter.createCaller(createContext("user", "ofrivaturi@gmail.com")).applications.list()).resolves.toEqual([]);
     expect(listSingleOfWeekApplications).toHaveBeenCalledTimes(1);
   });
 
