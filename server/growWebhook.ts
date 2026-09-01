@@ -39,6 +39,7 @@ import { notifyOwner } from "./_core/notification";
 import { startJourney } from "./automation";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
+import { buildNewYearBundleAccessEmail } from "./newYearBundleEmail";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -140,7 +141,11 @@ async function handleGuide(email: string, name: string, opts?: { skipJourney?: b
   }
 }
 
-async function handleCourse(email: string, name: string) {
+async function handleCourse(
+  email: string,
+  name: string,
+  opts: { skipJourney?: boolean; emailMode?: "standalone" | "new_year_bundle" } = {},
+) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
@@ -168,11 +173,24 @@ async function handleCourse(email: string, name: string) {
   const GUIDE_URL = `${SITE_BASE}/guide/view?token=${guideToken}`;
   const firstName = name.trim().split(" ")[0];
   await notifyOwner({ title: "רכישת קורס חדשה! 🎓", content: `${name} (${email}) רכש את הקורס ב-249 ₪` });
-  sendEmail({
+  if (opts.emailMode === "new_year_bundle") {
+    const bundleEmail = buildNewYearBundleAccessEmail({
+      firstName,
+      email,
+      courseUrl: COURSE_URL,
+      guideUrl: GUIDE_URL,
+    });
+    sendEmail({
+      to: { email, name },
+      ...bundleEmail,
+    }).catch(err => console.error("[GrowWebhook][NewYearBundle] Email failed:", err));
+  } else {
+    sendEmail({
     to: { email, name },
     subject: "הקורס שלך מחכה! 🎓",
     htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:40px 32px;text-align:center;"><h1 style="color:#ffe27c;font-size:26px;margin:0 0 8px;">תודה על הרכישה! 🎓</h1><p style="color:rgba(255,255,255,0.8);font-size:15px;margin:0;">הקורס שלך מחכה</p></div><div style="padding:40px 32px;"><p style="font-size:18px;color:#191265;margin:0 0 16px;">שלום ${firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">שמחתי מאוד שהצטרפתם לקורס "המסע"! 5 מודולים מעשיים שיוביל אתכם מהמקום שבו אתם תקועים אל האהבה שאתם מחפשים.</p><div style="text-align:center;margin:32px 0;"><a href="${COURSE_URL}" style="display:inline-block;background:#ffe27c;color:#191265;font-size:18px;font-weight:bold;padding:16px 40px;border-radius:12px;text-decoration:none;">כניסה לקורס</a></div><div style="background:#ffe27c;border-radius:12px;padding:20px 24px;margin:24px 0;"><p style="font-size:15px;color:#191265;font-weight:bold;margin:0 0 8px;">🎁 הבונוס שלך - המדריך הדיגיטלי</p><p style="font-size:14px;color:#191265;margin:0 0 16px;">כמי שרכש את הקורס, מגיע לך גם המדריך "לבחור נכון" - ללא תשלום נוסף.</p><div style="text-align:center;"><a href="${GUIDE_URL}" style="display:inline-block;background:#191265;color:#ffe27c;font-size:15px;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none;">פתיחת המדריך</a></div></div><p style="font-size:15px;color:#191265;font-weight:bold;margin:24px 0 8px;">באהבה,<br>הילית כספי</p></div><div style="background:#191265;padding:20px 32px;text-align:center;"><p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0;">קיבלת מייל זה כי רכשת את הקורס של הילית כספי.<br><a href="${SITE_BASE}/unsubscribe?email=${encodeURIComponent(email)}" style="color:rgba(255,255,255,0.5);">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
-  }).catch(err => console.error("[GrowWebhook][Course] Email failed:", err));
+    }).catch(err => console.error("[GrowWebhook][Course] Email failed:", err));
+  }
     // Update CRM lead status to client_course
   const existingCrmCourse = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.email, email)).limit(1);
   if (existingCrmCourse.length > 0) {
@@ -180,7 +198,9 @@ async function handleCourse(email: string, name: string) {
   } else {
     await db.insert(crmLeads).values({ name, email, status: "client_course", product: "course", source: "direct", createdAt: now, updatedAt: now }).catch(() => {});
   }
-  startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender: "female", journeyKey: "women_course" }).catch(() => {});
+  if (!opts.skipJourney) {
+    startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender: "female", journeyKey: "women_course" }).catch(() => {});
+  }
 }
 async function handleCoaching(email: string, name: string) {
   const db = await getDb();
@@ -411,7 +431,7 @@ async function handleBundleNewYear(email: string, name: string, phone: string, t
   // The course handler grants both course and guide access. This creates two
   // customer emails in total: database onboarding and one digital-access email.
   await handleDatabase(email, name, phone, transactionId);
-  await handleCourse(email, name);
+  await handleCourse(email, name, { skipJourney: true, emailMode: "new_year_bundle" });
   await notifyOwner({
     title: "רכישת חבילת שנה חדשה",
     content: `${name} (${email}) רכש/ה את חבילת השנה החדשה (מאגר + מדריך + קורס) ב־${amount} ₪. Transaction: ${transactionId || "N/A"}`,

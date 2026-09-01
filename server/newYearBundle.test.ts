@@ -23,7 +23,7 @@ describe("New Year holiday bundle", () => {
       .toBe("bundle_tubav");
   });
 
-  it("fulfills database onboarding and the course that also grants the guide", () => {
+  it("fulfills database onboarding and one combined course-and-guide email", () => {
     const webhook = readProjectFile("server/growWebhook.ts");
     const handler = webhook.slice(
       webhook.indexOf("async function handleBundleNewYear"),
@@ -31,9 +31,24 @@ describe("New Year holiday bundle", () => {
     );
 
     expect(handler).toContain("await handleDatabase");
-    expect(handler).toContain("await handleCourse");
+    expect(handler).toContain('await handleCourse(email, name, { skipJourney: true, emailMode: "new_year_bundle" })');
     expect(handler).not.toContain("await handleGuide");
+    expect(handler).not.toContain("startJourney");
     expect(handler).not.toContain("handlePlus");
+  });
+
+  it("keeps the standalone course journey but skips it for the holiday bundle", () => {
+    const webhook = readProjectFile("server/growWebhook.ts");
+    const courseHandler = webhook.slice(
+      webhook.indexOf("async function handleCourse"),
+      webhook.indexOf("async function handleCoaching"),
+    );
+
+    expect(courseHandler).toContain('opts.emailMode === "new_year_bundle"');
+    expect(courseHandler).toContain("buildNewYearBundleAccessEmail");
+    expect(courseHandler).toContain("if (!opts.skipJourney)");
+    expect(courseHandler).toContain('journeyKey: "women_course"');
+    expect(webhook).toContain('case "course":   await handleCourse(email, name); break;');
   });
 
   it("keeps the landing page separate from the database checkout funnel", () => {
