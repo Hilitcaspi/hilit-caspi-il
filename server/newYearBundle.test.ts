@@ -51,6 +51,20 @@ describe("New Year holiday bundle", () => {
     expect(webhook).toContain('case "course":   await handleCourse(email, name); break;');
   });
 
+  it("reuses existing course and guide access when a bundle is purchased again", () => {
+    const webhook = readProjectFile("server/growWebhook.ts");
+    const courseHandler = webhook.slice(
+      webhook.indexOf("async function handleCourse"),
+      webhook.indexOf("async function handleCoaching"),
+    );
+
+    expect(courseHandler).toContain('const isNewYearBundle = opts.emailMode === "new_year_bundle"');
+    expect(courseHandler).toContain("if (existing.length > 0 && !isNewYearBundle)");
+    expect(courseHandler).toContain("const courseToken = existing[0]?.token");
+    expect(courseHandler).toContain("const guideToken = existingGuide[0]?.token");
+    expect(courseHandler).toContain("await sendEmail");
+  });
+
   it("keeps the landing page separate from the database checkout funnel", () => {
     const app = readProjectFile("client/src/App.tsx");
     const landing = readProjectFile("client/src/pages/NewYearLoveBundle.tsx");

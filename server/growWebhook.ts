@@ -31,7 +31,7 @@
  */
 
 import crypto from "crypto";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusPaymentEvents } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
@@ -151,39 +151,49 @@ async function handleCourse(
 
   const existing = await db.select().from(productAccessTokens)
     .where(and(eq(productAccessTokens.email, email), eq(productAccessTokens.product, "course_249")))
+    .orderBy(desc(productAccessTokens.createdAt))
     .limit(1);
-  if (existing.length > 0) {
+  const isNewYearBundle = opts.emailMode === "new_year_bundle";
+  if (existing.length > 0 && !isNewYearBundle) {
     console.log(`[GrowWebhook] Course token already exists for ${email}, skipping`);
     return;
   }
 
-  await db.insert(leads).values({ name, email, phone: "", source: "paid_course" }).catch(() => {});
   const now = Date.now();
-  const courseToken = crypto.randomBytes(32).toString("hex");
-  const guideToken = crypto.randomBytes(32).toString("hex");
-  await db.insert(productAccessTokens).values({
-    token: courseToken, email, name, product: "course_249",
-    expiresAt: now + 365 * 24 * 60 * 60 * 1000, accessCount: 0, createdAt: now,
-  });
-  await db.insert(productAccessTokens).values({
-    token: guideToken, email, name, product: "guide_149",
-    expiresAt: now + 365 * 24 * 60 * 60 * 1000, accessCount: 0, createdAt: now,
-  });
+  const existingGuide = await db.select().from(productAccessTokens)
+    .where(and(eq(productAccessTokens.email, email), eq(productAccessTokens.product, "guide_149")))
+    .orderBy(desc(productAccessTokens.createdAt))
+    .limit(1);
+  const courseToken = existing[0]?.token || crypto.randomBytes(32).toString("hex");
+  const guideToken = existingGuide[0]?.token || crypto.randomBytes(32).toString("hex");
+  if (existing.length === 0) {
+    await db.insert(leads).values({ name, email, phone: "", source: "paid_course" }).catch(() => {});
+    await db.insert(productAccessTokens).values({
+      token: courseToken, email, name, product: "course_249",
+      expiresAt: now + 365 * 24 * 60 * 60 * 1000, accessCount: 0, createdAt: now,
+    });
+  }
+  if (existingGuide.length === 0) {
+    await db.insert(productAccessTokens).values({
+      token: guideToken, email, name, product: "guide_149",
+      expiresAt: now + 365 * 24 * 60 * 60 * 1000, accessCount: 0, createdAt: now,
+    });
+  }
   const COURSE_URL = `${SITE_BASE}/course/view?token=${courseToken}`;
   const GUIDE_URL = `${SITE_BASE}/guide/view?token=${guideToken}`;
   const firstName = name.trim().split(" ")[0];
   await notifyOwner({ title: "רכישת קורס חדשה! 🎓", content: `${name} (${email}) רכש את הקורס ב-249 ₪` });
-  if (opts.emailMode === "new_year_bundle") {
+  if (isNewYearBundle) {
     const bundleEmail = buildNewYearBundleAccessEmail({
       firstName,
       email,
       courseUrl: COURSE_URL,
       guideUrl: GUIDE_URL,
     });
-    sendEmail({
+    await sendEmail({
       to: { email, name },
       ...bundleEmail,
-    }).catch(err => console.error("[GrowWebhook][NewYearBundle] Email failed:", err));
+    });
   } else {
     sendEmail({
     to: { email, name },
