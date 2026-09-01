@@ -44,6 +44,7 @@ import {
 import { extractApprovedTestimonialSeeds, hydrateApprovedTestimonials } from "./publicTestimonials";
 import { buildOutcomeFeedbackRequestEmail, shouldOfferTestimonialRequest, TESTIMONIAL_REQUEST_COOLDOWN_MS } from "./testimonialRequests";
 import { buildApprovedTestimonialCreativeVariants } from "./testimonialCreative";
+import { testimonialRouter } from "./testimonialRouter";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -586,6 +587,7 @@ export const appRouter = router({
   matchBoost: matchBoostRouter,
   matchBoostPilot: matchBoostPilotRouter,
   operations: operationsRouter,
+  testimonial: testimonialRouter,
   publicProof: router({
     approvedTestimonials: publicProcedure.query(async () => {
       const db = await getDb();

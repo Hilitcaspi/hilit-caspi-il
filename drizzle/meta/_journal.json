@@ -120,6 +120,13 @@
       "when": 1787850149093,
       "tag": "0016_brainy_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1788276954721,
+      "tag": "0017_loud_proteus",
+      "breakpoints": true
     }
   ]
 }

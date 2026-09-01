@@ -988,3 +988,158 @@ export const webhookIdempotency = mysqlTable("webhook_idempotency", {
   createdAt:     bigint("created_at", { mode: "number" }).notNull(),
 });
 export type WebhookIdempotency = typeof webhookIdempotency.$inferSelect;
+
+/**
+ * Unified feedback and testimonial funnel.
+ * Public submission always requires a private token; publishing always requires team verification and explicit usage consent.
+ */
+export const testimonialRecords = mysqlTable("testimonial_records", {
+  id: int("id").primaryKey().autoincrement(),
+  publicToken: varchar("public_token", { length: 64 }).notNull().unique(),
+  status: mysqlEnum("status", [
+    "draft",
+    "candidate",
+    "approved_to_contact",
+    "sent",
+    "submitted",
+    "awaiting_consent",
+    "awaiting_verification",
+    "approved",
+    "published",
+    "revoked",
+    "archived",
+  ]).default("draft").notNull(),
+  proofType: mysqlEnum("proof_type", ["success", "progress", "product", "database", "service", "internal"]).notNull(),
+  sourceType: mysqlEnum("source_type", ["match", "database", "dna", "guide", "course", "boost", "service", "manual"]).notNull(),
+  singleId: int("single_id"),
+  crmLeadId: int("crm_lead_id"),
+  matchId: int("match_id"),
+  contactName: varchar("contact_name", { length: 150 }).notNull(),
+  contactEmail: varchar("contact_email", { length: 320 }).notNull(),
+  contactPhone: varchar("contact_phone", { length: 30 }),
+  sourceSnapshot: text("source_snapshot"),
+  rating: int("rating"),
+  npsScore: int("nps_score"),
+  feedbackText: text("feedback_text"),
+  improvementText: text("improvement_text"),
+  testimonialTextOriginal: text("testimonial_text_original"),
+  testimonialTextApproved: text("testimonial_text_approved"),
+  identityScope: mysqlEnum("identity_scope", ["anonymous", "first_name", "full_name", "full_name_photo"]).default("anonymous").notNull(),
+  consentText: boolean("consent_text").default(false).notNull(),
+  consentPhoto: boolean("consent_photo").default(false).notNull(),
+  consentVideo: boolean("consent_video").default(false).notNull(),
+  allowWebsite: boolean("allow_website").default(false).notNull(),
+  allowOrganicSocial: boolean("allow_organic_social").default(false).notNull(),
+  allowEmail: boolean("allow_email").default(false).notNull(),
+  allowPaidAds: boolean("allow_paid_ads").default(false).notNull(),
+  allowPr: boolean("allow_pr").default(false).notNull(),
+  allowSpellingEdits: boolean("allow_spelling_edits").default(false).notNull(),
+  allowMaterialEdits: boolean("allow_material_edits").default(false).notNull(),
+  consentVersion: varchar("consent_version", { length: 50 }),
+  consentConfirmedAt: bigint("consent_confirmed_at", { mode: "number" }),
+  consentRevokedAt: bigint("consent_revoked_at", { mode: "number" }),
+  teamVerifiedAt: bigint("team_verified_at", { mode: "number" }),
+  teamVerifiedBy: varchar("team_verified_by", { length: 200 }),
+  teamApprovedAt: bigint("team_approved_at", { mode: "number" }),
+  teamApprovedBy: varchar("team_approved_by", { length: 200 }),
+  publishedAt: bigint("published_at", { mode: "number" }),
+  archivedAt: bigint("archived_at", { mode: "number" }),
+  draftSubject: varchar("draft_subject", { length: 500 }),
+  draftBody: text("draft_body"),
+  requestApprovedAt: bigint("request_approved_at", { mode: "number" }),
+  requestApprovedBy: varchar("request_approved_by", { length: 200 }),
+  requestSentAt: bigint("request_sent_at", { mode: "number" }),
+  lastResponseAt: bigint("last_response_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({
+  statusIdx: index("testimonial_record_status_idx").on(table.status),
+  sourceIdx: index("testimonial_record_source_idx").on(table.sourceType),
+  singleIdx: index("testimonial_record_single_idx").on(table.singleId),
+  matchIdx: index("testimonial_record_match_idx").on(table.matchId),
+  emailIdx: index("testimonial_record_email_idx").on(table.contactEmail),
+  createdIdx: index("testimonial_record_created_idx").on(table.createdAt),
+}));
+export type TestimonialRecord = typeof testimonialRecords.$inferSelect;
+export type InsertTestimonialRecord = typeof testimonialRecords.$inferInsert;
+
+/** S3 metadata for customer-supplied testimonial images and videos. */
+export const testimonialMedia = mysqlTable("testimonial_media", {
+  id: int("id").primaryKey().autoincrement(),
+  recordId: int("record_id").notNull(),
+  mediaType: mysqlEnum("media_type", ["image", "video"]).notNull(),
+  storageKey: varchar("storage_key", { length: 500 }).notNull(),
+  storageUrl: text("storage_url").notNull(),
+  originalFileName: varchar("original_file_name", { length: 255 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  byteSize: bigint("byte_size", { mode: "number" }).notNull(),
+  status: mysqlEnum("status", ["uploaded", "approved", "rejected", "revoked"]).default("uploaded").notNull(),
+  uploadedAt: bigint("uploaded_at", { mode: "number" }).notNull(),
+  approvedAt: bigint("approved_at", { mode: "number" }),
+  approvedBy: varchar("approved_by", { length: 200 }),
+  rejectedAt: bigint("rejected_at", { mode: "number" }),
+  rejectedBy: varchar("rejected_by", { length: 200 }),
+  rejectionReason: text("rejection_reason"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({
+  recordIdx: index("testimonial_media_record_idx").on(table.recordId),
+  statusIdx: index("testimonial_media_status_idx").on(table.status),
+}));
+export type TestimonialMedia = typeof testimonialMedia.$inferSelect;
+export type InsertTestimonialMedia = typeof testimonialMedia.$inferInsert;
+
+/** Immutable publishing/use history for each approved testimonial. */
+export const testimonialUsage = mysqlTable("testimonial_usage", {
+  id: int("id").primaryKey().autoincrement(),
+  recordId: int("record_id").notNull(),
+  mediaId: int("media_id"),
+  channel: mysqlEnum("channel", ["website", "organic_social", "email", "paid_ads", "pr"]).notNull(),
+  format: varchar("format", { length: 100 }),
+  placement: varchar("placement", { length: 255 }),
+  campaignName: varchar("campaign_name", { length: 255 }),
+  publicUrl: text("public_url"),
+  approvedCopySnapshot: text("approved_copy_snapshot"),
+  publishedAt: bigint("published_at", { mode: "number" }).notNull(),
+  removedAt: bigint("removed_at", { mode: "number" }),
+  createdBy: varchar("created_by", { length: 200 }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, table => ({
+  recordIdx: index("testimonial_usage_record_idx").on(table.recordId),
+  channelIdx: index("testimonial_usage_channel_idx").on(table.channel),
+}));
+export type TestimonialUsage = typeof testimonialUsage.$inferSelect;
+export type InsertTestimonialUsage = typeof testimonialUsage.$inferInsert;
+
+/** Audit trail for public form and team actions. */
+export const testimonialEvents = mysqlTable("testimonial_events", {
+  id: int("id").primaryKey().autoincrement(),
+  recordId: int("record_id").notNull(),
+  eventType: mysqlEnum("event_type", [
+    "created",
+    "candidate_generated",
+    "contact_approved",
+    "request_marked_sent",
+    "form_opened",
+    "feedback_submitted",
+    "consent_granted",
+    "consent_updated",
+    "media_uploaded",
+    "team_verified",
+    "approved",
+    "published",
+    "usage_removed",
+    "consent_revoked",
+    "archived",
+  ]).notNull(),
+  actorType: mysqlEnum("actor_type", ["customer", "team", "system"]).notNull(),
+  actorRef: varchar("actor_ref", { length: 200 }),
+  metadata: text("metadata"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, table => ({
+  recordIdx: index("testimonial_event_record_idx").on(table.recordId),
+  eventIdx: index("testimonial_event_type_idx").on(table.eventType),
+  createdIdx: index("testimonial_event_created_idx").on(table.createdAt),
+}));
+export type TestimonialEvent = typeof testimonialEvents.$inferSelect;
+export type InsertTestimonialEvent = typeof testimonialEvents.$inferInsert;

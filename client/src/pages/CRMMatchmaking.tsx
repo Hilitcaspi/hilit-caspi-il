@@ -6,7 +6,7 @@ import { useState } from "react";
 import MatchmakingDashboard from "./MatchmakingDashboard";
 import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
 import BoostMembersAdminSection from "@/components/BoostMembersAdminSection";
-import TestimonialCreativeLibrarySection from "@/components/TestimonialCreativeLibrarySection";
+import TestimonialManagementSection from "@/components/TestimonialManagementSection";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -914,7 +914,7 @@ export default function CRMMatchmaking() {
             { id: "inactive" as const, label: "לא פעילים", icon: <span>🚫</span> },
             { id: "boost" as const, label: "מאושרי Boost", icon: <Sparkles size={14} /> },
             { id: "plus" as const, label: "חברי PLUS", icon: <span className="font-black text-[#8b7420]">＋</span> },
-            { id: "testimonials" as const, label: "עדויות מאושרות", icon: <span>✍️</span> },
+            { id: "testimonials" as const, label: "משובים והמלצות", icon: <span>✍️</span> },
             { id: "dashboard" as const, label: "דאשבורד 📊", icon: <BarChart3 size={14} /> },
           ].map(tab => (
             <button
@@ -3046,7 +3046,7 @@ export default function CRMMatchmaking() {
           <PlusPilotAdminSection />
         )}
         {activeTab === "testimonials" && (
-          <TestimonialCreativeLibrarySection />
+          <TestimonialManagementSection />
         )}
       </div>
     </div>

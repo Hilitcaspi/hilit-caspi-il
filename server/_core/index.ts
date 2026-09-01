@@ -26,6 +26,7 @@ import { storagePut } from "../storage";
 import { sendErrorAlert, installProcessErrorAlerts } from "./errorAlert";
 import { buildBoostEnrollmentNewsletter } from "../boostNewsletter";
 import { processBoostNewsletterWave, type BoostNewsletterWaveKey } from "../boostNewsletterCampaign";
+import { registerTestimonialMediaUpload } from "../testimonialMediaUpload";
 
 // Install process-level error alerts (uncaughtException / unhandledRejection).
 installProcessErrorAlerts();
@@ -54,6 +55,8 @@ async function startServer() {
   const server = createServer(app);
   // Trust reverse proxy (Cloudflare/load balancer) so express-rate-limit reads correct client IP
   app.set("trust proxy", 1);
+  // Raw media upload must be registered before the global JSON body parser.
+  registerTestimonialMediaUpload(app);
   // Body parser — 10MB to support base64 photo uploads in questionnaire
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));

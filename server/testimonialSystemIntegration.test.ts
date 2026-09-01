@@ -25,4 +25,25 @@ describe("testimonial system integration policy", () => {
       expect(component).not.toContain(prohibited);
     }
   });
+
+  it("keeps new outreach as drafts and does not call an email sender", () => {
+    const router = read("server/testimonialRouter.ts");
+    expect(router).toContain("approved_to_contact");
+    expect(router).toContain("sent: 0");
+    expect(router).not.toMatch(/sendEmail\s*\(/);
+  });
+
+  it("states that media upload is not publication consent", () => {
+    const upload = read("server/testimonialMediaUpload.ts");
+    const form = read("client/src/pages/TestimonialFeedback.tsx");
+    expect(upload).toContain("העלאה אינה אישור לפרסום");
+    expect(form).toContain("עצם ההעלאה אינה אישור לפרסום");
+  });
+
+  it("exposes a dedicated public form and CRM management tab", () => {
+    const app = read("client/src/App.tsx");
+    const crm = read("client/src/pages/CRMMatchmaking.tsx");
+    expect(app).toContain('/testimonial/feedback');
+    expect(crm).toContain("משובים והמלצות");
+  });
 });
