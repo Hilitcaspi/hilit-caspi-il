@@ -10,6 +10,7 @@ import {
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { sendEmail } from "./brevo";
+import { normalizeEmail, normalizedEmailEquals } from "./emailNormalization";
 
 export const BOOST_INTEREST_CONSENT_VERSION = "2026-08-27-interest-v1";
 const BOOST_LINK_COOLDOWN_MS = 10 * 60 * 1000;
@@ -85,7 +86,7 @@ export const matchBoostPilotRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database unavailable");
-      const email = input.email.toLowerCase();
+      const email = normalizeEmail(input.email);
       const single = await db.select({
         id: singles.id,
         firstName: singles.firstName,
@@ -96,7 +97,7 @@ export const matchBoostPilotRouter = router({
         questionnaireToken: singles.questionnaireToken,
       })
         .from(singles)
-        .where(eq(singles.email, email))
+        .where(normalizedEmailEquals(singles.email, email))
         .limit(1)
         .then(rows => rows[0] || null);
       const membership = single
@@ -108,7 +109,7 @@ export const matchBoostPilotRouter = router({
         : null;
       const existingInterest = await db.select({ updatedAt: matchBoostPilotInterests.updatedAt })
         .from(matchBoostPilotInterests)
-        .where(eq(matchBoostPilotInterests.email, email))
+        .where(normalizedEmailEquals(matchBoostPilotInterests.email, email))
         .limit(1)
         .then(rows => rows[0] || null);
       const now = Date.now();

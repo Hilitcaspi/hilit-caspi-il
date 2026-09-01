@@ -18,6 +18,7 @@ import { computeFullScore, passesHardFilters } from "./compatibility";
 import { getDb } from "./db";
 import { sendEmail } from "./brevo";
 import { buildMatchProposalEmail } from "./emailTemplates";
+import { normalizeEmail, normalizedEmailEquals } from "./emailNormalization";
 import { getMissingProfileFields } from "./matchmakingMetrics";
 import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 
@@ -377,7 +378,7 @@ async function getVerifiedSingle(email: string, token: string) {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
   const [single] = await db.select().from(singles).where(and(
-    eq(singles.email, email.trim().toLowerCase()),
+    normalizedEmailEquals(singles.email, email),
     eq(singles.questionnaireToken, token),
   )).limit(1);
   if (!single) throw new TRPCError({ code: "NOT_FOUND", message: "הקישור האישי אינו תקין" });
@@ -609,8 +610,8 @@ export async function fulfillPaidBoostPayment(input: {
   if (![BOOST_PRICE_AGOROT, LEGACY_BOOST_PRICE_AGOROT].some(amount => Math.abs(input.amountAgorot - amount) <= 1)) {
     throw new Error(`Unexpected Boost payment amount: ${input.amountAgorot}`);
   }
-  const normalizedEmail = input.email.trim().toLowerCase();
-  const [single] = await db.select().from(singles).where(eq(singles.email, normalizedEmail)).limit(1);
+  const normalizedEmail = normalizeEmail(input.email);
+  const [single] = await db.select().from(singles).where(normalizedEmailEquals(singles.email, normalizedEmail)).limit(1);
   if (!single) throw new Error(`Boost payment received for unknown member: ${normalizedEmail}`);
 
   const [existingByTransaction] = input.transactionId
@@ -944,8 +945,9 @@ export const matchBoostRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const normalizedEmail = normalizeEmail(input.email);
       const [single] = await db.select().from(singles)
-        .where(eq(singles.email, input.email.trim().toLowerCase())).limit(1);
+        .where(normalizedEmailEquals(singles.email, normalizedEmail)).limit(1);
       if (!single) throw new TRPCError({ code: "NOT_FOUND", message: "לא נמצא חבר מאגר עם המייל הזה" });
       if (!single.isPaid || !single.isActive || !single.consentMatchmaking) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "אפשר להזמין רק חבר מאגר פעיל ומשלם" });
@@ -954,7 +956,7 @@ export const matchBoostRouter = router({
         .where(eq(matchBoostMemberships.singleId, single.id)).limit(1);
       if (hasActiveBoostConsent(existing)) {
         await db.update(matchBoostPilotInterests).set({ status: "joined", matchedSingleId: single.id, updatedAt: Date.now() })
-          .where(eq(matchBoostPilotInterests.email, input.email.trim().toLowerCase()));
+          .where(normalizedEmailEquals(matchBoostPilotInterests.email, normalizedEmail));
         return { success: true, status: "active" as const, alreadyActive: true, singleId: single.id };
       }
 
@@ -991,7 +993,7 @@ export const matchBoostRouter = router({
           createdAt: now,
         });
         await tx.update(matchBoostPilotInterests).set({ status: "invited", matchedSingleId: single.id, updatedAt: now })
-          .where(eq(matchBoostPilotInterests.email, input.email.trim().toLowerCase()));
+          .where(normalizedEmailEquals(matchBoostPilotInterests.email, normalizedEmail));
       });
       return {
         success: true,
@@ -1151,7 +1153,7 @@ export const matchBoostRouter = router({
         await tx.update(matchBoostPilotInterests).set({ status: "joined", matchedSingleId: single.id, updatedAt: now })
           .where(or(
             eq(matchBoostPilotInterests.matchedSingleId, single.id),
-            eq(matchBoostPilotInterests.email, single.email?.toLowerCase() || ""),
+            normalizedEmailEquals(matchBoostPilotInterests.email, single.email || ""),
           ));
       });
       return { success: true, status: "active" as const, consentedAt: now };
@@ -1184,7 +1186,7 @@ export const matchBoostRouter = router({
         await tx.update(matchBoostPilotInterests).set({ status: "declined", matchedSingleId: single.id, updatedAt: now })
           .where(or(
             eq(matchBoostPilotInterests.matchedSingleId, single.id),
-            eq(matchBoostPilotInterests.email, single.email?.toLowerCase() || ""),
+            normalizedEmailEquals(matchBoostPilotInterests.email, single.email || ""),
           ));
       });
       return { success: true, status: "opted_out" as const, optedOutAt: now };

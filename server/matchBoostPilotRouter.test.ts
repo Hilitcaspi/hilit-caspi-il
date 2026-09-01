@@ -30,6 +30,16 @@ describe("Boost personal approval link funnel", () => {
     expect(submitFlow).not.toContain("insert(matchBoostMemberships)");
   });
 
+  it("matches member emails case-insensitively throughout the Boost approval flow", () => {
+    const submitFlow = routerSource.slice(routerSource.indexOf("submitInterest:"), routerSource.indexOf("overview:"));
+    expect(submitFlow).toContain("normalizeEmail(input.email)");
+    expect(submitFlow).toContain("normalizedEmailEquals(singles.email, email)");
+    expect(submitFlow).toContain("normalizedEmailEquals(matchBoostPilotInterests.email, email)");
+    expect(boostSource).toContain("normalizedEmailEquals(singles.email, email)");
+    expect(boostSource).toContain("normalizedEmailEquals(singles.email, normalizedEmail)");
+    expect(boostSource).not.toContain("eq(singles.email, email.trim().toLowerCase())");
+  });
+
   it("opens the Boost section inside the personal-area matches tab and keeps joining as a separate action", () => {
     expect(appSource).toContain('<Route path="/match-boost" component={MatchBoostLanding} />');
     expect(routerSource).toContain("https://hilitcaspi.com/my-profile?email=");
