@@ -43,4 +43,4 @@
 - [x] Add ofrivaturi@gmail.com to the server-side allowlist for private application management access.
 - [x] Ensure the authenticated management interface recognizes the allowlisted account as authorized.
 - [x] Add regression tests proving allowlisted access is granted while non-allowlisted access is denied.
-- [ ] Verify the authorization change, save a checkpoint, and synchronize it to GitHub.
+- [x] Verify the authorization change, save a checkpoint, and synchronize it to GitHub.
