@@ -819,6 +819,29 @@ async function startServer() {
     }
   });
 
+  // Aggregate-only owner digest. The durable schedule is created separately
+  // only after the owner approves the recipient, wording and activation.
+  app.post("/api/scheduled/israel-daily-report", express.json(), async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req as any);
+      if (!user.isCron || !user.taskUid) {
+        res.status(403).json({ error: "cron-only" });
+        return;
+      }
+      const { runScheduledDailyReport } = await import("../dailyReportService");
+      const result = await runScheduledDailyReport(user.taskUid);
+      res.json(result);
+    } catch (error) {
+      console.error("[DailyReport] Error:", error);
+      res.status(500).json({
+        error: String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { url: req.originalUrl },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // ─── Team Member Login (form POST with redirect — Chrome mobile fallback) ──
   app.post("/api/team/login-form", async (req, res) => {
     try {
@@ -1106,28 +1129,6 @@ async function startServer() {
     }
   }, WEEKLY_REPORT_CHECK_INTERVAL);
   if (SCHEDULERS_ENABLED) console.log("[WeeklyReport] Weekly report scheduler started (Tuesday 20:00 IL)");
-
-  // ─── Daily WhatsApp Report (every day at 21:00 Israel time) ──────────────
-  const DAILY_WA_CHECK_INTERVAL = 15 * 60 * 1000; // check every 15 min
-  let lastDailyWaDate = "";
-  if (SCHEDULERS_ENABLED) setInterval(async () => {
-    try {
-      const now = new Date();
-      const israelTime = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-      const hour = israelTime.getUTCHours();
-      const dateStr = israelTime.toISOString().split("T")[0];
-      if (hour === 21 && lastDailyWaDate !== dateStr) {
-        lastDailyWaDate = dateStr;
-        console.log("[DailyWA] Sending daily WhatsApp report...");
-        const { sendDailyWhatsAppReport } = await import('../dailyWhatsAppReport');
-        await sendDailyWhatsAppReport();
-        console.log("[DailyWA] Done");
-      }
-    } catch (err) {
-      console.error("[DailyWA] Error:", err);
-    }
-  }, DAILY_WA_CHECK_INTERVAL);
-  if (SCHEDULERS_ENABLED) console.log("[DailyWA] Daily WhatsApp report scheduler started (21:00 IL)");
 
   // ─── Meta Lead Ads Polling (every 1 minute) ───────────────────────────────
   // Pulls new leads directly from Meta Graph API - does NOT rely on webhook

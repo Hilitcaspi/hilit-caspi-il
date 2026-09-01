@@ -7,14 +7,16 @@ import MatchmakingDashboard from "./MatchmakingDashboard";
 import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
 import BoostMembersAdminSection from "@/components/BoostMembersAdminSection";
 import TestimonialManagementSection from "@/components/TestimonialManagementSection";
+import DailyReportManagementSection from "@/components/DailyReportManagementSection";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles } from "lucide-react";
+import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles, MessageSquareText } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { getMatchTrackingSummary, hasMutualYes, isUnsuccessfulMatch, isWaitingForMatchResponses } from "@shared/matchLifecycle";
 
 const RELIGIOSITY_LABELS: Record<string, string> = {
   secular:     "חילוני/ת",
@@ -292,11 +294,11 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials">(() => {
+  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report">(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    const allowedTabs = new Set(["singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "testimonials"]);
+    const allowedTabs = new Set(["singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "testimonials", "daily_report"]);
     return allowedTabs.has(requestedTab || "")
-      ? requestedTab as "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials"
+      ? requestedTab as "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report"
       : "singles";
   });
   // Filter-search tab state
@@ -338,7 +340,7 @@ export default function CRMMatchmaking() {
   const [compatDropdownB, setCompatDropdownB] = useState(false);
   const [compatResult, setCompatResult] = useState<any>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [matchSubTab, setMatchSubTab] = useState<"pending" | "proposed" | "matched" | "rejected" | "no_response" | "expired" | "followup">("pending");
+  const [matchSubTab, setMatchSubTab] = useState<"pending" | "proposed" | "unsuccessful" | "mutual_yes" | "followup">("pending");
   const [matchSearch, setMatchSearch] = useState("");
   const [hideProposed, setHideProposed] = useState(false); // show all singles by default
   const [showOnlyUpdatedThisMonth, setShowOnlyUpdatedThisMonth] = useState(false);
@@ -688,54 +690,14 @@ export default function CRMMatchmaking() {
 
   const activeCount = typedSingles.filter(s => s.isActive).length;
   const pendingCount = typedMatches.filter(m => m.status === "pending").length;
-  const matchedCount = typedMatches.filter(m => m.status === "matched").length;
+  const mutualYesCount = typedMatches.filter(m => hasMutualYes(m)).length;
+  const activeMutualYesCount = typedMatches.filter(m => hasMutualYes(m) && !m.returnedToPoolAt).length;
+  const releasedMutualYesCount = typedMatches.filter(m => hasMutualYes(m) && Boolean(m.returnedToPoolAt)).length;
 
   // Match sub-tab counts
   const now14daysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
-  // "proposed" tab = ALL matches that were ever sent (proposedAt is set, not pending)
-  // "no_match" tab = rejected OR expired only
-  // Classification uses tokenAUsedAt/tokenBUsedAt to distinguish explicit rejection from no response:
-  // - tokenUsedAt SET + approved=false → person clicked the link and explicitly rejected
-  // - tokenUsedAt NULL + approved=false/null → person never responded (default value)
-  // Categories:
-  // 1. Both approved=true (matched then released) → "דחו" tab
-  // 2. At least one person clicked AND rejected (tokenUsedAt set + approved=false) → "דחו" tab
-  // 3. Sent (proposedAt set) but no explicit rejection by anyone → "לא ענו" tab
-  const isRejected = (m: any) => {
-    if (m.status !== "rejected" && m.status !== "expired") return false;
-    // Case 1: Was matched (both approved) then manually released
-    if (m.approvedByA === true && m.approvedByB === true) return true;
-    // Case 2: At least one person explicitly rejected (clicked the link and said no)
-    // "Explicitly rejected" = tokenUsedAt is set AND approved is NOT true (covers false and null)
-    const aExplicitlyRejected = m.tokenAUsedAt && m.approvedByA !== true;
-    const bExplicitlyRejected = m.tokenBUsedAt && m.approvedByB !== true;
-    if (aExplicitlyRejected || bExplicitlyRejected) return true;
-    return false;
-  };
-  const isNoResponse = (m: any) => {
-    if (m.status !== "rejected" && m.status !== "expired") return false;
-    // Must have been actually sent (proposedAt exists)
-    if (!m.proposedAt) return false;
-    // If both approved → not "no response" (it's a released match)
-    if (m.approvedByA === true && m.approvedByB === true) return false;
-    // If at least one person explicitly rejected (clicked + rejected) → goes to "דחו" not here
-    const aExplicitlyRejected = m.tokenAUsedAt && m.approvedByA !== true;
-    const bExplicitlyRejected = m.tokenBUsedAt && m.approvedByB !== true;
-    if (aExplicitlyRejected || bExplicitlyRejected) return false;
-    // Everything else: sent but nobody explicitly rejected
-    // Includes: both ghosted, one approved but other ghosted, expired without action
-    return true;
-  };
-  const isNoMatch = (m: any) => {
-    if (m.status === "rejected") return true;
-    if (m.status === "expired") return true;
-    return false;
-  };
-  // "proposed" tab = only currently active proposals (status=proposed, within 48h)
-  const isActiveProposal = (m: any) => {
-    if (m.status !== "proposed") return false;
-    return true; // show all proposed regardless of time (48h countdown shown in UI)
-  };
+  // Mutual approval is historical truth. Returning to the pool changes the
+  // current tracking state, but never removes the pair from the mutual-yes history.
 
   // Hide pending matches where either person is already in an active proposal (within 48h)
   const isMatchBlocked = (m: any) => {
@@ -759,12 +721,10 @@ export default function CRMMatchmaking() {
 
   const matchSubCounts = {
     pending:  typedMatches.filter(m => isPendingVisible(m)).length,
-    proposed: typedMatches.filter(m => isActiveProposal(m)).length,
-    matched:  typedMatches.filter(m => m.status === "matched" && !m.returnedToPoolAt).length,
-    rejected: typedMatches.filter(m => isRejected(m)).length,
-    no_response: typedMatches.filter(m => isNoResponse(m)).length,
-    expired:  0, // merged into rejected
-        followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo && !m.returnedToPoolAt).length,
+    proposed: typedMatches.filter(m => isWaitingForMatchResponses(m)).length,
+    unsuccessful: typedMatches.filter(m => isUnsuccessfulMatch(m)).length,
+    mutual_yes: typedMatches.filter(m => hasMutualYes(m)).length,
+    followup: typedMatches.filter(m => hasMutualYes(m)).length,
   };
   // Filtered matches per sub-tab
   const filterMatchByName = (m: any) => {
@@ -778,12 +738,10 @@ export default function CRMMatchmaking() {
 
   const filteredMatchesBySubTab = {
     pending:  typedMatches.filter(m => isPendingVisible(m)).filter(filterMatchByName),
-    proposed: typedMatches.filter(m => isActiveProposal(m)).filter(filterMatchByName),
-    matched:  typedMatches.filter(m => m.status === "matched" && !m.returnedToPoolAt).filter(filterMatchByName),
-    rejected: typedMatches.filter(m => isRejected(m)).filter(filterMatchByName),
-    no_response: typedMatches.filter(m => isNoResponse(m)).filter(filterMatchByName),
-    expired:  [],
-    followup: typedMatches.filter(m => m.status === "matched" && m.matchedAt && m.matchedAt < now14daysAgo && !m.returnedToPoolAt).filter(filterMatchByName),
+    proposed: typedMatches.filter(m => isWaitingForMatchResponses(m)).filter(filterMatchByName),
+    unsuccessful: typedMatches.filter(m => isUnsuccessfulMatch(m)).filter(filterMatchByName),
+    mutual_yes: typedMatches.filter(m => hasMutualYes(m)).filter(filterMatchByName),
+    followup: typedMatches.filter(m => hasMutualYes(m)).filter(filterMatchByName),
   };
 
   const baseUrl = window.location.origin;
@@ -852,7 +810,7 @@ export default function CRMMatchmaking() {
         <div className="mx-auto flex w-full max-w-6xl min-w-0 items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-lg font-bold">💛 ניהול מאגר הרווקים</h1>
-            <p className="text-white/60 text-xs">{activeCount} פעילים · {pendingCount} ממתינים לאישור · {matchedCount} התאמות</p>
+            <p className="text-white/60 text-xs">{activeCount} פעילים · {pendingCount} ממתינים לאישור · {mutualYesCount} זוגות אמרו כן · {activeMutualYesCount} עדיין בהתאמה</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button
@@ -889,7 +847,7 @@ export default function CRMMatchmaking() {
             { label: "חברי מאגר", value: typedSingles.length, icon: "👥", color: "text-[#191265]" },
             { label: "פעילים", value: activeCount, icon: "✅", color: "text-green-600" },
             { label: "ממתינים לאישור", value: pendingCount, icon: "⏳", color: "text-amber-600" },
-            { label: "התאמות הצליחו", value: matchedCount, icon: "💛", color: "text-rose-600" },
+            { label: "זוגות שאמרו כן", value: mutualYesCount, icon: "💛", color: "text-rose-600" },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl p-3 text-center shadow-sm">
               <div className="text-lg">{s.icon}</div>
@@ -915,6 +873,7 @@ export default function CRMMatchmaking() {
             { id: "boost" as const, label: "מאושרי Boost", icon: <Sparkles size={14} /> },
             { id: "plus" as const, label: "חברי PLUS", icon: <span className="font-black text-[#8b7420]">＋</span> },
             { id: "testimonials" as const, label: "משובים והמלצות", icon: <span>✍️</span> },
+            { id: "daily_report" as const, label: "דוח חצות", icon: <MessageSquareText size={14} /> },
             { id: "dashboard" as const, label: "דאשבורד 📊", icon: <BarChart3 size={14} /> },
           ].map(tab => (
             <button
@@ -1468,10 +1427,9 @@ export default function CRMMatchmaking() {
             <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm overflow-x-auto">
               {([
                 { id: "pending"  as const, label: "ממתין לשליחה",    icon: "⏳", count: matchSubCounts.pending },
-                { id: "proposed" as const, label: "נשלחו הצעות",      icon: "📨", count: matchSubCounts.proposed },
-                { id: "matched"  as const, label: "יש התאמה",        icon: "💛", count: matchSubCounts.matched },
-                { id: "rejected" as const, label: "דחו",             icon: "❌", count: matchSubCounts.rejected },
-                { id: "no_response" as const, label: "לא ענו",       icon: "🚨", count: matchSubCounts.no_response },
+                { id: "proposed" as const, label: "קיבלו התאמה",      icon: "📨", count: matchSubCounts.proposed },
+                { id: "unsuccessful" as const, label: "אין התאמה",     icon: "✕", count: matchSubCounts.unsuccessful },
+                { id: "mutual_yes" as const, label: "שניהם אמרו כן", icon: "💛", count: matchSubCounts.mutual_yes },
                 { id: "followup" as const, label: "מעקב אחרי התאמה", icon: "🔔", count: matchSubCounts.followup },
               ] as const).map(st => (
                 <button
@@ -1501,34 +1459,31 @@ export default function CRMMatchmaking() {
             )}
             {matchSubTab === "proposed" && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
-                📨 <strong>נשלחו הצעות</strong> — כל ההצעות שנשלחו אי פעם לרווקים. ניתן לראות את הסטטוס של כל הצעה — ממתינה, אושרה, נדחתה או פגה.
+                📨 <strong>קיבלו התאמה</strong> — הצעות פעילות שממתינות לתשובת צד אחד או שני הצדדים.
               </div>
             )}
-            {matchSubTab === "matched" && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-xs text-green-800">
-                💛 <strong>יש התאמה</strong> — שני הצדדים אישרו! פרטי הקשר נחשפו.
-              </div>
-            )}
-            {matchSubTab === "rejected" && (
+            {matchSubTab === "unsuccessful" && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-800">
-                ❌ <strong>דחו</strong> — התאמות שלפחות אחד מהצדדים דחה במפורש.
+                ✕ <strong>אין התאמה</strong> — לפחות צד אחד אמר לא, או שההצעה הסתיימה בלי אישור הדדי.
               </div>
             )}
-            {matchSubTab === "no_response" && (
-              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-orange-800">
-                🚨 <strong>לא ענו</strong> — התאמות שפג תוקפן בלי שאף צד דחה במפורש — פשוט לא הגיבו.
+            {matchSubTab === "mutual_yes" && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-xs text-green-800">
+                💛 <strong>שניהם אמרו כן</strong> — היסטוריה מלאה של כל הזוגות שאישרו הדדית. הרשומה נשארת כאן גם אם בהמשך חזרו למאגר.
               </div>
             )}
             {matchSubTab === "followup" && (
-              <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-xs text-purple-800">
-                🔔 <strong>מעקב אחרי התאמה</strong> — התאמות שהצליחו לפני 14+ יום. כדאי לשאול איך הייתה הפגישה!
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-xs text-purple-800"><strong>{mutualYesCount}</strong> זוגות אמרו כן</div>
+                <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-xs text-green-800"><strong>{activeMutualYesCount}</strong> עדיין בהתאמה</div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700"><strong>{releasedMutualYesCount}</strong> חזרו למאגר</div>
               </div>
             )}
 
             {filteredMatchesBySubTab[matchSubTab].length === 0 && (
               <div className="bg-white rounded-xl p-8 text-center text-[#727272]">
                 <div className="text-4xl mb-2">
-                  {matchSubTab === "pending" ? "⏳" : matchSubTab === "proposed" ? "📨" : matchSubTab === "matched" ? "💛" : matchSubTab === "rejected" ? "❌" : matchSubTab === "expired" ? "⌛" : "🔔"}
+                  {matchSubTab === "pending" ? "⏳" : matchSubTab === "proposed" ? "📨" : matchSubTab === "mutual_yes" ? "💛" : matchSubTab === "unsuccessful" ? "✕" : "🔔"}
                 </div>
                 <p>אין התאמות בקטגוריה זו</p>
                 {matchSubTab === "pending" && (
@@ -1545,13 +1500,12 @@ export default function CRMMatchmaking() {
             )}
             {filteredMatchesBySubTab[matchSubTab].map(match => {
               // Determine display status badge based on actual match outcome
-             let displayStatus = match.status;
-             if (match.status === 'rejected' || match.status === 'expired') {
+             const tracking = getMatchTrackingSummary(match);
+             let displayStatus = tracking.mutualYes ? (match.returnedToPoolAt ? "released" : "matched") : match.status;
+             if (!tracking.mutualYes && (match.status === 'rejected' || match.status === 'expired')) {
                 const aExplicit = match.tokenAUsedAt && match.approvedByA !== true;
                 const bExplicit = match.tokenBUsedAt && match.approvedByB !== true;
-               if (match.approvedByA === true && match.approvedByB === true && match.returnedToPoolAt) {
-                 displayStatus = 'released'; // Was matched then manually released
-               } else if (aExplicit || bExplicit) {
+               if (aExplicit || bExplicit) {
                   displayStatus = 'rejected'; // Someone explicitly rejected
                 } else {
                   displayStatus = 'expired'; // No explicit rejection → show as "פג תוקף"
@@ -1572,7 +1526,7 @@ export default function CRMMatchmaking() {
                 const approved = isA ? match.approvedByA : match.approvedByB;
                 const isProposed = match.status === "proposed" || match.status === "matched" || match.status === "expired" || match.status === "rejected";
                 if (!isProposed) return null;
-               if (match.status === "matched") return { icon: "❤️", label: "אישרו: התאמה!", color: "bg-green-100 text-green-800" };
+               if (hasMutualYes(match)) return { icon: "❤️", label: "אישרו: התאמה!", color: "bg-green-100 text-green-800" };
                // Explicitly rejected: clicked the link AND chose to reject
                 if (tokenUsed && approved !== true) return { icon: "❌", label: "דחה/תה", color: "bg-red-100 text-red-700" };
                if (approved === true) return { icon: "✅", label: "אישר/ה", color: "bg-emerald-100 text-emerald-800" };
@@ -1649,7 +1603,7 @@ export default function CRMMatchmaking() {
                         {!(match as any).singleBQuestionnaireCompleted && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-semibold">⚠️ {match.singleBName?.split(" ")[0]} ללא שאלון</span>}
                       </div>
                       {/* Per-side status row — visible without expanding */}
-                      {(match.status === "proposed" || match.status === "expired" || match.status === "rejected") && (statusA || statusB) && (
+                      {(match.proposedAt || hasMutualYes(match)) && (statusA || statusB) && (
                         <div className="flex items-center gap-3 flex-wrap">
                           {statusA && (
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${statusA.color}`}>
@@ -1661,6 +1615,11 @@ export default function CRMMatchmaking() {
                               {statusB.icon} {match.singleBName?.split(" ")[0]}: {statusB.label}
                             </span>
                           )}
+                        </div>
+                      )}
+                      {tracking.mutualYes && (
+                        <div className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${tracking.state === "released" ? "bg-slate-100 text-slate-700" : "bg-emerald-100 text-emerald-800"}`}>
+                          {tracking.state === "released" ? "↩" : "●"} {tracking.label}
                         </div>
                       )}
                       {/* "What they seek" summary — visible in collapsed state */}
@@ -3047,6 +3006,9 @@ export default function CRMMatchmaking() {
         )}
         {activeTab === "testimonials" && (
           <TestimonialManagementSection />
+        )}
+        {activeTab === "daily_report" && (
+          <DailyReportManagementSection />
         )}
       </div>
     </div>

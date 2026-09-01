@@ -9,6 +9,7 @@ import {
   boolean,
   float,
   index,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 /**
@@ -676,8 +677,6 @@ export type InsertDiscountCode = typeof discountCodes.$inferInsert;
  * Payment Leads - contact details of users who initiated a payment flow
  * Used for lead tracking and follow-up even if payment was not completed
  */
-import { uniqueIndex } from "drizzle-orm/mysql-core";
-
 export const paymentLeads = mysqlTable("payment_leads", {
   id:        int("id").primaryKey().autoincrement(),
   name:      varchar("name", { length: 200 }).notNull(),
@@ -1143,3 +1142,56 @@ export const testimonialEvents = mysqlTable("testimonial_events", {
 }));
 export type TestimonialEvent = typeof testimonialEvents.$inferSelect;
 export type InsertTestimonialEvent = typeof testimonialEvents.$inferInsert;
+
+/** Owner-only configuration for the verified Israeli-site midnight digest. */
+export const dailyReportSettings = mysqlTable("daily_report_settings", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 100 }).notNull().default("israel-site-daily"),
+  isEnabled: boolean("is_enabled").notNull().default(false),
+  dryRun: boolean("dry_run").notNull().default(true),
+  timezone: varchar("timezone", { length: 50 }).notNull().default("Asia/Jerusalem"),
+  deliveryHour: int("delivery_hour").notNull().default(0),
+  deliveryMinute: int("delivery_minute").notNull().default(0),
+  recipientPhone: varchar("recipient_phone", { length: 30 }),
+  scheduleCronTaskUid: varchar("schedule_cron_task_uid", { length: 65 }),
+  databaseMonthlyMinTarget: int("database_monthly_min_target").notNull().default(350),
+  databaseMonthlyStretchTarget: int("database_monthly_stretch_target").notNull().default(400),
+  databaseMonthlyBudgetAgorot: int("database_monthly_budget_agorot").notNull().default(1000000),
+  boostMonthlyTarget: int("boost_monthly_target"),
+  bundleMonthlyTarget: int("bundle_monthly_target"),
+  leadMonthlyTarget: int("lead_monthly_target"),
+  revenueMonthlyTargetAgorot: int("revenue_monthly_target_agorot"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({
+  nameIdx: uniqueIndex("daily_report_settings_name_idx").on(table.name),
+  taskUidIdx: index("daily_report_settings_task_uid_idx").on(table.scheduleCronTaskUid),
+  enabledIdx: index("daily_report_settings_enabled_idx").on(table.isEnabled),
+}));
+export type DailyReportSettings = typeof dailyReportSettings.$inferSelect;
+export type InsertDailyReportSettings = typeof dailyReportSettings.$inferInsert;
+
+/** Immutable aggregate-only audit history for preview, dry-run and sent digests. */
+export const dailyReportRuns = mysqlTable("daily_report_runs", {
+  id: int("id").primaryKey().autoincrement(),
+  settingsId: int("settings_id").notNull(),
+  runKey: varchar("run_key", { length: 160 }).notNull(),
+  reportDate: varchar("report_date", { length: 10 }).notNull(),
+  trigger: mysqlEnum("trigger", ["preview", "manual", "scheduled"]).notNull(),
+  status: mysqlEnum("status", ["dry_run", "sent", "skipped", "failed"]).notNull(),
+  message: text("message").notNull(),
+  metricsJson: text("metrics_json").notNull(),
+  sourceStatusJson: text("source_status_json").notNull(),
+  providerMessageId: varchar("provider_message_id", { length: 200 }),
+  error: text("error"),
+  startedAt: bigint("started_at", { mode: "number" }).notNull(),
+  completedAt: bigint("completed_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, table => ({
+  runKeyIdx: uniqueIndex("daily_report_run_key_idx").on(table.runKey),
+  settingsIdx: index("daily_report_run_settings_idx").on(table.settingsId),
+  reportDateIdx: index("daily_report_run_date_idx").on(table.reportDate),
+  statusIdx: index("daily_report_run_status_idx").on(table.status),
+}));
+export type DailyReportRun = typeof dailyReportRuns.$inferSelect;
+export type InsertDailyReportRun = typeof dailyReportRuns.$inferInsert;

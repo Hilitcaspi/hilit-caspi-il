@@ -32,6 +32,7 @@ import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
 import { calculateOutcomeSegments } from "./matchmakingSegments";
 import { calculateAgeFromBirthDate } from "../shared/profileValidation";
+import { getReleaseLifecycleUpdate } from "../shared/matchLifecycle";
 import {
   parseMatchOutcomeNotes,
   setAdminOutcome,
@@ -45,6 +46,7 @@ import { extractApprovedTestimonialSeeds, hydrateApprovedTestimonials } from "./
 import { buildOutcomeFeedbackRequestEmail, shouldOfferTestimonialRequest, TESTIMONIAL_REQUEST_COOLDOWN_MS } from "./testimonialRequests";
 import { buildApprovedTestimonialCreativeVariants } from "./testimonialCreative";
 import { testimonialRouter } from "./testimonialRouter";
+import { dailyReportRouter } from "./dailyReportRouter";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -588,6 +590,7 @@ export const appRouter = router({
   matchBoostPilot: matchBoostPilotRouter,
   operations: operationsRouter,
   testimonial: testimonialRouter,
+  dailyReport: dailyReportRouter,
   publicProof: router({
     approvedTestimonials: publicProcedure.query(async () => {
       const db = await getDb();
@@ -4489,21 +4492,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         .where(or(isNull(matches.notes), notLike(matches.notes, `%${BOOST_CANDIDATE_NOTE_MARKER}%`)))
         .orderBy(desc(matches.createdAt), desc(matches.score)); // newest first, then by score
 
-      // Deduplicate: for each pair (A,B) keep only the row with the highest score.
-      // A pair can appear as (A,B) or (B,A) so normalise the key.
-      const bestPerPair = new Map<string, typeof rawMatches[0]>();
-      for (const m of rawMatches) {
-        const key = [Math.min(m.singleAId, m.singleBId), Math.max(m.singleAId, m.singleBId)].join('-');
-        const existing = bestPerPair.get(key);
-        // Keep the newest match per pair (most recent createdAt)
-        const mTime = m.createdAt instanceof Date ? m.createdAt.getTime() : Number(m.createdAt) || 0;
-        const existingTime = existing ? (existing.createdAt instanceof Date ? existing.createdAt.getTime() : Number(existing.createdAt) || 0) : 0;
-        if (!existing || mTime > existingTime) {
-          bestPerPair.set(key, m);
-        }
-      }
-      // Re-sort by most relevant date desc (proposedAt if sent, else createdAt) so newly-sent matches appear at top
-      const allMatches = Array.from(bestPerPair.values())
+      // Keep every historical proposal. If the same pair was sent again later, each
+      // proposal is a separate lifecycle event and must remain visible in the CRM.
+      const allMatches = [...rawMatches]
         .sort((a, b) => {
           const aTime = a.proposedAt ? Number(a.proposedAt) : (a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt) || 0);
           const bTime = b.proposedAt ? Number(b.proposedAt) : (b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt) || 0);
@@ -5003,9 +4994,22 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const now = Date.now();
-        const [current] = await db.select({ notes: matches.notes }).from(matches).where(eq(matches.id, input.matchId)).limit(1);
-        // Set status to rejected + returnedToPoolAt so both people are freed from the match
-        await db.update(matches).set({ status: "rejected", returnedToPoolAt: now, updatedAt: now, notes: setLegacyMatchNote(current?.notes, "שוחרר ידנית") }).where(eq(matches.id, input.matchId));
+        const [current] = await db.select({
+          status: matches.status,
+          approvedByA: matches.approvedByA,
+          approvedByB: matches.approvedByB,
+          matchedAt: matches.matchedAt,
+          contactRevealedAt: matches.contactRevealedAt,
+          notes: matches.notes,
+        }).from(matches).where(eq(matches.id, input.matchId)).limit(1);
+        if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "ההתאמה לא נמצאה" });
+        const releaseUpdate = getReleaseLifecycleUpdate(current);
+        await db.update(matches).set({
+          ...releaseUpdate,
+          returnedToPoolAt: now,
+          updatedAt: now,
+          notes: setLegacyMatchNote(current.notes, "שוחרר ידנית"),
+        }).where(eq(matches.id, input.matchId));
         return { success: true };
       }),
     /**

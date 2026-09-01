@@ -145,15 +145,16 @@ function guardAdmin(ctx: any) {
 
 // ── Meta Ads API helper ─────────────────────────────────────────────────────
 // ── Instagram & Facebook Insights API helper ────────────────────────────────
-async function fetchSocialInsights(since: number, until: number) {
+export async function fetchSocialInsights(since: number, until: number) {
   const token = process.env.META_ADS_TOKEN;
   if (!token) return null;
   const PAGE_ID = "853268171195420"; // Hilit Caspi Relationship
   const IG_ID = "17841476794270830";
   
   try {
+    const fetchWithTimeout = (url: string) => fetch(url, { signal: AbortSignal.timeout(6_000) });
     // Get page token for insights
-    const pagesRes = await fetch(`https://graph.facebook.com/v25.0/me/accounts?fields=id,access_token&access_token=${token}`);
+    const pagesRes = await fetchWithTimeout(`https://graph.facebook.com/v25.0/me/accounts?fields=id,access_token&access_token=${token}`);
     const pagesData = await pagesRes.json();
     const page = pagesData.data?.find((p: any) => p.id === PAGE_ID);
     const pageToken = page?.access_token || token;
@@ -162,20 +163,18 @@ async function fetchSocialInsights(since: number, until: number) {
     const untilUnix = Math.floor(until / 1000);
     
     // IG time_series: reach, follower_count
-    const igTimeRes = await fetch(`https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=reach,follower_count&metric_type=time_series&period=day&since=${sinceUnix}&until=${untilUnix}&access_token=${pageToken}`);
-    const igTimeData = await igTimeRes.json();
-    
-    // IG total_value: accounts_engaged, total_interactions, likes, comments, shares, saves
-    const igTotalRes = await fetch(`https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=accounts_engaged,total_interactions,likes,comments,shares,saves&metric_type=total_value&period=day&since=${sinceUnix}&until=${untilUnix}&access_token=${pageToken}`);
-    const igTotalData = await igTotalRes.json();
-    
-    // IG profile info
-    const igProfileRes = await fetch(`https://graph.facebook.com/v25.0/${IG_ID}?fields=followers_count,media_count,username&access_token=${pageToken}`);
-    const igProfile = await igProfileRes.json();
-    
-    // FB Page info
-    const fbPageRes = await fetch(`https://graph.facebook.com/v25.0/${PAGE_ID}?fields=fan_count,followers_count,name&access_token=${pageToken}`);
-    const fbPage = await fbPageRes.json();
+    const [igTimeRes, igTotalRes, igProfileRes, fbPageRes] = await Promise.all([
+      fetchWithTimeout(`https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=reach,follower_count&metric_type=time_series&period=day&since=${sinceUnix}&until=${untilUnix}&access_token=${pageToken}`),
+      fetchWithTimeout(`https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=accounts_engaged,total_interactions,likes,comments,shares,saves&metric_type=total_value&period=day&since=${sinceUnix}&until=${untilUnix}&access_token=${pageToken}`),
+      fetchWithTimeout(`https://graph.facebook.com/v25.0/${IG_ID}?fields=followers_count,media_count,username&access_token=${pageToken}`),
+      fetchWithTimeout(`https://graph.facebook.com/v25.0/${PAGE_ID}?fields=fan_count,followers_count,name&access_token=${pageToken}`),
+    ]);
+    const [igTimeData, igTotalData, igProfile, fbPage] = await Promise.all([
+      igTimeRes.json(),
+      igTotalRes.json(),
+      igProfileRes.json(),
+      fbPageRes.json(),
+    ]);
     
     // Parse IG time series
     const reachData = igTimeData.data?.find((m: any) => m.name === 'reach')?.values || [];
@@ -228,15 +227,15 @@ async function fetchSocialInsights(since: number, until: number) {
   }
 }
 
-async function fetchMetaAdsInsights(since: string, until: string) {
+export async function fetchMetaAdsInsights(since: string, until: string) {
   const token = process.env.META_ADS_TOKEN;
   const mainAccountId = "act_254697595735216";
   const boostsAccountId = "act_3841144459522772";
-  const fields = "campaign_name,spend,impressions,clicks,reach,actions";
+  const fields = "campaign_name,objective,spend,impressions,clicks,reach,actions";
   async function fetchAccount(accountId: string) {
     try {
       const url = `https://graph.facebook.com/v19.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&level=campaign&limit=50&access_token=${token}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(6_000) });
       const data = await res.json();
       if (data.error) { console.error("Meta API error:", data.error.message); return []; }
       return data.data || [];
@@ -247,7 +246,7 @@ async function fetchMetaAdsInsights(since: string, until: string) {
     return rows.map((r: any) => {
       const actions = r.actions || [];
       const gv = (t: string) => Number(actions.find((a: any) => a.action_type === t)?.value || 0);
-      return { name: r.campaign_name, spend: Number(r.spend || 0), impressions: Number(r.impressions || 0), reach: Number(r.reach || 0), clicks: Number(r.clicks || 0), purchases: gv("purchase"), leads: gv("lead"), registrations: gv("complete_registration"), videoViews: gv("video_view"), postEngagement: gv("post_engagement"), likes: gv("like"), comments: gv("comment"), shares: gv("post"), saves: gv("onsite_conversion.post_save"), cpl: gv("lead") > 0 ? Math.round(Number(r.spend) / gv("lead") * 10) / 10 : 0, cpa: gv("purchase") > 0 ? Math.round(Number(r.spend) / gv("purchase") * 10) / 10 : 0, roas: gv("purchase") > 0 ? Math.round(gv("purchase") * 299 / Number(r.spend) * 10) / 10 : 0 };
+      return { name: r.campaign_name, objective: String(r.objective || ""), spend: Number(r.spend || 0), impressions: Number(r.impressions || 0), reach: Number(r.reach || 0), clicks: Number(r.clicks || 0), purchases: gv("purchase"), leads: gv("lead"), registrations: gv("complete_registration"), videoViews: gv("video_view"), postEngagement: gv("post_engagement"), likes: gv("like"), comments: gv("comment"), shares: gv("post"), saves: gv("onsite_conversion.post_save"), cpl: gv("lead") > 0 ? Math.round(Number(r.spend) / gv("lead") * 10) / 10 : 0, cpa: gv("purchase") > 0 ? Math.round(Number(r.spend) / gv("purchase") * 10) / 10 : 0, roas: gv("purchase") > 0 ? Math.round(gv("purchase") * 299 / Number(r.spend) * 10) / 10 : 0 };
     });
   }
   return { campaigns: parseInsights(campaignData), boosts: parseInsights(boostData) };

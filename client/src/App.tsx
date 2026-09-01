@@ -51,6 +51,8 @@ const MatchRespond = lazy(() => import("@/pages/MatchRespond"));
 const MatchOutcomeFeedback = lazy(() => import("@/pages/MatchOutcomeFeedback"));
 const TestimonialFeedback = lazy(() => import("@/pages/TestimonialFeedback"));
 const TestimonialCrmPreview = lazy(() => import("@/pages/TestimonialCrmPreview"));
+const DailyReportCrmPreview = lazy(() => import("@/pages/DailyReportCrmPreview"));
+const MatchTrackingPreview = lazy(() => import("@/pages/MatchTrackingPreview"));
 const MatchOwnerApprove = lazy(() => import("@/pages/MatchOwnerApprove"));
 const CRMMatchmaking = lazy(() => import("@/pages/CRMMatchmaking"));
 const ScientificQuestionnaire = lazy(() => import("@/pages/ScientificQuestionnaire"));
@@ -304,6 +306,8 @@ function HeRouter() {
           <Route path={"/testimonial/feedback"} component={TestimonialFeedback} />
           {import.meta.env.DEV && <Route path={"/__preview/testimonial-form"} component={TestimonialFeedback} />}
           {import.meta.env.DEV && <Route path={"/__preview/testimonials-crm"} component={TestimonialCrmPreview} />}
+          {import.meta.env.DEV && <Route path={"/__preview/daily-report"} component={DailyReportCrmPreview} />}
+          {import.meta.env.DEV && <Route path={"/__preview/match-tracking"} component={MatchTrackingPreview} />}
           <Route path={"/match/return-to-pool"} component={lazy(() => import("./pages/MatchReturnToPool"))} />
           <Route path={"/match/owner-approve"} component={MatchOwnerApprove} />
           <Route path={"/live/thank-you"} component={LiveEventThankYou} />
