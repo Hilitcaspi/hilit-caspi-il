@@ -101,6 +101,7 @@ const submissionSchema = z.object({
   npsScore: z.number().int().min(0).max(10).optional(),
   feedbackText: z.string().trim().min(2).max(5000),
   secondaryText: z.string().trim().max(5000).optional(),
+  outcomeText: z.string().trim().max(5000).optional(),
   improvementText: z.string().trim().max(3000).optional(),
   testimonialText: z.string().trim().max(5000).optional(),
   identityScope: identityScopeSchema.default("anonymous"),
@@ -293,7 +294,14 @@ export const testimonialRouter = router({
         db.select().from(testimonialUsage).where(eq(testimonialUsage.recordId, input.id)).orderBy(desc(testimonialUsage.createdAt)),
         db.select().from(testimonialEvents).where(eq(testimonialEvents.recordId, input.id)).orderBy(desc(testimonialEvents.createdAt)),
       ]);
-      return { record, media, usage, events, publicFormPath: `/testimonial/feedback?token=${record.publicToken}` };
+      return {
+        record,
+        media,
+        usage,
+        events,
+        questions: publicQuestionsForSource(record.sourceType, record.surveyKind),
+        publicFormPath: `/testimonial/feedback?token=${record.publicToken}`,
+      };
     }),
 
     createDraft: teamProcedure.input(z.object({
@@ -707,7 +715,9 @@ export const testimonialRouter = router({
         rating: input.rating ?? null,
         npsScore: input.npsScore ?? null,
         feedbackText: input.feedbackText,
-        structuredAnswers: input.secondaryText ? JSON.stringify({ secondaryText: input.secondaryText }) : null,
+        structuredAnswers: input.secondaryText || input.outcomeText
+          ? JSON.stringify({ secondaryText: input.secondaryText || null, outcomeText: input.outcomeText || null })
+          : null,
         improvementText: input.improvementText || null,
         testimonialTextOriginal: isSatisfactionSurvey ? null : input.testimonialText || null,
         identityScope: input.identityScope,

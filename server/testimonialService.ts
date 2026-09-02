@@ -1,6 +1,6 @@
 import type { TestimonialRecord } from "../drizzle/schema";
 
-export const TESTIMONIAL_CONSENT_VERSION = "2026-09-02-v2";
+export const TESTIMONIAL_CONSENT_VERSION = "2026-09-02-v3";
 
 export const TESTIMONIAL_STATUSES = [
   "draft",
@@ -126,6 +126,7 @@ export function publicQuestionsForSource(sourceType: TestimonialSourceType, surv
   primaryQuestion: string;
   secondaryQuestion: string;
   testimonialPrompt: string;
+  outcomeQuestion: string | null;
   showRatings: boolean;
   showImprovement: boolean;
   rewardLabel: string | null;
@@ -137,66 +138,76 @@ export function publicQuestionsForSource(sourceType: TestimonialSourceType, surv
       primaryQuestion: "איך הייתה החוויה שלך עד עכשיו?",
       secondaryQuestion: "מה היה מועיל במיוחד, ומה אפשר לעשות טוב יותר?",
       testimonialPrompt: "אם יש משהו שתרצו לאפשר לנו לשתף בעתיד, אפשר לכתוב אותו כאן בנפרד",
+      outcomeQuestion: null,
       showRatings: true,
       showImprovement: true,
       rewardLabel: null,
     };
   }
 
-  const map: Record<TestimonialSourceType, { heading: string; primaryQuestion: string; secondaryQuestion: string; testimonialPrompt: string }> = {
+  const map: Record<TestimonialSourceType, { heading: string; primaryQuestion: string; secondaryQuestion: string; testimonialPrompt: string; outcomeQuestion: string }> = {
     match: {
       heading: "אשמח לשמוע על החוויה שלך",
-      primaryQuestion: "איך הייתה ההיכרות ומה הרגיש טוב או משמעותי בחיבור?",
-      secondaryQuestion: "מה חשבת על הדרך שבה ההתאמה נבנתה והוצגה לך?",
-      testimonialPrompt: "מה היית רוצה לספר למי שמתלבט אם לתת הזדמנות לתהליך?",
+      primaryQuestion: "עוד לפני ההיכרות עצמה, מה בתהליך, בשיטה או בליווי של הילית גרם לך להרגיש שיש כאן דרך אחרת למצוא אהבה?",
+      secondaryQuestion: "מה היה מקצועי, אישי או מדויק בדרך שבה החיבור נבנה והוצג לך?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה שואל למה כדאי לתת הזדמנות לתהליך של הילית, מה היית רוצה לומר לו?",
+      outcomeQuestion: "ולבסוף, אם הייתה לך התאמה טובה, מה בחיבור עצמו הפתיע או ריגש אותך לטובה?",
     },
     database: {
       heading: "אשמח לשמוע על החוויה שלך במאגר",
-      primaryQuestion: "מה הרגיש לך ברור, אישי או שונה בתהליך ההצטרפות?",
-      secondaryQuestion: "איזה חלק בתהליך נתן לך תחושה שיש כאן דרך אחרת להכיר?",
-      testimonialPrompt: "מה היית רוצה שמי שמתלבט לגבי המאגר ידע?",
+      primaryQuestion: "מה במאגר ובדרך האישית של הילית הרגיש לך שונה מאפליקציות או מהיכרויות שניסית בעבר?",
+      secondaryQuestion: "מה בתהליך, בשירות או בהסברים נתן לך תחושת ביטחון וערך?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה מתלבט אם להצטרף למאגר, מה היית רוצה לומר לו?",
+      outcomeQuestion: "אם כבר קיבלת התאמה, מה הרגיש טוב או מדויק בדרך שבה היא נבחרה והוצגה לך?",
     },
     dna: {
       heading: "אשמח לשמוע מה לקחת משאלון ה־DNA",
-      primaryQuestion: "איזו תובנה חדשה קיבלת על עצמך או על הבחירות שלך?",
-      secondaryQuestion: "מה בתוצאה הרגיש לך מדויק או מסקרן במיוחד?",
-      testimonialPrompt: "איך אפשר לתאר את הערך שקיבלת מהשאלון?",
+      primaryQuestion: "איזו תובנה חדשה קיבלת על עצמך, על הבחירות שלך או על הזוגיות שמתאימה לך?",
+      secondaryQuestion: "מה גרם לך להרגיש שמדובר בשאלון מדויק ובעל ערך ולא בעוד שאלון כללי?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה שואל למה כדאי למלא את שאלון ה־DNA, מה היית רוצה לומר לו?",
+      outcomeQuestion: "איזה צעד, מחשבה או שינוי כבר התחילו אצלך בעקבות התוצאה?",
     },
     guide: {
       heading: "אשמח לשמוע על המדריך לבחור נכון",
-      primaryQuestion: "איזו שאלה או תרגיל גרמו לך לעצור ולחשוב?",
-      secondaryQuestion: "מה השתנה בדרך שבה מסתכלים על בחירה והתאמה?",
-      testimonialPrompt: "מה היית רוצה לספר למי ששוקלים לקרוא את המדריך?",
+      primaryQuestion: "איזו שאלה, תובנה או משימה במדריך גרמו לך לעצור ולהסתכל אחרת על הבחירות שלך?",
+      secondaryQuestion: "מה במדריך הרגיש לך מקצועי, אישי או שימושי במיוחד?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה מתלבט אם לקרוא את המדריך, מה היית רוצה לומר לו?",
+      outcomeQuestion: "מה כבר השתנה בדרך שבה את או אתה בוחנים התאמה בעקבות המדריך?",
     },
     course: {
       heading: "אשמח לשמוע על המסע לזוגיות",
-      primaryQuestion: "איזה חלק בקורס היה משמעותי ומה הצלחת ליישם?",
-      secondaryQuestion: "איזו תובנה תלווה אותך גם אחרי סיום הקורס?",
-      testimonialPrompt: "איך אפשר לתאר את התהליך למי ששוקלים להצטרף?",
+      primaryQuestion: "איזה חלק בקורס היה משמעותי עבורך, ומה הצלחת להבין או ליישם בזכותו?",
+      secondaryQuestion: "מה בדרך, בשיטה או בליווי של הילית הרגיש לך מדויק ובעל ערך?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה מתלבט אם להצטרף למסע לזוגיות, מה היית רוצה לומר לו?",
+      outcomeQuestion: "איזה שינוי, תובנה או צעד ימשיכו איתך גם אחרי סיום הקורס?",
     },
     bundle: {
       heading: "אשמח לשמוע על חוויית חבילת החג",
-      primaryQuestion: "איזה מהכלים בחבילה היה משמעותי עבורך עד עכשיו?",
-      secondaryQuestion: "איזו תובנה או פעולה חדשה לקחת מהשילוב בין המאגר, המדריך והקורס?",
-      testimonialPrompt: "מה היית רוצה לספר למי ששוקלים לבחור בחבילה?",
+      primaryQuestion: "איזה כלי בחבילת החג נתן לך עד עכשיו את הערך המשמעותי ביותר, ולמה?",
+      secondaryQuestion: "מה בשילוב בין המאגר, המדריך והקורס גרם לך להרגיש שיש כאן תהליך שלם ומדויק?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה מתלבט אם לבחור בחבילת החג, מה היית רוצה לומר לו?",
+      outcomeQuestion: "איזו תובנה, פעולה או הזדמנות חדשה כבר נוצרו עבורך בזכות החבילה?",
     },
     boost: {
       heading: "אשמח לשמוע על חוויית Boost",
-      primaryQuestion: "מה היה ברור, מסקרן או שימושי בתהליך?",
-      secondaryQuestion: "איך הרגישה האפשרות לבחור ולשלוח בקשה באופן עצמאי?",
-      testimonialPrompt: "מה הערך שקיבלת מהאפשרות לבחור ולשלוח בקשה בעצמך?",
+      primaryQuestion: "מה היה מסקרן, ברור או שימושי באפשרות לבחור ולשלוח בקשת התאמה בעצמך?",
+      secondaryQuestion: "מה בשירות Boost נתן לך תחושה שיש יותר אפשרויות ויותר שליטה בתהליך?",
+      testimonialPrompt: "אם חבר מאגר היה מתלבט אם להשתמש ב־Boost, מה היית רוצה לומר לו?",
+      outcomeQuestion: "אם נוצר חיבור בעקבות Boost, מה היה טוב או מפתיע בחוויה?",
     },
     service: {
       heading: "אשמח לשמוע על החוויה שלך",
-      primaryQuestion: "מה היה משמעותי או מועיל עבורך בפגישה ובתהליך?",
-      secondaryQuestion: "עם איזו תובנה או תחושה יצאת מהמפגש?",
-      testimonialPrompt: "מה היית רוצה לשתף על השירות שקיבלת?",
+      primaryQuestion: "מה היה משמעותי או מועיל במיוחד בפגישה ובתהליך עם הילית?",
+      secondaryQuestion: "מה בדרך, בהקשבה או בשירות גרם לך להרגיש שרואים ומבינים אותך?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה מתלבט אם לפנות להילית, מה היית רוצה לומר לו?",
+      outcomeQuestion: "עם איזו תובנה, תחושה או פעולה יצאת מהמפגש?",
     },
     manual: {
       heading: "אשמח לשמוע על החוויה שלך",
-      primaryQuestion: "מה היה משמעותי עבורך בתהליך?",
-      secondaryQuestion: "מה הרגיש לך מדויק או מועיל במיוחד?",
-      testimonialPrompt: "מה היית רוצה לשתף עם מי שמתלבט?",
+      primaryQuestion: "מה בתהליך עם הילית היה משמעותי, אישי או בעל ערך עבורך?",
+      secondaryQuestion: "מה בשיטה, בליווי או בשירות הרגיש לך מדויק במיוחד?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה מתלבט אם להכיר את הדרך של הילית, מה היית רוצה לומר לו?",
+      outcomeQuestion: "איזו תוצאה, תובנה או תחושה טובה כבר לקחת מהתהליך?",
     },
   };
   return {

@@ -9,9 +9,15 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertCircle, Check, FileVideo, Image as ImageIcon, Loader2, ShieldCheck, Upload } from "lucide-react";
 import { toast } from "sonner";
+import {
+  disableQuickTextConsent,
+  enableQuickTextConsent,
+  QUICK_TEXT_CHANNELS,
+  type TestimonialConsentChannel,
+} from "@shared/testimonialConsent";
 
 type IdentityScope = "anonymous" | "first_name" | "full_name" | "full_name_photo";
-type Channel = "website" | "organic_social" | "email" | "paid_ads" | "pr";
+type Channel = TestimonialConsentChannel;
 
 const channelOptions: Array<{ value: Channel; label: string }> = [
   { value: "website", label: "באתר" },
@@ -41,6 +47,7 @@ export default function TestimonialFeedback() {
   const [npsScore, setNpsScore] = useState<number | undefined>();
   const [feedbackText, setFeedbackText] = useState("");
   const [secondaryText, setSecondaryText] = useState("");
+  const [outcomeText, setOutcomeText] = useState("");
   const [improvementText, setImprovementText] = useState("");
   const [testimonialText, setTestimonialText] = useState("");
   const [identityScope, setIdentityScope] = useState<IdentityScope>("anonymous");
@@ -50,6 +57,7 @@ export default function TestimonialFeedback() {
   const [allowedChannels, setAllowedChannels] = useState<Channel[]>([]);
   const [allowSpellingEdits, setAllowSpellingEdits] = useState(false);
   const [allowMaterialEdits, setAllowMaterialEdits] = useState(false);
+  const [showAdvancedConsent, setShowAdvancedConsent] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [rewardPath, setRewardPath] = useState<string | null>(null);
@@ -63,16 +71,17 @@ export default function TestimonialFeedback() {
     status: "draft",
     canSubmit: true,
     hasActiveConsent: false,
-    consentVersion: "2026-09-02-v2",
+    consentVersion: "2026-09-02-v3",
     rewardType: "date_map",
     rewardGranted: false,
     rewardPath: null,
     questions: {
       heading: "אשמח לשמוע על החוויה שלך",
       intro: "כמה מילים ממך יעזרו לנו לספר על הדרך כפי שהיא באמת. בסיום מחכה לך מתנה אישית מהילית.",
-      primaryQuestion: "איזה חלק בתהליך היה משמעותי עבורך?",
-      secondaryQuestion: "איזו תובנה תלווה אותך גם אחרי סיום התהליך?",
-      testimonialPrompt: "מה היית רוצה לספר למי ששוקלים להצטרף?",
+      primaryQuestion: "איזה חלק בקורס היה משמעותי עבורך, ומה הצלחת להבין או ליישם בזכותו?",
+      secondaryQuestion: "מה בדרך, בשיטה או בליווי של הילית הרגיש לך מדויק ובעל ערך?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה מתלבט אם להצטרף למסע לזוגיות, מה היית רוצה לומר לו?",
+      outcomeQuestion: "איזה שינוי, תובנה או צעד ימשיכו איתך גם אחרי סיום הקורס?",
       showRatings: false,
       showImprovement: false,
       rewardLabel: "מפת הדייט הבא",
@@ -90,6 +99,35 @@ export default function TestimonialFeedback() {
   const uploadedImage = formData?.media.some(item => item.mediaType === "image" && item.status !== "rejected") ?? false;
   const uploadedVideo = formData?.media.some(item => item.mediaType === "video" && item.status !== "rejected") ?? false;
   const anyConsent = consentText || consentPhoto || consentVideo;
+  const quickConsentActive = consentText
+    && identityScope === "first_name"
+    && allowSpellingEdits
+    && QUICK_TEXT_CHANNELS.every(channel => allowedChannels.includes(channel));
+
+  function toggleQuickConsent() {
+    if (quickConsentActive) {
+      const next = disableQuickTextConsent(allowedChannels, consentPhoto || consentVideo);
+      setConsentText(next.consentText);
+      setIdentityScope(next.identityScope);
+      setAllowedChannels(next.allowedChannels);
+      setAllowSpellingEdits(next.allowSpellingEdits);
+      return;
+    }
+    const next = enableQuickTextConsent(allowedChannels);
+    setConsentText(next.consentText);
+    setIdentityScope(next.identityScope);
+    setAllowedChannels(next.allowedChannels);
+    setAllowSpellingEdits(next.allowSpellingEdits);
+  }
+
+  function toggleMediaConsent(kind: "photo" | "video", checked: boolean) {
+    if (kind === "photo") setConsentPhoto(checked);
+    else setConsentVideo(checked);
+    if (checked) setAllowedChannels(current => Array.from(new Set([...current, ...QUICK_TEXT_CHANNELS])));
+    if (!checked && !consentText && (kind === "photo" ? !consentVideo : !consentPhoto)) {
+      setAllowedChannels(current => current.filter(channel => !QUICK_TEXT_CHANNELS.includes(channel)));
+    }
+  }
 
   function toggleChannel(channel: Channel, checked: boolean) {
     setAllowedChannels(current => checked ? Array.from(new Set([...current, channel])) : current.filter(item => item !== channel));
@@ -154,6 +192,7 @@ export default function TestimonialFeedback() {
         npsScore,
         feedbackText,
         secondaryText: secondaryText || undefined,
+        outcomeText: outcomeText || undefined,
         improvementText: improvementText || undefined,
         testimonialText: testimonialText || undefined,
         identityScope,
@@ -224,15 +263,24 @@ export default function TestimonialFeedback() {
           <>
             <section className="rounded-[2rem] border border-[#f0d6df] bg-white p-6 shadow-[0_18px_55px_rgba(117,63,84,.08)] md:p-8">
               <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#9b6d55]">חלק 1 · המשוב שלך</p>
-              <h2 className="mt-3 text-2xl font-semibold">{data.questions.primaryQuestion}</h2>
+              <h2 className="mt-3 text-2xl font-semibold">כמה שאלות קצרות שיעזרו לי להבין מה היה משמעותי עבורך</h2>
               <div className="mt-6">
-                <Label htmlFor="feedback" className="text-base">מה תרצו לשתף?</Label>
-                <Textarea id="feedback" value={feedbackText} onChange={event => setFeedbackText(event.target.value)} className="mt-2 min-h-32 rounded-2xl border-[#d8c8bc] bg-[#fffdfb] text-base" placeholder="אפשר לכתוב בכמה מילים, בדיוק כפי שהרגשת" />
+                <Label htmlFor="feedback" className="text-base font-semibold leading-7">{data.questions.primaryQuestion}</Label>
+                <Textarea id="feedback" value={feedbackText} onChange={event => setFeedbackText(event.target.value)} className="mt-3 min-h-32 rounded-2xl border-[#e7c4d1] bg-[#fffafd] text-base" placeholder="אפשר לכתוב בכנות ובמילים שלך" />
               </div>
               <div className="mt-6">
-                <Label htmlFor="secondary" className="text-base">{data.questions.secondaryQuestion}</Label>
-                <Textarea id="secondary" value={secondaryText} onChange={event => setSecondaryText(event.target.value)} className="mt-2 min-h-28 rounded-2xl border-[#d8c8bc] bg-[#fffdfb] text-base" placeholder="אפשר לשתף גם במשפט אחד" />
+                <Label htmlFor="secondary" className="text-base font-semibold leading-7">{data.questions.secondaryQuestion}</Label>
+                <Textarea id="secondary" value={secondaryText} onChange={event => setSecondaryText(event.target.value)} className="mt-3 min-h-28 rounded-2xl border-[#e7c4d1] bg-[#fffafd] text-base" placeholder="אפשר לשתף גם במשפט אחד" />
               </div>
+              {data.surveyKind === "positive_experience" && <div className="mt-6 rounded-2xl border border-[#efcad7] bg-[#fff4f8] p-5">
+                <Label htmlFor="testimonial" className="text-base font-semibold leading-7">{data.questions.testimonialPrompt}</Label>
+                <p className="mt-2 text-sm leading-6 text-[#795e69]">כאן כדאי לכתוב את המשפט שהיית רוצה שיגיע לעוד אנשים שמחפשים אהבה.</p>
+                <Textarea id="testimonial" value={testimonialText} onChange={event => setTestimonialText(event.target.value)} className="mt-3 min-h-32 rounded-2xl border-[#dfb7c6] bg-white text-base" placeholder="אפשר לכתוב את ההמלצה בדיוק במילים שלך" />
+              </div>}
+              {data.questions.outcomeQuestion && <div className="mt-6">
+                <Label htmlFor="outcome" className="text-base font-semibold leading-7">{data.questions.outcomeQuestion}</Label>
+                <Textarea id="outcome" value={outcomeText} onChange={event => setOutcomeText(event.target.value)} className="mt-3 min-h-28 rounded-2xl border-[#e7c4d1] bg-[#fffafd] text-base" placeholder="לא חובה, רק אם מתאים לשתף" />
+              </div>}
               {data.questions.showRatings && <div className="mt-6 grid gap-6 md:grid-cols-2">
                 <div>
                   <Label className="text-base">דירוג החוויה</Label>
@@ -270,33 +318,40 @@ export default function TestimonialFeedback() {
             {data.surveyKind === "positive_experience" && <section className="rounded-[2rem] border border-[#f0d6df] bg-white p-6 shadow-[0_18px_55px_rgba(117,63,84,.08)] md:p-8">
               <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#9b6d55]">חלק 3 · הצהרת שימוש</p>
               <h2 className="mt-3 text-2xl font-semibold">רק אם תרצו לאפשר לנו לשתף</h2>
-              <p className="mt-3 leading-7 text-[#66534a]">המשוב נשמר גם בלי הסכמה לפרסום. תוכלו לבחור בדיוק מה מותר, היכן ובאיזו זהות.</p>
-              <div className="mt-6">
-                <Label htmlFor="testimonial" className="text-base">{data.questions.testimonialPrompt}</Label>
-                <Textarea id="testimonial" value={testimonialText} onChange={event => setTestimonialText(event.target.value)} className="mt-2 min-h-28 rounded-2xl border-[#d8c8bc]" placeholder="כתבו כאן רק את הנוסח שמותר לשתף" />
-              </div>
+              <p className="mt-3 leading-7 text-[#66534a]">המשוב נשמר גם בלי הסכמה לפרסום. אם מתאים לך שהמילים שלך יגיעו לעוד אנשים שמחפשים אהבה, אפשר לאשר זאת בלחיצה אחת.</p>
+              <button type="button" onClick={toggleQuickConsent} className={`mt-6 w-full rounded-2xl border-2 p-5 text-right transition ${quickConsentActive ? "border-[#9d4f6c] bg-[#f9e3eb] shadow-[0_12px_35px_rgba(157,79,108,.14)]" : "border-[#dfb7c6] bg-white hover:border-[#b76b87]"}`}>
+                <span className="flex items-start gap-4">
+                  <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${quickConsentActive ? "border-[#9d4f6c] bg-[#9d4f6c] text-white" : "border-[#c58ba0] text-transparent"}`}><Check className="h-4 w-4" /></span>
+                  <span>
+                    <strong className="block text-lg">כן, אפשר לשתף את ההמלצה שכתבתי</strong>
+                    <span className="mt-2 block text-sm leading-6 text-[#725866]">עם השם הפרטי שלי, באתר, בסושיאל ובמייל. אפשר לבצע תיקוני כתיב ופיסוק בלבד, ואפשר לבטל את האישור בעתיד.</span>
+                  </span>
+                </span>
+              </button>
+              <p className="mt-3 text-sm leading-6 text-[#795e69]">המתנה ניתנת גם בלי אישור לפרסום. שום דבר לא מתפרסם לפני בדיקה של הצוות.</p>
 
-              <div className="mt-6 space-y-3">
-                <ConsentRow id="consent-text" checked={consentText} onChange={setConsentText} label="אישור לשימוש בטקסט שכתבתי" />
-                <ConsentRow id="consent-photo" checked={consentPhoto} onChange={setConsentPhoto} label="אישור לשימוש בתמונה שצירפתי" disabled={!uploadedImage} hint={!uploadedImage ? "אפשר לבחור לאחר העלאת תמונה" : undefined} />
-                <ConsentRow id="consent-video" checked={consentVideo} onChange={setConsentVideo} label="אישור לשימוש בסרטון שצירפתי" disabled={!uploadedVideo} hint={!uploadedVideo ? "אפשר לבחור לאחר העלאת סרטון" : undefined} />
-              </div>
+              <button type="button" onClick={() => setShowAdvancedConsent(current => !current)} className="mt-6 text-sm font-semibold text-[#8e4963] underline underline-offset-4">{showAdvancedConsent ? "סגירת אפשרויות נוספות" : "אפשרויות נוספות: תמונה, סרטון, שם מלא או פרסום ממומן"}</button>
 
-              {anyConsent && <div className="mt-7 border-t border-[#eadfd7] pt-6">
-                <h3 className="font-semibold">היכן מותר להשתמש?</h3>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">{channelOptions.map(channel => <ConsentRow key={channel.value} id={`channel-${channel.value}`} checked={allowedChannels.includes(channel.value)} onChange={checked => toggleChannel(channel.value, checked)} label={channel.label} />)}</div>
-
-                <h3 className="mt-7 font-semibold">כיצד אפשר לזהות אותך?</h3>
-                <RadioGroup value={identityScope} onValueChange={value => setIdentityScope(value as IdentityScope)} className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {[{ value: "anonymous", label: "בעילום שם" }, { value: "first_name", label: "שם פרטי בלבד" }, { value: "full_name", label: "שם מלא" }, { value: "full_name_photo", label: "שם מלא ותמונה", disabled: !consentPhoto }].map(option => <label key={option.value} className={`flex items-center gap-3 rounded-xl border p-4 ${option.disabled ? "opacity-50" : "cursor-pointer"}`}><RadioGroupItem value={option.value} disabled={option.disabled} /><span>{option.label}</span></label>)}
-                </RadioGroup>
-
-                <div className="mt-7 space-y-3">
-                  <ConsentRow id="spelling" checked={allowSpellingEdits} onChange={setAllowSpellingEdits} label="מותר לבצע תיקוני כתיב ופיסוק בלבד" />
-                  <ConsentRow id="material" checked={allowMaterialEdits} onChange={setAllowMaterialEdits} label="מותר להציע עריכה מהותית, רק לאחר שאאשר את הנוסח הסופי" />
+              {showAdvancedConsent && <div className="mt-5 rounded-2xl border border-[#edd1dc] bg-[#fff8fa] p-5">
+                <div className="space-y-3">
+                  <ConsentRow id="consent-photo" checked={consentPhoto} onChange={checked => toggleMediaConsent("photo", checked)} label="אישור לשימוש בתמונה שצירפתי באתר, בסושיאל ובמייל" disabled={!uploadedImage} hint={!uploadedImage ? "אפשר לבחור לאחר העלאת תמונה" : undefined} />
+                  <ConsentRow id="consent-video" checked={consentVideo} onChange={checked => toggleMediaConsent("video", checked)} label="אישור לשימוש בסרטון שצירפתי באתר, בסושיאל ובמייל" disabled={!uploadedVideo} hint={!uploadedVideo ? "אפשר לבחור לאחר העלאת סרטון" : undefined} />
                 </div>
-                <p className="mt-5 rounded-xl bg-[#f6f1ec] p-4 text-sm leading-6 text-[#6f5d54]">גרסת הצהרה: {data.consentVersion}. אפשר לבטל את ההסכמה בעתיד באמצעות אותו קישור או בפנייה לצוות.</p>
+
+                {anyConsent && <>
+                  <h3 className="mt-7 font-semibold">כיצד אפשר לזהות אותך?</h3>
+                  <RadioGroup value={identityScope} onValueChange={value => setIdentityScope(value as IdentityScope)} className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {[{ value: "anonymous", label: "בעילום שם" }, { value: "first_name", label: "שם פרטי בלבד" }, { value: "full_name", label: "שם מלא" }, { value: "full_name_photo", label: "שם מלא ותמונה", disabled: !consentPhoto }].map(option => <label key={option.value} className={`flex items-center gap-3 rounded-xl border bg-white p-4 ${option.disabled ? "opacity-50" : "cursor-pointer"}`}><RadioGroupItem value={option.value} disabled={option.disabled} /><span>{option.label}</span></label>)}
+                  </RadioGroup>
+
+                  <div className="mt-7 space-y-3">
+                    <ConsentRow id="channel-paid" checked={allowedChannels.includes("paid_ads")} onChange={checked => toggleChannel("paid_ads", checked)} label="אישור נוסף לשימוש במודעות ממומנות" />
+                    <ConsentRow id="channel-pr" checked={allowedChannels.includes("pr")} onChange={checked => toggleChannel("pr", checked)} label="אישור נוסף לשימוש בכתבות וביחסי ציבור" />
+                    <ConsentRow id="material" checked={allowMaterialEdits} onChange={setAllowMaterialEdits} label="אפשר להציע עריכה מהותית, רק לאחר שאאשר את הנוסח הסופי" />
+                  </div>
+                </>}
               </div>}
+              <p className="mt-5 rounded-xl bg-[#f6f1ec] p-4 text-sm leading-6 text-[#6f5d54]">גרסת הצהרה: {data.consentVersion}. אפשר לבטל את ההסכמה בעתיד באמצעות אותו קישור או בפנייה לצוות.</p>
             </section>}
 
             <Button onClick={() => void submit()} disabled={submitFeedback.isPending} className="h-14 w-full rounded-full bg-[#a75f78] text-base text-white hover:bg-[#8e4963]">{submitFeedback.isPending ? <><Loader2 className="ml-2 h-5 w-5 animate-spin" />שומרים...</> : data.surveyKind === "positive_experience" ? "שליחה וקבלת המתנה" : "שליחת הסקר"}</Button>

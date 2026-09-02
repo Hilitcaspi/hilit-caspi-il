@@ -258,6 +258,7 @@ function CreateDraftDialog({ open, onOpenChange, onCreated }: { open: boolean; o
 
 function RecordDetails({ data, onRefresh }: { data: any; onRefresh: () => Promise<void> }) {
   const record = data.record;
+  const structuredAnswers = parseStructuredAnswers(record.structuredAnswers);
   const update = trpc.testimonial.team.update.useMutation();
   const approveContact = trpc.testimonial.team.approveContact.useMutation();
   const verify = trpc.testimonial.team.verify.useMutation();
@@ -289,7 +290,15 @@ function RecordDetails({ data, onRefresh }: { data: any; onRefresh: () => Promis
     <div><p className="mb-2 text-sm font-semibold">גוף טיוטת הפנייה</p><Textarea value={draftBody} onChange={e => setDraftBody(e.target.value)} className="min-h-28" /></div>
     <Button variant="outline" onClick={() => void run(() => update.mutateAsync({ id: record.id, draftSubject, draftBody, testimonialTextApproved: approvedText || null }), "הטיוטה נשמרה")}>שמירת טיוטה</Button>
 
-    {(record.feedbackText || record.testimonialTextOriginal) && <div className="grid gap-4 md:grid-cols-2"><TextPanel title="משוב מקורי" text={record.feedbackText} /><TextPanel title="טקסט שהותר לשיתוף" text={record.testimonialTextOriginal} /></div>}
+    {(record.feedbackText || record.testimonialTextOriginal || structuredAnswers.secondaryText || structuredAnswers.outcomeText) && <div>
+      <h4 className="font-semibold">תשובות המשוב הממוקדות</h4>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <TextPanel title={data.questions.primaryQuestion} text={record.feedbackText} />
+        <TextPanel title={data.questions.secondaryQuestion} text={structuredAnswers.secondaryText} />
+        <TextPanel title={data.questions.testimonialPrompt} text={record.testimonialTextOriginal} />
+        {data.questions.outcomeQuestion && <TextPanel title={data.questions.outcomeQuestion} text={structuredAnswers.outcomeText} />}
+      </div>
+    </div>}
 
     <ConsentSummary record={record} />
 
@@ -308,7 +317,18 @@ function InfoChip({ label, value }: { label: string; value: string }) { return <
 
 function ConsentSummary({ record }: { record: any }) {
   const channels = [["allowWebsite", "אתר"], ["allowOrganicSocial", "סושיאל"], ["allowEmail", "מייל"], ["allowPaidAds", "מודעות"], ["allowPr", "יחסי ציבור"]].filter(([key]) => record[key]).map(([, label]) => label);
-  return <div className="rounded-xl border border-[#e1d5cc] p-4"><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#6f3f2f]" /><h4 className="font-semibold">הצהרת שימוש</h4></div><div className="mt-3 flex flex-wrap gap-2 text-xs"><Badge variant="outline">זהות: {record.identityScope}</Badge><Badge variant="outline">טקסט: {record.consentText ? "מאושר" : "לא"}</Badge><Badge variant="outline">תמונה: {record.consentPhoto ? "מאושרת" : "לא"}</Badge><Badge variant="outline">וידאו: {record.consentVideo ? "מאושר" : "לא"}</Badge>{channels.map(label => <Badge key={label} variant="outline">{label}</Badge>)}</div>{record.consentRevokedAt && <p className="mt-3 text-sm font-semibold text-red-700">ההסכמה בוטלה. אין לעשות שימוש בחומר.</p>}</div>;
+  const quickTextConsent = record.consentText && record.identityScope === "first_name" && record.allowWebsite && record.allowOrganicSocial && record.allowEmail && !record.allowPaidAds && !record.allowPr;
+  return <div className="rounded-xl border border-[#e1d5cc] p-4"><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#6f3f2f]" /><h4 className="font-semibold">הצהרת שימוש</h4></div>{quickTextConsent && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">אישור מהיר: טקסט עם שם פרטי באתר, בסושיאל ובמייל</p>}<div className="mt-3 flex flex-wrap gap-2 text-xs"><Badge variant="outline">זהות: {record.identityScope}</Badge><Badge variant="outline">טקסט: {record.consentText ? "מאושר" : "לא"}</Badge><Badge variant="outline">תמונה: {record.consentPhoto ? "מאושרת" : "לא"}</Badge><Badge variant="outline">וידאו: {record.consentVideo ? "מאושר" : "לא"}</Badge>{channels.map(label => <Badge key={label} variant="outline">{label}</Badge>)}</div>{record.consentRevokedAt && <p className="mt-3 text-sm font-semibold text-red-700">ההסכמה בוטלה. אין לעשות שימוש בחומר.</p>}</div>;
+}
+
+function parseStructuredAnswers(value: string | null | undefined): { secondaryText?: string | null; outcomeText?: string | null } {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 function TextPanel({ title, text }: { title: string; text?: string | null }) { return <div className="rounded-xl bg-[#f6f1ed] p-4"><p className="text-sm font-semibold">{title}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#66534a]">{text || "לא נכתב"}</p></div>; }

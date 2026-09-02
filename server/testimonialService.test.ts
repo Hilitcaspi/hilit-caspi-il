@@ -27,7 +27,10 @@ describe("testimonial service", () => {
 
   it("builds source-specific questions and draft copy without sending", () => {
     expect(publicQuestionsForSource("dna").heading).toContain("DNA");
-    expect(publicQuestionsForSource("boost").secondaryQuestion).toContain("עצמאי");
+    expect(publicQuestionsForSource("match").primaryQuestion).toContain("תהליך");
+    expect(publicQuestionsForSource("match").secondaryQuestion).toContain("מקצועי");
+    expect(publicQuestionsForSource("boost").testimonialPrompt).toContain("חבר מאגר");
+    expect(publicQuestionsForSource("database").outcomeQuestion).toContain("התאמה");
     const draft = buildTestimonialDraft({ firstName: "דנה לוי", sourceType: "course" });
     expect(draft.subject).toContain("דנה");
     expect(draft.body).toContain("מתנה");
@@ -47,7 +50,7 @@ describe("testimonial service", () => {
   it("uses dedicated holiday bundle questions instead of generic service copy", () => {
     const questions = publicQuestionsForSource("bundle", "positive_experience");
     expect(questions.heading).toContain("חבילת החג");
-    expect(questions.primaryQuestion).toContain("כלים בחבילה");
+    expect(questions.primaryQuestion).toContain("כלי בחבילת החג");
   });
 
   it("grants the thank-you gift once without depending on publication consent", () => {
