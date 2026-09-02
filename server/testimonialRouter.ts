@@ -11,6 +11,7 @@ import {
   feedbackAutomationSettings,
   matches,
   singles,
+  webhookIdempotency,
 } from "../drizzle/schema";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { getTestimonialDb } from "./testimonialDb";
@@ -19,6 +20,7 @@ import { parseMatchOutcomeNotes } from "./matchOutcome";
 import { isEligibleMatchCandidate, matchCandidateProofType, matchCandidateReason } from "./testimonialCandidates";
 import { isPermanentlyBlockedEmail } from "./brevo";
 import { prepareHistoricalMatchDrafts, prepareSatisfactionSurveyDrafts } from "./feedbackCampaignDrafts";
+import { buildFeedbackRequestKey, buildFeedbackUrl } from "./feedbackAutomation";
 import {
   buildTestimonialDraft,
   consentAllowsChannel,
@@ -658,6 +660,34 @@ export const testimonialRouter = router({
   }),
 
   public: router({
+    productThankYouLink: publicProcedure.input(z.object({
+      transactionId: z.string().trim().min(6).max(200),
+      expectedProduct: z.enum(["guide", "course", "bundle_tubav", "bundle_new_year"]),
+    })).query(async ({ input }) => {
+      const db = await requireDb();
+      const [purchase] = await db.select({
+        product: webhookIdempotency.product,
+        email: webhookIdempotency.email,
+      }).from(webhookIdempotency)
+        .where(eq(webhookIdempotency.transactionId, input.transactionId))
+        .limit(1);
+      if (!purchase?.email || purchase.product !== input.expectedProduct) return { feedbackUrl: null };
+
+      const requestKey = buildFeedbackRequestKey({
+        touchpoint: "product_followup",
+        subjectId: input.transactionId,
+        contactId: normalizeTestimonialEmail(purchase.email),
+      });
+      const [record] = await db.select({
+        publicToken: testimonialRecords.publicToken,
+        status: testimonialRecords.status,
+      }).from(testimonialRecords)
+        .where(eq(testimonialRecords.requestKey, requestKey))
+        .limit(1);
+      if (!record || record.status === "archived" || record.status === "revoked") return { feedbackUrl: null };
+      return { feedbackUrl: buildFeedbackUrl(record.publicToken) };
+    }),
+
     form: publicProcedure.input(z.object({ token: z.string().length(64) })).query(async ({ input }) => {
       const { db, record } = await getRecordByToken(input.token);
       const media = await db.select({

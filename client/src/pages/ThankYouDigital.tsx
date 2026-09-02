@@ -18,6 +18,7 @@ import { Link } from "wouter";
 import { trackPurchase } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import { gaPurchase } from "@/lib/ga";
+import ProductFeedbackThankYouCard from "@/components/ProductFeedbackThankYouCard";
 
 const WHATSAPP_URL =
   "https://wa.me/972552442334?text=" +
@@ -160,6 +161,8 @@ export default function ThankYouDigital() {
             </a>
           </div>
         </motion.div>
+
+        <ProductFeedbackThankYouCard expectedProduct="guide" />
 
         {/* WhatsApp */}
         <motion.div

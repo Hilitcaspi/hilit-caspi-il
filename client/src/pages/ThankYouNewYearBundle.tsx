@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { useEffect } from "react";
-import { BookOpenCheck, CheckCircle2, Heart, Mail, Network } from "lucide-react";
+import { BookOpenCheck, CheckCircle2, Mail, Network } from "lucide-react";
 import { gaPurchase } from "@/lib/ga";
 import { trackPurchase } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
+import ProductFeedbackThankYouCard from "@/components/ProductFeedbackThankYouCard";
 
 const SUPPORT_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, רכשתי את חבילת השנה החדשה ואשמח לעזרה");
 
@@ -42,11 +43,7 @@ export default function ThankYouNewYearBundle() {
               <div className="flex gap-4 rounded-2xl border border-[#191265]/10 p-5"><BookOpenCheck className="mt-1 h-6 w-6 shrink-0 text-[#c96b87]" /><div><h3 className="font-black">המסע ולבחור נכון</h3><p className="mt-1 text-sm leading-6 text-[#5d576c]">המייל הדיגיטלי כולל קישור אישי לקורס וקישור למדריך. אפשר להתחיל מיד לאחר קבלת המייל.</p></div></div>
             </div>
 
-            <div className="mt-7 rounded-2xl border border-[#efcad7] bg-[#fff1f5] p-5 text-center text-[#6f3f52]">
-              <Heart className="mx-auto h-6 w-6" />
-              <h3 className="mt-3 font-black">החוויה שלכם יכולה לעזור לעוד אנשים</h3>
-              <p className="mt-2 text-sm leading-7 text-[#795e69]">אחרי שתתחילו להשתמש בחבילה, יישלח אליכם קישור אישי לשיתוף החוויה. כמה מילים אמיתיות יכולות לעזור לעוד אנשים שמחפשים אהבה להכיר את הדרך, להצטרף לקהילה ולהוסיף עוד הזדמנויות להיכרות עבור כולם. בסיום תחכה לכם מתנת תודה אישית מהילית.</p>
-            </div>
+            <div className="mt-7"><ProductFeedbackThankYouCard expectedProduct="bundle_new_year" /></div>
 
             <p className="mt-7 rounded-2xl border border-[#d4ae3f]/35 bg-[#fff9e8] p-5 text-center text-sm leading-7">לא מצאתם את המייל? בדקו בספאם ובקידומי מכירות. עיבוד התשלום והפקת הקישורים עשויים להימשך כמה דקות.</p>
 

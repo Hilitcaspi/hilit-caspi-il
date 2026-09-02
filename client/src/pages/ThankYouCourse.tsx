@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { trackPurchase } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import { gaPurchase } from "@/lib/ga";
+import ProductFeedbackThankYouCard from "@/components/ProductFeedbackThankYouCard";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent('היי הילית! רכשתי את הקורס "המסע" באתר ואשמח לעזרה');
 
@@ -95,6 +96,8 @@ export default function ThankYouCourse() {
               קישור למדריך נשלח אליך יחד עם הקורס במייל.
             </p>
           </div>
+
+          <ProductFeedbackThankYouCard expectedProduct="course" />
 
           {/* WhatsApp */}
           <div className="bg-[#191265] rounded-3xl p-8 text-center">

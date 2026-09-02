@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { trackPurchase } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import { gaPurchase } from "@/lib/ga";
+import ProductFeedbackThankYouCard from "@/components/ProductFeedbackThankYouCard";
 
 const WHATSAPP_SUPPORT_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, רכשתי את חבילת טו באב ואשמח לעזרה");
 
@@ -84,6 +85,7 @@ export default function ThankYouBundle() {
             </div>
           </motion.div>
 
+          <ProductFeedbackThankYouCard expectedProduct="bundle_tubav" />
 
           {/* Tips */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 0.6 }}
