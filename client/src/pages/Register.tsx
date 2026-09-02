@@ -63,7 +63,6 @@ const slideIn = {
 };
 
 export default function Register() {
-  React.useEffect(() => { track({ eventType: "database_cta" }); }, []);
   const [, navigate] = useLocation();
   const search = useSearch();
   const params = new URLSearchParams(search);

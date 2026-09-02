@@ -3,9 +3,10 @@
  * עיצוב: Deep navy #191265, warm cream #f0eadc, gold #ffe27c
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import React from "react";
 import { track } from "@/lib/track";
+import { buildDatabaseJoinHref } from "@/lib/landingPageExperiment";
 import { trackViewContent } from "@/lib/metaPixel";
 import { gaViewItem } from "@/lib/ga";
 import { motion, useInView } from "framer-motion";
@@ -56,6 +57,17 @@ export default function DatabaseSales() {
   }, []);
   const [scrolled, setScrolled] = useState(false);
   const search = useSearch();
+  const joinHref = useMemo(
+    () => buildDatabaseJoinHref(search, window.sessionStorage, window.localStorage),
+    [search],
+  );
+  const trackJoinClick = (placement: "navbar" | "hero" | "final") => {
+    track({
+      eventType: "database_cta",
+      page: "/database",
+      metadata: { destination: "/join", placement, experiment: "database_lp_test_sep2026" },
+    });
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -83,7 +95,7 @@ export default function DatabaseSales() {
             <span className="text-white font-bold text-lg cursor-pointer hover:text-[#ffe27c] transition-colors">הילית כספי</span>
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/join?source=database">
+            <Link href={joinHref} onClick={() => trackJoinClick("navbar")}>
               <span className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105 cursor-pointer">
                 הצטרפות למאגר
               </span>
@@ -112,7 +124,7 @@ export default function DatabaseSales() {
               בניתי שיטה שלוקחת את כל מה שטוב בכל אחד מהעולמות: גם המראה חשוב, גם הפרמטרים הבסיסיים, וגם הדפוסים הפנימיים שמנבאים אהבה שתחזיק לאורך שנים. לא בחרתי בין הגישות. שילבתי את כולן.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/join?source=database">
+              <Link href={joinHref} onClick={() => trackJoinClick("hero")}>
                 <span className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl text-center cursor-pointer block">
                   ♡ הצטרפות למאגר
                 </span>
@@ -318,7 +330,7 @@ export default function DatabaseSales() {
               ממלאים שאלון DNA, יוצרים פרופיל, והמערכת ואני בודקות התאמות רלוונטיות. תשלום חד-פעמי, ללא דמי חבר חודשיים.
             </motion.p>
             <motion.div variants={fadeUp}>
-              <Link href="/join?source=database">
+              <Link href={joinHref} onClick={() => trackJoinClick("final")}>
                 <span className="inline-block bg-[#ffe27c] text-[#191265] font-black text-xl px-10 py-5 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl cursor-pointer">
                   ♡ הצטרפות למאגר
                 </span>

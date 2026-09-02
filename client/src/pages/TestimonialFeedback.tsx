@@ -253,6 +253,12 @@ export default function TestimonialFeedback() {
       </header>
 
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 md:px-0 md:py-12">
+        {data.surveyKind === "positive_experience" && <section className="rounded-[2rem] border border-[#efcad7] bg-gradient-to-br from-[#fff8fb] to-[#fbe8ef] p-6 shadow-[0_18px_55px_rgba(117,63,84,.07)] md:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#9b6d55]">כמה מילים שיכולות לפתוח עוד אפשרויות</p>
+          <h2 className="mt-3 text-2xl font-semibold text-[#5f3042]">החוויה שלך יכולה לעזור לקהילה הזאת לגדול</h2>
+          <p className="mt-3 leading-7 text-[#725866]">הפלטפורמה הזו נולדה כדי לעזור לאנשים למצוא אהבה בדרך אנושית ומדויקת יותר. כשמשתפים חוויה אמיתית ומאפשרים לנו לפרסם אותה, עוד אנשים יכולים להכיר את הדרך, להצטרף לקהילה ולהוסיף עוד הזדמנויות להיכרות ולהתאמות עבור כולם.</p>
+          <p className="mt-3 font-semibold leading-7 text-[#7b4258]">גם כמה מילים שלך יכולות לעזור לאדם נוסף לעשות את הצעד הראשון.</p>
+        </section>}
         {!data.canSubmit ? (
           <section className="rounded-[2rem] bg-white p-8 text-center shadow-sm">
             <ShieldCheck className="mx-auto h-10 w-10 text-[#6f3f2f]" />
@@ -274,7 +280,7 @@ export default function TestimonialFeedback() {
               </div>
               {data.surveyKind === "positive_experience" && <div className="mt-6 rounded-2xl border border-[#efcad7] bg-[#fff4f8] p-5">
                 <Label htmlFor="testimonial" className="text-base font-semibold leading-7">{data.questions.testimonialPrompt}</Label>
-                <p className="mt-2 text-sm leading-6 text-[#795e69]">כאן כדאי לכתוב את המשפט שהיית רוצה שיגיע לעוד אנשים שמחפשים אהבה.</p>
+                <p className="mt-2 text-sm leading-6 text-[#795e69]">כאן אפשר לכתוב את המשפט שהיית רוצה שיגיע לעוד אנשים שמחפשים אהבה ויעזור להם להכיר את הדרך.</p>
                 <Textarea id="testimonial" value={testimonialText} onChange={event => setTestimonialText(event.target.value)} className="mt-3 min-h-32 rounded-2xl border-[#dfb7c6] bg-white text-base" placeholder="אפשר לכתוב את ההמלצה בדיוק במילים שלך" />
               </div>}
               {data.questions.outcomeQuestion && <div className="mt-6">

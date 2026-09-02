@@ -45,7 +45,7 @@ export default function ThankYouNewYearBundle() {
             <div className="mt-7 rounded-2xl border border-[#efcad7] bg-[#fff1f5] p-5 text-center text-[#6f3f52]">
               <Heart className="mx-auto h-6 w-6" />
               <h3 className="mt-3 font-black">החוויה שלכם יכולה לעזור לעוד אנשים</h3>
-              <p className="mt-2 text-sm leading-7 text-[#795e69]">אחרי שתתחילו להשתמש בחבילה, יישלח אליכם קישור אישי לשיתוף החוויה. כמה מילים יכולות לעזור לעוד אנשים שמחפשים אהבה להכיר את הדרך והכלים, ובסיום תחכה לכם מתנת תודה אישית מהילית.</p>
+              <p className="mt-2 text-sm leading-7 text-[#795e69]">אחרי שתתחילו להשתמש בחבילה, יישלח אליכם קישור אישי לשיתוף החוויה. כמה מילים אמיתיות יכולות לעזור לעוד אנשים שמחפשים אהבה להכיר את הדרך, להצטרף לקהילה ולהוסיף עוד הזדמנויות להיכרות עבור כולם. בסיום תחכה לכם מתנת תודה אישית מהילית.</p>
             </div>
 
             <p className="mt-7 rounded-2xl border border-[#d4ae3f]/35 bg-[#fff9e8] p-5 text-center text-sm leading-7">לא מצאתם את המייל? בדקו בספאם ובקידומי מכירות. עיבוד התשלום והפקת הקישורים עשויים להימשך כמה דקות.</p>
