@@ -46,6 +46,23 @@ describe("feedback automation", () => {
     expect(email.htmlContent).toContain("/unsubscribe?email=dana%40example.com");
   });
 
+  it("keeps the satisfaction survey neutral and separate from the testimonial gift", () => {
+    const email = buildFeedbackRequestEmail({
+      firstName: "דנה",
+      contactEmail: "dana@example.com",
+      sourceType: "database",
+      surveyKind: "satisfaction_survey",
+      feedbackUrl: "https://example.com/survey",
+    });
+    expect(email.subject).toContain("נשמח לשמוע מה דעתך");
+    expect(email.htmlContent).toContain("סקר שביעות רצון קצר ונפרד");
+    expect(email.htmlContent).toContain("לא יפורסמו ללא בקשת רשות נפרדת");
+    expect(email.htmlContent).not.toContain("מפת הדייט הבא");
+    expect(email.htmlContent).not.toContain("מתנה אישית");
+    expect(email.htmlContent).toContain("https://example.com/survey");
+    expect(email.htmlContent).toContain("/unsubscribe?email=dana%40example.com");
+  });
+
   it("waits for meaningful product use before requesting feedback", () => {
     expect(feedbackProductPlan("bundle_new_year")).toEqual({ sourceType: "bundle", delayDays: 10 });
     expect(feedbackProductPlan("match_boost")).toBeNull();

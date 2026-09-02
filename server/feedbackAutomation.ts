@@ -17,6 +17,7 @@ import {
   normalizeTestimonialEmail,
   type TestimonialProofType,
   type TestimonialSourceType,
+  type TestimonialSurveyKind,
   type TestimonialTouchpoint,
 } from "./testimonialService";
 
@@ -109,14 +110,17 @@ export function buildFeedbackRequestEmail(input: {
   firstName: string;
   contactEmail: string;
   sourceType: TestimonialSourceType;
+  surveyKind?: TestimonialSurveyKind;
   feedbackUrl: string;
   reminder?: boolean;
 }): { subject: string; htmlContent: string; textContent: string } {
+  const surveyKind = input.surveyKind ?? "positive_experience";
   const draft = buildTestimonialDraft({
     firstName: input.firstName,
     sourceType: input.sourceType,
-    surveyKind: "positive_experience",
+    surveyKind,
   });
+  const isSatisfactionSurvey = surveyKind === "satisfaction_survey";
   const subject = input.reminder
     ? `${input.firstName}, אשמח לשמוע איך מתקדמת החוויה שלך`
     : draft.subject;
@@ -124,6 +128,13 @@ export function buildFeedbackRequestEmail(input: {
     ? "עבר שבוע מאז החיבור, ואם ההיכרות עדיין ממשיכה אשמח לשמוע בכמה מילים איך זה מרגיש עד עכשיו."
     : draft.body;
   const unsubscribeUrl = `https://hilitcaspi.com/unsubscribe?email=${encodeURIComponent(normalizeTestimonialEmail(input.contactEmail))}`;
+  if (isSatisfactionSurvey) {
+    return {
+      subject,
+      htmlContent: `<!doctype html><html dir="rtl" lang="he"><body style="margin:0;background:#f7f3ef;font-family:Arial,sans-serif;color:#2a1712"><div style="max-width:620px;margin:0 auto;padding:28px 14px"><div style="background:linear-gradient(135deg,#2a1712,#6f3f52);color:#fff;border-radius:28px 28px 0 0;padding:34px 30px"><div style="font-size:13px;letter-spacing:2px;color:#f3d9df">הילית כספי</div><h1 style="font-size:30px;line-height:1.3;margin:14px 0 0">חשוב לי לשמוע איך הייתה החוויה שלך עד עכשיו</h1></div><div style="background:#fff;border-radius:0 0 28px 28px;padding:30px;box-shadow:0 18px 50px rgba(65,34,44,.12)"><p style="font-size:17px;line-height:1.8;margin:0">היי ${input.firstName},</p><p style="font-size:17px;line-height:1.8">${intro}</p><div style="background:#faf6f3;border:1px solid #eadfd7;border-radius:16px;padding:18px 20px;margin:22px 0"><p style="font-size:16px;line-height:1.8;margin:0"><strong>זהו סקר שביעות רצון קצר ונפרד.</strong> המטרה היא להבין מה עובד ומה נכון לשפר. התשובות נשמרות לצורכי למידה ולא יפורסמו ללא בקשת רשות נפרדת.</p></div><div style="text-align:center;margin:30px 0"><a href="${input.feedbackUrl}" style="display:inline-block;background:#6f3f52;color:#fff;text-decoration:none;border-radius:999px;padding:16px 30px;font-size:17px;font-weight:bold">למילוי הסקר הקצר</a></div><p style="font-size:16px;line-height:1.8;margin-top:28px">תודה על הזמן ועל הכנות,<br><strong>הילית</strong></p><p style="margin:28px 0 0;text-align:center;font-size:12px;color:#8a766d"><a href="${unsubscribeUrl}" style="color:#8a766d;text-decoration:underline">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
+      textContent: `היי ${input.firstName},\n\n${intro}\n\nזהו סקר שביעות רצון קצר ונפרד. המטרה היא להבין מה עובד ומה נכון לשפר. התשובות נשמרות לצורכי למידה ולא יפורסמו ללא בקשת רשות נפרדת.\n\nלמילוי הסקר:\n${input.feedbackUrl}\n\nתודה על הזמן ועל הכנות,\nהילית\n\nלהסרה מרשימת התפוצה:\n${unsubscribeUrl}`,
+    };
+  }
   return {
     subject,
     htmlContent: `<!doctype html><html dir="rtl" lang="he"><body style="margin:0;background:#fff3f6;font-family:Arial,sans-serif;color:#432432"><div style="max-width:620px;margin:0 auto;padding:28px 14px"><div style="background:linear-gradient(135deg,#6f3f52,#a75f78);color:#fff;border-radius:28px 28px 0 0;padding:34px 30px"><div style="font-size:13px;letter-spacing:2px;color:#f6d9e4">הילית כספי</div><h1 style="font-size:30px;line-height:1.3;margin:14px 0 0">אשמח לשמוע על החוויה שלך</h1></div><div style="background:#fff;border-radius:0 0 28px 28px;padding:30px;box-shadow:0 18px 50px rgba(102,49,70,.12)"><p style="font-size:17px;line-height:1.8;margin:0">היי ${input.firstName},</p><p style="font-size:17px;line-height:1.8">${intro}</p><div style="background:#fff2f6;border:1px solid #efcad7;border-radius:16px;padding:18px 20px;margin:22px 0"><p style="font-size:16px;line-height:1.8;margin:0"><strong>השיתוף שלך יכול לעזור לעוד אנשים שמחפשים אהבה</strong> להכיר דרך, תהליך וכלים שיכולים לקדם גם אותם.</p></div><p style="font-size:16px;line-height:1.8">בסיום מחכה לך מתנה אישית ממני: <strong>מפת הדייט הבא</strong>. המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם.</p><div style="text-align:center;margin:30px 0"><a href="${input.feedbackUrl}" style="display:inline-block;background:#a75f78;color:#fff;text-decoration:none;border-radius:999px;padding:16px 30px;font-size:17px;font-weight:bold">אשמח לשתף ולקבל את המתנה שלי</a></div><p style="font-size:14px;line-height:1.7;color:#795e69">רק אם מתאים לך, אפשר לבחור בטופס בנפרד מה מותר לנו לשתף, היכן ובאיזו זהות. שום דבר לא מתפרסם אוטומטית.</p><p style="font-size:16px;line-height:1.8;margin-top:28px">באהבה,<br><strong>הילית</strong></p><p style="margin:28px 0 0;text-align:center;font-size:12px;color:#9b7b87"><a href="${unsubscribeUrl}" style="color:#9b7b87;text-decoration:underline">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
@@ -358,6 +369,7 @@ export async function processFeedbackAutomation(now = Date.now()): Promise<{
       firstName: record.contactName.trim().split(/\s+/)[0] || "שלום",
       contactEmail: record.contactEmail,
       sourceType: record.sourceType,
+      surveyKind: record.surveyKind,
       feedbackUrl: buildFeedbackUrl(record.publicToken),
       reminder: record.touchpoint === "match_week",
     });
