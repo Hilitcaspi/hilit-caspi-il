@@ -91,8 +91,8 @@ export default function DailyReportManagementSection() {
         <div className="grid gap-5 p-6 md:grid-cols-[1fr_auto] md:items-center">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#ffe27c] px-3 py-1 text-xs font-black text-[#191265]">SMS כבוי</span>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs">מצב הדגמה בלבד</span>
+              <span className="rounded-full bg-[#ffe27c] px-3 py-1 text-xs font-black text-[#191265]">{data.settings.isEnabled && !data.settings.dryRun ? "SMS פעיל" : "SMS כבוי"}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs">{data.settings.isEnabled && !data.settings.dryRun ? "שלוש הודעות בחצות" : "מצב הדגמה בלבד"}</span>
             </div>
             <h2 className="text-2xl font-black">דוח חצות יומי</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-white/75">מסכם את היום שהסתיים לפי שעון ישראל. המספרים מבוססים על Grow, ה־CRM ו־Meta; מקור חסר מסומן ולא מוערך.</p>
@@ -119,12 +119,19 @@ export default function DailyReportManagementSection() {
         <div className="rounded-3xl border border-[#e8e5dc] bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h3 className="flex items-center gap-2 text-lg font-black text-[#191265]"><MessageSquareText size={19} /> הודעת ה־SMS המדויקת</h3>
-              <p className="mt-1 text-xs text-[#727272]">זה הנוסח שיישלח רק לאחר אישור מפורש והפעלת התזמון.</p>
+              <h3 className="flex items-center gap-2 text-lg font-black text-[#191265]"><MessageSquareText size={19} /> שלוש הודעות ה־SMS</h3>
+              <p className="mt-1 text-xs text-[#727272]">כל הודעה נשלחת בנפרד לשני הנמענים המאושרים.</p>
             </div>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{data.preview.message.length} תווים</span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">3 הודעות</span>
           </div>
-          <pre className="whitespace-pre-wrap rounded-2xl bg-[#f5f2ea] p-4 font-sans text-sm leading-7 text-[#191265]">{data.preview.message}</pre>
+          <div className="space-y-3">
+            {data.preview.messages.map((part, index) => (
+              <div key={part.key} className="rounded-2xl bg-[#f5f2ea] p-4">
+                <div className="mb-2 flex items-center justify-between gap-3 text-xs font-bold text-[#727272]"><span>הודעה {index + 1} מתוך 3</span><span>{part.message.length} תווים</span></div>
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-[#191265]">{part.message}</pre>
+              </div>
+            ))}
+          </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button onClick={() => saveDryRun.mutate()} disabled={saveDryRun.isPending} className="bg-[#191265] text-white hover:bg-[#2a2177]">
               <ShieldCheck size={16} /> {saveDryRun.isPending ? "שומר…" : "שמור ריצת הדגמה ללא שליחה"}
@@ -172,8 +179,8 @@ export default function DailyReportManagementSection() {
             </label>
           ))}
           <label className="text-xs font-bold text-[#191265]">
-            מספר מנהל לקבלת SMS
-            <input value={recipientPhone} onChange={event => setRecipientPhone(event.target.value)} inputMode="tel" className="mt-1 w-full rounded-xl border border-[#dedbd2] bg-[#fbfaf7] px-3 py-2 text-sm outline-none focus:border-[#191265]" placeholder={data.settings.recipientMasked || "לא הוגדר"} />
+            מספרי מנהלים לקבלת SMS
+            <input value={recipientPhone} onChange={event => setRecipientPhone(event.target.value)} inputMode="tel" className="mt-1 w-full rounded-xl border border-[#dedbd2] bg-[#fbfaf7] px-3 py-2 text-sm outline-none focus:border-[#191265]" placeholder={data.settings.recipientMaskedList?.join(", ") || "לא הוגדרו"} />
           </label>
         </div>
         <Button

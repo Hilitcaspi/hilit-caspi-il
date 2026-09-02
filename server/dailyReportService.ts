@@ -13,6 +13,7 @@ import { fetchMetaAdsInsights, fetchSocialInsights } from "./dashboardRouter";
 import { calculateMatchmakingMetrics, getMissingProfileFields } from "./matchmakingMetrics";
 import {
   buildDailyReportMessage,
+  buildDailyReportMessages,
   DAILY_REPORT_TIMEZONE,
   getReportDateForMidnightRun,
   getReportDateRange,
@@ -47,8 +48,21 @@ export function maskRecipient(phone: string | null): string | null {
   return `${digits.slice(0, 3)}****${digits.slice(-2)}`;
 }
 
+export function parseRecipientPhones(value: string | null): string[] {
+  if (!value) return [];
+  return Array.from(new Set(value.split(/[,;\n]+/).map(phone => phone.trim()).filter(Boolean)));
+}
+
+export function maskRecipients(value: string | null): string[] {
+  return parseRecipientPhones(value).map(phone => maskRecipient(phone) || "****");
+}
+
 export function buildScheduledDailyReportRunKey(settingsId: number, reportDate: string): string {
   return `daily-report:${settingsId}:${reportDate}`;
+}
+
+export function buildManualDailyReportRunKey(settingsId: number, reportDate: string): string {
+  return `daily-report:${settingsId}:manual:${reportDate}:three-part-v1`;
 }
 
 export function isDailyReportLocalMidnight(now: number, timezone = DAILY_REPORT_TIMEZONE): boolean {
@@ -63,7 +77,7 @@ export function isDailyReportLocalMidnight(now: number, timezone = DAILY_REPORT_
 export function getDailyReportDeliveryMode(settings: Pick<DailyReportSettings, "isEnabled" | "dryRun" | "recipientPhone">) {
   if (!settings.isEnabled) return "disabled" as const;
   if (settings.dryRun) return "dry_run" as const;
-  if (!settings.recipientPhone) return "missing_recipient" as const;
+  if (parseRecipientPhones(settings.recipientPhone).length === 0) return "missing_recipient" as const;
   return "send" as const;
 }
 
@@ -92,9 +106,9 @@ export async function getOrCreateDailyReportSettings(db?: Db): Promise<DailyRepo
     databaseMonthlyMinTarget: 350,
     databaseMonthlyStretchTarget: 400,
     databaseMonthlyBudgetAgorot: 1_000_000,
-    boostMonthlyTarget: null,
-    bundleMonthlyTarget: null,
-    leadMonthlyTarget: null,
+    boostMonthlyTarget: 90,
+    bundleMonthlyTarget: 70,
+    leadMonthlyTarget: 2_000,
     revenueMonthlyTargetAgorot: null,
     createdAt: now,
     updatedAt: now,
@@ -116,6 +130,10 @@ function isSalesCampaign(campaign: { name?: string; objective?: string; purchase
 
 function sumSpendAgorot(campaigns: Array<{ spend?: number }>): number {
   return Math.round(campaigns.reduce((sum, campaign) => sum + Number(campaign.spend || 0), 0) * 100);
+}
+
+function sumCampaignMetric(campaigns: Array<Record<string, unknown>>, key: "impressions" | "clicks" | "leads"): number {
+  return campaigns.reduce((sum, campaign) => sum + Number(campaign[key] || 0), 0);
 }
 
 async function externalOrNull<T>(promise: Promise<T>): Promise<T | null> {
@@ -215,6 +233,7 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
   ]);
 
   const todayPayments = paymentAggregate(paymentRows, range.dayStart, range.dayEnd);
+  const weekPayments = paymentAggregate(paymentRows, range.weekStart, range.dayEnd);
   const monthPayments = paymentAggregate(paymentRows, range.monthStart, range.dayEnd);
   const activePaidSingles = singleRows.filter(single => single.isActive && single.isPaid && !single.isSeed);
   const matchmaking = calculateMatchmakingMetrics(singleRows as any, matchRows as any, {
@@ -250,24 +269,34 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
     salesPurchasesToday: todayPayments.salesPurchases,
     salesPurchasesMonth: monthPayments.salesPurchases,
     databasePurchasesToday: todayPayments.database.count,
+    databasePurchasesWeek: weekPayments.database.count,
     databasePurchasesMonth: monthPayments.database.count,
     databaseRevenueTodayAgorot: todayPayments.database.revenueAgorot,
     databaseRevenueMonthAgorot: monthPayments.database.revenueAgorot,
     boostPurchasesToday: todayPayments.boost.count,
+    boostPurchasesWeek: weekPayments.boost.count,
     boostPurchasesMonth: monthPayments.boost.count,
     boostRevenueTodayAgorot: todayPayments.boost.revenueAgorot,
     boostRevenueMonthAgorot: monthPayments.boost.revenueAgorot,
     bundlePurchasesToday: todayPayments.bundle.count,
+    bundlePurchasesWeek: weekPayments.bundle.count,
     bundlePurchasesMonth: monthPayments.bundle.count,
     bundleRevenueTodayAgorot: todayPayments.bundle.revenueAgorot,
     bundleRevenueMonthAgorot: monthPayments.bundle.revenueAgorot,
     leadsToday: leadRows.filter(row => row.createdAt >= range.dayStart && row.createdAt < range.dayEnd).length,
+    leadsWeek: leadRows.filter(row => row.createdAt >= range.weekStart && row.createdAt < range.dayEnd).length,
     leadsMonth: leadRows.length,
     instagramFollowersNew: social?.instagram.followerGrowth ?? null,
     salesCampaignSpendTodayAgorot: metaAvailable ? sumSpendAgorot(daySalesCampaigns) : null,
     salesCampaignSpendMonthAgorot: metaAvailable ? sumSpendAgorot(monthSalesCampaigns) : null,
+    salesCampaignImpressionsToday: metaAvailable ? sumCampaignMetric(daySalesCampaigns, "impressions") : null,
+    salesCampaignClicksToday: metaAvailable ? sumCampaignMetric(daySalesCampaigns, "clicks") : null,
+    salesCampaignLeadsToday: metaAvailable ? sumCampaignMetric(daySalesCampaigns, "leads") : null,
     boostCampaignSpendTodayAgorot: metaAvailable ? sumSpendAgorot(dayMeta!.boosts) : null,
     boostCampaignSpendMonthAgorot: metaAvailable ? sumSpendAgorot(monthMeta!.boosts) : null,
+    boostCampaignImpressionsToday: metaAvailable ? sumCampaignMetric(dayMeta!.boosts, "impressions") : null,
+    boostCampaignClicksToday: metaAvailable ? sumCampaignMetric(dayMeta!.boosts, "clicks") : null,
+    boostCampaignLeadsToday: metaAvailable ? sumCampaignMetric(dayMeta!.boosts, "leads") : null,
     matchesSentToday: matchRows.filter(match => Number(match.proposedAt || 0) >= range.dayStart && Number(match.proposedAt || 0) < range.dayEnd).length,
     matchesMutualYesToday: matchRows.filter(match => Number(match.matchedAt || 0) >= range.dayStart && Number(match.matchedAt || 0) < range.dayEnd).length,
     activeSinglesNoMatch14Days: matchmaking.noMatchDuration.over14,
@@ -281,6 +310,7 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
     targets,
     sources,
     message: buildDailyReportMessage(metrics, targets, sources),
+    messages: buildDailyReportMessages(metrics, targets, sources),
     generatedAt: Date.now(),
   };
 }
@@ -294,7 +324,12 @@ export async function getDailyReportOverview() {
     .where(eq(dailyReportRuns.settingsId, settings.id))
     .orderBy(desc(dailyReportRuns.id)).limit(30);
   return {
-    settings: { ...settings, recipientPhone: undefined, recipientMasked: maskRecipient(settings.recipientPhone) },
+    settings: {
+      ...settings,
+      recipientPhone: undefined,
+      recipientMasked: maskRecipient(settings.recipientPhone),
+      recipientMaskedList: maskRecipients(settings.recipientPhone),
+    },
     preview,
     runs: runs.map(run => ({ ...run, metricsJson: undefined, sourceStatusJson: undefined })),
   };
@@ -349,6 +384,74 @@ export async function recordDailyReportDryRun() {
   return { ok: true, sent: false, preview };
 }
 
+export async function sendDailyReportMessages(
+  recipients: string[],
+  messages: Array<{ key: string; message: string }>,
+  sender: (phone: string, message: string) => Promise<boolean> = sendSMS,
+) {
+  const deliveries: Array<{ recipientIndex: number; messageKey: string; sent: boolean }> = [];
+  for (let recipientIndex = 0; recipientIndex < recipients.length; recipientIndex += 1) {
+    const recipient = recipients[recipientIndex];
+    for (const part of messages) {
+      const sent = await sender(recipient, part.message);
+      deliveries.push({ recipientIndex, messageKey: part.key, sent });
+    }
+  }
+  return deliveries;
+}
+
+export async function runManualDailyReportBackfill(reportDate: string, recipientPhones?: string[]) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) throw new Error("Invalid report date");
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const settings = await getOrCreateDailyReportSettings(db);
+  const recipients = recipientPhones?.length
+    ? Array.from(new Set(recipientPhones.map(phone => phone.trim()).filter(Boolean)))
+    : parseRecipientPhones(settings.recipientPhone);
+  if (recipients.length === 0) throw new Error("Recipient not configured");
+  const runKey = buildManualDailyReportRunKey(settings.id, reportDate);
+  const [existing] = await db.select().from(dailyReportRuns).where(eq(dailyReportRuns.runKey, runKey)).limit(1);
+  if (existing) return { ok: existing.status === "sent", skipped: "duplicate" as const, runId: existing.id };
+
+  const preview = await collectDailyReportPreview(settings, reportDate);
+  const startedAt = Date.now();
+  await db.insert(dailyReportRuns).values({
+    settingsId: settings.id,
+    runKey,
+    reportDate,
+    trigger: "manual",
+    status: "dry_run",
+    message: preview.messages.map(part => part.message).join("\n\n"),
+    metricsJson: JSON.stringify(preview.metrics),
+    sourceStatusJson: JSON.stringify(preview.sources),
+    providerMessageId: null,
+    error: null,
+    startedAt,
+    completedAt: null,
+    createdAt: startedAt,
+  });
+  const [run] = await db.select().from(dailyReportRuns).where(eq(dailyReportRuns.runKey, runKey)).limit(1);
+  if (!run) throw new Error("Failed to create manual daily report run");
+
+  const deliveries = await sendDailyReportMessages(recipients, preview.messages);
+  const sentCount = deliveries.filter(delivery => delivery.sent).length;
+  const expectedCount = recipients.length * preview.messages.length;
+  const ok = sentCount === expectedCount;
+  await db.update(dailyReportRuns).set({
+    status: ok ? "sent" : "failed",
+    providerMessageId: `accepted:${sentCount}/${expectedCount}`,
+    error: ok ? null : `Vibrate accepted ${sentCount} of ${expectedCount} messages`,
+    completedAt: Date.now(),
+  }).where(eq(dailyReportRuns.id, run.id));
+  return {
+    ok,
+    sent: sentCount,
+    expected: expectedCount,
+    runId: run.id,
+    messageLengths: preview.messages.map(part => part.message.length),
+  };
+}
+
 export async function runScheduledDailyReport(taskUid: string, now = Date.now()) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -375,7 +478,7 @@ export async function runScheduledDailyReport(taskUid: string, now = Date.now())
       reportDate,
       trigger: "scheduled",
       status: "dry_run",
-      message: preview.message,
+      message: preview.messages.map(part => part.message).join("\n\n"),
       metricsJson: JSON.stringify(preview.metrics),
       sourceStatusJson: JSON.stringify(preview.sources),
       providerMessageId: null,
@@ -399,11 +502,16 @@ export async function runScheduledDailyReport(taskUid: string, now = Date.now())
     return { ok: false, sent: false, error: "Recipient not configured", runId: run.id };
   }
 
-  const sent = await sendSMS(settings.recipientPhone!, preview.message);
+  const recipients = parseRecipientPhones(settings.recipientPhone);
+  const deliveries = await sendDailyReportMessages(recipients, preview.messages);
+  const sentCount = deliveries.filter(delivery => delivery.sent).length;
+  const expectedCount = recipients.length * preview.messages.length;
+  const sent = sentCount === expectedCount;
   await db.update(dailyReportRuns).set({
     status: sent ? "sent" : "failed",
-    error: sent ? null : "Vibrate did not accept the message",
+    providerMessageId: `accepted:${sentCount}/${expectedCount}`,
+    error: sent ? null : `Vibrate accepted ${sentCount} of ${expectedCount} messages`,
     completedAt: Date.now(),
   }).where(eq(dailyReportRuns.id, run.id));
-  return { ok: sent, sent, runId: run.id };
+  return { ok: sent, sent, accepted: sentCount, expected: expectedCount, runId: run.id };
 }
