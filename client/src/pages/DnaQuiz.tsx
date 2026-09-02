@@ -217,6 +217,7 @@ export default function DnaQuiz() {
   const [answers, setAnswers] = useState<number[]>([]);
   const [dnaType, setDnaType] = useState<DnaType | null>(null);
   const [scores, setScores] = useState<Record<DnaType, number> | null>(null);
+  const [feedbackUrl, setFeedbackUrl] = useState<string | null>(null);
   const [pendingAnswers, setPendingAnswers] = useState<number[]>([]);
   const [tiebreakerQuestion, setTiebreakerQuestion] = useState<typeof TIEBREAKER_QUESTIONS[0] | null>(null);
   const [tiebreakerAnswer, setTiebreakerAnswer] = useState<DnaType | null>(null);
@@ -230,6 +231,7 @@ export default function DnaQuiz() {
     onSuccess: (data) => {
       setDnaType(data.dnaType as DnaType);
       setScores(data.scores as Record<DnaType, number>);
+      setFeedbackUrl(data.feedbackUrl ?? null);
       setPhase("result");
       // Track quiz complete
       trackMutation.mutate({ eventType: "dna_quiz_complete", page: "/dna-quiz" });
@@ -865,6 +867,16 @@ export default function DnaQuiz() {
               </>
             )}
           </motion.div>
+          {feedbackUrl && <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.52 }}
+            className="rounded-3xl border border-[#d9c3a7] bg-[#fbf5ed] p-6 text-center shadow-sm"
+          >
+            <h3 className="text-xl font-black text-[#191265]">אשמח לשמוע מה לקחת מהשאלון</h3>
+            <p className="mt-2 text-sm leading-7 text-[#5f514b]">כמה מילים על מה הרגיש מדויק או מסקרן, ובסיום מחכה לך מתנה אישית ממני.</p>
+            <a href={feedbackUrl} className="mt-5 inline-flex rounded-full bg-[#191265] px-6 py-3 font-bold text-white transition hover:bg-[#1800ad]">אשמח לשתף ולקבל את המתנה שלי</a>
+          </motion.div>}
           {/* Personal message from Hilit */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

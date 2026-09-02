@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, like, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { z } from "zod";
 import {
@@ -8,6 +8,7 @@ import {
   testimonialMedia,
   testimonialRecords,
   testimonialUsage,
+  feedbackAutomationSettings,
   matches,
   singles,
 } from "../drizzle/schema";
@@ -16,6 +17,8 @@ import { getTestimonialDb } from "./testimonialDb";
 import { storageGetSignedUrl } from "./storage";
 import { parseMatchOutcomeNotes } from "./matchOutcome";
 import { isEligibleMatchCandidate, matchCandidateProofType, matchCandidateReason } from "./testimonialCandidates";
+import { isPermanentlyBlockedEmail } from "./brevo";
+import { prepareHistoricalMatchDrafts, prepareSatisfactionSurveyDrafts } from "./feedbackCampaignDrafts";
 import {
   buildTestimonialDraft,
   consentAllowsChannel,
@@ -24,12 +27,16 @@ import {
   normalizeTestimonialEmail,
   publicDisplayName,
   publicQuestionsForSource,
+  resolveFeedbackRewardGrant,
   TESTIMONIAL_CHANNELS,
   TESTIMONIAL_CONSENT_VERSION,
   TESTIMONIAL_IDENTITY_SCOPES,
   TESTIMONIAL_PROOF_TYPES,
+  TESTIMONIAL_REWARD_TYPES,
   TESTIMONIAL_SOURCE_TYPES,
   TESTIMONIAL_STATUSES,
+  TESTIMONIAL_SURVEY_KINDS,
+  TESTIMONIAL_TOUCHPOINTS,
 } from "./testimonialService";
 
 const proofTypeSchema = z.enum(TESTIMONIAL_PROOF_TYPES);
@@ -37,6 +44,9 @@ const sourceTypeSchema = z.enum(TESTIMONIAL_SOURCE_TYPES);
 const statusSchema = z.enum(TESTIMONIAL_STATUSES);
 const identityScopeSchema = z.enum(TESTIMONIAL_IDENTITY_SCOPES);
 const channelSchema = z.enum(TESTIMONIAL_CHANNELS);
+const surveyKindSchema = z.enum(TESTIMONIAL_SURVEY_KINDS);
+const touchpointSchema = z.enum(TESTIMONIAL_TOUCHPOINTS);
+const rewardTypeSchema = z.enum(TESTIMONIAL_REWARD_TYPES);
 
 async function requireDb() {
   const db = await getTestimonialDb();
@@ -90,6 +100,7 @@ const submissionSchema = z.object({
   rating: z.number().int().min(1).max(5).optional(),
   npsScore: z.number().int().min(0).max(10).optional(),
   feedbackText: z.string().trim().min(2).max(5000),
+  secondaryText: z.string().trim().max(5000).optional(),
   improvementText: z.string().trim().max(3000).optional(),
   testimonialText: z.string().trim().max(5000).optional(),
   identityScope: identityScopeSchema.default("anonymous"),
@@ -120,6 +131,11 @@ export const testimonialRouter = router({
         status: testimonialRecords.status,
         proofType: testimonialRecords.proofType,
         sourceType: testimonialRecords.sourceType,
+        surveyKind: testimonialRecords.surveyKind,
+        touchpoint: testimonialRecords.touchpoint,
+        rewardType: testimonialRecords.rewardType,
+        requestSentAt: testimonialRecords.requestSentAt,
+        rewardGrantedAt: testimonialRecords.rewardGrantedAt,
         consentText: testimonialRecords.consentText,
         consentPhoto: testimonialRecords.consentPhoto,
         consentVideo: testimonialRecords.consentVideo,
@@ -127,16 +143,24 @@ export const testimonialRouter = router({
       const byStatus = Object.fromEntries(TESTIMONIAL_STATUSES.map(status => [status, 0])) as Record<string, number>;
       const byProofType = Object.fromEntries(TESTIMONIAL_PROOF_TYPES.map(type => [type, 0])) as Record<string, number>;
       const bySourceType = Object.fromEntries(TESTIMONIAL_SOURCE_TYPES.map(type => [type, 0])) as Record<string, number>;
+      const bySurveyKind = Object.fromEntries(TESTIMONIAL_SURVEY_KINDS.map(type => [type, 0])) as Record<string, number>;
+      const byTouchpoint = Object.fromEntries(TESTIMONIAL_TOUCHPOINTS.map(type => [type, 0])) as Record<string, number>;
       for (const row of rows) {
         byStatus[row.status] += 1;
         byProofType[row.proofType] += 1;
         bySourceType[row.sourceType] += 1;
+        bySurveyKind[row.surveyKind] += 1;
+        byTouchpoint[row.touchpoint] += 1;
       }
       return {
         total: rows.length,
         byStatus,
         byProofType,
         bySourceType,
+        bySurveyKind,
+        byTouchpoint,
+        requestsSent: rows.filter(row => Boolean(row.requestSentAt)).length,
+        rewardsGranted: rows.filter(row => row.rewardType !== "none" && Boolean(row.rewardGrantedAt)).length,
         withTextConsent: rows.filter(row => row.consentText).length,
         withPhotoConsent: rows.filter(row => row.consentPhoto).length,
         withVideoConsent: rows.filter(row => row.consentVideo).length,
@@ -147,6 +171,8 @@ export const testimonialRouter = router({
       status: statusSchema.optional(),
       proofType: proofTypeSchema.optional(),
       sourceType: sourceTypeSchema.optional(),
+      surveyKind: surveyKindSchema.optional(),
+      touchpoint: touchpointSchema.optional(),
       search: z.string().trim().max(150).optional(),
       limit: z.number().int().min(1).max(250).default(100),
     }).optional()).query(async ({ input }) => {
@@ -155,6 +181,8 @@ export const testimonialRouter = router({
       if (input?.status) conditions.push(eq(testimonialRecords.status, input.status));
       if (input?.proofType) conditions.push(eq(testimonialRecords.proofType, input.proofType));
       if (input?.sourceType) conditions.push(eq(testimonialRecords.sourceType, input.sourceType));
+      if (input?.surveyKind) conditions.push(eq(testimonialRecords.surveyKind, input.surveyKind));
+      if (input?.touchpoint) conditions.push(eq(testimonialRecords.touchpoint, input.touchpoint));
       if (input?.search) {
         const search = `%${input.search}%`;
         conditions.push(or(
@@ -183,6 +211,81 @@ export const testimonialRouter = router({
       }));
     }),
 
+    automationOverview: teamProcedure.query(async () => {
+      const db = await requireDb();
+      const [settings] = await db.select().from(feedbackAutomationSettings)
+        .where(eq(feedbackAutomationSettings.settingName, "default"))
+        .limit(1);
+      const rows = await db.select({
+        status: testimonialRecords.status,
+        scheduledAt: testimonialRecords.scheduledAt,
+        requestSentAt: testimonialRecords.requestSentAt,
+        deliveryChannel: testimonialRecords.deliveryChannel,
+        touchpoint: testimonialRecords.touchpoint,
+      }).from(testimonialRecords);
+      return {
+        settings: settings ?? null,
+        queued: rows.filter(row => row.deliveryChannel === "email" && row.status === "approved_to_contact" && !row.requestSentAt).length,
+        scheduled: rows.filter(row => Boolean(row.scheduledAt) && !row.requestSentAt).length,
+        sent: rows.filter(row => Boolean(row.requestSentAt)).length,
+        byTouchpoint: Object.fromEntries(TESTIMONIAL_TOUCHPOINTS.map(touchpoint => [touchpoint, rows.filter(row => row.touchpoint === touchpoint).length])),
+      };
+    }),
+
+    satisfactionSamplePreview: teamProcedure.input(z.object({
+      sampleSize: z.number().int().min(10).max(250).default(60),
+    }).optional()).query(async ({ input }) => {
+      const db = await requireDb();
+      const rows = await db.select({
+        id: singles.id,
+        email: singles.email,
+        createdAt: singles.createdAt,
+      }).from(singles).where(and(
+        eq(singles.isActive, true),
+        eq(singles.isSeed, false),
+        eq(singles.consentEmailMarketing, true),
+        isNotNull(singles.email),
+      ));
+      const now = Date.now();
+      const seen = new Set<string>();
+      const eligible = rows.filter(row => {
+        const email = normalizeTestimonialEmail(row.email || "");
+        if (!email || seen.has(email) || isPermanentlyBlockedEmail(email)) return false;
+        seen.add(email);
+        return true;
+      });
+      const buckets = [
+        { key: "under_14_days", label: "עד שבועיים", min: 0, max: 14 },
+        { key: "days_14_30", label: "שבועיים עד חודש", min: 14, max: 31 },
+        { key: "days_31_60", label: "חודש עד חודשיים", min: 31, max: 61 },
+        { key: "over_60_days", label: "מעל חודשיים", min: 61, max: Number.POSITIVE_INFINITY },
+      ];
+      const requested = Math.min(input?.sampleSize ?? 60, eligible.length);
+      const basePerBucket = Math.floor(requested / buckets.length);
+      let remaining = requested;
+      const breakdown = buckets.map((bucket, index) => {
+        const available = eligible.filter(row => {
+          const created = Number(row.createdAt || 0);
+          const tenureDays = Math.max(0, (now - created) / 86_400_000);
+          return tenureDays >= bucket.min && tenureDays < bucket.max;
+        }).length;
+        const suggested = index === buckets.length - 1 ? Math.min(available, remaining) : Math.min(available, basePerBucket);
+        remaining -= suggested;
+        return { key: bucket.key, label: bucket.label, available, suggested };
+      });
+      return { eligible: eligible.length, requested, breakdown, createsNothing: true };
+    }),
+
+    prepareHistoricalDrafts: teamProcedure.mutation(async () => {
+      return prepareHistoricalMatchDrafts({ execute: true });
+    }),
+
+    prepareSatisfactionDrafts: teamProcedure.input(z.object({
+      sampleSize: z.number().int().min(10).max(250).default(60),
+    })).mutation(async ({ input }) => {
+      return prepareSatisfactionSurveyDrafts({ execute: true, sampleSize: input.sampleSize });
+    }),
+
     getById: teamProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
       const { db, record } = await getRecordById(input.id);
       const [media, usage, events] = await Promise.all([
@@ -196,6 +299,11 @@ export const testimonialRouter = router({
     createDraft: teamProcedure.input(z.object({
       proofType: proofTypeSchema,
       sourceType: sourceTypeSchema,
+      surveyKind: surveyKindSchema.default("positive_experience"),
+      touchpoint: touchpointSchema.default("manual"),
+      deliveryChannel: z.enum(["email", "onsite", "manual"]).default("manual"),
+      rewardType: rewardTypeSchema.default("none"),
+      requestKey: z.string().trim().max(191).optional(),
       contactName: z.string().trim().min(2).max(150),
       contactEmail: z.string().trim().email().max(320),
       contactPhone: z.string().trim().max(30).optional(),
@@ -208,9 +316,13 @@ export const testimonialRouter = router({
     })).mutation(async ({ input, ctx }) => {
       const db = await requireDb();
       const now = Date.now();
-      const draft = buildTestimonialDraft({ firstName: input.contactName, sourceType: input.sourceType });
+      const draft = buildTestimonialDraft({ firstName: input.contactName, sourceType: input.sourceType, surveyKind: input.surveyKind });
       const result = await db.insert(testimonialRecords).values({
         publicToken: crypto.randomBytes(32).toString("hex"),
+        requestKey: input.requestKey || null,
+        surveyKind: input.surveyKind,
+        touchpoint: input.touchpoint,
+        deliveryChannel: input.deliveryChannel,
         status: "draft",
         proofType: input.proofType,
         sourceType: input.sourceType,
@@ -223,6 +335,8 @@ export const testimonialRouter = router({
         sourceSnapshot: input.sourceSnapshot ? JSON.stringify(input.sourceSnapshot) : null,
         draftSubject: input.draftSubject || draft.subject,
         draftBody: input.draftBody || draft.body,
+        rewardType: input.surveyKind === "positive_experience" ? input.rewardType : "none",
+        incentiveDisclosureRequired: input.surveyKind === "positive_experience" && input.rewardType !== "none",
         createdAt: now,
         updatedAt: now,
       });
@@ -314,6 +428,10 @@ export const testimonialRouter = router({
         const proofType = matchCandidateProofType({ detailStatus: candidate.detailStatus, feedback: candidate.feedback });
         const result = await db.insert(testimonialRecords).values({
           publicToken: crypto.randomBytes(32).toString("hex"),
+          requestKey: `match-outcome:${candidate.matchId}:${candidate.singleId}`,
+          surveyKind: "positive_experience",
+          touchpoint: "manual",
+          deliveryChannel: "manual",
           status: "candidate",
           proofType,
           sourceType: "match",
@@ -331,6 +449,8 @@ export const testimonialRouter = router({
           }),
           draftSubject: draft.subject,
           draftBody: draft.body,
+          rewardType: "date_map",
+          incentiveDisclosureRequired: true,
           createdAt: now,
           updatedAt: now,
         });
@@ -543,10 +663,15 @@ export const testimonialRouter = router({
         displayName: publicDisplayName(record.contactName),
         sourceType: record.sourceType,
         proofType: record.proofType,
+        surveyKind: record.surveyKind,
+        touchpoint: record.touchpoint,
         status: record.status,
-        questions: publicQuestionsForSource(record.sourceType),
-        canSubmit: !["approved", "published", "revoked", "archived"].includes(record.status),
+        questions: publicQuestionsForSource(record.sourceType, record.surveyKind),
+        canSubmit: !["submitted", "approved", "published", "revoked", "archived"].includes(record.status),
         consentVersion: TESTIMONIAL_CONSENT_VERSION,
+        rewardType: record.rewardType,
+        rewardGranted: Boolean(record.rewardGrantedAt),
+        rewardPath: record.rewardGrantedAt && record.rewardType === "date_map" ? `/testimonial/reward?token=${record.publicToken}` : null,
         hasActiveConsent: Boolean(record.consentConfirmedAt && !record.consentRevokedAt && (record.consentText || record.consentPhoto || record.consentVideo)),
         media: media.filter(item => item.status !== "revoked"),
       };
@@ -561,26 +686,34 @@ export const testimonialRouter = router({
     submit: publicProcedure.input(submissionSchema).mutation(async ({ input }) => {
       const { db, record } = await getRecordByToken(input.token);
       if (["approved", "published", "revoked", "archived"].includes(record.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "לא ניתן לעדכן את הטופס במצב הנוכחי" });
-      const allowedChannels = Array.from(new Set(input.allowedChannels));
-      const anyConsent = input.consentText || input.consentPhoto || input.consentVideo;
+      const isSatisfactionSurvey = record.surveyKind === "satisfaction_survey";
+      const allowedChannels = isSatisfactionSurvey ? [] : Array.from(new Set(input.allowedChannels));
+      const anyConsent = isSatisfactionSurvey ? false : input.consentText || input.consentPhoto || input.consentVideo;
       const now = Date.now();
-      const status = deriveSubmissionStatus({
+      const status = isSatisfactionSurvey ? "submitted" : deriveSubmissionStatus({
         testimonialText: input.testimonialText,
-        consentText: input.consentText,
-        consentPhoto: input.consentPhoto,
-        consentVideo: input.consentVideo,
+        consentText: isSatisfactionSurvey ? false : input.consentText,
+        consentPhoto: isSatisfactionSurvey ? false : input.consentPhoto,
+        consentVideo: isSatisfactionSurvey ? false : input.consentVideo,
         allowedChannels,
+      });
+      const rewardGrantedAt = resolveFeedbackRewardGrant({
+        surveyKind: record.surveyKind,
+        rewardType: record.rewardType,
+        existingGrantedAt: record.rewardGrantedAt,
+        now,
       });
       await db.update(testimonialRecords).set({
         rating: input.rating ?? null,
         npsScore: input.npsScore ?? null,
         feedbackText: input.feedbackText,
+        structuredAnswers: input.secondaryText ? JSON.stringify({ secondaryText: input.secondaryText }) : null,
         improvementText: input.improvementText || null,
-        testimonialTextOriginal: input.testimonialText || null,
+        testimonialTextOriginal: isSatisfactionSurvey ? null : input.testimonialText || null,
         identityScope: input.identityScope,
-        consentText: input.consentText,
-        consentPhoto: input.consentPhoto,
-        consentVideo: input.consentVideo,
+        consentText: isSatisfactionSurvey ? false : input.consentText,
+        consentPhoto: isSatisfactionSurvey ? false : input.consentPhoto,
+        consentVideo: isSatisfactionSurvey ? false : input.consentVideo,
         allowWebsite: allowedChannels.includes("website"),
         allowOrganicSocial: allowedChannels.includes("organic_social"),
         allowEmail: allowedChannels.includes("email"),
@@ -591,13 +724,30 @@ export const testimonialRouter = router({
         consentVersion: anyConsent ? TESTIMONIAL_CONSENT_VERSION : null,
         consentConfirmedAt: anyConsent ? now : null,
         consentRevokedAt: null,
+        rewardGrantedAt,
         status,
         lastResponseAt: now,
         updatedAt: now,
       }).where(eq(testimonialRecords.id, record.id));
       await appendEvent({ db, recordId: record.id, eventType: "feedback_submitted", actorType: "customer", metadata: { hasTestimonialText: Boolean(input.testimonialText), status } });
       if (anyConsent) await appendEvent({ db, recordId: record.id, eventType: "consent_granted", actorType: "customer", metadata: { consentVersion: TESTIMONIAL_CONSENT_VERSION, channels: allowedChannels } });
-      return { success: true, status };
+      return {
+        success: true,
+        status,
+        rewardPath: rewardGrantedAt && record.rewardType === "date_map" ? `/testimonial/reward?token=${record.publicToken}` : null,
+      };
+    }),
+
+    reward: publicProcedure.input(z.object({ token: z.string().length(64) })).mutation(async ({ input }) => {
+      const { db, record } = await getRecordByToken(input.token);
+      if (!record.rewardGrantedAt || record.rewardType !== "date_map") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "המתנה עדיין אינה זמינה" });
+      }
+      if (!record.rewardViewedAt) {
+        const now = Date.now();
+        await db.update(testimonialRecords).set({ rewardViewedAt: now, updatedAt: now }).where(eq(testimonialRecords.id, record.id));
+      }
+      return { rewardType: "date_map" as const, grantedAt: record.rewardGrantedAt };
     }),
 
     revoke: publicProcedure.input(z.object({ token: z.string().length(64) })).mutation(async ({ input }) => {

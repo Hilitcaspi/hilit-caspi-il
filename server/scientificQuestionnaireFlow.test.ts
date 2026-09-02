@@ -7,7 +7,9 @@ const routerSource = readFileSync(resolve(process.cwd(), "server/routers.ts"), "
 
 describe("scientific questionnaire save recovery", () => {
   it("keeps saved answers until the server confirms success", () => {
-    const successBlock = source.slice(source.indexOf("onSuccess: () =>"), source.indexOf("onError: (err) =>"));
+    const successStart = source.indexOf("onSuccess: (data) =>");
+    expect(successStart).toBeGreaterThan(-1);
+    const successBlock = source.slice(successStart, source.indexOf("onError: (err) =>"));
     const submitBlock = source.slice(source.indexOf("const handleNext"), source.indexOf("const handleBack"));
     expect(successBlock).toContain("localStorage.removeItem(storageKey)");
     expect(submitBlock).not.toContain("localStorage.removeItem(storageKey)");

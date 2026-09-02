@@ -995,6 +995,22 @@ export type WebhookIdempotency = typeof webhookIdempotency.$inferSelect;
 export const testimonialRecords = mysqlTable("testimonial_records", {
   id: int("id").primaryKey().autoincrement(),
   publicToken: varchar("public_token", { length: 64 }).notNull().unique(),
+  requestKey: varchar("request_key", { length: 191 }),
+  surveyKind: mysqlEnum("survey_kind", ["positive_experience", "satisfaction_survey"]).default("positive_experience").notNull(),
+  touchpoint: mysqlEnum("touchpoint", [
+    "match_mutual",
+    "match_week",
+    "dna_result",
+    "database_complete",
+    "guide_complete",
+    "course_complete",
+    "product_followup",
+    "personal_session",
+    "historical_match",
+    "representative_sample",
+    "manual",
+  ]).default("manual").notNull(),
+  deliveryChannel: mysqlEnum("delivery_channel", ["email", "onsite", "manual"]).default("manual").notNull(),
   status: mysqlEnum("status", [
     "draft",
     "candidate",
@@ -1009,7 +1025,7 @@ export const testimonialRecords = mysqlTable("testimonial_records", {
     "archived",
   ]).default("draft").notNull(),
   proofType: mysqlEnum("proof_type", ["success", "progress", "product", "database", "service", "internal"]).notNull(),
-  sourceType: mysqlEnum("source_type", ["match", "database", "dna", "guide", "course", "boost", "service", "manual"]).notNull(),
+  sourceType: mysqlEnum("source_type", ["match", "database", "dna", "guide", "course", "bundle", "boost", "service", "manual"]).notNull(),
   singleId: int("single_id"),
   crmLeadId: int("crm_lead_id"),
   matchId: int("match_id"),
@@ -1017,6 +1033,7 @@ export const testimonialRecords = mysqlTable("testimonial_records", {
   contactEmail: varchar("contact_email", { length: 320 }).notNull(),
   contactPhone: varchar("contact_phone", { length: 30 }),
   sourceSnapshot: text("source_snapshot"),
+  structuredAnswers: text("structured_answers"),
   rating: int("rating"),
   npsScore: int("nps_score"),
   feedbackText: text("feedback_text"),
@@ -1047,7 +1064,14 @@ export const testimonialRecords = mysqlTable("testimonial_records", {
   draftBody: text("draft_body"),
   requestApprovedAt: bigint("request_approved_at", { mode: "number" }),
   requestApprovedBy: varchar("request_approved_by", { length: 200 }),
+  scheduledAt: bigint("scheduled_at", { mode: "number" }),
   requestSentAt: bigint("request_sent_at", { mode: "number" }),
+  reminderDueAt: bigint("reminder_due_at", { mode: "number" }),
+  reminderSentAt: bigint("reminder_sent_at", { mode: "number" }),
+  rewardType: mysqlEnum("reward_type", ["none", "date_map", "boost_free", "boost_one_shekel"]).default("none").notNull(),
+  rewardGrantedAt: bigint("reward_granted_at", { mode: "number" }),
+  rewardViewedAt: bigint("reward_viewed_at", { mode: "number" }),
+  incentiveDisclosureRequired: boolean("incentive_disclosure_required").default(false).notNull(),
   lastResponseAt: bigint("last_response_at", { mode: "number" }),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
@@ -1056,6 +1080,10 @@ export const testimonialRecords = mysqlTable("testimonial_records", {
   sourceIdx: index("testimonial_record_source_idx").on(table.sourceType),
   singleIdx: index("testimonial_record_single_idx").on(table.singleId),
   matchIdx: index("testimonial_record_match_idx").on(table.matchId),
+  requestKeyIdx: uniqueIndex("testimonial_record_request_key_idx").on(table.requestKey),
+  surveyKindIdx: index("testimonial_record_survey_kind_idx").on(table.surveyKind),
+  touchpointIdx: index("testimonial_record_touchpoint_idx").on(table.touchpoint),
+  scheduledIdx: index("testimonial_record_scheduled_idx").on(table.scheduledAt),
   emailIdx: index("testimonial_record_email_idx").on(table.contactEmail),
   createdIdx: index("testimonial_record_created_idx").on(table.createdAt),
 }));
@@ -1142,6 +1170,32 @@ export const testimonialEvents = mysqlTable("testimonial_events", {
 }));
 export type TestimonialEvent = typeof testimonialEvents.$inferSelect;
 export type InsertTestimonialEvent = typeof testimonialEvents.$inferInsert;
+
+/** Owner-only controls for feedback automation. All outbound delivery defaults to disabled. */
+export const feedbackAutomationSettings = mysqlTable("feedback_automation_settings", {
+  id: int("id").primaryKey().autoincrement(),
+  settingName: varchar("setting_name", { length: 80 }).default("default").notNull(),
+  enabled: boolean("enabled").default(false).notNull(),
+  scheduleCronTaskUid: varchar("schedule_cron_task_uid", { length: 65 }),
+  matchImmediateEnabled: boolean("match_immediate_enabled").default(false).notNull(),
+  matchWeekReminderEnabled: boolean("match_week_reminder_enabled").default(false).notNull(),
+  dnaResultEnabled: boolean("dna_result_enabled").default(false).notNull(),
+  databaseCompleteEnabled: boolean("database_complete_enabled").default(false).notNull(),
+  guideCompleteEnabled: boolean("guide_complete_enabled").default(false).notNull(),
+  courseCompleteEnabled: boolean("course_complete_enabled").default(false).notNull(),
+  productFollowupEnabled: boolean("product_followup_enabled").default(false).notNull(),
+  satisfactionSurveyEnabled: boolean("satisfaction_survey_enabled").default(false).notNull(),
+  historicalBatchEnabled: boolean("historical_batch_enabled").default(false).notNull(),
+  cooldownDays: int("cooldown_days").default(45).notNull(),
+  maxEmailsPerRun: int("max_emails_per_run").default(50).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({
+  settingNameIdx: uniqueIndex("feedback_automation_setting_name_idx").on(table.settingName),
+  taskUidIdx: index("feedback_automation_task_uid_idx").on(table.scheduleCronTaskUid),
+}));
+export type FeedbackAutomationSetting = typeof feedbackAutomationSettings.$inferSelect;
+export type InsertFeedbackAutomationSetting = typeof feedbackAutomationSettings.$inferInsert;
 
 /** Owner-only configuration for the verified Israeli-site midnight digest. */
 export const dailyReportSettings = mysqlTable("daily_report_settings", {

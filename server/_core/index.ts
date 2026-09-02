@@ -842,6 +842,28 @@ async function startServer() {
     }
   });
 
+  // Feedback queue. The schedule stays absent until the owner approves activation.
+  app.post("/api/scheduled/feedback-automation", express.json(), async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req as any);
+      if (!user.isCron || !user.taskUid) {
+        res.status(403).json({ error: "cron-only" });
+        return;
+      }
+      const { runScheduledFeedbackAutomation } = await import("../feedbackAutomation");
+      const result = await runScheduledFeedbackAutomation(user.taskUid);
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      console.error("[FeedbackAutomation] Error:", error);
+      res.status(500).json({
+        error: String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { url: req.originalUrl },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // ─── Team Member Login (form POST with redirect — Chrome mobile fallback) ──
   app.post("/api/team/login-form", async (req, res) => {
     try {

@@ -217,8 +217,10 @@ export default function ScientificQuestionnaire() {
     }
   }, [token, profileError]);
 
+  const [feedbackUrl, setFeedbackUrl] = useState<string | null>(null);
   const completeMutation = trpc.singles.completeQuestionnaire.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setFeedbackUrl(data.feedbackUrl ?? null);
       if (storageKey) {
         try { localStorage.removeItem(storageKey); } catch {}
       }
@@ -1024,6 +1026,12 @@ export default function ScientificQuestionnaire() {
                   שמחתי לקבל אותך! אני אעבור על הפרופיל שלך אישית ואיצור איתך קשר ברגע שתהיה התאמה מתאימה. בינתיים, הצטרפ{isFemale ? "י" : ""} לקבוצת הוואטסאפ שלי לטיפים יומיומיים. 💛
                 </p>
               </div>
+
+              {feedbackUrl && <div className="mb-5 w-full rounded-3xl border border-[#d9c3a7] bg-[#fbf5ed] p-6 text-center shadow-sm">
+                <h3 className="text-xl font-black text-[#191265]">אשמח לשמוע על חוויית ההצטרפות שלך</h3>
+                <p className="mt-2 text-sm leading-7 text-[#5f514b]">כמה מילים על מה הרגיש ברור, אישי או שונה בתהליך, ובסיום מחכה לך מתנה אישית ממני.</p>
+                <a href={feedbackUrl} className="mt-5 inline-flex rounded-full bg-[#191265] px-6 py-3 font-bold text-white transition hover:bg-[#1800ad]">אשמח לשתף ולקבל את המתנה שלי</a>
+              </div>}
 
               <a href="https://hilitcaspi.com/api/wa/site" target="_blank" rel="noopener noreferrer"
                 className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1da851] text-white font-bold py-4 rounded-2xl transition-all duration-300 text-base mb-3">

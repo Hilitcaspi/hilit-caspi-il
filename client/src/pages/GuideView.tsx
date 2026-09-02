@@ -574,6 +574,7 @@ export default function GuideView() {
   const [pendingAnswers, setPendingAnswers] = useState<Record<string, string>>({});
   const [savingProgress, setSavingProgress] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
+  const [feedbackUrl, setFeedbackUrl] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -674,12 +675,13 @@ export default function GuideView() {
     if (!token) return;
     setSavingProgress(true);
     try {
-      await saveProgressMutation.mutateAsync({
+      const result = await saveProgressMutation.mutateAsync({
         token,
         chapterId,
         completed,
         exerciseAnswers: pendingAnswers,
       });
+      if (result.feedbackUrl) setFeedbackUrl(result.feedbackUrl);
       setExerciseAnswers(prev => ({ ...prev, ...pendingAnswers }));
       setPendingAnswers({});
       if (completed && !completedChapters.includes(chapterId)) {
@@ -1316,6 +1318,11 @@ export default function GuideView() {
                   לחצי על הכפתור למטה לקבלת הניתוח האישי שלך.
                 </p>
               </div>
+              {feedbackUrl && <div className="mb-4 rounded-2xl border border-[#d9c3a7] bg-[#fbf5ed] p-6 text-center">
+                <h3 className="text-xl font-black text-[#191265]">אשמח לשמוע מה לקחת מהמדריך</h3>
+                <p className="mt-2 text-sm leading-7 text-[#5f514b]">כמה מילים על התרגיל או התובנה שהיו משמעותיים, ובסיום מחכה לך מתנה אישית ממני.</p>
+                <a href={feedbackUrl} className="mt-5 inline-flex rounded-full bg-[#191265] px-6 py-3 font-bold text-white transition hover:bg-[#1800ad]">אשמח לשתף ולקבל את המתנה שלי</a>
+              </div>}
               {/* Analysis section */}
               {!analysis && !generatingAnalysis && (
                 <div className="bg-[#ffe27c]/20 border-2 border-[#ffe27c] rounded-2xl p-6 text-center mb-4">

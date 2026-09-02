@@ -36,6 +36,7 @@ import { getDb } from "./db";
 import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusPaymentEvents } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
+import { queueProductFeedbackAfterPurchase } from "./feedbackAutomation";
 import { startJourney } from "./automation";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
@@ -778,6 +779,15 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       case "live_event": await handleLiveEvent(email, name, phone); break;
       case "match_boost": await handleMatchBoost(email, transactionId, sum, context.boostCheckoutReference); break;
       case "plus": await handlePlus(email, name, transactionId, sum, data); break;
+    }
+
+    if (transactionId && product) {
+      await queueProductFeedbackAfterPurchase({
+        product,
+        transactionId,
+        contactName: name,
+        contactEmail: email,
+      }).catch((error: unknown) => console.error(`[GrowWebhook] Failed to queue product feedback for ${product}:`, error));
     }
 
     // Persist the actual amount paid as the P&L revenue source of truth.

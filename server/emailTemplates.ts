@@ -1470,6 +1470,7 @@ export function buildContactRevealEmail(params: {
   singleId: number;
   dashboardUrl: string;
   proposalSource?: "regular" | "boost";
+  feedbackUrl?: string;
 }): EmailTemplate {
   const isBoost = params.proposalSource === "boost";
   const dnaProfile = params.matchDnaType ? DNA_PROFILES[params.matchDnaType] : null;
@@ -1517,6 +1518,8 @@ export function buildContactRevealEmail(params: {
     </a>
     <p style="font-size:13px;color:#727272;line-height:1.7;text-align:center;margin:0 0 18px;">באזור האישי אפשר לצפות בהתאמה, לעדכן את הפרופיל ולנהל את סטטוס ההתאמות במקום אחד.</p>
 
+    ${params.feedbackUrl ? `<div style="background:#fff1f5;border:1px solid #efc9d6;border-radius:14px;padding:22px 24px;margin:22px 0;text-align:center;"><p style="font-size:17px;color:#6f3f52;font-weight:700;margin:0 0 8px;">אשמח לשמוע על החוויה שלך</p><p style="font-size:14px;color:#795e69;line-height:1.7;margin:0 0 16px;">השיתוף שלך יכול לעזור לעוד אנשים שמחפשים אהבה להכיר דרך וכלים שיכולים לקדם גם אותם. בסיום מחכה לך מתנה אישית ממני.</p><a href="${params.feedbackUrl}" style="display:inline-block;background:#a75f78;color:#fff !important;font-weight:700;font-size:15px;padding:13px 24px;border-radius:999px;text-decoration:none;">אשמח לשתף ולקבל את המתנה שלי</a><p style="font-size:12px;color:#8a6673;line-height:1.6;margin:13px 0 0;">המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם. רק אם מתאים לך, אפשר לבחור מה מותר לנו לשתף.</p></div>` : ""}
+
     <!-- Pre-date tip -->
     <div style="background:#fff8e1; border-right:4px solid #ffe27c; border-radius:8px; padding:20px 24px; margin:20px 0;">
       <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">💡 טיפ שלי לפני הפגישה הראשונה</p>
@@ -1548,7 +1551,7 @@ export function buildContactRevealEmail(params: {
       ? `התאמת ה־Boost אושרה! הנה הפרטים של ${params.matchFirstName} 💛`
       : `שניכם אמרתם כן! הנה הפרטים של ${params.matchFirstName} 💛`,
     htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\n${isBoost ? "התאמת ה־Boost אושרה" : "שניכם אמרתם כן"}!\n\nשם: ${params.matchFirstName}${params.matchLastName ? " " + params.matchLastName : ""}\nטלפון: ${params.matchPhone}\nמייל: ${params.matchEmail}\n\nכניסה לאזור האישי: ${params.dashboardUrl}\n\nטיפ לפני הפגישה: ${params.preDateTip}\n\nהילית כספי`,
+    textBody: `שלום ${params.firstName},\n\n${isBoost ? "התאמת ה־Boost אושרה" : "שניכם אמרתם כן"}!\n\nשם: ${params.matchFirstName}${params.matchLastName ? " " + params.matchLastName : ""}\nטלפון: ${params.matchPhone}\nמייל: ${params.matchEmail}\n\nכניסה לאזור האישי: ${params.dashboardUrl}\n${params.feedbackUrl ? `\nאשמח לשמוע על החוויה שלך. השיתוף שלך יכול לעזור לעוד אנשים שמחפשים אהבה. בסיום מחכה לך מתנה אישית ממני: ${params.feedbackUrl}\n` : ""}\nטיפ לפני הפגישה: ${params.preDateTip}\n\nהילית כספי`,
   };
 }
 

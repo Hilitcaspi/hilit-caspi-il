@@ -5,6 +5,7 @@ import {
   deriveSubmissionStatus,
   normalizeTestimonialEmail,
   publicQuestionsForSource,
+  resolveFeedbackRewardGrant,
 } from "./testimonialService";
 
 describe("testimonial service", () => {
@@ -26,9 +27,36 @@ describe("testimonial service", () => {
 
   it("builds source-specific questions and draft copy without sending", () => {
     expect(publicQuestionsForSource("dna").heading).toContain("DNA");
-    expect(publicQuestionsForSource("boost").primaryQuestion).toContain("תהליך");
+    expect(publicQuestionsForSource("boost").secondaryQuestion).toContain("עצמאי");
     const draft = buildTestimonialDraft({ firstName: "דנה לוי", sourceType: "course" });
     expect(draft.subject).toContain("דנה");
-    expect(draft.body).toContain("משוב");
+    expect(draft.body).toContain("מתנה");
+    expect(draft.body).toContain("גם בלי אישור לפרסם");
+  });
+
+  it("keeps satisfaction surveys neutral and separate from testimonial rewards", () => {
+    const questions = publicQuestionsForSource("database", "satisfaction_survey");
+    expect(questions.showRatings).toBe(true);
+    expect(questions.showImprovement).toBe(true);
+    expect(questions.rewardLabel).toBeNull();
+    const draft = buildTestimonialDraft({ firstName: "דנה", sourceType: "database", surveyKind: "satisfaction_survey" });
+    expect(draft.body).toContain("מה נכון לשפר");
+    expect(draft.body).toContain("לא ישמשו לפרסום");
+  });
+
+  it("uses dedicated holiday bundle questions instead of generic service copy", () => {
+    const questions = publicQuestionsForSource("bundle", "positive_experience");
+    expect(questions.heading).toContain("חבילת החג");
+    expect(questions.primaryQuestion).toContain("כלים בחבילה");
+  });
+
+  it("grants the thank-you gift once without depending on publication consent", () => {
+    const now = 1_788_300_000_000;
+    expect(resolveFeedbackRewardGrant({ surveyKind: "positive_experience", rewardType: "date_map", now }))
+      .toBe(now);
+    expect(resolveFeedbackRewardGrant({ surveyKind: "positive_experience", rewardType: "date_map", existingGrantedAt: now - 10, now }))
+      .toBe(now - 10);
+    expect(resolveFeedbackRewardGrant({ surveyKind: "satisfaction_survey", rewardType: "date_map", now }))
+      .toBeNull();
   });
 });

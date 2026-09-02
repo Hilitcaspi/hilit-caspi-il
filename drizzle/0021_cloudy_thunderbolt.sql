@@ -1,0 +1,3 @@
+ALTER TABLE `testimonial_records` MODIFY COLUMN `touchpoint` enum('match_mutual','match_week','dna_result','database_complete','guide_complete','course_complete','product_followup','personal_session','historical_match','representative_sample','manual') NOT NULL DEFAULT 'manual';--> statement-breakpoint
+ALTER TABLE `testimonial_records` MODIFY COLUMN `source_type` enum('match','database','dna','guide','course','bundle','boost','service','manual') NOT NULL;--> statement-breakpoint
+ALTER TABLE `feedback_automation_settings` ADD `product_followup_enabled` boolean DEFAULT false NOT NULL;

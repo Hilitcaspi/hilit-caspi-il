@@ -782,6 +782,7 @@ export default function CourseView() {
   const [showFeedback, setShowFeedback] = useState<Record<string, boolean>>({});
   const [savingProgress, setSavingProgress] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
+  const [feedbackUrl, setFeedbackUrl] = useState<string | null>(null);
   const [showSoulMap, setShowSoulMap] = useState(false);
   const [showTechnique, setShowTechnique] = useState<number | null>(null);
   const [courseUserDnaType, setCourseUserDnaType] = useState<"leader" | "romantic" | "free_spirit" | "anchor" | null>(null);
@@ -839,12 +840,13 @@ export default function CourseView() {
     setSavingProgress(true);
     try {
       const allAnswers = { ...quizAnswers, ...openAnswers, ...pendingAnswers, ...pendingOpen };
-      await saveProgressMutation.mutateAsync({
+      const result = await saveProgressMutation.mutateAsync({
         token,
         chapterId: moduleId,
         completed,
         exerciseAnswers: allAnswers,
       });
+      if (result.feedbackUrl) setFeedbackUrl(result.feedbackUrl);
       setQuizAnswers(prev => ({ ...prev, ...pendingAnswers }));
       setOpenAnswers(prev => ({ ...prev, ...pendingOpen }));
       setPendingAnswers({});
@@ -1365,6 +1367,14 @@ export default function CourseView() {
               >
                 צפה/י במפה שלי
               </button>
+            </div>
+          )}
+
+          {allModulesCompleted && feedbackUrl && (
+            <div className="mb-6 rounded-3xl border border-[#d9c3a7] bg-[#fbf5ed] p-6 text-center md:p-8">
+              <h3 className="text-2xl font-black text-[#191265]">אשמח לשמוע על המסע שלך</h3>
+              <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#5f514b]">כמה מילים על החלק שהיה משמעותי ועל התובנה שתלווה אותך הלאה, ובסיום מחכה לך מתנה אישית ממני.</p>
+              <a href={feedbackUrl} className="mt-5 inline-flex rounded-full bg-[#191265] px-7 py-3 font-bold text-white transition hover:bg-[#1800ad]">אשמח לשתף ולקבל את המתנה שלי</a>
             </div>
           )}
 

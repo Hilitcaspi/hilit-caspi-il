@@ -33,6 +33,7 @@ import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
 import { calculateOutcomeSegments } from "./matchmakingSegments";
 import { calculateAgeFromBirthDate } from "../shared/profileValidation";
 import { getReleaseLifecycleUpdate } from "../shared/matchLifecycle";
+import { buildFeedbackRequestKey, ensurePositiveFeedbackRequest, markFeedbackRequestSent } from "./feedbackAutomation";
 import {
   parseMatchOutcomeNotes,
   setAdminOutcome,
@@ -1473,8 +1474,23 @@ export const appRouter = router({
         });
 
         // notifyOwner removed, DNA quiz completion notifications disabled
+        const [lead] = await db.select().from(crmLeads)
+          .where(eq(crmLeads.quizSessionId, input.sessionId))
+          .limit(1);
+        const feedback = lead?.email ? await ensurePositiveFeedbackRequest({
+          requestKey: buildFeedbackRequestKey({ touchpoint: "dna_result", subjectId: input.sessionId, contactId: lead.id }),
+          touchpoint: "dna_result",
+          deliveryChannel: "onsite",
+          proofType: "product",
+          sourceType: "dna",
+          contactName: lead.name,
+          contactEmail: lead.email,
+          contactPhone: lead.phone,
+          crmLeadId: lead.id,
+          sourceSnapshot: { dnaType },
+        }) : null;
 
-        return { dnaType, scores: groupScores };
+        return { dnaType, scores: groupScores, feedbackUrl: feedback?.feedbackUrl ?? null };
       }),
 
     markConverted: publicProcedure
@@ -2420,8 +2436,20 @@ export const appRouter = router({
             console.error("[completeQuestionnaire] Background match generation failed:", bgErr);
           }
         });
+        const feedback = profile.email ? await ensurePositiveFeedbackRequest({
+          requestKey: buildFeedbackRequestKey({ touchpoint: "database_complete", subjectId: profile.id, contactId: profile.id }),
+          touchpoint: "database_complete",
+          deliveryChannel: "onsite",
+          proofType: "database",
+          sourceType: "database",
+          contactName: `${profile.firstName} ${profile.lastName || ""}`.trim(),
+          contactEmail: profile.email,
+          contactPhone: profile.phone,
+          singleId: profile.id,
+          sourceSnapshot: { questionnaireCompletedAt: now },
+        }) : null;
 
-        return { singleId: profile.id, success: true, alreadyCompleted: false };
+        return { singleId: profile.id, success: true, alreadyCompleted: false, feedbackUrl: feedback?.feedbackUrl ?? null };
       }),
 
     /**
@@ -3314,10 +3342,12 @@ export const appRouter = router({
           .from(courseProgress)
           .where(eq(courseProgress.token, input.token))
           .limit(1);
+        let nextCompletedChapters: number[];
 
         if (!existing) {
           // Create new progress record
           const completedChapters = input.completed ? [input.chapterId] : [];
+          nextCompletedChapters = completedChapters;
           await db.insert(courseProgress).values({
             token: input.token,
             product: accessRow.product,
@@ -3336,6 +3366,7 @@ export const appRouter = router({
             const idx = completed.indexOf(input.chapterId);
             if (idx > -1) completed.splice(idx, 1);
           }
+          nextCompletedChapters = completed;
           const mergedAnswers = {
             ...JSON.parse(existing.exerciseAnswers || "{}"),
             ...(input.exerciseAnswers ?? {}),
@@ -3350,7 +3381,23 @@ export const appRouter = router({
             .where(eq(courseProgress.token, input.token));
         }
 
-        return { success: true };
+        const requiredChapters = accessRow.product === "guide_149" ? 6 : 5;
+        const fullyCompleted = Array.from({ length: requiredChapters }, (_, index) => index + 1)
+          .every(chapterId => nextCompletedChapters.includes(chapterId));
+        const sourceType = accessRow.product === "guide_149" ? "guide" : "course";
+        const touchpoint = accessRow.product === "guide_149" ? "guide_complete" : "course_complete";
+        const feedback = fullyCompleted ? await ensurePositiveFeedbackRequest({
+          requestKey: buildFeedbackRequestKey({ touchpoint, subjectId: input.token, contactId: accessRow.email }),
+          touchpoint,
+          deliveryChannel: "onsite",
+          proofType: "product",
+          sourceType,
+          contactName: accessRow.name || "שלום",
+          contactEmail: accessRow.email,
+          sourceSnapshot: { product: accessRow.product, completedChapters: requiredChapters },
+        }) : null;
+
+        return { success: true, feedbackUrl: feedback?.feedbackUrl ?? null };
       }),
 
     /**
@@ -4293,6 +4340,36 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
           if (singleA && singleB) {
             const score = match.score ?? 0;
+            const [feedbackA, feedbackB] = await Promise.all([
+              singleA.email ? ensurePositiveFeedbackRequest({
+                requestKey: buildFeedbackRequestKey({ touchpoint: "match_mutual", subjectId: match.id, contactId: singleA.id }),
+                touchpoint: "match_mutual",
+                deliveryChannel: "email",
+                proofType: "success",
+                sourceType: isBoost ? "boost" : "match",
+                contactName: singleA.firstName,
+                contactEmail: singleA.email,
+                contactPhone: singleA.phone,
+                singleId: singleA.id,
+                matchId: match.id,
+                sourceSnapshot: { matchedAt: now, proposalSource: isBoost ? "boost" : "regular", score },
+                scheduledAt: null,
+              }) : Promise.resolve(null),
+              singleB.email ? ensurePositiveFeedbackRequest({
+                requestKey: buildFeedbackRequestKey({ touchpoint: "match_mutual", subjectId: match.id, contactId: singleB.id }),
+                touchpoint: "match_mutual",
+                deliveryChannel: "email",
+                proofType: "success",
+                sourceType: isBoost ? "boost" : "match",
+                contactName: singleB.firstName,
+                contactEmail: singleB.email,
+                contactPhone: singleB.phone,
+                singleId: singleB.id,
+                matchId: match.id,
+                sourceSnapshot: { matchedAt: now, proposalSource: isBoost ? "boost" : "regular", score },
+                scheduledAt: null,
+              }) : Promise.resolve(null),
+            ]);
             const dashboardUrlA = singleA.questionnaireToken
               ? `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(singleA.email || "")}&token=${encodeURIComponent(singleA.questionnaireToken)}&tab=matches`
               : "https://hilitcaspi.com/my-profile";
@@ -4319,6 +4396,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               singleId: singleA.id,
               dashboardUrl: dashboardUrlA,
               proposalSource: isBoost ? "boost" : "regular",
+              feedbackUrl: feedbackA?.feedbackUrl,
             });
 
             const emailRevealB = buildContactRevealEmailTemplate({
@@ -4338,10 +4416,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               singleId: singleB.id,
               dashboardUrl: dashboardUrlB,
               proposalSource: isBoost ? "boost" : "regular",
+              feedbackUrl: feedbackB?.feedbackUrl,
             });
 
             // Send contact reveal emails to both
-            await Promise.all([
+            const [deliveryA, deliveryB] = await Promise.all([
               sendEmail({
                 to: { email: singleA.email!, name: singleA.firstName },
                 subject: emailRevealA.subject,
@@ -4352,6 +4431,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
                 subject: emailRevealB.subject,
                 htmlContent: emailRevealB.htmlBody,
               }),
+            ]);
+            await Promise.all([
+              deliveryA.success && feedbackA ? markFeedbackRequestSent(feedbackA.record.id, deliveryA.messageId) : Promise.resolve(),
+              deliveryB.success && feedbackB ? markFeedbackRequestSent(feedbackB.record.id, deliveryB.messageId) : Promise.resolve(),
             ]);
 
             await notifyOwner({

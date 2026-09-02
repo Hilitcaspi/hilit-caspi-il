@@ -6,7 +6,9 @@ let testimonialDb: MySql2Database<Record<string, never>> | null = null;
 
 export async function getTestimonialDb() {
   if (testimonialDb) return testimonialDb;
-  const url = process.env.DATABASE_URL || process.env.LEGACY_DATABASE_URL || "";
+  // Match the operational source used by server/db.ts so automation-created
+  // records, public forms and the CRM always read and write the same database.
+  const url = process.env.LEGACY_DATABASE_URL || process.env.DATABASE_URL || "";
   if (!url) return null;
   testimonialPool = createPool({
     uri: url,

@@ -40,6 +40,7 @@ export default function TestimonialFeedback() {
   const [rating, setRating] = useState<number | undefined>();
   const [npsScore, setNpsScore] = useState<number | undefined>();
   const [feedbackText, setFeedbackText] = useState("");
+  const [secondaryText, setSecondaryText] = useState("");
   const [improvementText, setImprovementText] = useState("");
   const [testimonialText, setTestimonialText] = useState("");
   const [identityScope, setIdentityScope] = useState<IdentityScope>("anonymous");
@@ -51,19 +52,30 @@ export default function TestimonialFeedback() {
   const [allowMaterialEdits, setAllowMaterialEdits] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [rewardPath, setRewardPath] = useState<string | null>(null);
   const previewData = useMemo(() => ({
     displayName: undefined,
     proofType: "product",
     sourceType: "course",
+    surveyKind: "positive_experience",
+    touchpoint: "course_complete",
     productLabel: "המסע לזוגיות",
     status: "draft",
     canSubmit: true,
     hasActiveConsent: false,
-    consentVersion: "testimonial-consent-2026-09-v1",
+    consentVersion: "2026-09-02-v2",
+    rewardType: "date_map",
+    rewardGranted: false,
+    rewardPath: null,
     questions: {
-      heading: "נשמח לשמוע על החוויה שלך",
-      primaryQuestion: "מה היה משמעותי עבורך בתהליך?",
-      testimonialPrompt: "אם תרצו לאפשר לנו לשתף, כתבו כאן רק את הנוסח שמותר לפרסום",
+      heading: "אשמח לשמוע על החוויה שלך",
+      intro: "כמה מילים ממך יעזרו לנו לספר על הדרך כפי שהיא באמת. בסיום מחכה לך מתנה אישית מהילית.",
+      primaryQuestion: "איזה חלק בתהליך היה משמעותי עבורך?",
+      secondaryQuestion: "איזו תובנה תלווה אותך גם אחרי סיום התהליך?",
+      testimonialPrompt: "מה היית רוצה לספר למי ששוקלים להצטרף?",
+      showRatings: false,
+      showImprovement: false,
+      rewardLabel: "מפת הדייט הבא",
     },
     media: [] as Array<{ id: number; mediaType: string; originalFileName: string; byteSize: number; status: string }>,
   }), []);
@@ -119,7 +131,8 @@ export default function TestimonialFeedback() {
 
   async function submit() {
     if (isPreview) {
-      toast.info("מצב תצוגה מקדימה. לא נשמר משוב.");
+      setRewardPath("/__preview/testimonial-reward");
+      setSubmitted(true);
       return;
     }
     if (feedbackText.trim().length < 2) {
@@ -135,11 +148,12 @@ export default function TestimonialFeedback() {
       return;
     }
     try {
-      await submitFeedback.mutateAsync({
+      const result = await submitFeedback.mutateAsync({
         token,
         rating,
         npsScore,
         feedbackText,
+        secondaryText: secondaryText || undefined,
         improvementText: improvementText || undefined,
         testimonialText: testimonialText || undefined,
         identityScope,
@@ -150,6 +164,7 @@ export default function TestimonialFeedback() {
         allowSpellingEdits,
         allowMaterialEdits,
       });
+      setRewardPath(result.rewardPath || null);
       setSubmitted(true);
       await utils.testimonial.public.form.invalidate({ token });
     } catch (error) {
@@ -159,9 +174,9 @@ export default function TestimonialFeedback() {
 
   if (!isPreview && (!token || formQuery.error)) {
     return (
-      <main dir="rtl" className="min-h-screen bg-[#f4efe7] px-5 py-20 text-[#2a1712]">
+      <main dir="rtl" className="min-h-screen bg-[#fff6f8] px-5 py-20 text-[#4c2634]">
         <div className="mx-auto max-w-xl rounded-[2rem] bg-white p-8 text-center shadow-[0_24px_70px_rgba(47,25,18,.12)]">
-          <AlertCircle className="mx-auto mb-4 h-10 w-10 text-[#8b563f]" />
+          <AlertCircle className="mx-auto mb-4 h-10 w-10 text-[#a75f78]" />
           <h1 className="text-2xl font-bold">הקישור אינו פעיל</h1>
           <p className="mt-3 text-[#715e55]">אפשר לפנות לצוות כדי לקבל קישור חדש.</p>
         </div>
@@ -170,17 +185,17 @@ export default function TestimonialFeedback() {
   }
 
   if (!isPreview && formQuery.isLoading) {
-    return <main className="flex min-h-screen items-center justify-center bg-[#f4efe7]"><Loader2 className="h-8 w-8 animate-spin text-[#6f3f2f]" /></main>;
+    return <main className="flex min-h-screen items-center justify-center bg-[#fff6f8]"><Loader2 className="h-8 w-8 animate-spin text-[#a75f78]" /></main>;
   }
 
   if (submitted) {
     return (
-      <main dir="rtl" className="min-h-screen bg-[#f4efe7] px-5 py-16 text-[#2a1712]">
+      <main dir="rtl" className="min-h-screen bg-[#fff6f8] px-5 py-16 text-[#4c2634]">
         <div className="mx-auto max-w-xl rounded-[2rem] bg-white p-9 text-center shadow-[0_24px_70px_rgba(47,25,18,.12)]">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#e6efe7]"><Check className="h-7 w-7 text-[#376346]" /></div>
-          <h1 className="mt-5 text-3xl font-semibold">תודה על הכנות</h1>
-          <p className="mt-4 leading-7 text-[#715e55]">המשוב נשמר. אם אישרת שימוש ציבורי, שום דבר לא יפורסם לפני בדיקה ואישור של הצוות.</p>
-          <Button onClick={() => setLocation("/")} className="mt-7 rounded-full bg-[#2b1712] px-8 text-white hover:bg-[#3a2119]">חזרה לאתר</Button>
+          <h1 className="mt-5 text-3xl font-semibold">תודה ששיתפת</h1>
+          <p className="mt-4 leading-7 text-[#715e55]">המשוב נשמר. אם ניתנה הרשאת שימוש, שום דבר לא יפורסם לפני בדיקה ואישור של הצוות.</p>
+          {rewardPath ? <Button onClick={() => setLocation(rewardPath)} className="mt-7 rounded-full bg-[#a75f78] px-8 text-white hover:bg-[#8e4963]">למתנה האישית שלך</Button> : <Button onClick={() => setLocation("/")} className="mt-7 rounded-full bg-[#a75f78] px-8 text-white hover:bg-[#8e4963]">חזרה לאתר</Button>}
         </div>
       </main>
     );
@@ -188,13 +203,13 @@ export default function TestimonialFeedback() {
 
   const data = formData!;
   return (
-    <main dir="rtl" className="min-h-screen bg-[#f4efe7] text-[#2a1712]">
-      <header className="relative overflow-hidden bg-[#24130f] px-5 py-12 text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(216,186,154,.25),transparent_34%),radial-gradient(circle_at_90%_90%,rgba(117,78,56,.28),transparent_38%)]" />
+    <main dir="rtl" className="min-h-screen bg-[#fff6f8] text-[#4c2634]">
+      <header className="relative overflow-hidden bg-gradient-to-br from-[#6f3f52] via-[#a75f78] to-[#d89bb0] px-5 py-12 text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(255,231,239,.32),transparent_34%),radial-gradient(circle_at_90%_90%,rgba(255,255,255,.14),transparent_38%)]" />
         <div className="relative mx-auto max-w-3xl">
-          <p className="text-sm tracking-[.18em] text-[#dfc4aa]">הילית כספי</p>
-          <h1 className="mt-4 text-4xl font-semibold leading-tight md:text-5xl">{data.questions.heading}</h1>
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-[#eadfd7]">{data.displayName ? `${data.displayName}, ` : ""}המשוב שלך עוזר לנו ללמוד, להשתפר ולבנות חוויה טובה יותר.</p>
+          <p className="text-sm tracking-[.18em] text-[#ffe3ec]">הילית כספי</p>
+          <h1 className="mt-4 text-4xl font-semibold leading-tight md:text-5xl">{data.questions.heading}{data.questions.rewardLabel ? ", ובסיום מחכה לך מתנה אישית ממני" : ""}</h1>
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-[#fff3f7]">{data.displayName ? `${data.displayName}, ` : ""}{data.questions.intro}</p>
         </div>
       </header>
 
@@ -207,14 +222,18 @@ export default function TestimonialFeedback() {
           </section>
         ) : (
           <>
-            <section className="rounded-[2rem] bg-white p-6 shadow-sm md:p-8">
+            <section className="rounded-[2rem] border border-[#f0d6df] bg-white p-6 shadow-[0_18px_55px_rgba(117,63,84,.08)] md:p-8">
               <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#9b6d55]">חלק 1 · המשוב שלך</p>
               <h2 className="mt-3 text-2xl font-semibold">{data.questions.primaryQuestion}</h2>
               <div className="mt-6">
                 <Label htmlFor="feedback" className="text-base">מה תרצו לשתף?</Label>
-                <Textarea id="feedback" value={feedbackText} onChange={event => setFeedbackText(event.target.value)} className="mt-2 min-h-36 rounded-2xl border-[#d8c8bc] bg-[#fffdfb] text-base" placeholder="אפשר לכתוב בכנות מה עבד ומה היה פחות ברור" />
+                <Textarea id="feedback" value={feedbackText} onChange={event => setFeedbackText(event.target.value)} className="mt-2 min-h-32 rounded-2xl border-[#d8c8bc] bg-[#fffdfb] text-base" placeholder="אפשר לכתוב בכמה מילים, בדיוק כפי שהרגשת" />
               </div>
-              <div className="mt-6 grid gap-6 md:grid-cols-2">
+              <div className="mt-6">
+                <Label htmlFor="secondary" className="text-base">{data.questions.secondaryQuestion}</Label>
+                <Textarea id="secondary" value={secondaryText} onChange={event => setSecondaryText(event.target.value)} className="mt-2 min-h-28 rounded-2xl border-[#d8c8bc] bg-[#fffdfb] text-base" placeholder="אפשר לשתף גם במשפט אחד" />
+              </div>
+              {data.questions.showRatings && <div className="mt-6 grid gap-6 md:grid-cols-2">
                 <div>
                   <Label className="text-base">דירוג החוויה</Label>
                   <div className="mt-3 flex gap-2" dir="ltr">{[1, 2, 3, 4, 5].map(value => <button type="button" key={value} onClick={() => setRating(value)} className={`h-11 w-11 rounded-full border text-sm font-semibold transition ${rating === value ? "border-[#2b1712] bg-[#2b1712] text-white" : "border-[#d8c8bc] bg-white hover:border-[#8b563f]"}`}>{value}</button>)}</div>
@@ -223,15 +242,19 @@ export default function TestimonialFeedback() {
                   <Label htmlFor="improvement" className="text-base">מה אפשר לשפר? <span className="text-[#9d8b82]">לא חובה</span></Label>
                   <Input id="improvement" value={improvementText} onChange={event => setImprovementText(event.target.value)} className="mt-3 rounded-xl border-[#d8c8bc]" />
                 </div>
-              </div>
-              <div className="mt-6">
+              </div>}
+              {data.questions.showRatings && <div className="mt-6">
                 <Label className="text-base">עד כמה הייתם ממליצים לאחרים? <span className="text-[#9d8b82]">לא חובה</span></Label>
                 <div className="mt-3 grid grid-cols-11 gap-1" dir="ltr">{Array.from({ length: 11 }, (_, value) => <button type="button" key={value} onClick={() => setNpsScore(value)} className={`aspect-square rounded-lg border text-xs font-semibold md:text-sm ${npsScore === value ? "border-[#7a4937] bg-[#7a4937] text-white" : "border-[#d8c8bc] bg-white"}`}>{value}</button>)}</div>
                 <div className="mt-2 flex justify-between text-xs text-[#8a766d]"><span>לא סביר</span><span>סביר מאוד</span></div>
-              </div>
+              </div>}
+              {data.questions.rewardLabel && <div className="mt-7 rounded-2xl border border-[#efcad7] bg-[#fff1f5] p-5">
+                <p className="font-semibold text-[#7b4258]">מתנת תודה בסיום: {data.questions.rewardLabel}</p>
+                <p className="mt-2 text-sm leading-6 text-[#795e69]">המתנה ניתנת על עצם השיתוף ואינה תלויה בתוכן התשובה או באישור לפרסום.</p>
+              </div>}
             </section>
 
-            <section className="rounded-[2rem] bg-[#e8dfd4] p-6 md:p-8">
+            {data.surveyKind === "positive_experience" && <section className="rounded-[2rem] border border-[#edccd8] bg-[#fbe8ef] p-6 md:p-8">
               <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#8b563f]">חלק 2 · רשות בלבד</p>
               <h2 className="mt-3 text-2xl font-semibold">רוצים לשתף גם תמונה או סרטון?</h2>
               <p className="mt-3 leading-7 text-[#66534a]">אפשר לצרף חומר אישי. <strong>עצם ההעלאה אינה אישור לפרסום.</strong> ההרשאה נקבעת בנפרד בחלק הבא.</p>
@@ -242,9 +265,9 @@ export default function TestimonialFeedback() {
               </label>
               <p className="mt-3 text-xs text-[#7d685e]">תמונה עד 10MB · סרטון עד 80MB · JPEG, PNG, WebP, MP4, MOV או WebM</p>
               {data.media.length > 0 && <div className="mt-5 space-y-2">{data.media.map(media => <div key={media.id} className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm">{media.mediaType === "image" ? <ImageIcon className="h-5 w-5" /> : <FileVideo className="h-5 w-5" />}<span className="min-w-0 flex-1 truncate">{media.originalFileName}</span><span className="text-[#8a766d]">{formatBytes(media.byteSize)}</span></div>)}</div>}
-            </section>
+            </section>}
 
-            <section className="rounded-[2rem] bg-white p-6 shadow-sm md:p-8">
+            {data.surveyKind === "positive_experience" && <section className="rounded-[2rem] border border-[#f0d6df] bg-white p-6 shadow-[0_18px_55px_rgba(117,63,84,.08)] md:p-8">
               <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#9b6d55]">חלק 3 · הצהרת שימוש</p>
               <h2 className="mt-3 text-2xl font-semibold">רק אם תרצו לאפשר לנו לשתף</h2>
               <p className="mt-3 leading-7 text-[#66534a]">המשוב נשמר גם בלי הסכמה לפרסום. תוכלו לבחור בדיוק מה מותר, היכן ובאיזו זהות.</p>
@@ -254,9 +277,9 @@ export default function TestimonialFeedback() {
               </div>
 
               <div className="mt-6 space-y-3">
-                <ConsentRow id="consent-text" checked={consentText} onChange={setConsentText} label="אני מאשר/ת שימוש בטקסט שכתבתי" />
-                <ConsentRow id="consent-photo" checked={consentPhoto} onChange={setConsentPhoto} label="אני מאשר/ת שימוש בתמונה שצירפתי" disabled={!uploadedImage} hint={!uploadedImage ? "אפשר לבחור לאחר העלאת תמונה" : undefined} />
-                <ConsentRow id="consent-video" checked={consentVideo} onChange={setConsentVideo} label="אני מאשר/ת שימוש בסרטון שצירפתי" disabled={!uploadedVideo} hint={!uploadedVideo ? "אפשר לבחור לאחר העלאת סרטון" : undefined} />
+                <ConsentRow id="consent-text" checked={consentText} onChange={setConsentText} label="אישור לשימוש בטקסט שכתבתי" />
+                <ConsentRow id="consent-photo" checked={consentPhoto} onChange={setConsentPhoto} label="אישור לשימוש בתמונה שצירפתי" disabled={!uploadedImage} hint={!uploadedImage ? "אפשר לבחור לאחר העלאת תמונה" : undefined} />
+                <ConsentRow id="consent-video" checked={consentVideo} onChange={setConsentVideo} label="אישור לשימוש בסרטון שצירפתי" disabled={!uploadedVideo} hint={!uploadedVideo ? "אפשר לבחור לאחר העלאת סרטון" : undefined} />
               </div>
 
               {anyConsent && <div className="mt-7 border-t border-[#eadfd7] pt-6">
@@ -274,9 +297,9 @@ export default function TestimonialFeedback() {
                 </div>
                 <p className="mt-5 rounded-xl bg-[#f6f1ec] p-4 text-sm leading-6 text-[#6f5d54]">גרסת הצהרה: {data.consentVersion}. אפשר לבטל את ההסכמה בעתיד באמצעות אותו קישור או בפנייה לצוות.</p>
               </div>}
-            </section>
+            </section>}
 
-            <Button onClick={() => void submit()} disabled={submitFeedback.isPending} className="h-14 w-full rounded-full bg-[#2b1712] text-base text-white hover:bg-[#3a2119]">{submitFeedback.isPending ? <><Loader2 className="ml-2 h-5 w-5 animate-spin" />שומרים...</> : "שמירת המשוב"}</Button>
+            <Button onClick={() => void submit()} disabled={submitFeedback.isPending} className="h-14 w-full rounded-full bg-[#a75f78] text-base text-white hover:bg-[#8e4963]">{submitFeedback.isPending ? <><Loader2 className="ml-2 h-5 w-5 animate-spin" />שומרים...</> : data.surveyKind === "positive_experience" ? "שליחה וקבלת המתנה" : "שליחת הסקר"}</Button>
           </>
         )}
 
