@@ -38,11 +38,12 @@ describe("feedback automation", () => {
   });
 
   it("states clearly that the gift does not depend on publication consent", () => {
-    const email = buildFeedbackRequestEmail({ firstName: "דנה", sourceType: "match", feedbackUrl: "https://example.com/form" });
+    const email = buildFeedbackRequestEmail({ firstName: "דנה", contactEmail: "dana@example.com", sourceType: "match", feedbackUrl: "https://example.com/form" });
     expect(email.subject).toContain("מתנה אישית");
     expect(email.htmlContent).toContain("גם בלי אישור לפרסם");
     expect(email.htmlContent).toContain("https://example.com/form");
     expect(email.htmlContent).toContain("לעוד אנשים שמחפשים אהבה");
+    expect(email.htmlContent).toContain("/unsubscribe?email=dana%40example.com");
   });
 
   it("waits for meaningful product use before requesting feedback", () => {
