@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildScheduledDailyReportRunKey, getDailyReportDeliveryMode, maskRecipient } from "./dailyReportService";
+import {
+  buildScheduledDailyReportRunKey,
+  getDailyReportDeliveryMode,
+  isDailyReportLocalMidnight,
+  maskRecipient,
+} from "./dailyReportService";
 
 describe("daily report delivery safeguards", () => {
   it("uses one deterministic run key per settings row and report date", () => {
@@ -18,5 +23,15 @@ describe("daily report delivery safeguards", () => {
     expect(getDailyReportDeliveryMode({ isEnabled: true, dryRun: true, recipientPhone: "0521234567" })).toBe("dry_run");
     expect(getDailyReportDeliveryMode({ isEnabled: true, dryRun: false, recipientPhone: null })).toBe("missing_recipient");
     expect(getDailyReportDeliveryMode({ isEnabled: true, dryRun: false, recipientPhone: "0521234567" })).toBe("send");
+  });
+
+  it("accepts the summer UTC trigger only when it is midnight in Israel", () => {
+    expect(isDailyReportLocalMidnight(Date.parse("2026-09-01T21:00:00Z"))).toBe(true);
+    expect(isDailyReportLocalMidnight(Date.parse("2026-09-01T22:00:00Z"))).toBe(false);
+  });
+
+  it("accepts the winter UTC trigger only when it is midnight in Israel", () => {
+    expect(isDailyReportLocalMidnight(Date.parse("2026-12-01T22:00:00Z"))).toBe(true);
+    expect(isDailyReportLocalMidnight(Date.parse("2026-12-01T21:00:00Z"))).toBe(false);
   });
 });

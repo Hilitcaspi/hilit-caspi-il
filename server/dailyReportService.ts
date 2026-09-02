@@ -51,6 +51,15 @@ export function buildScheduledDailyReportRunKey(settingsId: number, reportDate: 
   return `daily-report:${settingsId}:${reportDate}`;
 }
 
+export function isDailyReportLocalMidnight(now: number, timezone = DAILY_REPORT_TIMEZONE): boolean {
+  const hour = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(now)).find(part => part.type === "hour")?.value;
+  return hour === "00";
+}
+
 export function getDailyReportDeliveryMode(settings: Pick<DailyReportSettings, "isEnabled" | "dryRun" | "recipientPhone">) {
   if (!settings.isEnabled) return "disabled" as const;
   if (settings.dryRun) return "dry_run" as const;
@@ -348,6 +357,9 @@ export async function runScheduledDailyReport(taskUid: string, now = Date.now())
   if (!settings) return { ok: true, skipped: "orphan" as const };
   const deliveryMode = getDailyReportDeliveryMode(settings);
   if (deliveryMode === "disabled") return { ok: true, skipped: "disabled" as const };
+  if (!isDailyReportLocalMidnight(now, settings.timezone)) {
+    return { ok: true, skipped: "outside_local_midnight" as const };
+  }
 
   const reportDate = getReportDateForMidnightRun(now, settings.timezone);
   const runKey = buildScheduledDailyReportRunKey(settings.id, reportDate);
