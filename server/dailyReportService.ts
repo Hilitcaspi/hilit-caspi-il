@@ -360,6 +360,21 @@ export async function updateDailyReportSettings(input: {
   return getOrCreateDailyReportSettings(db);
 }
 
+export async function activateDailyReportSettings(taskUid: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const settings = await getOrCreateDailyReportSettings(db);
+  const recipientCount = parseRecipientPhones(settings.recipientPhone).length;
+  if (recipientCount !== 2) throw new Error(`Expected two approved recipients, found ${recipientCount}`);
+  await db.update(dailyReportSettings).set({
+    isEnabled: true,
+    dryRun: false,
+    scheduleCronTaskUid: taskUid,
+    updatedAt: Date.now(),
+  }).where(eq(dailyReportSettings.id, settings.id));
+  return { ok: true, settingsId: settings.id, recipientCount, isEnabled: true, dryRun: false, scheduleLinked: true };
+}
+
 export async function recordDailyReportDryRun() {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
