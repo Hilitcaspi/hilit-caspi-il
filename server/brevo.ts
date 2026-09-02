@@ -5,6 +5,8 @@
 
 // BREVO_API_KEY is read directly from process.env
 
+import { buildSignedUnsubscribeUrl } from "./emailUnsubscribe";
+
 const BREVO_API_URL = "https://api.brevo.com/v3";
 const SENDER = { name: "הילית כספי", email: "hilit@hilitcaspi.com" };
 
@@ -19,6 +21,20 @@ export const PERMANENTLY_BLOCKED_EMAILS = new Set([
 
 export function isPermanentlyBlockedEmail(email: string): boolean {
   return PERMANENTLY_BLOCKED_EMAILS.has(email.toLowerCase().trim());
+}
+
+export function upgradeLegacyUnsubscribeLinks(content: string | undefined, email: string): string | undefined {
+  if (!content) return content;
+  return content.replace(
+    /https:\/\/[^\s"'<>]+\/unsubscribe\?email=[^\s"'<>]+/gi,
+    legacyUrl => {
+      try {
+        return buildSignedUnsubscribeUrl({ email, baseUrl: new URL(legacyUrl).origin });
+      } catch {
+        return buildSignedUnsubscribeUrl({ email });
+      }
+    },
+  );
 }
 
 // Brevo contact list IDs - will be created on first use
@@ -100,8 +116,8 @@ export async function sendEmail({
       sender: SENDER,
       to: [to],
       subject,
-      htmlContent,
-      textContent,
+      htmlContent: upgradeLegacyUnsubscribeLinks(htmlContent, to.email),
+      textContent: upgradeLegacyUnsubscribeLinks(textContent, to.email),
     };
 
     const res = await brevoFetch("/smtp/email", {
@@ -135,9 +151,12 @@ export async function sendEmailBatch(input: {
   try {
     if (input.versions.length === 0) return { success: true, messageIds: [] };
     if (input.versions.length > 1000) return { success: false, error: "Batch exceeds 1000 message versions" };
-    const deliverable = input.versions.filter((version) =>
-      version.to.every((recipient) => !isPermanentlyBlockedEmail(recipient.email)),
-    );
+    const deliverable = input.versions
+      .filter((version) => version.to.every((recipient) => !isPermanentlyBlockedEmail(recipient.email)))
+      .map((version) => ({
+        ...version,
+        htmlContent: upgradeLegacyUnsubscribeLinks(version.htmlContent, version.to[0]?.email || ""),
+      }));
     if (deliverable.length === 0) return { success: true, messageIds: [] };
 
     const response = await brevoFetch("/smtp/email", {

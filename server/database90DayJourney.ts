@@ -3,6 +3,7 @@ import { emailLog, matches, singles } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { getDb } from "./db";
 import { getMissingProfileFields } from "./matchmakingMetrics";
+import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
 
 const SITE_BASE = "https://hilitcaspi.com";
 const JOURNEY_KEY = "database_90_day_v1";
@@ -72,8 +73,9 @@ function questionnaireUrl(single: JourneySingle): string {
   return `${SITE_BASE}/join/questionnaire?token=${encodeURIComponent(single.questionnaireToken)}`;
 }
 
-function emailFrame(content: string): string {
-  return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f0eadc;font-family:Arial,sans-serif;color:#191265"><div style="max-width:620px;margin:0 auto;background:#fff"><div style="background:#191265;padding:28px 36px;text-align:center"><div style="color:#ffe27c;font-size:22px;font-weight:900">הילית כספי</div><div style="color:rgba(255,255,255,.7);font-size:13px;margin-top:5px">מאגר הרווקים והרווקות</div></div><div style="padding:34px;line-height:1.8;font-size:16px">${content}</div><div style="background:#191265;padding:20px 32px;text-align:center;color:rgba(255,255,255,.55);font-size:12px">הילית כספי | מאמנת למציאת זוגיות</div></div></body></html>`;
+function emailFrame(content: string, email: string): string {
+  const unsubscribeUrl = buildSignedUnsubscribeUrl({ email });
+  return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f0eadc;font-family:Arial,sans-serif;color:#191265"><div style="max-width:620px;margin:0 auto;background:#fff"><div style="background:#191265;padding:28px 36px;text-align:center"><div style="color:#ffe27c;font-size:22px;font-weight:900">הילית כספי</div><div style="color:rgba(255,255,255,.7);font-size:13px;margin-top:5px">מאגר הרווקים והרווקות</div></div><div style="padding:34px;line-height:1.8;font-size:16px">${content}</div><div style="background:#191265;padding:20px 32px;text-align:center;color:rgba(255,255,255,.55);font-size:12px">הילית כספי | <a href="${unsubscribeUrl}" style="color:#ffe27c">הסרה ממסרים שיווקיים</a></div></div></body></html>`;
 }
 
 function cta(url: string, label: string): string {
@@ -88,6 +90,7 @@ export function buildDatabase90DayEmail(
 ): { subject: string; htmlBody: string; textBody: string; skipReason?: string } {
   const firstName = single.firstName || "היי";
   const personalProfileUrl = profileUrl(single);
+  const frame = (content: string) => emailFrame(content, single.email || "");
 
   if (stageIndex === 1 && missing.length === 0) {
     return { subject: "הפרופיל מלא", htmlBody: "", textBody: "", skipReason: "profile_complete" };
@@ -98,7 +101,7 @@ export function buildDatabase90DayEmail(
     const url = questionnaireUrl(single);
     return {
       subject: `${firstName}, נשארו כמה פרטים כדי שנוכל להתאים לך נכון`,
-      htmlBody: emailFrame(`<h2 style="font-size:24px">${firstName}, הפרופיל עדיין לא מלא</h2><p>כדי שנוכל לבדוק התאמות באופן רציני והדדי, חסרים כרגע: <strong>${missingText}</strong>.</p><p>פרופיל מלא עוזר לנו להבין לא רק מי מתאים לך, אלא גם למי את/ה מתאים/ה.</p>${cta(url, "השלמת הפרטים והשאלון")}<p style="font-size:13px;color:#777">התשלום אינו התחייבות למספר התאמות או לתדירות קבועה. התאמה נשלחת כאשר נמצאת התאמה הדדית ורלוונטית.</p>`),
+      htmlBody: frame(`<h2 style="font-size:24px">${firstName}, הפרופיל עדיין לא מלא</h2><p>כדי שנוכל לבדוק התאמות באופן רציני והדדי, חסרים כרגע: <strong>${missingText}</strong>.</p><p>פרופיל מלא עוזר לנו להבין לא רק מי מתאים לך, אלא גם למי את/ה מתאים/ה.</p>${cta(url, "השלמת הפרטים והשאלון")}<p style="font-size:13px;color:#777">התשלום אינו התחייבות למספר התאמות או לתדירות קבועה. התאמה נשלחת כאשר נמצאת התאמה הדדית ורלוונטית.</p>`),
       textBody: `${firstName}, חסרים בפרופיל: ${missingText}. להשלמה: ${url}`,
     };
   }
@@ -106,7 +109,7 @@ export function buildDatabase90DayEmail(
   if (stageIndex === 2) {
     return {
       subject: `${firstName}, כך פועל תהליך ההתאמה במאגר`,
-      htmlBody: emailFrame(`<h2 style="font-size:24px">התאמה טובה צריכה לעבוד לשני הכיוונים</h2><p>אנחנו לא שולחים שמות כדי לעמוד במכסה. כל הצעה נבדקת לפי גיל, אזור, אורח חיים, רצון בילדים, ערכים, שאלון מדעי והעדפות הדדיות.</p><p><strong>299 ש״ח הם דמי הצטרפות למאגר ולתהליך ההתאמה המקצועי.</strong> הם אינם שירות אישי צמוד ואינם התחייבות לכמות או לתדירות קבועה.</p><p>מטרת העל שלנו היא להגדיל בהתמדה את מספר ההזדמנויות המתאימות — בלי להחליף איכות בכמות.</p>${cta(personalProfileUrl, "כניסה לאזור האישי")}`),
+      htmlBody: frame(`<h2 style="font-size:24px">התאמה טובה צריכה לעבוד לשני הכיוונים</h2><p>אנחנו לא שולחים שמות כדי לעמוד במכסה. כל הצעה נבדקת לפי גיל, אזור, אורח חיים, רצון בילדים, ערכים, שאלון מדעי והעדפות הדדיות.</p><p><strong>299 ש״ח הם דמי הצטרפות למאגר ולתהליך ההתאמה המקצועי.</strong> הם אינם שירות אישי צמוד ואינם התחייבות לכמות או לתדירות קבועה.</p><p>מטרת העל שלנו היא להגדיל בהתמדה את מספר ההזדמנויות המתאימות — בלי להחליף איכות בכמות.</p>${cta(personalProfileUrl, "כניסה לאזור האישי")}`),
       textBody: `${firstName}, כל הצעה נבדקת לשני הכיוונים. אין התחייבות לכמות או לתדירות קבועה. אזור אישי: ${personalProfileUrl}`,
     };
   }
@@ -116,7 +119,7 @@ export function buildDatabase90DayEmail(
     const offer = selectDatabaseUpsellOffer(14, stats, missing);
     return {
       subject: hasProposals ? `${firstName}, עדכון על ההזדמנויות שלך במאגר` : `${firstName}, הפרופיל פעיל ואנחנו ממשיכים לחפש`,
-      htmlBody: emailFrame(hasProposals
+      htmlBody: frame(hasProposals
         ? `<h2 style="font-size:24px">הפרופיל שלך פעיל</h2><p>עד עכשיו נשלחו עבורך <strong>${stats.proposals}</strong> הצעות התאמה. אנחנו ממשיכים לבדוק הזדמנויות נוספות לפי ההתאמה ההדדית.</p>${cta(personalProfileUrl, "צפייה באזור האישי")}`
         : `<h2 style="font-size:24px">הפרופיל שלך פעיל במאגר</h2><p>עדיין לא נשלחה הצעה. זה לא אומר שהפרופיל נשכח: המערכת והצוות ממשיכים לבדוק התאמות, אך לא נשלח אדם שאינו עומד בהתאמה ההדדית רק כדי לייצר כמות.</p><p>כדאי לוודא שהפרופיל וההעדפות שלך עדכניים — זה מגדיל את היכולת שלנו לזהות הזדמנויות נכונות.</p>${cta(personalProfileUrl, "בדיקת הפרופיל וההעדפות")}${upsellBlock(offer)}`),
       textBody: hasProposals
@@ -129,7 +132,7 @@ export function buildDatabase90DayEmail(
     const offer = selectDatabaseUpsellOffer(30, stats, missing);
     return {
       subject: `${firstName}, סיכום החודש הראשון שלך במאגר`,
-      htmlBody: emailFrame(`<h2 style="font-size:24px">חודש במאגר: תמונת המצב שלך</h2><div style="background:#f8f6f0;border-radius:14px;padding:18px 22px"><p style="margin:0 0 8px">הצעות שנשלחו: <strong>${stats.proposals}</strong></p><p style="margin:0 0 8px">אישורים הדדיים: <strong>${stats.mutualApprovals}</strong></p><p style="margin:0">פגישות שדווחו: <strong>${stats.meetings}</strong></p></div><p>המספרים אינם ציון אישי. הם עוזרים לנו להבין איפה נדרש דיוק, הרחבת העדפות או עוד זמן כדי למצוא התאמה הדדית.</p>${cta(personalProfileUrl, "בדיקת הפרופיל שלי")}${upsellBlock(offer)}`),
+      htmlBody: frame(`<h2 style="font-size:24px">חודש במאגר: תמונת המצב שלך</h2><div style="background:#f8f6f0;border-radius:14px;padding:18px 22px"><p style="margin:0 0 8px">הצעות שנשלחו: <strong>${stats.proposals}</strong></p><p style="margin:0 0 8px">אישורים הדדיים: <strong>${stats.mutualApprovals}</strong></p><p style="margin:0">פגישות שדווחו: <strong>${stats.meetings}</strong></p></div><p>המספרים אינם ציון אישי. הם עוזרים לנו להבין איפה נדרש דיוק, הרחבת העדפות או עוד זמן כדי למצוא התאמה הדדית.</p>${cta(personalProfileUrl, "בדיקת הפרופיל שלי")}${upsellBlock(offer)}`),
       textBody: `${firstName}, בחודש הראשון: ${stats.proposals} הצעות, ${stats.mutualApprovals} אישורים הדדיים, ${stats.meetings} פגישות שדווחו. ${personalProfileUrl}`,
     };
   }
@@ -138,7 +141,7 @@ export function buildDatabase90DayEmail(
     const offer = selectDatabaseUpsellOffer(60, stats, missing);
     return {
       subject: `${firstName}, אנחנו ממשיכים לעבוד על ההזדמנויות שלך`,
-      htmlBody: emailFrame(`<h2 style="font-size:24px">60 יום במאגר</h2><p>המטרה שלנו נשארת ברורה: לייצר יותר ויותר הזדמנויות מתאימות, תוך שמירה על התאמה הדדית ואיכותית.</p><p>עד כה נשלחו עבורך <strong>${stats.proposals}</strong> הצעות ונוצרו <strong>${stats.mutualApprovals}</strong> אישורים הדדיים. אם השתנו אצלך אזור, טווח גילאים, רצון בילדים או העדפות אחרות, חשוב לעדכן — שינוי קטן יכול לפתוח אפשרויות חדשות.</p>${cta(personalProfileUrl, "עדכון הפרופיל וההעדפות")}${upsellBlock(offer)}`),
+      htmlBody: frame(`<h2 style="font-size:24px">60 יום במאגר</h2><p>המטרה שלנו נשארת ברורה: לייצר יותר ויותר הזדמנויות מתאימות, תוך שמירה על התאמה הדדית ואיכותית.</p><p>עד כה נשלחו עבורך <strong>${stats.proposals}</strong> הצעות ונוצרו <strong>${stats.mutualApprovals}</strong> אישורים הדדיים. אם השתנו אצלך אזור, טווח גילאים, רצון בילדים או העדפות אחרות, חשוב לעדכן — שינוי קטן יכול לפתוח אפשרויות חדשות.</p>${cta(personalProfileUrl, "עדכון הפרופיל וההעדפות")}${upsellBlock(offer)}`),
       textBody: `${firstName}, 60 יום במאגר: ${stats.proposals} הצעות ו-${stats.mutualApprovals} אישורים הדדיים. לעדכון: ${personalProfileUrl}`,
     };
   }
@@ -147,7 +150,7 @@ export function buildDatabase90DayEmail(
   const offer = selectDatabaseUpsellOffer(90, stats, missing);
   return {
     subject: `${firstName}, סיכום 90 הימים הראשונים שלך`,
-    htmlBody: emailFrame(`<h2 style="font-size:24px">90 יום: עוזרים לנו לדייק את ההמשך</h2><p>עד עכשיו נשלחו עבורך <strong>${stats.proposals}</strong> הצעות, נוצרו <strong>${stats.mutualApprovals}</strong> אישורים הדדיים ודווחו <strong>${stats.meetings}</strong> פגישות.</p><p>אם נוצר חיבור, נקבע דייט או שהדברים לא המשיכו — עדכון קצר יעזור לנו למדוד תוצאות אמיתיות ולשפר את ההמשך. שום דבר לא יפורסם ללא הסכמה מפורשת.</p>${cta(finalUrl, stats.latestOutcomeUrl ? "עדכון קצר על ההתאמה" : "בדיקת הפרופיל שלי")}${upsellBlock(offer)}`),
+    htmlBody: frame(`<h2 style="font-size:24px">90 יום: עוזרים לנו לדייק את ההמשך</h2><p>עד עכשיו נשלחו עבורך <strong>${stats.proposals}</strong> הצעות, נוצרו <strong>${stats.mutualApprovals}</strong> אישורים הדדיים ודווחו <strong>${stats.meetings}</strong> פגישות.</p><p>אם נוצר חיבור, נקבע דייט או שהדברים לא המשיכו — עדכון קצר יעזור לנו למדוד תוצאות אמיתיות ולשפר את ההמשך. שום דבר לא יפורסם ללא הסכמה מפורשת.</p>${cta(finalUrl, stats.latestOutcomeUrl ? "עדכון קצר על ההתאמה" : "בדיקת הפרופיל שלי")}${upsellBlock(offer)}`),
     textBody: `${firstName}, סיכום 90 יום: ${stats.proposals} הצעות, ${stats.mutualApprovals} אישורים הדדיים, ${stats.meetings} פגישות. עדכון: ${finalUrl}`,
   };
 }
@@ -186,6 +189,7 @@ export async function processDatabase90DayJourney(options: { now?: number; limit
   const cohort = await db.select().from(singles).where(and(
     eq(singles.isPaid, true),
     eq(singles.isActive, true),
+    eq(singles.consentEmailMarketing, true),
     eq(singles.isSeed, false),
     eq(singles.market, "il"),
     gte(singles.createdAt, DATABASE_90_DAY_LAUNCH_AT),
@@ -243,6 +247,8 @@ export async function processDatabase90DayJourney(options: { now?: number; limit
     if (evaluated >= limit) break;
     if (!single.email) continue;
     const recipientEmail = single.email;
+    const suppression = await isEmailMarketingSuppressed(recipientEmail);
+    if (suppression.suppressed) { skipped++; continue; }
     const joinedAt = Number(single.subscriptionStartedAt || single.createdAt || 0);
     if (!joinedAt) continue;
     const ageDays = Math.floor((now - joinedAt) / DAY_MS);

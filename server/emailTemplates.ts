@@ -5,6 +5,7 @@
  */
 
 import { toEmailImageUrl } from "./emailImages";
+import { buildSignedUnsubscribeUrl } from "./emailUnsubscribe";
 
 export type EmailTemplate = {
   subject: string;
@@ -88,15 +89,9 @@ function urgencyBanner(): string {
 }
 
 function baseTemplate(content: string, recipientEmail?: string, leadId?: number, preheader?: string): string {
-  let unsubLink: string;
-  if (leadId && recipientEmail) {
-    const token = Buffer.from(`${leadId}:${recipientEmail}`).toString("base64");
-    unsubLink = `${UNSUBSCRIBE_BASE}?token=${encodeURIComponent(token)}`;
-  } else if (recipientEmail) {
-    unsubLink = `${UNSUBSCRIBE_BASE}?email=${encodeURIComponent(recipientEmail)}`;
-  } else {
-    unsubLink = UNSUBSCRIBE_BASE;
-  }
+  const unsubLink = recipientEmail
+    ? buildSignedUnsubscribeUrl({ email: recipientEmail, leadId })
+    : UNSUBSCRIBE_BASE;
   return `<!DOCTYPE html>
 <html dir="rtl" lang="he">
 <head>
@@ -1281,13 +1276,17 @@ export function renderTemplate(
     text = text.replaceAll(placeholder, value);
     subject = subject.replaceAll(placeholder, value);
   }
-  // Inject personalized unsubscribe token
-  if (recipientEmail && leadId) {
-    const token = Buffer.from(`${leadId}:${recipientEmail}`).toString("base64");
-    const personalizedLink = `${UNSUBSCRIBE_BASE}?token=${encodeURIComponent(token)}`;
+  // Replace legacy email links with a signed personalized token.
+  if (recipientEmail) {
+    const personalizedLink = buildSignedUnsubscribeUrl({ email: recipientEmail, leadId });
     const genericLink = `${UNSUBSCRIBE_BASE}?email=${encodeURIComponent(recipientEmail)}`;
-    html = html.replace(genericLink, personalizedLink);
-    html = html.replace(UNSUBSCRIBE_BASE, personalizedLink);
+    const placeholderLink = `${UNSUBSCRIBE_BASE}?email={{recipientEmail}}`;
+    html = html.replaceAll(genericLink, personalizedLink);
+    html = html.replaceAll(placeholderLink, personalizedLink);
+    html = html.replaceAll(`href="${UNSUBSCRIBE_BASE}"`, `href="${personalizedLink}"`);
+    text = text.replaceAll(genericLink, personalizedLink);
+    text = text.replaceAll(placeholderLink, personalizedLink);
+    text = text.replaceAll(UNSUBSCRIBE_BASE, personalizedLink);
   }
   return { subject, htmlBody: html, textBody: text };
 }

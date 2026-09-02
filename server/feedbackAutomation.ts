@@ -12,6 +12,7 @@ import {
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { isPermanentlyBlockedEmail, sendEmail } from "./brevo";
+import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
 import {
   buildTestimonialDraft,
   normalizeTestimonialEmail,
@@ -127,7 +128,7 @@ export function buildFeedbackRequestEmail(input: {
   const intro = input.reminder
     ? "עבר שבוע מאז החיבור, ואם ההיכרות עדיין ממשיכה אשמח לשמוע בכמה מילים איך זה מרגיש עד עכשיו."
     : draft.body;
-  const unsubscribeUrl = `https://hilitcaspi.com/unsubscribe?email=${encodeURIComponent(normalizeTestimonialEmail(input.contactEmail))}`;
+  const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.contactEmail });
   if (isSatisfactionSurvey) {
     return {
       subject,
@@ -154,16 +155,8 @@ async function getSettings(): Promise<FeedbackAutomationSetting | null> {
 async function canEmailContact(email: string): Promise<boolean> {
   const normalizedEmail = normalizeTestimonialEmail(email);
   if (!normalizedEmail || isPermanentlyBlockedEmail(normalizedEmail)) return false;
-  const db = await getDb();
-  if (!db) return false;
-  const [blockedLead] = await db.select({ id: crmLeads.id })
-    .from(crmLeads)
-    .where(and(
-      sql`LOWER(${crmLeads.email}) = ${normalizedEmail}`,
-      eq(crmLeads.emailUnsubscribed, true),
-    ))
-    .limit(1);
-  return !blockedLead;
+  const suppression = await isEmailMarketingSuppressed(normalizedEmail);
+  return !suppression.suppressed;
 }
 
 export async function ensurePositiveFeedbackRequest(input: {
@@ -313,7 +306,7 @@ async function queueWeekMatchRequests(now: number): Promise<number> {
     const people = await db.select().from(singles)
       .where(or(eq(singles.id, match.singleAId), eq(singles.id, match.singleBId)));
     for (const person of people) {
-      if (!person.email || person.isSeed || !person.isActive) continue;
+      if (!person.email || person.isSeed || !person.isActive || !person.consentEmailMarketing) continue;
       const request = await ensurePositiveFeedbackRequest({
         requestKey: buildFeedbackRequestKey({ touchpoint: "match_week", subjectId: match.id, contactId: person.id }),
         touchpoint: "match_week",
@@ -355,7 +348,16 @@ export async function processFeedbackAutomation(now = Date.now()): Promise<{
   let sent = 0;
   let failed = 0;
   for (const record of due) {
-    if (!(await canEmailContact(record.contactEmail))) continue;
+    if (!(await canEmailContact(record.contactEmail))) {
+      await db.update(testimonialRecords)
+        .set({ status: "archived", archivedAt: now, updatedAt: now })
+        .where(and(
+          eq(testimonialRecords.id, record.id),
+          eq(testimonialRecords.status, "approved_to_contact"),
+          isNull(testimonialRecords.requestSentAt),
+        ));
+      continue;
+    }
     const claim = await db.update(testimonialRecords)
       .set({ status: "sent", requestSentAt: now, updatedAt: now })
       .where(and(

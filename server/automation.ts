@@ -17,8 +17,23 @@ import { sendEmail, addContactToList } from "./brevo";
 import { sendWhatsAppViaMake } from "./whatsappWebhook";
 import { EMAIL_SEQUENCES, renderTemplate, DNA_PROFILES, type JourneyKey, buildMatchFollowUpEmail } from "./emailTemplates";
 import crypto from "crypto";
+import { isEmailMarketingSuppressed } from "./emailUnsubscribe";
 
 const SITE_BASE = "https://hilitcaspi.com";
+const OPERATIONAL_FIRST_EMAIL_JOURNEYS = new Set<JourneyKey>([
+  "women_guide",
+  "men_guide",
+  "women_course",
+  "men_course",
+  "women_matchmaking",
+  "men_matchmaking",
+  "women_matchmaking_welcome",
+  "men_matchmaking_welcome",
+]);
+
+export function isOperationalJourneyEmail(journeyKey: string, emailIndex: number): boolean {
+  return emailIndex === 1 && OPERATIONAL_FIRST_EMAIL_JOURNEYS.has(journeyKey as JourneyKey);
+}
 
 /**
  * Generate a product access token for a buyer and return the personalized link.
@@ -111,6 +126,8 @@ export async function startJourney({
     return;
   }
 
+  const initialSuppression = await isEmailMarketingSuppressed(email);
+
   // Idempotency guard: check if this journey was already started for this email
   // Allow re-sending if the first email was sent more than 30 days ago (user may have re-engaged)
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -201,19 +218,21 @@ export async function startJourney({
   };
   const sourceLabel = JOURNEY_SOURCE_MAP[journeyKey] ?? journeyKey;
 
-  // Add contact to Brevo list
-  await addContactToList({
-    email,
-    firstName,
-    lastName,
-    phone,
-    attributes: {
-      DNA_TYPE: dnaType ?? "",
-      GENDER: gender,
-      SOURCE: sourceLabel,
-    },
-    listKey: journeyKey,
-  });
+  // Only marketing-eligible contacts are added to provider lists.
+  if (!initialSuppression.suppressed) {
+    await addContactToList({
+      email,
+      firstName,
+      lastName,
+      phone,
+      attributes: {
+        DNA_TYPE: dnaType ?? "",
+        GENDER: gender,
+        SOURCE: sourceLabel,
+      },
+      listKey: journeyKey,
+    });
+  }
 
   // Generate product access link if this is a purchase journey
   let guideLink = `${SITE_BASE}/guide`;
@@ -231,6 +250,9 @@ export async function startJourney({
   // Schedule all emails in the sequence
   const delays = getDelaysForSequence(sequence.length, journeyKey);
   for (let i = 0; i < sequence.length; i++) {
+    const emailIndex = i + 1;
+    const suppressedMarketingEmail = initialSuppression.suppressed
+      && !isOperationalJourneyEmail(journeyKey, emailIndex);
     const template = sequence[i];
     const rendered = renderTemplate(template, {
       firstName,
@@ -252,18 +274,19 @@ export async function startJourney({
       recipientEmail: email,
       recipientName: firstName,
       journeyKey,
-      emailIndex: i + 1,
+      emailIndex,
       subject: rendered.subject,
       htmlBody: rendered.htmlBody,
       textBody: rendered.textBody,
       scheduledAt: scheduledAt.getTime(),
       sentAt: null,
-      status: "pending",
+      status: suppressedMarketingEmail ? "cancelled" : "pending",
+      errorMessage: suppressedMarketingEmail ? `suppressed:${initialSuppression.reason}` : null,
       createdAt: Date.now(),
     });
     const insertedId = (insertResult as any)[0]?.insertId ?? (insertResult as any).insertId;
     // Send email 1 immediately
-    if (i === 0 && insertedId) {
+    if (i === 0 && insertedId && !suppressedMarketingEmail) {
       await sendScheduledEmail({
         db,
         emailLogId: insertedId,
@@ -393,6 +416,15 @@ export async function processPendingEmails(): Promise<number> {
 
   let sent = 0;
   for (const entry of pending) {
+    const suppression = await isEmailMarketingSuppressed(entry.recipientEmail);
+    if (suppression.suppressed && !isOperationalJourneyEmail(entry.journeyKey, entry.emailIndex)) {
+      await db.update(emailLog)
+        .set({ status: "cancelled", errorMessage: `suppressed:${suppression.reason}`, sentAt: Date.now() })
+        .where(eq(emailLog.id, entry.id));
+      console.log(`[Automation] Skipped email ${entry.emailIndex}: ${suppression.reason}`);
+      continue;
+    }
+
     // Skip if lead has unsubscribed
     if (entry.leadId) {
       const lead = await db

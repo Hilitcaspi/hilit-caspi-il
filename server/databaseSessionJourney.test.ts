@@ -37,6 +37,12 @@ describe("database session journey", () => {
     expect(regular.htmlBody).not.toContain("coupon=PLUS50");
   });
 
+  it("uses a signed unsubscribe link for newly generated marketing email", () => {
+    const message = buildSessionJourneyEmail(1, single, false);
+    expect(message.htmlBody).toContain("/unsubscribe?token=");
+    expect(message.htmlBody).not.toContain("/unsubscribe?email=");
+  });
+
   it("keeps the September follow-up disabled until explicit approval and stops it after expiry", () => {
     expect(isSeptemberFollowupEnabled(SEPTEMBER_FOLLOWUP_EXPIRES_AT - DAY, false)).toBe(false);
     expect(isSeptemberFollowupEnabled(SEPTEMBER_FOLLOWUP_EXPIRES_AT - DAY, true)).toBe(true);

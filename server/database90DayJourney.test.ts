@@ -39,6 +39,8 @@ describe("database 90-day journey", () => {
     const email = buildDatabase90DayEmail(2, single, stats, []);
     expect(email.htmlBody).toContain("299 ש״ח הם דמי הצטרפות");
     expect(email.htmlBody).toContain("אינם התחייבות לכמות או לתדירות קבועה");
+    expect(email.htmlBody).toContain("/unsubscribe?token=");
+    expect(email.htmlBody).not.toContain("/unsubscribe?email=");
   });
 
   it("adapts the day-14 message when no match was proposed", () => {

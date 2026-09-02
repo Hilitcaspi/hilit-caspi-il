@@ -27,6 +27,7 @@ import { sendErrorAlert, installProcessErrorAlerts } from "./errorAlert";
 import { buildBoostEnrollmentNewsletter } from "../boostNewsletter";
 import { processBoostNewsletterWave, type BoostNewsletterWaveKey } from "../boostNewsletterCampaign";
 import { registerTestimonialMediaUpload } from "../testimonialMediaUpload";
+import { applyEmailUnsubscribe } from "../emailUnsubscribe";
 
 // Install process-level error alerts (uncaughtException / unhandledRejection).
 installProcessErrorAlerts();
@@ -263,7 +264,7 @@ async function startServer() {
         const ts = event.ts ? event.ts * 1000 : Date.now();
         const messageId = event["message-id"] || event.messageId || null;
         if (!email || !eventType) continue;
-        console.log(`[BrevoWebhook] ${eventType}: ${email} (msgId: ${messageId})`);
+        console.log(`[BrevoWebhook] ${eventType} received (msgId: ${messageId})`);
         
         // Try to match by Brevo message-id tag first (most accurate),
         // then fall back to most recent sent email within a reasonable time window
@@ -303,10 +304,7 @@ async function startServer() {
                 WHERE email = ${email} LIMIT 1`
           );
         } else if (eventType === "unsubscribed") {
-          await db.execute(
-            sql`UPDATE crm_leads SET emailUnsubscribed = 1, notes = CONCAT(COALESCE(notes,''), '\n[הסיר עצמו מרשימת תפוצה]')
-                WHERE email = ${email} LIMIT 1`
-          );
+          await applyEmailUnsubscribe({ email, source: "brevo_webhook" });
         }
       }
     } catch (err) { console.error("[BrevoWebhook]", err); }

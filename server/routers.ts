@@ -26,7 +26,12 @@ import { startJourney, getJourneyKey } from "./automation";
 import { ga4GenerateLead, ga4SignUp, clientIdFromEmail } from "./_core/ga4";
 import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as buildMatchProposalEmailTemplate, buildContactRevealEmail as buildContactRevealEmailTemplate, buildMatchRejectionAckEmail, buildOwnerMatchApprovalEmail, buildConsolationEmail, WOMEN_MATCHMAKING_EMAIL_1, MEN_MATCHMAKING_EMAIL_1, DNA_PROFILES, buildMatchFollowUpEmail } from "./emailTemplates";
 import { sendEmail } from "./brevo";
-import { unsubscribeBoostNewsletterMember, verifyBoostNewsletterUnsubscribeToken } from "./boostNewsletterCampaign";
+import { verifyBoostNewsletterUnsubscribeToken } from "./boostNewsletterCampaign";
+import {
+  applyEmailUnsubscribe,
+  parseLegacyLeadUnsubscribeToken,
+  verifySignedUnsubscribeToken,
+} from "./emailUnsubscribe";
 import { sendSMS } from "./vibrate";
 import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
@@ -3176,42 +3181,59 @@ export const appRouter = router({
      * Token = base64(leadId:email)
      */
     process: publicProcedure
-      .input(z.object({ token: z.string() }))
+      .input(z.object({ token: z.string().optional(), email: z.string().email().optional() }).refine(
+        value => Boolean(value.token || value.email),
+        { message: "חסר קישור הסרה" },
+      ))
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-        const boostNewsletterToken = verifyBoostNewsletterUnsubscribeToken(input.token);
+        const boostNewsletterToken = input.token ? verifyBoostNewsletterUnsubscribeToken(input.token) : null;
         if (boostNewsletterToken) {
-          const success = await unsubscribeBoostNewsletterMember(
-            boostNewsletterToken.singleId,
-            boostNewsletterToken.email,
-          );
+          const success = await applyEmailUnsubscribe({
+            singleId: boostNewsletterToken.singleId,
+            email: boostNewsletterToken.email,
+            source: "boost_token",
+          });
           if (!success) throw new TRPCError({ code: "BAD_REQUEST", message: "טוקן לא תקין" });
-          return { success: true, email: boostNewsletterToken.email };
+          return { success: true };
         }
 
-        let leadId: number;
-        let email: string;
-        try {
-          const decoded = Buffer.from(input.token, "base64").toString("utf-8");
-          const [idStr, ...emailParts] = decoded.split(":");
-          leadId = parseInt(idStr);
-          email = emailParts.join(":");
-          if (!leadId || !email) throw new Error("invalid");
-        } catch {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "טוקן לא תקין" });
+        const signedToken = input.token ? verifySignedUnsubscribeToken(input.token) : null;
+        if (signedToken) {
+          await applyEmailUnsubscribe({ ...signedToken, source: "signed_token" });
+          return { success: true };
         }
 
-        await db.update(crmLeads)
-          .set({
-            emailUnsubscribed: true,
-            emailUnsubscribedAt: Date.now(),
-            updatedAt: Date.now(),
-          })
-          .where(and(eq(crmLeads.id, leadId), eq(crmLeads.email, email)));
+        const legacyToken = input.token ? parseLegacyLeadUnsubscribeToken(input.token) : null;
+        if (legacyToken?.leadId) {
+          const [lead] = await db.select({ id: crmLeads.id })
+            .from(crmLeads)
+            .where(and(
+              eq(crmLeads.id, legacyToken.leadId),
+              sql`LOWER(TRIM(${crmLeads.email})) = ${legacyToken.email}`,
+            ))
+            .limit(1);
+          if (!lead) throw new TRPCError({ code: "BAD_REQUEST", message: "טוקן לא תקין" });
+          await applyEmailUnsubscribe({ ...legacyToken, source: "legacy_token" });
+          return { success: true };
+        }
 
-        return { success: true, email };
+        if (input.email) {
+          const normalizedEmail = input.email.trim().toLowerCase();
+          const [knownLead] = await db.select({ id: crmLeads.id }).from(crmLeads)
+            .where(sql`LOWER(TRIM(${crmLeads.email})) = ${normalizedEmail}`).limit(1);
+          const [knownSingle] = await db.select({ id: singles.id }).from(singles)
+            .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`).limit(1);
+          if (!knownLead && !knownSingle) {
+            return { success: true };
+          }
+          await applyEmailUnsubscribe({ email: normalizedEmail, source: "legacy_email" });
+          return { success: true };
+        }
+
+        throw new TRPCError({ code: "BAD_REQUEST", message: "טוקן לא תקין" });
       }),
   }),
   // ── Product Access (guide + course interactive pages) ──────────────────────

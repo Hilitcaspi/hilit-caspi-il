@@ -3,6 +3,7 @@ import { completedPayments, crmLeads, emailLog, matches, plusPilotMembers, singl
 import { sendEmail } from "./brevo";
 import { getDb } from "./db";
 import { getMissingProfileFields } from "./matchmakingMetrics";
+import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
 
 const SITE_BASE = "https://hilitcaspi.com";
 const JOURNEY_KEY = "database_session_upsell_v1";
@@ -61,7 +62,7 @@ function escapeHtml(value: string) {
 }
 
 function frame(content: string, email: string) {
-  const unsubscribe = `${SITE_BASE}/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribe = buildSignedUnsubscribeUrl({ email });
   return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f0eadc;font-family:Arial,sans-serif;color:#191265"><div style="max-width:620px;margin:0 auto;background:#fff"><div style="background:#191265;padding:28px 36px;text-align:center"><div style="color:#ffe27c;font-size:22px;font-weight:900">הילית כספי</div><div style="color:rgba(255,255,255,.7);font-size:13px;margin-top:5px">מאגר הרווקים והרווקות</div></div><div style="padding:34px;line-height:1.8;font-size:16px">${content}</div><div style="background:#191265;padding:20px 32px;text-align:center;color:rgba(255,255,255,.55);font-size:12px">הילית כספי | <a href="${unsubscribe}" style="color:#ffe27c">הסרה ממסרים שיווקיים</a></div></div></body></html>`;
 }
 
@@ -114,6 +115,7 @@ export async function processDatabaseSessionJourney(options: { now?: number; lim
   const cohort = await db.select().from(singles).where(and(
     eq(singles.isPaid, true),
     eq(singles.isActive, true),
+    eq(singles.consentEmailMarketing, true),
     eq(singles.isSeed, false),
     eq(singles.market, "il"),
   ));
@@ -145,6 +147,8 @@ export async function processDatabaseSessionJourney(options: { now?: number; lim
   for (const single of [...cohort].sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))) {
     if (evaluated >= limit) break;
     if (!single.email) continue;
+    const suppression = await isEmailMarketingSuppressed(single.email);
+    if (suppression.suppressed) { skipped++; continue; }
     if (unsubscribed.has(single.email.trim().toLowerCase())) { skipped++; continue; }
     const joinedAt = Number(single.subscriptionStartedAt || single.createdAt || 0);
     if (!joinedAt) continue;

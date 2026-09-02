@@ -43,7 +43,8 @@ describe("feedback automation", () => {
     expect(email.htmlContent).toContain("גם בלי אישור לפרסם");
     expect(email.htmlContent).toContain("https://example.com/form");
     expect(email.htmlContent).toContain("לעוד אנשים שמחפשים אהבה");
-    expect(email.htmlContent).toContain("/unsubscribe?email=dana%40example.com");
+    expect(email.htmlContent).toContain("/unsubscribe?token=");
+    expect(email.htmlContent).not.toContain("/unsubscribe?email=");
   });
 
   it("keeps the satisfaction survey neutral and separate from the testimonial gift", () => {
@@ -60,7 +61,8 @@ describe("feedback automation", () => {
     expect(email.htmlContent).not.toContain("מפת הדייט הבא");
     expect(email.htmlContent).not.toContain("מתנה אישית");
     expect(email.htmlContent).toContain("https://example.com/survey");
-    expect(email.htmlContent).toContain("/unsubscribe?email=dana%40example.com");
+    expect(email.htmlContent).toContain("/unsubscribe?token=");
+    expect(email.htmlContent).not.toContain("/unsubscribe?email=");
   });
 
   it("waits for meaningful product use before requesting feedback", () => {
