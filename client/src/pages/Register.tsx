@@ -6,8 +6,8 @@
 import { useState, useRef, useEffect } from "react";
 import React from "react";
 import { track } from "@/lib/track";
-import { trackInitiateCheckout, trackCompleteRegistration } from "@/lib/metaPixel";
-import { gaBeginCheckout, gaSignUp } from "@/lib/ga";
+import { trackCompleteRegistration } from "@/lib/metaPixel";
+import { gaSignUp } from "@/lib/ga";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { useLocation, useSearch } from "wouter";
@@ -256,8 +256,6 @@ export default function Register() {
     }
     // If DNA already known (came from quiz), skip DNA step entirely
     if (dnaFromQuiz) {
-      trackInitiateCheckout({ value: 299, currency: "ILS", content_name: "מאגר רווקים" });
-      gaBeginCheckout("database");
       setStep("payment");
     } else {
       // Go directly to the embedded DNA quiz (no manual selection screen)
@@ -1233,7 +1231,6 @@ export default function Register() {
                   setDnaFromQuiz(dnaType);
                   setGender(quizGender as "female" | "male");
                   if (quizSessionId) setSessionId(quizSessionId);
-                  trackInitiateCheckout({ value: 299, currency: "ILS", content_name: "מאגר רווקים" });
                   setStep("payment");
                 }}
               />

@@ -6,10 +6,7 @@
 
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { useEffect, useState } from "react";
-import { trackPurchase } from "@/lib/metaPixel";
-import { track } from "@/lib/track";
-import { gaPurchase } from "@/lib/ga";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DatabaseExpectations from "@/components/DatabaseExpectations";
 
@@ -21,20 +18,6 @@ export default function ThankYouDatabase() {
   const [errorMsg, setErrorMsg] = useState("");
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
-
-  useEffect(() => {
-    // Deduplication: only fire purchase events once per session (prevents double-counting on refresh)
-    const dedupKey = "purchase_fired_database";
-    if (sessionStorage.getItem(dedupKey)) return;
-    sessionStorage.setItem(dedupKey, "1");
-    // Use URL params from Grow redirect if available, otherwise generate a predictable ID
-    const params = new URLSearchParams(window.location.search);
-    const txId = params.get("transactionId") || params.get("trxId") || `client-database-${Date.now()}`;
-    const eventID = `grow-${txId}`;
-    trackPurchase({ value: 299, currency: "ILS", content_name: "מאגר רווקים", eventID });
-    track({ eventType: "purchase", page: "/thank-you/database", metadata: { product: "database", value: 299 } });
-    gaPurchase("database", txId);
-  }, []);
 
   const getLinkMutation = trpc.singles.getQuestionnaireLink.useMutation({
     onSuccess: (data) => {

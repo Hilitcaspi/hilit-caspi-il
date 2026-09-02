@@ -58,4 +58,16 @@ describe("landing page experiment attribution", () => {
     expect(databaseSource).toContain('trackJoinClick("final")');
     expect(registerSource).not.toContain('track({ eventType: "database_cta" });');
   });
+
+  it("persists DNA lead attribution in both the CRM lead and quiz result", () => {
+    const dnaSource = readFileSync(resolve(process.cwd(), "client/src/pages/DnaQuiz.tsx"), "utf8");
+    const routerSource = readFileSync(resolve(process.cwd(), "server/routers.ts"), "utf8");
+
+    for (const field of ["utmSource", "utmMedium", "utmCampaign", "utmContent", "utmTerm", "metaCampaignId", "metaAdSetId", "metaAdId"]) {
+      expect(dnaSource).toContain(field);
+      expect(routerSource).toContain(field);
+    }
+    expect(routerSource).toContain("utmCampaign: input.utmCampaign");
+    expect(routerSource).toContain("metaAdId: input.metaAdId");
+  });
 });

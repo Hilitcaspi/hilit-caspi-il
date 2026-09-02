@@ -200,6 +200,9 @@ export default function DnaQuiz() {
   const utmCampaign = urlParams.get("utm_campaign") || sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined;
   const utmContent = urlParams.get("utm_content") || sessionStorage.getItem("utm_content") || localStorage.getItem("utm_content") || undefined;
   const utmTerm = urlParams.get("utm_term") || sessionStorage.getItem("utm_term") || localStorage.getItem("utm_term") || undefined;
+  const metaCampaignId = urlParams.get("meta_campaign_id") || sessionStorage.getItem("meta_campaign_id") || localStorage.getItem("meta_campaign_id") || undefined;
+  const metaAdSetId = urlParams.get("meta_adset_id") || sessionStorage.getItem("meta_adset_id") || localStorage.getItem("meta_adset_id") || undefined;
+  const metaAdId = urlParams.get("meta_ad_id") || sessionStorage.getItem("meta_ad_id") || localStorage.getItem("meta_ad_id") || undefined;
   // Persist UTMs in both sessionStorage and localStorage so they survive page reloads and cross-domain redirects
   if (urlParams.get("utm_source")) { sessionStorage.setItem("utm_source", urlParams.get("utm_source") as string); localStorage.setItem("utm_source", urlParams.get("utm_source") as string); }
   if (urlParams.get("utm_medium")) { sessionStorage.setItem("utm_medium", urlParams.get("utm_medium") as string); localStorage.setItem("utm_medium", urlParams.get("utm_medium") as string); }
@@ -579,6 +582,14 @@ export default function DnaQuiz() {
             free_spirit: pendingAnswers.slice(10,15).reduce((s,v)=>s+v,0),
             anchor: pendingAnswers.slice(15,20).reduce((s,v)=>s+v,0),
           } as Record<string,number>).sort((a,b)=>b[1]-a[1])[0][0] as "leader"|"romantic"|"free_spirit"|"anchor") : undefined),
+          utmSource,
+          utmMedium,
+          utmCampaign,
+          utmContent,
+          utmTerm,
+          metaCampaignId,
+          metaAdSetId,
+          metaAdId,
         });
         gaGenerateLead("dna_quiz_capture");
       } catch {
