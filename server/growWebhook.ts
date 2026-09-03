@@ -99,6 +99,15 @@ export function detectProductByDesc(desc: string): string | null {
   return null;
 }
 
+export function isPotentialPlusCharge(sum: number, sandboxConfigured = Boolean(
+  process.env.GROW_SANDBOX_USER_ID?.trim()
+  && process.env.GROW_SANDBOX_RECURRING_PAGE_CODE?.trim(),
+)): boolean {
+  const isProductionPlusAmount = sum >= 85 && sum <= 115;
+  const isSandboxPlusAmount = sandboxConfigured && sum >= 0.5 && sum <= 1.5;
+  return isProductionPlusAmount || isSandboxPlusAmount;
+}
+
 // ─── Product handlers ─────────────────────────────────────────────────────────
 
 async function handleGuide(email: string, name: string, opts?: { skipJourney?: boolean }) {
@@ -681,9 +690,10 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       product = descProduct;
     }
   }
-  // 3. A 99₪ charge is ambiguous with the historical live event. If this email
-  // has a pending Plus checkout, prefer Plus; otherwise use the amount fallback.
-  if (!product && sum >= 85 && sum <= 115 && email) {
+  // 3. A 99₪ charge is ambiguous with the historical live event, and the temporary
+  // Plus Sandbox uses 1₪. If this email has a pending Plus checkout, prefer Plus;
+  // otherwise continue to the normal amount fallback.
+  if (!product && isPotentialPlusCharge(sum) && email) {
     try {
       const db = await getDb();
       if (db) {

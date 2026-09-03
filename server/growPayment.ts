@@ -6,10 +6,6 @@
  *
  * Grow docs: https://grow-il.readme.io/reference/post_api-light-server-1-0-createpaymentprocess
  *
- * Test credentials (sandbox):
- *   userId:   10be6655a4711b2a
- *   pageCode: d9ee228fd53b
- *
  * Production credentials come from env vars:
  *   GROW_USER_ID  / GROW_PAGE_CODE_DATABASE
  *   GROW_PAGE_CODE_GUIDE / GROW_PAGE_CODE_COURSE
@@ -31,6 +27,8 @@ const GROW_API_BASE = IS_GROW_PROD
 
 const GROW_API_URL = `${GROW_API_BASE}/api/light/server/1.0/createPaymentProcess`;
 const GROW_APPROVE_URL = `${GROW_API_BASE}/api/light/server/1.0/approveTransaction`;
+const GROW_SANDBOX_API_URL = "https://sandbox.meshulam.co.il/api/light/server/1.0/createPaymentProcess";
+const GROW_SANDBOX_APPROVE_URL = "https://sandbox.meshulam.co.il/api/light/server/1.0/approveTransaction";
 
 // Browser-like headers to avoid Incapsula 403 blocking
 const BROWSER_HEADERS = {
@@ -87,6 +85,27 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   plus:         { description: "Database Plus - מנוי חודשי",                         sum: 99 },
 };
 
+export type PlusCheckoutMode = "production" | "sandbox" | "unconfigured";
+
+export function getPlusCheckoutConfig(): {
+  configured: boolean;
+  mode: PlusCheckoutMode;
+  checkoutAmount: number | null;
+  displayAmount: number;
+} {
+  if (process.env.GROW_PAGE_CODE_PLUS?.trim()) {
+    return { configured: true, mode: "production", checkoutAmount: 99, displayAmount: 99 };
+  }
+  const sandboxConfigured = Boolean(
+    process.env.GROW_SANDBOX_USER_ID?.trim()
+    && process.env.GROW_SANDBOX_RECURRING_PAGE_CODE?.trim(),
+  );
+  if (sandboxConfigured) {
+    return { configured: true, mode: "sandbox", checkoutAmount: 1, displayAmount: 99 };
+  }
+  return { configured: false, mode: "unconfigured", checkoutAmount: null, displayAmount: 99 };
+}
+
 // ─── createPaymentProcess ─────────────────────────────────────────────────────
 export interface CreatePaymentInput {
   product: string;
@@ -99,17 +118,76 @@ export interface CreatePaymentInput {
   personalToken?: string;
   /** Signed server-generated reference used to bind a Boost webhook to one request. */
   webhookReference?: string;
+  /** Browser origin used only for Plus Sandbox callbacks in the temporary preview. */
+  origin?: string;
 }
 
 export interface CreatePaymentResult {
   authCode: string;
   processToken?: string;
+  url?: string;
+  checkoutMode?: PlusCheckoutMode;
 }
 
 export async function createPaymentProcess(input: CreatePaymentInput): Promise<CreatePaymentResult> {
   const { notifyPaymentFailure } = await import("./paymentFailureAlert");
   const config = PRODUCT_CONFIGS[input.product];
   if (!config) throw new Error(`Unknown product: ${input.product}`);
+
+  const plusCheckout = input.product === "plus" ? getPlusCheckoutConfig() : null;
+  if (plusCheckout && !plusCheckout.configured) {
+    throw new Error("The Database Plus payment product is not configured yet");
+  }
+
+  if (plusCheckout?.mode === "sandbox") {
+    const pageCode = process.env.GROW_SANDBOX_RECURRING_PAGE_CODE?.trim() || "";
+    const userId = process.env.GROW_SANDBOX_USER_ID?.trim() || "";
+    const callbackBase = input.origin && /^https:\/\//i.test(input.origin)
+      ? input.origin.replace(/\/$/, "")
+      : SITE_BASE;
+    const form = new FormData();
+    form.append("userId", userId);
+    form.append("pageCode", pageCode);
+    form.append("chargeType", "1");
+    form.append("sum", "1");
+    form.append("description", "Database Plus Monthly");
+    form.append("pageField[invoiceName]", input.fullName);
+    form.append("pageField[fullName]", input.fullName);
+    form.append("pageField[phone]", input.phone || "");
+    form.append("pageField[email]", input.email);
+    form.append("successUrl", `${callbackBase}/thank-you/plus`);
+    form.append("cancelUrl", callbackBase);
+    form.append("notifyUrl", `${callbackBase}/api/grow/webhook`);
+
+    const response = await globalThis.fetch(GROW_SANDBOX_API_URL, {
+      method: "POST",
+      headers: { accept: "application/json", ...BROWSER_HEADERS },
+      body: form,
+    });
+    const payload = await response.json().catch(() => null) as {
+      status?: number | boolean;
+      data?: { url?: string; processToken?: string };
+      err?: string;
+    } | null;
+    if (!response.ok || !(payload?.status === 1 || payload?.status === true) || !payload.data?.url) {
+      void notifyPaymentFailure({
+        customerName: input.fullName,
+        customerEmail: input.email,
+        customerPhone: input.phone,
+        product: input.product,
+        amount: 1,
+        errorMessage: payload?.err || `Grow Sandbox returned HTTP ${response.status}`,
+        stage: "createProcess",
+      });
+      throw new Error(payload?.err || "Grow Sandbox did not return a hosted payment form");
+    }
+    return {
+      authCode: "",
+      processToken: payload.data.processToken,
+      url: payload.data.url,
+      checkoutMode: "sandbox",
+    };
+  }
 
   const pageCode = PAGE_CODES[input.product];
   if (!pageCode) {
@@ -224,12 +302,18 @@ export async function approveTransaction(
   product?: string
 ): Promise<boolean> {
   const data = webhookData ?? {};
-  const pageCode = product ? (PAGE_CODES[product] ?? GROW_USER_ID) : GROW_USER_ID;
+  const plusCheckout = product === "plus" ? getPlusCheckoutConfig() : null;
+  const usePlusSandbox = plusCheckout?.mode === "sandbox";
+  const growUserId = usePlusSandbox ? process.env.GROW_SANDBOX_USER_ID || "" : GROW_USER_ID;
+  const pageCode = usePlusSandbox
+    ? process.env.GROW_SANDBOX_RECURRING_PAGE_CODE || ""
+    : product ? (PAGE_CODES[product] ?? GROW_USER_ID) : GROW_USER_ID;
+  const approveUrl = usePlusSandbox ? GROW_SANDBOX_APPROVE_URL : GROW_APPROVE_URL;
 
   const params = new URLSearchParams();
   // Required: pageCode and userId
   params.append("pageCode", pageCode);
-  params.append("userId", GROW_USER_ID);
+  params.append("userId", growUserId);
 
   // Required: transaction identifiers
   params.append("transactionId", String(transactionId));
@@ -265,7 +349,7 @@ export async function approveTransaction(
   if (data.processToken) params.append("processToken", String(data.processToken));
 
   try {
-    const res = await globalThis.fetch(GROW_APPROVE_URL, {
+    const res = await globalThis.fetch(approveUrl, {
       method: "POST",
       body: params.toString(),
       headers: {

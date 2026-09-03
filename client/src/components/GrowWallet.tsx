@@ -158,6 +158,11 @@ interface GrowWalletProps {
   personalToken?: string;
   boostMatchId?: number;
   showCoupon?: boolean;
+  plusConsents?: {
+    renewalAccepted: boolean;
+    termsAccepted: boolean;
+    boostAccepted: boolean;
+  };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -175,6 +180,7 @@ export default function GrowWallet({
   personalToken,
   boostMatchId,
   showCoupon = true,
+  plusConsents,
 }: GrowWalletProps) {
   const [name, setName] = useState(prefillName || "");
   const [email, setEmail] = useState(prefillEmail || "");
@@ -268,10 +274,11 @@ export default function GrowWallet({
 
   // Preload SDK script on mount (background, no init yet)
   useEffect(() => {
+    if (product === "plus") return;
     preloadGrowSDKScript().catch(err => {
       console.warn("[GrowWallet] Script preload failed:", err);
     });
-  }, []);
+  }, [product]);
 
   const handlePay = useCallback(async () => {
     const fullName = name.trim();
@@ -319,18 +326,19 @@ export default function GrowWallet({
     };
 
     try {
-      // Step 1: Ensure script is loaded
-      logStep("1_script_load_start");
-      await preloadGrowSDKScript();
-      if (!window.growPayment) throw new Error("Grow SDK not available after script load");
-      logStep("1_script_load_done");
+      if (product !== "plus") {
+        // Step 1: Ensure script is loaded
+        logStep("1_script_load_start");
+        await preloadGrowSDKScript();
+        if (!window.growPayment) throw new Error("Grow SDK not available after script load");
+        logStep("1_script_load_done");
 
-      // Step 2: Always call init() fresh — it's idempotent and ensures runtime is started
-      logStep("2_init_start");
-      await window.growPayment.init({
-        environment: GROW_ENV,
-        version: GROW_VERSION,
-        events: {
+        // Step 2: Always call init() fresh — it's idempotent and ensures runtime is started
+        logStep("2_init_start");
+        await window.growPayment.init({
+          environment: GROW_ENV,
+          version: GROW_VERSION,
+          events: {
           onSuccess: (r: any) => {
             setWalletLoading(false);
             callbacksRef.current.onSuccess?.(r);
@@ -379,15 +387,16 @@ export default function GrowWallet({
               processToken: lastProcessTokenRef.current || undefined,
             });
           },
-        },
-      });
+          },
+        });
 
-      logStep("2_init_done");
+        logStep("2_init_done");
 
-      // Step 3: Wait for runtime to be fully ready
-      logStep("3_wait_runtime_start");
-      await waitForGrowRuntime(12000);
-      logStep("3_wait_runtime_done");
+        // Step 3: Wait for runtime to be fully ready
+        logStep("3_wait_runtime_start");
+        await waitForGrowRuntime(12000);
+        logStep("3_wait_runtime_done");
+      }
 
       // Step 4: Create payment process via server-side tRPC (secure, no CORS issues)
       // Calculate discounted price if coupon is applied
@@ -471,7 +480,16 @@ export default function GrowWallet({
         personalToken,
         boostTermsAccepted: product === "match_boost" ? true : undefined,
         boostMatchId: product === "match_boost" ? boostMatchId : undefined,
+        plusRenewalAccepted: product === "plus" && plusConsents?.renewalAccepted ? true : undefined,
+        plusTermsAccepted: product === "plus" && plusConsents?.termsAccepted ? true : undefined,
+        plusBoostAccepted: product === "plus" && plusConsents?.boostAccepted ? true : undefined,
+        origin: product === "plus" ? window.location.origin : undefined,
       });
+
+      if (result.url) {
+        window.location.assign(result.url);
+        return;
+      }
 
       // Save processToken for failure reporting (if SDK payment fails later)
       lastProcessTokenRef.current = result.processToken || null;
@@ -496,7 +514,7 @@ export default function GrowWallet({
         stage: "createProcess",
       });
     }
-  }, [name, email, phone, product, termsPath, termsAccepted, personalToken, boostMatchId, couponApplied]);
+  }, [name, email, phone, product, termsPath, termsAccepted, ageConfirmed, personalToken, boostMatchId, couponApplied, plusConsents]);
 
   const hasAllDetails = prefillName && prefillEmail;
 

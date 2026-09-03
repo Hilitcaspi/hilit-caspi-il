@@ -7278,6 +7278,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
   // Creates a payment process on Grow's server and returns an authCode for the
   // frontend SDK to open the inline wallet (no redirect to pay.grow.link).
   payment: router({
+    plusCheckoutConfig: publicProcedure.query(async () => {
+      const { getPlusCheckoutConfig } = await import("./growPayment");
+      return getPlusCheckoutConfig();
+    }),
     createProcess: publicProcedure
       .input(z.object({
         product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "bundle_new_year", "match_boost", "plus"]),
@@ -7302,9 +7306,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         personalToken: z.string().min(16).max(200).optional(),
         boostTermsAccepted: z.literal(true).optional(),
         boostMatchId: z.number().int().positive().optional(),
+        plusRenewalAccepted: z.literal(true).optional(),
+        plusTermsAccepted: z.literal(true).optional(),
+        plusBoostAccepted: z.literal(true).optional(),
+        origin: z.string().url().max(500).optional(),
       }))
       .mutation(async ({ input }) => {
-        const { createPaymentProcess, PRODUCT_CONFIGS } = await import("./growPayment");
+        const { createPaymentProcess, getPlusCheckoutConfig, PRODUCT_CONFIGS } = await import("./growPayment");
         const db = await getDb();
 
         let preparedBoostRequestId: number | null = null;
@@ -7327,33 +7335,35 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
 
         if (input.product === "plus") {
-          if (!process.env.GROW_PAGE_CODE_PLUS?.trim()) {
+          const plusCheckout = getPlusCheckoutConfig();
+          if (!plusCheckout.configured) {
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "מסך החיוב החודשי עדיין לא הופעל" });
           }
-          if (!db || !input.personalToken) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: "נדרש קישור אישי תקין להצטרפות ל־Plus" });
+          if (input.plusRenewalAccepted !== true || input.plusTermsAccepted !== true || input.plusBoostAccepted !== true) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "יש לאשר את תנאי החיוב, התקנון והשתתפות ב־Boost לפני התשלום" });
+          }
+          if (!db) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "מסד הנתונים אינו זמין" });
           }
           const normalizedEmail = input.email.trim().toLowerCase();
-          const [single] = await db.select().from(singles).where(and(
-            eq(singles.email, normalizedEmail),
-            eq(singles.questionnaireToken, input.personalToken),
-          )).limit(1);
-          if (!single || !single.isActive || !single.isPaid) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Plus זמין לחברים פעילים במאגר עם קישור אישי" });
+          const normalizedPhone = (input.phone || "").replace(/\D/g, "");
+          if (normalizedPhone.length < 9) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "יש להזין מספר טלפון תקין" });
           }
-          const memberMatches = await db.select({
-            id: matches.id,
-            singleAId: matches.singleAId,
-            singleBId: matches.singleBId,
-            proposedAt: matches.proposedAt,
-            status: matches.status,
-            matchDetailStatus: matches.matchDetailStatus,
-            returnedToPoolAt: matches.returnedToPoolAt,
-          }).from(matches).where(or(eq(matches.singleAId, single.id), eq(matches.singleBId, single.id)));
-          const { assessPlusEligibility } = await import("./plusPilotRouter");
-          const eligibility = assessPlusEligibility(single, memberMatches);
-          if (!eligibility.eligible) {
-            throw new TRPCError({ code: "FORBIDDEN", message: eligibility.blockers[0] || "הפרופיל אינו זכאי כרגע ל־Plus" });
+          const [single] = await db.select().from(singles)
+            .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`)
+            .limit(1);
+          const storedPhone = (single?.phone || "").replace(/\D/g, "");
+          if (!single || !single.isActive || !single.isPaid || !storedPhone || storedPhone.slice(-9) !== normalizedPhone.slice(-9)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Plus זמין לחברים פעילים במאגר בלבד" });
+          }
+          if (input.personalToken && input.personalToken !== single.questionnaireToken) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "הקישור האישי אינו תואם לפרופיל" });
+          }
+          const [existingMember] = await db.select().from(plusPilotMembers)
+            .where(eq(plusPilotMembers.singleId, single.id)).limit(1);
+          if (existingMember?.status === "active" && existingMember.billingStatus === "active") {
+            throw new TRPCError({ code: "CONFLICT", message: "מנוי Plus כבר פעיל בפרופיל הזה" });
           }
           const now = Date.now();
           await db.insert(plusPilotMembers).values({
@@ -7362,20 +7372,25 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             billingStatus: "pending",
             monthlyMatchTarget: 2,
             premiumSupportEnabled: false,
-            eligibilityScore: eligibility.score,
-            eligibilityReasons: JSON.stringify({ reasons: eligibility.reasons, blockers: eligibility.blockers }),
-            source: "plus_checkout",
+            eligibilityScore: 100,
+            eligibilityReasons: JSON.stringify({ reasons: ["active_paid_database_member"], blockers: [] }),
+            source: plusCheckout.mode === "sandbox" ? "plus_checkout_sandbox" : "plus_checkout_public",
             waitlistedAt: now,
             lastEngagedAt: now,
             createdAt: now,
             updatedAt: now,
           }).onDuplicateKeyUpdate({ set: {
             billingStatus: "pending",
-            eligibilityScore: eligibility.score,
-            eligibilityReasons: JSON.stringify({ reasons: eligibility.reasons, blockers: eligibility.blockers }),
+            eligibilityScore: 100,
+            eligibilityReasons: JSON.stringify({ reasons: ["active_paid_database_member"], blockers: [] }),
             lastEngagedAt: now,
             updatedAt: now,
           }});
+          verifiedPaymentIdentity = {
+            fullName: `${single.firstName || ""} ${single.lastName || ""}`.trim() || input.fullName,
+            email: single.email?.trim().toLowerCase() || normalizedEmail,
+            phone: single.phone || input.phone || "",
+          };
         }
 
         // Server-side coupon validation — never trust client-supplied price

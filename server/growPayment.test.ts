@@ -11,7 +11,7 @@ describe("growPayment module", () => {
   });
 
   it("has product configs for all supported products", () => {
-    const expected = ["database", "guide", "course", "coaching", "session", "bundle_new_year", "match_boost"];
+    const expected = ["database", "guide", "course", "coaching", "session", "bundle_new_year", "match_boost", "plus"];
     for (const p of expected) {
       expect(PRODUCT_CONFIGS[p]).toBeDefined();
       expect(PRODUCT_CONFIGS[p].sum).toBeGreaterThan(0);
