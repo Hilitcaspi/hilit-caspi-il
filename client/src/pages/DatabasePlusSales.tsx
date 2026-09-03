@@ -31,7 +31,7 @@ export default function DatabasePlusSales() {
   const isPersonalLink = Boolean(email && token);
   const statusQuery = trpc.plusPilot.getMyStatus.useQuery({ email, token }, { enabled: isPersonalLink, retry: false });
   const plusData = statusQuery.data;
-  const canPurchase = Boolean((isPersonalLink && plusData?.paymentConfigured && (plusData.status === "eligible" || plusData.status === "invited") && termsAccepted && renewalAccepted && boostAccepted) || import.meta.env.DEV);
+  const canPurchase = Boolean(termsAccepted && renewalAccepted && boostAccepted);
   useEffect(() => {
     if (isPersonalLink) return;
     const label = "נדרש קישור אישי מהפרופיל האישי";

@@ -1,5 +1,17 @@
 # Payment Fix TODO
 
+## Database Plus: checkpoint לרכישה ציבורית
+
+- [ ] Save a checkpoint for the removal of the personal-link requirement from Database Plus.
+- [ ] Push the matching checkpoint code to the configured GitHub repository.
+- [ ] Publish the saved version manually and test the public Database Plus entry point.
+
+## Database Plus: רכישה ציבורית
+
+- [x] Remove the personal-link and pre-eligibility requirements from the public Database Plus checkout entry point.
+- [x] Preserve required customer details, age confirmation, terms consent, and server-only Grow payment creation.
+- [ ] Verify an unauthenticated visitor can reach the payment action on Database Plus.
+
 ## Database Plus: סנכרון לפני פרסום
 
 - [ ] Synchronize the pending remote project changes without overwriting the current Database Plus work.
