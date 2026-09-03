@@ -1826,8 +1826,8 @@ export const appRouter = router({
     // role check (teamProcedure + ctx.user.role === "admin").
 
     /**
-     * Register a basic profile after payment (before the 15-question scientific questionnaire).
-     * Saves the profile, generates a questionnaire token, and sends an email with the link.
+     * Persist a basic profile. Paid Grow registrations first save an inactive draft;
+     * payment activation and the questionnaire email remain owned by the Grow webhook.
      * The questionnaire is completed separately via /join/questionnaire?token=xxx
      */
     registerBasicProfile: publicProcedure
@@ -1883,6 +1883,7 @@ export const appRouter = router({
           consentMatchmaking: z.boolean().nullish(),
           consentDataSharing: z.boolean().nullish(),
           consentEmailMarketing: z.boolean().nullish(),
+          deferUntilPayment: z.boolean().optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -1916,8 +1917,19 @@ export const appRouter = router({
         if (existingProfile) {
           // Check if this is a skeleton record created by Grow webhook (age=0, city empty)
           const isSkeleton = existingProfile.age === 0 && (!existingProfile.city || existingProfile.city === "");
+          const activatesWithFreeToken = Boolean(input.freeToken) && !existingProfile.isPaid;
+          const isUnpaidDraft = !existingProfile.isPaid && (input.deferUntilPayment === true || activatesWithFreeToken);
 
-          if (isSkeleton) {
+          if (input.deferUntilPayment && existingProfile.isPaid) {
+            return {
+              singleId: existingProfile.id,
+              questionnaireToken: existingProfile.questionnaireToken || "",
+              success: true,
+              alreadyExists: true,
+            };
+          }
+
+          if (isSkeleton || isUnpaidDraft) {
             // Update the skeleton record with the full profile data from the form
             console.log("[RegisterBasic] Updating Grow skeleton record id:", existingProfile.id, "for:", normalizedEmail);
             let photoUrl: string | undefined;
@@ -1967,8 +1979,8 @@ export const appRouter = router({
               locationPreference: input.locationPreference,
               partnerDescription: input.partnerDescription,
               ...(photoUrl ? { photoUrl } : {}),
-              isActive: existingProfile.isPaid || existingProfile.isActive,
-              isPaid: existingProfile.isPaid,
+              isActive: input.freeToken ? true : (existingProfile.isPaid || existingProfile.isActive),
+              isPaid: input.freeToken ? true : existingProfile.isPaid,
               updatedAt: now,
               // Save UTM from the registration form (sessionStorage → frontend → here)
               ...(input.utmSource ? { utmSource: input.utmSource } : {}),
@@ -1976,35 +1988,71 @@ export const appRouter = router({
               ...(input.utmCampaign ? { utmCampaign: input.utmCampaign } : {}),
               ...(input.utmContent ? { utmContent: input.utmContent } : {}),
             }).where(eq(singles.id, existingProfile.id));
-            // Send questionnaire email with the existing token
-            const origin = input.origin || "https://hilitcaspi.com";
-            const questionnaireUrl = `${origin}/join/questionnaire?token=${existingProfile.questionnaireToken}`;
-            sendEmail({
-              to: { email: normalizedEmail, name: input.firstName },
-              subject: "השלמת הרישום למאגר הרווקים של הילית",
-              htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:40px 32px;text-align:center;"><h1 style="color:#ffe27c;font-size:26px;margin:0 0 8px;">שלב אחד נוסף! 💛</h1><p style="color:rgba(255,255,255,0.8);font-size:15px;margin:0;">השאלון המדעי מחכה לך</p></div><div style="padding:40px 32px;"><p style="font-size:18px;color:#191265;margin:0 0 16px;">שלום ${input.firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 16px;">התשלום עבר בהצלחה ופרטיך נשמרו. כדי להיכנס למאגר ולקבל התאמות, יש להשלים את השאלון המדעי.</p><div style="text-align:center;margin:32px 0;"><a href="${questionnaireUrl}" style="display:inline-block;background:#ffe27c;color:#191265;font-size:18px;font-weight:bold;padding:16px 40px;border-radius:12px;text-decoration:none;">למילוי השאלון המדעי</a></div><p style="font-size:15px;color:#191265;font-weight:bold;margin:24px 0 8px;">באהבה,<br>הילית כספי</p></div></div></body></html>`,
-            }).catch(err => console.error("[RegisterBasic] Skeleton update email failed:", err));
+            if (!input.deferUntilPayment) {
+              // Draft saves before Grow must never send onboarding mail to an unpaid profile.
+              const origin = input.origin || "https://hilitcaspi.com";
+              const questionnaireUrl = `${origin}/join/questionnaire?token=${existingProfile.questionnaireToken}`;
+              sendEmail({
+                to: { email: normalizedEmail, name: input.firstName },
+                subject: "השלמת הרישום למאגר הרווקים של הילית",
+                htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:40px 32px;text-align:center;"><h1 style="color:#ffe27c;font-size:26px;margin:0 0 8px;">שלב אחד נוסף! 💛</h1><p style="color:rgba(255,255,255,0.8);font-size:15px;margin:0;">השאלון המדעי מחכה לך</p></div><div style="padding:40px 32px;"><p style="font-size:18px;color:#191265;margin:0 0 16px;">שלום ${input.firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 16px;">התשלום עבר בהצלחה ופרטיך נשמרו. כדי להיכנס למאגר ולקבל התאמות, יש להשלים את השאלון המדעי.</p><div style="text-align:center;margin:32px 0;"><a href="${questionnaireUrl}" style="display:inline-block;background:#ffe27c;color:#191265;font-size:18px;font-weight:bold;padding:16px 40px;border-radius:12px;text-decoration:none;">למילוי השאלון המדעי</a></div><p style="font-size:15px;color:#191265;font-weight:bold;margin:24px 0 8px;">באהבה,<br>הילית כספי</p></div></div></body></html>`,
+              }).catch(err => console.error("[RegisterBasic] Skeleton update email failed:", err));
+            }
             // notifyOwner removed — profile updated from Grow no longer sends email/push
             // Link DNA quiz session to this single (non-blocking)
             if (input.dnaSessionId) {
               db.update(dnaQuizResults)
-                .set({ convertedToRegistration: true, singleId: existingProfile.id })
+                .set(input.deferUntilPayment
+                  ? { singleId: existingProfile.id }
+                  : { convertedToRegistration: true, singleId: existingProfile.id })
                 .where(eq(dnaQuizResults.sessionId, input.dnaSessionId))
                 .catch(err => console.error("[RegisterBasic] dnaQuizResults skeleton update failed:", err));
             }
             // Auto-link DNA type for skeleton records when dnaType/dnaSessionId are missing
-            if (!input.dnaType && !input.dnaSessionId) {
+            if (!input.deferUntilPayment && !input.dnaType && !input.dnaSessionId) {
               autoLinkDnaType(db, existingProfile.id, normalizedEmail, normalizedPhone)
                 .then(linkedDna => {
                   if (linkedDna) console.log(`[RegisterBasic/Skeleton] Auto-linked dnaType=${linkedDna} for single id=${existingProfile.id}`);
                 })
                 .catch(err => console.error("[RegisterBasic/Skeleton] autoLinkDnaType failed:", err));
             }
+            if (activatesWithFreeToken) {
+              const [leadByEmail] = await db.select({ id: crmLeads.id })
+                .from(crmLeads)
+                .where(sql`LOWER(TRIM(${crmLeads.email})) = ${normalizedEmail}`)
+                .orderBy(desc(crmLeads.createdAt))
+                .limit(1);
+              if (leadByEmail) {
+                await db.update(crmLeads)
+                  .set({ status: "client_database", singleId: existingProfile.id, product: "database", updatedAt: now })
+                  .where(eq(crmLeads.id, leadByEmail.id));
+              } else {
+                await db.insert(crmLeads).values({
+                  name: `${input.firstName} ${input.lastName || ""}`.trim(),
+                  email: normalizedEmail,
+                  phone: normalizedPhone || input.phone,
+                  gender: input.gender,
+                  dnaType: input.dnaType,
+                  quizSessionId: input.dnaSessionId,
+                  source: "direct",
+                  status: "client_database",
+                  singleId: existingProfile.id,
+                  product: "database",
+                  createdAt: now,
+                  updatedAt: now,
+                });
+              }
+              notifyOwner({
+                title: "פרופיל חדש נרשם! (גישה חינמית) 💎",
+                content: `${input.firstName} ${input.lastName || ""} נרשם למאגר עם גישה חינמית.`,
+              }).catch(err => console.error("[RegisterBasic] notifyOwner failed:", err));
+              ga4SignUp(clientIdFromEmail(input.email), "free_token").catch(() => {});
+            }
             return { singleId: existingProfile.id, questionnaireToken: existingProfile.questionnaireToken || "", success: true, alreadyExists: false };
           }
 
           // Already fully registered - resend questionnaire email if not yet completed
-          if (!existingProfile.questionnaireCompletedAt && existingProfile.questionnaireToken) {
+          if (!input.deferUntilPayment && !existingProfile.questionnaireCompletedAt && existingProfile.questionnaireToken) {
             const origin = input.origin || "https://hilitcaspi.com";
             const questionnaireUrl = `${origin}/join/questionnaire?token=${existingProfile.questionnaireToken}`;
             sendEmail({
@@ -2045,8 +2093,8 @@ export const appRouter = router({
           age: input.birthDate ? Math.floor((Date.now() - new Date(input.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : (input.age ?? 0),
           birthDate: input.birthDate || null,
           city: input.city,
-          phone: input.phone,
-          email: input.email,
+          phone: normalizedPhone || input.phone,
+          email: normalizedEmail,
           height: input.height,
           education: input.education,
           religiosity: input.religiosity,
@@ -2099,13 +2147,15 @@ export const appRouter = router({
         // Mark DNA quiz session as converted (non-blocking)
         if (input.dnaSessionId) {
           db.update(dnaQuizResults)
-            .set({ convertedToRegistration: true, singleId: newSingleId })
+            .set(input.deferUntilPayment
+              ? { singleId: newSingleId }
+              : { convertedToRegistration: true, singleId: newSingleId })
             .where(eq(dnaQuizResults.sessionId, input.dnaSessionId))
             .catch(err => console.error("[RegisterBasic] dnaQuizResults update failed:", err));
         }
 
         // Auto-link DNA type if not provided (user may have taken quiz separately)
-        if (!input.dnaType && !input.dnaSessionId) {
+        if (!input.deferUntilPayment && !input.dnaType && !input.dnaSessionId) {
           autoLinkDnaType(db, newSingleId, normalizedEmail, normalizedPhone)
             .then(linkedDna => {
               if (linkedDna) console.log(`[RegisterBasic] Auto-linked dnaType=${linkedDna} for single id=${newSingleId}`);
@@ -2113,22 +2163,27 @@ export const appRouter = router({
             .catch(err => console.error("[RegisterBasic] autoLinkDnaType failed:", err));
         }
 
-        // Create or update CRM lead (non-blocking)
+        // Link pre-payment drafts to an existing CRM/DNA lead without promoting
+        // them to client_database before Grow confirms payment.
         db.select({ id: crmLeads.id })
           .from(crmLeads)
-          .where(eq(crmLeads.email, input.email))
+          .where(sql`LOWER(TRIM(${crmLeads.email})) = ${normalizedEmail}`)
           .orderBy(desc(crmLeads.createdAt))
           .limit(1)
           .then(async ([leadByEmail]) => {
-            if (leadByEmail) {
+            if (leadByEmail && input.deferUntilPayment) {
+              await db.update(crmLeads)
+                .set({ singleId: newSingleId, gender: input.gender, dnaType: input.dnaType, quizSessionId: input.dnaSessionId, updatedAt: now })
+                .where(eq(crmLeads.id, leadByEmail.id));
+            } else if (leadByEmail) {
               await db.update(crmLeads)
                 .set({ status: "client_database", singleId: newSingleId, product: "database", updatedAt: now })
                 .where(eq(crmLeads.id, leadByEmail.id));
-            } else {
+            } else if (!input.deferUntilPayment) {
               await db.insert(crmLeads).values({
                 name: `${input.firstName} ${input.lastName || ""}`.trim(),
-                email: input.email,
-                phone: input.phone,
+                email: normalizedEmail,
+                phone: normalizedPhone || input.phone,
                 gender: input.gender,
                 dnaType: input.dnaType,
                 quizSessionId: input.dnaSessionId,
@@ -2151,6 +2206,7 @@ export const appRouter = router({
           }).catch(err => console.error("[RegisterBasic] notifyOwner failed:", err));
         }
 
+        if (!input.deferUntilPayment) {
         // Send email with questionnaire link
         const origin = input.origin || "https://hilitcaspi.com";
         const questionnaireUrl = `${origin}/join/questionnaire?token=${questionnaireToken}`;
@@ -2186,6 +2242,7 @@ export const appRouter = router({
 
         // Fire GA4 sign_up event server-side
         ga4SignUp(clientIdFromEmail(input.email), input.freeToken ? "free_token" : "database").catch(() => {});
+        }
 
         return { singleId: newSingleId, questionnaireToken, success: true };
       }),

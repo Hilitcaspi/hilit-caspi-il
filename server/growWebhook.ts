@@ -33,7 +33,7 @@
 import crypto from "crypto";
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { productAccessTokens, leads, singles, crmLeads, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusPaymentEvents } from "../drizzle/schema";
+import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusPaymentEvents } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
 import { queueProductFeedbackAfterPurchase } from "./feedbackAutomation";
@@ -288,7 +288,7 @@ async function handleSession(email: string, name: string) {
   }).catch(err => console.error("[GrowWebhook][Session] Email failed:", err));
 }
 
-async function handleDatabase(email: string, name: string, phone: string, transactionId: string = "") {
+export async function handleDatabase(email: string, name: string, phone: string, transactionId: string = "") {
   const db = await getDb();
   if (!db) return;
   const firstName = name.trim().split(" ")[0];
@@ -301,6 +301,25 @@ async function handleDatabase(email: string, name: string, phone: string, transa
   // the user already registered via the form with a different phone number.
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedPhone = phone ? phone.trim().replace(/[\s\-]/g, "") : "";
+  const existingCrmProfile = await db.select({
+    id: crmLeads.id,
+    gender: crmLeads.gender,
+    quizSessionId: crmLeads.quizSessionId,
+  }).from(crmLeads)
+    .where(sql`LOWER(TRIM(${crmLeads.email})) = ${normalizedEmail}`)
+    .orderBy(desc(crmLeads.createdAt))
+    .limit(1)
+    .then(r => r[0] ?? null);
+  let verifiedGender = existingCrmProfile?.gender === "female" || existingCrmProfile?.gender === "male"
+    ? existingCrmProfile.gender
+    : null;
+  if (!verifiedGender && existingCrmProfile?.quizSessionId) {
+    verifiedGender = await db.select({ gender: dnaQuizResults.gender })
+      .from(dnaQuizResults)
+      .where(eq(dnaQuizResults.sessionId, existingCrmProfile.quizSessionId))
+      .limit(1)
+      .then(r => r[0]?.gender === "female" || r[0]?.gender === "male" ? r[0].gender : null);
+  }
   let singleRecord = await db.select({ id: singles.id, questionnaireToken: singles.questionnaireToken })
     .from(singles)
     .where(
@@ -319,16 +338,27 @@ async function handleDatabase(email: string, name: string, phone: string, transa
       .where(eq(singles.id, singleRecord.id));
     console.log(`[GrowWebhook] Marked existing single id=${singleRecord.id} as isPaid=true + isActive=true (tx=${transactionId}) for ${email}`);
   } else {
+    if (!verifiedGender) {
+      // The DB requires a gender value. Do not invent one for a paid customer:
+      // preserve the confirmed payment and flag the profile for manual recovery.
+      console.error(`[GrowWebhook] Paid database profile missing verified gender for ${normalizedEmail}; fallback profile was not created`);
+      await notifyOwner({
+        title: "נדרש שחזור פרופיל לאחר תשלום",
+        content: `${name} (${normalizedEmail}) שילם למאגר, אך לא נמצא מגדר מאומת ב־CRM או בשאלון DNA. לא נוצר פרופיל חלקי. Transaction: ${transactionId || "N/A"}`,
+      });
+      return;
+    }
     // Create singles record with personal questionnaire token
     const token = crypto.randomBytes(32).toString("hex");
     const inserted = await db.insert(singles).values({
       firstName,
       lastName,
-      gender: "male" as const, // will be corrected when they fill the questionnaire
+      gender: verifiedGender,
+      seekingGender: null,
       age: 0,
       city: "",
-      phone: phone || null,
-      email,
+      phone: normalizedPhone || null,
+      email: normalizedEmail,
       questionnaireToken: token,
       isPaid: true,
       paymentRef: transactionId || null,
@@ -340,23 +370,20 @@ async function handleDatabase(email: string, name: string, phone: string, transa
     const singleId = (inserted as any)[0].insertId as number;
     singleRecord = { id: singleId, questionnaireToken: token };
 
-    // Update or create CRM lead
-    const existingCrm = await db.select({ id: crmLeads.id })
-      .from(crmLeads)
-      .where(eq(crmLeads.email, email))
-      .limit(1)
-      .then(r => r[0] ?? null);
-    if (existingCrm) {
-      await db.update(crmLeads)
-        .set({ singleId, product: "database", status: "client_database", updatedAt: now })
-        .where(eq(crmLeads.id, existingCrm.id));
-    } else {
-      await db.insert(crmLeads).values({
-        name, email, phone: phone || "", source: "direct",
-        product: "database", status: "client_database",
-        singleId, createdAt: now, updatedAt: now,
-      }).catch(() => {});
-    }
+  }
+
+  // A CRM lead becomes a database client only after this confirmed-payment webhook,
+  // whether Grow found a full pre-payment draft or had to create a fallback row.
+  if (existingCrmProfile) {
+    await db.update(crmLeads)
+      .set({ singleId: singleRecord.id, product: "database", status: "client_database", updatedAt: now })
+      .where(eq(crmLeads.id, existingCrmProfile.id));
+  } else {
+    await db.insert(crmLeads).values({
+      name, email: normalizedEmail, phone: normalizedPhone, source: "direct",
+      product: "database", status: "client_database",
+      singleId: singleRecord.id, createdAt: now, updatedAt: now,
+    }).catch(() => {});
   }
 
   await db.insert(leads).values({ name, email, phone, source: "paid_database" }).catch(() => {});

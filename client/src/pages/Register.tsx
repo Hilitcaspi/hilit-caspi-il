@@ -241,7 +241,7 @@ export default function Register() {
     );
   };
 
-  const handleProfileSubmit = (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Manual validation for iOS Safari (which doesn't show native validation popups)
     const form = e.target as HTMLFormElement;
@@ -256,7 +256,22 @@ export default function Register() {
     }
     // If DNA already known (came from quiz), skip DNA step entirely
     if (dnaFromQuiz) {
-      setStep("payment");
+      if (freeTokenFromUrl) {
+        setStep("free_token_verify");
+        return;
+      }
+      setPaymentLoading(true);
+      setRegisterError("");
+      try {
+        await saveProfileDraftBeforePayment();
+        setStep("payment");
+      } catch (err) {
+        console.error("[PrePayment] Failed to save profile draft:", err);
+        setRegisterError("לא הצלחנו לשמור את הפרופיל לפני התשלום. לא בוצע חיוב. אנא נסו שוב.");
+        setStep("uploading_error");
+      } finally {
+        setPaymentLoading(false);
+      }
     } else {
       // Go directly to the embedded DNA quiz (no manual selection screen)
       setStep("dna_select");
@@ -498,6 +513,9 @@ export default function Register() {
       setGrowOpened(true);
     },
   });
+  const profileDraftMutation = trpc.singles.registerBasicProfile.useMutation();
+  const [draftSavedBeforePayment, setDraftSavedBeforePayment] = useState(false);
+  const draftSaveInFlightRef = useRef<Promise<unknown> | null>(null);
 
   const buildRegisterPayload = () => ({
     firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email,
@@ -519,11 +537,46 @@ export default function Register() {
     utmContent: sessionStorage.getItem("utm_content") || localStorage.getItem("utm_content") || undefined,
   });
 
+  async function saveProfileDraftBeforePayment(overrides?: {
+    gender?: "female" | "male";
+    dnaType?: "leader" | "romantic" | "free_spirit" | "anchor";
+    dnaSessionId?: string;
+  }) {
+    if (draftSaveInFlightRef.current) return draftSaveInFlightRef.current;
+    const attempt = (async () => {
+      const payload = {
+        ...buildRegisterPayload(),
+        ...overrides,
+        deferUntilPayment: true,
+      };
+      try { localStorage.setItem("pending_profile_payload", JSON.stringify(payload)); } catch {}
+      const data = await profileDraftMutation.mutateAsync(payload);
+      if (data?.alreadyExists) {
+        try { localStorage.removeItem("pending_profile_payload"); } catch {}
+        throw new Error("PROFILE_ALREADY_REGISTERED");
+      }
+      if (data?.questionnaireToken) setQuestionnaireToken(data.questionnaireToken);
+      setDraftSavedBeforePayment(true);
+      return data;
+    })();
+    draftSaveInFlightRef.current = attempt;
+    try {
+      return await attempt;
+    } finally {
+      draftSaveInFlightRef.current = null;
+    }
+  }
+
   const handlePaymentSuccess = async () => {
     // Fire Meta Pixel
     trackCompleteRegistration({ content_name: "מאגר רווקים" });
     gaSignUp("database");
-    // Save profile - MUST succeed to prevent skeleton profiles
+    if (draftSavedBeforePayment) {
+      try { localStorage.removeItem("pending_profile_payload"); } catch {}
+      setGrowOpened(true);
+      return;
+    }
+    // Fallback for a legacy or resumed checkout that reached Grow without a draft.
     const payload = buildRegisterPayload();
     // Save payload to localStorage as backup in case the request fails
     try { localStorage.setItem('pending_profile_payload', JSON.stringify(payload)); } catch {}
@@ -1055,9 +1108,9 @@ export default function Register() {
                     אני מסכימה/מסכים לקבל עדכונים ותוכן מהילית כספי בדואר אלקטרוני. אפשר להסיר מרשימת התפוצה בכל עת.
                   </span>
                 </label>
-                <button type="submit"
-                  className="w-full bg-[#191265] text-white font-black text-lg py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 shadow-xl">
-                  המשך לתשלום ₪299 ←
+                <button type="submit" disabled={paymentLoading}
+                  className="w-full bg-[#191265] text-white font-black text-lg py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 shadow-xl disabled:opacity-60 disabled:cursor-wait">
+                  {paymentLoading ? "שומרת את הפרטים..." : "המשך לתשלום ₪299 ←"}
                 </button>
               </form>
             </motion.div>
@@ -1227,11 +1280,30 @@ export default function Register() {
             <motion.div key="dna_select" {...slideIn}>
               <EmbeddedDnaQuiz
                 initialGender={gender}
-                onComplete={(dnaType, quizGender, quizSessionId) => {
+                onComplete={async (dnaType, quizGender, quizSessionId) => {
                   setDnaFromQuiz(dnaType);
                   setGender(quizGender as "female" | "male");
                   if (quizSessionId) setSessionId(quizSessionId);
-                  setStep("payment");
+                  if (freeTokenFromUrl) {
+                    setStep("free_token_verify");
+                    return;
+                  }
+                  setPaymentLoading(true);
+                  setRegisterError("");
+                  try {
+                    await saveProfileDraftBeforePayment({
+                      gender: quizGender as "female" | "male",
+                      dnaType,
+                      ...(quizSessionId ? { dnaSessionId: quizSessionId } : {}),
+                    });
+                    setStep("payment");
+                  } catch (err) {
+                    console.error("[PrePayment] Failed to save profile draft after DNA:", err);
+                    setRegisterError("לא הצלחנו לשמור את הפרופיל לפני התשלום. לא בוצע חיוב. אנא נסו שוב.");
+                    setStep("uploading_error");
+                  } finally {
+                    setPaymentLoading(false);
+                  }
                 }}
               />
               <button
@@ -1362,7 +1434,7 @@ export default function Register() {
                         <li className="flex items-start gap-2"><span className="text-[#ffe27c] font-bold mt-0.5">✓</span><span>כשתהיה התאמה תקבלו מייל עם פרטי הצד השני לאישור</span></li>
                       </ul>
                     </div>
-                    {questionnaireToken ? (
+                    {questionnaireToken && isFreeTokenPath ? (
                       <a
                         href={`/join/questionnaire?token=${questionnaireToken}`}
                         className="block w-full bg-[#ffe27c] text-[#191265] font-black py-5 rounded-2xl text-lg text-center hover:bg-white transition-colors mb-4 shadow-lg"
