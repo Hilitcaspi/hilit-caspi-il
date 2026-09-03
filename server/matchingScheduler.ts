@@ -156,6 +156,7 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
     .where(
       and(
         eq(singles.isActive, true),
+        eq(singles.consentMatchmaking, true),
         isNotNull(singles.email),
         isNotNull(singles.gender)
       )
