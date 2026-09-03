@@ -1,0 +1,19 @@
+Uploading file: /home/ubuntu/business-report-assets/actual_revenue_vs_spend.png (size: 65629 bytes)
+Upload timeout: 2m0s
+File uploaded successfully!
+CDN URL: https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/tFSiKZOsNlSmlMRc.png
+Uploading file: /home/ubuntu/business-report-assets/forecast_scenarios.png (size: 108774 bytes)
+Upload timeout: 2m0s
+File uploaded successfully!
+CDN URL: https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/hZgYKerDOstvjYpJ.png
+Uploading file: /home/ubuntu/business-report-assets/product_and_match_funnel.png (size: 108601 bytes)
+Upload timeout: 2m0s
+File uploaded successfully!
+CDN URL: https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/uqpmhceMgNwDWGrp.png
+
+========== Upload Summary ==========
+[SUCCESS] /home/ubuntu/business-report-assets/actual_revenue_vs_spend.png -> https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/tFSiKZOsNlSmlMRc.png
+[SUCCESS] /home/ubuntu/business-report-assets/forecast_scenarios.png -> https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/hZgYKerDOstvjYpJ.png
+[SUCCESS] /home/ubuntu/business-report-assets/product_and_match_funnel.png -> https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/uqpmhceMgNwDWGrp.png
+=====================================
+Total: 3, Success: 3, Failed: 0

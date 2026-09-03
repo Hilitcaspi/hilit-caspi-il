@@ -1,12 +1,17 @@
 import { trpc } from "@/lib/trpc";
+import { HelmetProvider } from "react-helmet-async";
 import { COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
-import { startLogin } from "./const";
+import { getLoginUrl } from "./const";
 import "./index.css";
+import { initBehaviorTracker } from "@/lib/behaviorTracker";
+
+// Initialize behavior tracking (Hotjar-style)
+initBehaviorTracker();
 
 const queryClient = new QueryClient();
 
@@ -18,7 +23,12 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  startLogin();
+  // Don't redirect if user is on team login page or has team token
+  if (window.location.pathname.startsWith("/team/")) return;
+  if (document.cookie.includes("team_token")) return;
+  if (localStorage.getItem("team_token")) return;
+
+  window.location.href = getLoginUrl();
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -60,6 +70,20 @@ const trpcClient = trpc.createClient({
         } catch {
           // sessionStorage unavailable
         }
+        // Team member token fallback (mobile browsers may not send HttpOnly cookies)
+        try {
+          const teamToken = localStorage.getItem("team_token");
+          if (teamToken) {
+            return { "x-team-token": teamToken };
+          }
+        } catch {}
+        // Also check non-httpOnly cookie (set by form-based login)
+        try {
+          const cookieMatch = document.cookie.match(/team_token_js=([^;]+)/);
+          if (cookieMatch?.[1]) {
+            return { "x-team-token": cookieMatch[1] };
+          }
+        } catch {}
         return {};
       },
       fetch(input, init) {
@@ -73,9 +97,11 @@ const trpcClient = trpc.createClient({
 });
 
 createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
+  <HelmetProvider>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </trpc.Provider>
+  </HelmetProvider>
 );

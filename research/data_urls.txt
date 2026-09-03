@@ -1,0 +1,19 @@
+Uploading file: /home/ubuntu/hilit-caspi-il/research/business_metrics_summary.json (size: 7380 bytes)
+Upload timeout: 2m0s
+File uploaded successfully!
+CDN URL: https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/atJPFpmnwsvUPzCJ.json
+Uploading file: /home/ubuntu/hilit-caspi-il/research/unit_economics_raw.json (size: 4717 bytes)
+Upload timeout: 2m0s
+File uploaded successfully!
+CDN URL: https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/yTvcrEQHcbYdEJzX.json
+Uploading file: /home/ubuntu/hilit-caspi-il/research/forecast_summary.csv (size: 442 bytes)
+Upload timeout: 2m0s
+File uploaded successfully!
+CDN URL: https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/nrSclqGnXXpVRBiE.csv
+
+========== Upload Summary ==========
+[SUCCESS] /home/ubuntu/hilit-caspi-il/research/business_metrics_summary.json -> https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/atJPFpmnwsvUPzCJ.json
+[SUCCESS] /home/ubuntu/hilit-caspi-il/research/unit_economics_raw.json -> https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/yTvcrEQHcbYdEJzX.json
+[SUCCESS] /home/ubuntu/hilit-caspi-il/research/forecast_summary.csv -> https://files.manuscdn.com/user_upload_by_module/session_file/310519663464075430/nrSclqGnXXpVRBiE.csv
+=====================================
+Total: 3, Success: 3, Failed: 0

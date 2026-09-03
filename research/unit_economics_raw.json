@@ -1,0 +1,227 @@
+{
+  "asOf": "2026-08-22",
+  "uniqueBuyers": 613,
+  "totalPurchaseRows": 640,
+  "repeatBuyerCount": 25,
+  "repeatBuyerRate": 0.040783034257748776,
+  "productCustomerCounts": {
+    "database": 521,
+    "bundle_tubav": 93,
+    "course": 4,
+    "guide": 8,
+    "session": 12,
+    "coaching": 1
+  },
+  "crossSell": {
+    "database->bundle_tubav": 12,
+    "bundle_tubav->database": 12,
+    "course->guide": 2,
+    "guide->course": 2,
+    "session->bundle_tubav": 2,
+    "bundle_tubav->session": 2,
+    "database->guide": 5,
+    "guide->database": 5,
+    "database->coaching": 1,
+    "coaching->database": 1,
+    "guide->session": 2,
+    "course->database": 1,
+    "course->session": 1,
+    "database->course": 1,
+    "database->session": 3,
+    "session->guide": 2,
+    "session->course": 1,
+    "session->database": 3
+  },
+  "matchSummary": {
+    "totalMatches": 4496,
+    "matchedStatus": "53",
+    "rejectedStatus": "946",
+    "pendingStatus": "3022",
+    "doubleApproved": "142",
+    "atLeastOneEmailOpened": "1462"
+  },
+  "matchesByMonth": [
+    {
+      "month": "2026-05",
+      "matches": 57,
+      "matched": "0",
+      "rejected": "33",
+      "doubleApproved": "10"
+    },
+    {
+      "month": "2026-06",
+      "matches": 674,
+      "matched": "0",
+      "rejected": "196",
+      "doubleApproved": "31"
+    },
+    {
+      "month": "2026-07",
+      "matches": 1677,
+      "matched": "7",
+      "rejected": "301",
+      "doubleApproved": "45"
+    },
+    {
+      "month": "2026-08",
+      "matches": 2088,
+      "matched": "46",
+      "rejected": "416",
+      "doubleApproved": "56"
+    }
+  ],
+  "emailSummary": [
+    {
+      "journeyKey": "women_first_step_v2",
+      "emails": 28907,
+      "sent": "22568",
+      "failed": "4153",
+      "opened": "8538",
+      "clicked": "1392"
+    },
+    {
+      "journeyKey": "men_first_step_v2",
+      "emails": 23075,
+      "sent": "18206",
+      "failed": "2900",
+      "opened": "6295",
+      "clicked": "1113"
+    },
+    {
+      "journeyKey": "free_guide_nurture",
+      "emails": 900,
+      "sent": "760",
+      "failed": "134",
+      "opened": "256",
+      "clicked": "164"
+    },
+    {
+      "journeyKey": "profile_completion_urgency_5",
+      "emails": 249,
+      "sent": "249",
+      "failed": "0",
+      "opened": "91",
+      "clicked": "112"
+    },
+    {
+      "journeyKey": "abandoned_database",
+      "emails": 246,
+      "sent": "232",
+      "failed": "11",
+      "opened": "112",
+      "clicked": "45"
+    },
+    {
+      "journeyKey": "men_matchmaking_welcome",
+      "emails": 124,
+      "sent": "124",
+      "failed": "0",
+      "opened": "66",
+      "clicked": "30"
+    },
+    {
+      "journeyKey": "abandoned_guide",
+      "emails": 114,
+      "sent": "53",
+      "failed": "0",
+      "opened": "15",
+      "clicked": "2"
+    },
+    {
+      "journeyKey": "abandoned_course",
+      "emails": 111,
+      "sent": "50",
+      "failed": "0",
+      "opened": "13",
+      "clicked": "0"
+    },
+    {
+      "journeyKey": "profile_completion_urgency_2",
+      "emails": 88,
+      "sent": "87",
+      "failed": "1",
+      "opened": "32",
+      "clicked": "38"
+    },
+    {
+      "journeyKey": "men_first_step",
+      "emails": 87,
+      "sent": "43",
+      "failed": "44",
+      "opened": "8",
+      "clicked": "3"
+    },
+    {
+      "journeyKey": "women_matchmaking_welcome",
+      "emails": 84,
+      "sent": "81",
+      "failed": "3",
+      "opened": "33",
+      "clicked": "7"
+    },
+    {
+      "journeyKey": "women_first_step",
+      "emails": 81,
+      "sent": "49",
+      "failed": "32",
+      "opened": "6",
+      "clicked": "7"
+    },
+    {
+      "journeyKey": "women_guide",
+      "emails": 80,
+      "sent": "77",
+      "failed": "3",
+      "opened": "51",
+      "clicked": "35"
+    },
+    {
+      "journeyKey": "profile_completion_urgency_3",
+      "emails": 44,
+      "sent": "44",
+      "failed": "0",
+      "opened": "15",
+      "clicked": "12"
+    },
+    {
+      "journeyKey": "profile_completion_urgency_4",
+      "emails": 32,
+      "sent": "32",
+      "failed": "0",
+      "opened": "6",
+      "clicked": "5"
+    },
+    {
+      "journeyKey": "women_transformation",
+      "emails": 30,
+      "sent": "29",
+      "failed": "0",
+      "opened": "22",
+      "clicked": "7"
+    },
+    {
+      "journeyKey": "abandoned_coaching",
+      "emails": 21,
+      "sent": "21",
+      "failed": "0",
+      "opened": "8",
+      "clicked": "2"
+    },
+    {
+      "journeyKey": "women_course",
+      "emails": 21,
+      "sent": "17",
+      "failed": "4",
+      "opened": "12",
+      "clicked": "11"
+    },
+    {
+      "journeyKey": "men_transformation",
+      "emails": 3,
+      "sent": "0",
+      "failed": "3",
+      "opened": "0",
+      "clicked": "0"
+    }
+  ]
+}

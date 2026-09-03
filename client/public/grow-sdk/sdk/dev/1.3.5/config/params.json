@@ -1,0 +1,21 @@
+{
+	"api": {
+		"baseUrls": {
+			"default": {
+				"url": "https://dev.meshulam.co.il/api/light/web/1.0"
+			},
+			"analytics": {
+				"url": "https://ga.meshulam.co.il/analytics"
+			},
+			"paybox": {
+				"url": "https://devpaybox.grow.security/api/providers/server/1.0",
+				"headers": {
+					"X-API-KEY": "hSrRnwZgs22YYIlhHh7pv4Mk4sasotbi4X33CtSJ"
+				}
+			},
+			"payboxPhp": {
+				"url": "https://dev.meshulam.co.il/api/providers/server/1.0"
+			}
+		}
+	}
+}

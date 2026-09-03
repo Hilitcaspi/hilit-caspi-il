@@ -1,0 +1,689 @@
+{
+  "asOf": "2026-08-22",
+  "startMonthlyRevenue": 120736.32,
+  "scenarios": {
+    "conservative": {
+      "label": "שמרני",
+      "description": "אין צמיחה בחצי השנה הראשונה, לאחר מכן 1% חודשי שמתמתן ל־0.75%. ללא קפיצת LTV.",
+      "year1Revenue": 1474617.2955304636,
+      "year2Revenue": 1641695.188030973,
+      "year3Revenue": 1819873.610882124,
+      "month12RunRate": 1537968.4390729265,
+      "month24RunRate": 1733021.332700369,
+      "month36RunRate": 1895590.6875186241,
+      "milestoneMonths": {
+        "3m_arr": null,
+        "6m_arr": null,
+        "10m_arr": null
+      },
+      "breakEvenMonthsAt65Margin": {
+        "50000": 1,
+        "80000": 8,
+        "120000": null,
+        "180000": null
+      },
+      "months": [
+        {
+          "month": 1,
+          "revenue": 120736.32,
+          "annualizedRunRate": 1448835.84
+        },
+        {
+          "month": 2,
+          "revenue": 120736.32,
+          "annualizedRunRate": 1448835.84
+        },
+        {
+          "month": 3,
+          "revenue": 120736.32,
+          "annualizedRunRate": 1448835.84
+        },
+        {
+          "month": 4,
+          "revenue": 120736.32,
+          "annualizedRunRate": 1448835.84
+        },
+        {
+          "month": 5,
+          "revenue": 120736.32,
+          "annualizedRunRate": 1448835.84
+        },
+        {
+          "month": 6,
+          "revenue": 120736.32,
+          "annualizedRunRate": 1448835.84
+        },
+        {
+          "month": 7,
+          "revenue": 121943.68320000001,
+          "annualizedRunRate": 1463324.1984
+        },
+        {
+          "month": 8,
+          "revenue": 123163.12003200002,
+          "annualizedRunRate": 1477957.4403840003
+        },
+        {
+          "month": 9,
+          "revenue": 124394.75123232002,
+          "annualizedRunRate": 1492737.0147878402
+        },
+        {
+          "month": 10,
+          "revenue": 125638.69874464322,
+          "annualizedRunRate": 1507664.3849357185
+        },
+        {
+          "month": 11,
+          "revenue": 126895.08573208965,
+          "annualizedRunRate": 1522741.0287850758
+        },
+        {
+          "month": 12,
+          "revenue": 128164.03658941055,
+          "annualizedRunRate": 1537968.4390729265
+        },
+        {
+          "month": 13,
+          "revenue": 129445.67695530466,
+          "annualizedRunRate": 1553348.1234636558
+        },
+        {
+          "month": 14,
+          "revenue": 130740.1337248577,
+          "annualizedRunRate": 1568881.6046982924
+        },
+        {
+          "month": 15,
+          "revenue": 132047.53506210627,
+          "annualizedRunRate": 1584570.4207452752
+        },
+        {
+          "month": 16,
+          "revenue": 133368.01041272734,
+          "annualizedRunRate": 1600416.124952728
+        },
+        {
+          "month": 17,
+          "revenue": 134701.6905168546,
+          "annualizedRunRate": 1616420.2862022552
+        },
+        {
+          "month": 18,
+          "revenue": 136048.70742202314,
+          "annualizedRunRate": 1632584.4890642776
+        },
+        {
+          "month": 19,
+          "revenue": 137409.19449624338,
+          "annualizedRunRate": 1648910.3339549205
+        },
+        {
+          "month": 20,
+          "revenue": 138783.28644120583,
+          "annualizedRunRate": 1665399.43729447
+        },
+        {
+          "month": 21,
+          "revenue": 140171.11930561787,
+          "annualizedRunRate": 1682053.4316674145
+        },
+        {
+          "month": 22,
+          "revenue": 141572.83049867404,
+          "annualizedRunRate": 1698873.9659840884
+        },
+        {
+          "month": 23,
+          "revenue": 142988.5588036608,
+          "annualizedRunRate": 1715862.7056439295
+        },
+        {
+          "month": 24,
+          "revenue": 144418.4443916974,
+          "annualizedRunRate": 1733021.332700369
+        },
+        {
+          "month": 25,
+          "revenue": 145501.58272463514,
+          "annualizedRunRate": 1746018.9926956217
+        },
+        {
+          "month": 26,
+          "revenue": 146592.8445950699,
+          "annualizedRunRate": 1759114.135140839
+        },
+        {
+          "month": 27,
+          "revenue": 147692.29092953293,
+          "annualizedRunRate": 1772307.491154395
+        },
+        {
+          "month": 28,
+          "revenue": 148799.98311150444,
+          "annualizedRunRate": 1785599.7973380531
+        },
+        {
+          "month": 29,
+          "revenue": 149915.98298484072,
+          "annualizedRunRate": 1798991.7958180886
+        },
+        {
+          "month": 30,
+          "revenue": 151040.35285722703,
+          "annualizedRunRate": 1812484.2342867244
+        },
+        {
+          "month": 31,
+          "revenue": 152173.15550365625,
+          "annualizedRunRate": 1826077.866043875
+        },
+        {
+          "month": 32,
+          "revenue": 153314.45416993368,
+          "annualizedRunRate": 1839773.4500392042
+        },
+        {
+          "month": 33,
+          "revenue": 154464.3125762082,
+          "annualizedRunRate": 1853571.7509144985
+        },
+        {
+          "month": 34,
+          "revenue": 155622.79492052976,
+          "annualizedRunRate": 1867473.5390463572
+        },
+        {
+          "month": 35,
+          "revenue": 156789.96588243375,
+          "annualizedRunRate": 1881479.590589205
+        },
+        {
+          "month": 36,
+          "revenue": 157965.89062655202,
+          "annualizedRunRate": 1895590.6875186241
+        }
+      ]
+    },
+    "base": {
+      "label": "בסיס",
+      "description": "3% חודשי בחצי השנה הראשונה, 2% בהמשך השנה, 1.5% בשנה השנייה ו־1% בשלישית.",
+      "year1Revenue": 1732002.7192382042,
+      "year2Revenue": 2149048.8700681943,
+      "year3Revenue": 2486458.2323341523,
+      "month12RunRate": 1948244.951077461,
+      "month24RunRate": 2329357.0659663994,
+      "month36RunRate": 2624777.846045705,
+      "milestoneMonths": {
+        "3m_arr": null,
+        "6m_arr": null,
+        "10m_arr": null
+      },
+      "breakEvenMonthsAt65Margin": {
+        "50000": 1,
+        "80000": 1,
+        "120000": 21,
+        "180000": null
+      },
+      "months": [
+        {
+          "month": 1,
+          "revenue": 124358.40960000001,
+          "annualizedRunRate": 1492300.9152000002
+        },
+        {
+          "month": 2,
+          "revenue": 128089.16188800002,
+          "annualizedRunRate": 1537069.9426560001
+        },
+        {
+          "month": 3,
+          "revenue": 131931.83674464002,
+          "annualizedRunRate": 1583182.0409356803
+        },
+        {
+          "month": 4,
+          "revenue": 135889.79184697923,
+          "annualizedRunRate": 1630677.5021637508
+        },
+        {
+          "month": 5,
+          "revenue": 139966.48560238862,
+          "annualizedRunRate": 1679597.8272286635
+        },
+        {
+          "month": 6,
+          "revenue": 144165.48017046027,
+          "annualizedRunRate": 1729985.7620455232
+        },
+        {
+          "month": 7,
+          "revenue": 147048.78977386947,
+          "annualizedRunRate": 1764585.4772864338
+        },
+        {
+          "month": 8,
+          "revenue": 149989.76556934687,
+          "annualizedRunRate": 1799877.1868321626
+        },
+        {
+          "month": 9,
+          "revenue": 152989.5608807338,
+          "annualizedRunRate": 1835874.7305688057
+        },
+        {
+          "month": 10,
+          "revenue": 156049.3520983485,
+          "annualizedRunRate": 1872592.225180182
+        },
+        {
+          "month": 11,
+          "revenue": 159170.33914031545,
+          "annualizedRunRate": 1910044.0696837856
+        },
+        {
+          "month": 12,
+          "revenue": 162353.74592312175,
+          "annualizedRunRate": 1948244.951077461
+        },
+        {
+          "month": 13,
+          "revenue": 164789.05211196857,
+          "annualizedRunRate": 1977468.6253436229
+        },
+        {
+          "month": 14,
+          "revenue": 167260.8878936481,
+          "annualizedRunRate": 2007130.654723777
+        },
+        {
+          "month": 15,
+          "revenue": 169769.8012120528,
+          "annualizedRunRate": 2037237.6145446333
+        },
+        {
+          "month": 16,
+          "revenue": 172316.34823023356,
+          "annualizedRunRate": 2067796.1787628029
+        },
+        {
+          "month": 17,
+          "revenue": 174901.09345368703,
+          "annualizedRunRate": 2098813.1214442444
+        },
+        {
+          "month": 18,
+          "revenue": 177524.6098554923,
+          "annualizedRunRate": 2130295.3182659075
+        },
+        {
+          "month": 19,
+          "revenue": 180187.47900332467,
+          "annualizedRunRate": 2162249.748039896
+        },
+        {
+          "month": 20,
+          "revenue": 182890.2911883745,
+          "annualizedRunRate": 2194683.494260494
+        },
+        {
+          "month": 21,
+          "revenue": 185633.64555620012,
+          "annualizedRunRate": 2227603.7466744017
+        },
+        {
+          "month": 22,
+          "revenue": 188418.15023954312,
+          "annualizedRunRate": 2261017.8028745176
+        },
+        {
+          "month": 23,
+          "revenue": 191244.42249313626,
+          "annualizedRunRate": 2294933.069917635
+        },
+        {
+          "month": 24,
+          "revenue": 194113.0888305333,
+          "annualizedRunRate": 2329357.0659663994
+        },
+        {
+          "month": 25,
+          "revenue": 196054.21971883863,
+          "annualizedRunRate": 2352650.636626064
+        },
+        {
+          "month": 26,
+          "revenue": 198014.76191602703,
+          "annualizedRunRate": 2376177.142992324
+        },
+        {
+          "month": 27,
+          "revenue": 199994.9095351873,
+          "annualizedRunRate": 2399938.9144222476
+        },
+        {
+          "month": 28,
+          "revenue": 201994.85863053918,
+          "annualizedRunRate": 2423938.3035664703
+        },
+        {
+          "month": 29,
+          "revenue": 204014.80721684458,
+          "annualizedRunRate": 2448177.686602135
+        },
+        {
+          "month": 30,
+          "revenue": 206054.955289013,
+          "annualizedRunRate": 2472659.4634681563
+        },
+        {
+          "month": 31,
+          "revenue": 208115.50484190314,
+          "annualizedRunRate": 2497386.0581028378
+        },
+        {
+          "month": 32,
+          "revenue": 210196.65989032216,
+          "annualizedRunRate": 2522359.918683866
+        },
+        {
+          "month": 33,
+          "revenue": 212298.6264892254,
+          "annualizedRunRate": 2547583.5178707046
+        },
+        {
+          "month": 34,
+          "revenue": 214421.61275411764,
+          "annualizedRunRate": 2573059.3530494114
+        },
+        {
+          "month": 35,
+          "revenue": 216565.82888165882,
+          "annualizedRunRate": 2598789.9465799057
+        },
+        {
+          "month": 36,
+          "revenue": 218731.48717047542,
+          "annualizedRunRate": 2624777.846045705
+        }
+      ]
+    },
+    "scale": {
+      "label": "סקייל",
+      "description": "הרחבת צוות, מנוי/Plus, אפסייל שיטתי ושיפור קהילות: 7% חודשי בתחילה, מתמתן בהדרגה.",
+      "year1Revenue": 2174038.66633604,
+      "year2Revenue": 3241929.8630551347,
+      "year3Revenue": 4081417.284973989,
+      "month12RunRate": 2751198.224435856,
+      "month24RunRate": 3700055.7453300385,
+      "month36RunRate": 4423853.884537244,
+      "milestoneMonths": {
+        "3m_arr": 16,
+        "6m_arr": null,
+        "10m_arr": null
+      },
+      "breakEvenMonthsAt65Margin": {
+        "50000": 1,
+        "80000": 1,
+        "120000": 7,
+        "180000": 20
+      },
+      "months": [
+        {
+          "month": 1,
+          "revenue": 129187.86240000001,
+          "annualizedRunRate": 1550254.3488000003
+        },
+        {
+          "month": 2,
+          "revenue": 138231.01276800002,
+          "annualizedRunRate": 1658772.1532160002
+        },
+        {
+          "month": 3,
+          "revenue": 147907.18366176003,
+          "annualizedRunRate": 1774886.2039411203
+        },
+        {
+          "month": 4,
+          "revenue": 158260.68651808324,
+          "annualizedRunRate": 1899128.238216999
+        },
+        {
+          "month": 5,
+          "revenue": 169338.93457434908,
+          "annualizedRunRate": 2032067.214892189
+        },
+        {
+          "month": 6,
+          "revenue": 181192.65999455354,
+          "annualizedRunRate": 2174311.9199346425
+        },
+        {
+          "month": 7,
+          "revenue": 188440.3663943357,
+          "annualizedRunRate": 2261284.3967320286
+        },
+        {
+          "month": 8,
+          "revenue": 195977.98105010914,
+          "annualizedRunRate": 2351735.7726013097
+        },
+        {
+          "month": 9,
+          "revenue": 203817.10029211352,
+          "annualizedRunRate": 2445805.2035053624
+        },
+        {
+          "month": 10,
+          "revenue": 211969.78430379808,
+          "annualizedRunRate": 2543637.411645577
+        },
+        {
+          "month": 11,
+          "revenue": 220448.57567595,
+          "annualizedRunRate": 2645382.9081114
+        },
+        {
+          "month": 12,
+          "revenue": 229266.51870298802,
+          "annualizedRunRate": 2751198.224435856
+        },
+        {
+          "month": 13,
+          "revenue": 234998.18167056268,
+          "annualizedRunRate": 2819978.180046752
+        },
+        {
+          "month": 14,
+          "revenue": 240873.13621232673,
+          "annualizedRunRate": 2890477.634547921
+        },
+        {
+          "month": 15,
+          "revenue": 246894.9646176349,
+          "annualizedRunRate": 2962739.5754116187
+        },
+        {
+          "month": 16,
+          "revenue": 253067.33873307574,
+          "annualizedRunRate": 3036808.0647969088
+        },
+        {
+          "month": 17,
+          "revenue": 259394.0222014026,
+          "annualizedRunRate": 3112728.2664168314
+        },
+        {
+          "month": 18,
+          "revenue": 265878.87275643763,
+          "annualizedRunRate": 3190546.4730772516
+        },
+        {
+          "month": 19,
+          "revenue": 272525.84457534854,
+          "annualizedRunRate": 3270310.1349041825
+        },
+        {
+          "month": 20,
+          "revenue": 279338.99068973225,
+          "annualizedRunRate": 3352067.888276787
+        },
+        {
+          "month": 21,
+          "revenue": 286322.4654569755,
+          "annualizedRunRate": 3435869.585483706
+        },
+        {
+          "month": 22,
+          "revenue": 293480.5270933999,
+          "annualizedRunRate": 3521766.325120799
+        },
+        {
+          "month": 23,
+          "revenue": 300817.54027073487,
+          "annualizedRunRate": 3609810.4832488187
+        },
+        {
+          "month": 24,
+          "revenue": 308337.9787775032,
+          "annualizedRunRate": 3700055.7453300385
+        },
+        {
+          "month": 25,
+          "revenue": 312963.04845916573,
+          "annualizedRunRate": 3755556.5815099888
+        },
+        {
+          "month": 26,
+          "revenue": 317657.49418605317,
+          "annualizedRunRate": 3811889.930232638
+        },
+        {
+          "month": 27,
+          "revenue": 322422.35659884394,
+          "annualizedRunRate": 3869068.2791861272
+        },
+        {
+          "month": 28,
+          "revenue": 327258.6919478266,
+          "annualizedRunRate": 3927104.303373919
+        },
+        {
+          "month": 29,
+          "revenue": 332167.572327044,
+          "annualizedRunRate": 3986010.8679245277
+        },
+        {
+          "month": 30,
+          "revenue": 337150.08591194963,
+          "annualizedRunRate": 4045801.0309433956
+        },
+        {
+          "month": 31,
+          "revenue": 342207.3372006288,
+          "annualizedRunRate": 4106488.046407546
+        },
+        {
+          "month": 32,
+          "revenue": 347340.4472586382,
+          "annualizedRunRate": 4168085.3671036586
+        },
+        {
+          "month": 33,
+          "revenue": 352550.55396751774,
+          "annualizedRunRate": 4230606.647610213
+        },
+        {
+          "month": 34,
+          "revenue": 357838.8122770305,
+          "annualizedRunRate": 4294065.747324366
+        },
+        {
+          "month": 35,
+          "revenue": 363206.3944611859,
+          "annualizedRunRate": 4358476.733534231
+        },
+        {
+          "month": 36,
+          "revenue": 368654.4903781037,
+          "annualizedRunRate": 4423853.884537244
+        }
+      ]
+    }
+  },
+  "breakEvenSensitivity": [
+    {
+      "contributionMargin": 0.55,
+      "monthlyFixedCosts": 50000,
+      "breakEvenRevenue": 90909.0909090909,
+      "currentRunRateSurplusBeforeTax": 16404.97600000001
+    },
+    {
+      "contributionMargin": 0.55,
+      "monthlyFixedCosts": 80000,
+      "breakEvenRevenue": 145454.54545454544,
+      "currentRunRateSurplusBeforeTax": -13595.02399999999
+    },
+    {
+      "contributionMargin": 0.55,
+      "monthlyFixedCosts": 120000,
+      "breakEvenRevenue": 218181.81818181818,
+      "currentRunRateSurplusBeforeTax": -53595.02399999999
+    },
+    {
+      "contributionMargin": 0.55,
+      "monthlyFixedCosts": 180000,
+      "breakEvenRevenue": 327272.72727272724,
+      "currentRunRateSurplusBeforeTax": -113595.02399999999
+    },
+    {
+      "contributionMargin": 0.65,
+      "monthlyFixedCosts": 50000,
+      "breakEvenRevenue": 76923.07692307692,
+      "currentRunRateSurplusBeforeTax": 28478.608000000007
+    },
+    {
+      "contributionMargin": 0.65,
+      "monthlyFixedCosts": 80000,
+      "breakEvenRevenue": 123076.92307692308,
+      "currentRunRateSurplusBeforeTax": -1521.3919999999925
+    },
+    {
+      "contributionMargin": 0.65,
+      "monthlyFixedCosts": 120000,
+      "breakEvenRevenue": 184615.3846153846,
+      "currentRunRateSurplusBeforeTax": -41521.39199999999
+    },
+    {
+      "contributionMargin": 0.65,
+      "monthlyFixedCosts": 180000,
+      "breakEvenRevenue": 276923.07692307694,
+      "currentRunRateSurplusBeforeTax": -101521.39199999999
+    },
+    {
+      "contributionMargin": 0.75,
+      "monthlyFixedCosts": 50000,
+      "breakEvenRevenue": 66666.66666666667,
+      "currentRunRateSurplusBeforeTax": 40552.240000000005
+    },
+    {
+      "contributionMargin": 0.75,
+      "monthlyFixedCosts": 80000,
+      "breakEvenRevenue": 106666.66666666667,
+      "currentRunRateSurplusBeforeTax": 10552.240000000005
+    },
+    {
+      "contributionMargin": 0.75,
+      "monthlyFixedCosts": 120000,
+      "breakEvenRevenue": 160000,
+      "currentRunRateSurplusBeforeTax": -29447.759999999995
+    },
+    {
+      "contributionMargin": 0.75,
+      "monthlyFixedCosts": 180000,
+      "breakEvenRevenue": 240000,
+      "currentRunRateSurplusBeforeTax": -89447.76
+    }
+  ]
+}

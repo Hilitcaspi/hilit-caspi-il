@@ -1,0 +1,1 @@
+ALTER TABLE `daily_report_settings` ADD CONSTRAINT `daily_report_settings_name_idx` UNIQUE(`name`);

@@ -1,0 +1,381 @@
+{
+  "asOf": "2026-08-22",
+  "startMs": 1774990800000,
+  "payments_by_month_product": [
+    {
+      "month": "2026-06",
+      "product": "database",
+      "purchases": 2
+    },
+    {
+      "month": "2026-07",
+      "product": "bundle_tubav",
+      "purchases": 91
+    },
+    {
+      "month": "2026-07",
+      "product": "course",
+      "purchases": 1
+    },
+    {
+      "month": "2026-07",
+      "product": "database",
+      "purchases": 264
+    },
+    {
+      "month": "2026-07",
+      "product": "guide",
+      "purchases": 3
+    },
+    {
+      "month": "2026-07",
+      "product": "session",
+      "purchases": 4
+    },
+    {
+      "month": "2026-08",
+      "product": "bundle_tubav",
+      "purchases": 3
+    },
+    {
+      "month": "2026-08",
+      "product": "coaching",
+      "purchases": 1
+    },
+    {
+      "month": "2026-08",
+      "product": "course",
+      "purchases": 3
+    },
+    {
+      "month": "2026-08",
+      "product": "database",
+      "purchases": 255
+    },
+    {
+      "month": "2026-08",
+      "product": "guide",
+      "purchases": 5
+    },
+    {
+      "month": "2026-08",
+      "product": "session",
+      "purchases": 8
+    }
+  ],
+  "payments_by_week": [
+    {
+      "week": "2026-W25",
+      "purchases": 2
+    },
+    {
+      "week": "2026-W27",
+      "purchases": 20
+    },
+    {
+      "week": "2026-W28",
+      "purchases": 98
+    },
+    {
+      "week": "2026-W29",
+      "purchases": 93
+    },
+    {
+      "week": "2026-W30",
+      "purchases": 87
+    },
+    {
+      "week": "2026-W31",
+      "purchases": 83
+    },
+    {
+      "week": "2026-W32",
+      "purchases": 72
+    },
+    {
+      "week": "2026-W33",
+      "purchases": 109
+    },
+    {
+      "week": "2026-W34",
+      "purchases": 76
+    }
+  ],
+  "leads_by_month_source": [
+    {
+      "month": "2026-04",
+      "source": "dna_quiz",
+      "leads": 505
+    },
+    {
+      "month": "2026-04",
+      "source": "meta_lead_guide",
+      "leads": 118
+    },
+    {
+      "month": "2026-04",
+      "source": "direct",
+      "leads": 35
+    },
+    {
+      "month": "2026-04",
+      "source": "guide_form",
+      "leads": 10
+    },
+    {
+      "month": "2026-05",
+      "source": "dna_quiz",
+      "leads": 1189
+    },
+    {
+      "month": "2026-05",
+      "source": "direct",
+      "leads": 99
+    },
+    {
+      "month": "2026-05",
+      "source": "guide_form",
+      "leads": 20
+    },
+    {
+      "month": "2026-06",
+      "source": "dna_quiz",
+      "leads": 2406
+    },
+    {
+      "month": "2026-06",
+      "source": "direct",
+      "leads": 101
+    },
+    {
+      "month": "2026-06",
+      "source": "guide_form",
+      "leads": 18
+    },
+    {
+      "month": "2026-07",
+      "source": "dna_quiz",
+      "leads": 2120
+    },
+    {
+      "month": "2026-07",
+      "source": "direct",
+      "leads": 149
+    },
+    {
+      "month": "2026-07",
+      "source": "guide_form",
+      "leads": 16
+    },
+    {
+      "month": "2026-08",
+      "source": "dna_quiz",
+      "leads": 2096
+    },
+    {
+      "month": "2026-08",
+      "source": "direct",
+      "leads": 69
+    },
+    {
+      "month": "2026-08",
+      "source": "guide_form",
+      "leads": 14
+    }
+  ],
+  "leads_by_week": [
+    {
+      "week": "2026-W16",
+      "leads": 18
+    },
+    {
+      "week": "2026-W17",
+      "leads": 303
+    },
+    {
+      "week": "2026-W18",
+      "leads": 604
+    },
+    {
+      "week": "2026-W19",
+      "leads": 370
+    },
+    {
+      "week": "2026-W20",
+      "leads": 320
+    },
+    {
+      "week": "2026-W21",
+      "leads": 200
+    },
+    {
+      "week": "2026-W22",
+      "leads": 161
+    },
+    {
+      "week": "2026-W23",
+      "leads": 405
+    },
+    {
+      "week": "2026-W24",
+      "leads": 569
+    },
+    {
+      "week": "2026-W25",
+      "leads": 714
+    },
+    {
+      "week": "2026-W26",
+      "leads": 698
+    },
+    {
+      "week": "2026-W27",
+      "leads": 617
+    },
+    {
+      "week": "2026-W28",
+      "leads": 766
+    },
+    {
+      "week": "2026-W29",
+      "leads": 531
+    },
+    {
+      "week": "2026-W30",
+      "leads": 309
+    },
+    {
+      "week": "2026-W31",
+      "leads": 370
+    },
+    {
+      "week": "2026-W32",
+      "leads": 647
+    },
+    {
+      "week": "2026-W33",
+      "leads": 771
+    },
+    {
+      "week": "2026-W34",
+      "leads": 592
+    }
+  ],
+  "singles_by_month_gender": [
+    {
+      "month": "2026-04",
+      "gender": "female",
+      "registrations": 48,
+      "paid": "48",
+      "active": "48"
+    },
+    {
+      "month": "2026-04",
+      "gender": "male",
+      "registrations": 32,
+      "paid": "32",
+      "active": "30"
+    },
+    {
+      "month": "2026-05",
+      "gender": "female",
+      "registrations": 125,
+      "paid": "123",
+      "active": "122"
+    },
+    {
+      "month": "2026-05",
+      "gender": "male",
+      "registrations": 106,
+      "paid": "101",
+      "active": "99"
+    },
+    {
+      "month": "2026-06",
+      "gender": "female",
+      "registrations": 172,
+      "paid": "170",
+      "active": "168"
+    },
+    {
+      "month": "2026-06",
+      "gender": "male",
+      "registrations": 127,
+      "paid": "126",
+      "active": "121"
+    },
+    {
+      "month": "2026-07",
+      "gender": "female",
+      "registrations": 186,
+      "paid": "186",
+      "active": "185"
+    },
+    {
+      "month": "2026-07",
+      "gender": "male",
+      "registrations": 157,
+      "paid": "152",
+      "active": "150"
+    },
+    {
+      "month": "2026-08",
+      "gender": "female",
+      "registrations": 113,
+      "paid": "113",
+      "active": "109"
+    },
+    {
+      "month": "2026-08",
+      "gender": "male",
+      "registrations": 120,
+      "paid": "120",
+      "active": "117"
+    }
+  ],
+  "singles_snapshot": [
+    {
+      "total": 1186,
+      "active": "1149",
+      "paid": "1171",
+      "activeWomen": "632",
+      "activeMen": "517",
+      "scientificComplete": "1078",
+      "withPhoto": "1079"
+    }
+  ],
+  "payment_period": [
+    {
+      "firstPaymentAt": 1781783252343,
+      "lastPaymentAt": 1787409469943,
+      "totalPurchases": 640
+    }
+  ],
+  "lead_to_purchase_by_month": [
+    {
+      "leadMonth": "2026-04",
+      "leads": 668,
+      "convertedEmails": 15
+    },
+    {
+      "leadMonth": "2026-05",
+      "leads": 1308,
+      "convertedEmails": 28
+    },
+    {
+      "leadMonth": "2026-06",
+      "leads": 2525,
+      "convertedEmails": 50
+    },
+    {
+      "leadMonth": "2026-07",
+      "leads": 2285,
+      "convertedEmails": 225
+    },
+    {
+      "leadMonth": "2026-08",
+      "leads": 2179,
+      "convertedEmails": 149
+    }
+  ]
+}

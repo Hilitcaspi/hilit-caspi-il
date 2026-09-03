@@ -1,0 +1,25 @@
+﻿scenario,scenario_label_he,campaign,budget,budget_share_pct,gated_by_grow
+conservative,שמרני,database_cold_acquisition,7000.0,38.9,False
+conservative,שמרני,database_retargeting,3000.0,16.7,False
+conservative,שמרני,holiday_bundle_acquisition,5000.0,27.8,False
+conservative,שמרני,holiday_bundle_retargeting,1500.0,8.3,False
+conservative,שמרני,dna_lead_quality_test,500.0,2.8,False
+conservative,שמרני,session_coaching,700.0,3.9,False
+conservative,שמרני,match_boost_reserve,100.0,0.6,True
+conservative,שמרני,plus_reserve,200.0,1.1,True
+base,יעד עבודה,database_cold_acquisition,7000.0,35.0,False
+base,יעד עבודה,database_retargeting,3000.0,15.0,False
+base,יעד עבודה,holiday_bundle_acquisition,6500.0,32.5,False
+base,יעד עבודה,holiday_bundle_retargeting,1500.0,7.5,False
+base,יעד עבודה,dna_lead_quality_test,500.0,2.5,False
+base,יעד עבודה,session_coaching,1000.0,5.0,False
+base,יעד עבודה,match_boost_reserve,200.0,1.0,True
+base,יעד עבודה,plus_reserve,300.0,1.5,True
+stretch,מתיחה,database_cold_acquisition,8000.0,33.3,False
+stretch,מתיחה,database_retargeting,3250.0,13.5,False
+stretch,מתיחה,holiday_bundle_acquisition,8000.0,33.3,False
+stretch,מתיחה,holiday_bundle_retargeting,2000.0,8.3,False
+stretch,מתיחה,dna_lead_quality_test,750.0,3.1,False
+stretch,מתיחה,session_coaching,1500.0,6.2,False
+stretch,מתיחה,match_boost_reserve,200.0,0.8,True
+stretch,מתיחה,plus_reserve,300.0,1.2,True

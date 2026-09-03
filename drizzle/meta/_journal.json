@@ -1,5 +1,160 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1782381793961,
+      "tag": "0000_spooky_manta",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1783153115752,
+      "tag": "0001_modern_tomorrow_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1783157338010,
+      "tag": "0002_tough_frightful_four",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1785693121667,
+      "tag": "0003_flashy_nick_fury",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1785751137915,
+      "tag": "0004_gorgeous_marten_broadcloak",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1785824744942,
+      "tag": "0005_first_prism",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1785842699795,
+      "tag": "0006_old_wolfsbane",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787421701986,
+      "tag": "0007_mean_captain_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1787422458967,
+      "tag": "0008_romantic_blob",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1787423293946,
+      "tag": "0009_motionless_doorman",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1787425141962,
+      "tag": "0010_slimy_jack_flag",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1787475242345,
+      "tag": "0011_peaceful_slyde",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1787478139500,
+      "tag": "0012_early_infant_terrible",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1787683014420,
+      "tag": "0013_soft_living_tribunal",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1787847542511,
+      "tag": "0014_chunky_thaddeus_ross",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "5",
+      "when": 1787847809148,
+      "tag": "0015_free_outlaw_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1787850149093,
+      "tag": "0016_brainy_mad_thinker",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1788276954721,
+      "tag": "0017_loud_proteus",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1788282185192,
+      "tag": "0018_workable_stark_industries",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1788284076113,
+      "tag": "0019_medical_mephisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1788336957169,
+      "tag": "0020_wonderful_the_liberteens",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1788340971137,
+      "tag": "0021_cloudy_thunderbolt",
+      "breakpoints": true
+    }
+  ]
 }
