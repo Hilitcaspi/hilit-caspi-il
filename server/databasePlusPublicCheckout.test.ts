@@ -6,7 +6,9 @@ import { isPotentialPlusCharge } from "./growWebhook";
 
 const originalEnv = {
   nodeEnv: process.env.NODE_ENV,
+  productionUserId: process.env.GROW_USER_ID,
   productionPageCode: process.env.GROW_PAGE_CODE_PLUS,
+  databasePageCode: process.env.GROW_PAGE_CODE_DATABASE,
   sandboxUserId: process.env.GROW_SANDBOX_USER_ID,
   sandboxPageCode: process.env.GROW_SANDBOX_RECURRING_PAGE_CODE,
 };
@@ -17,9 +19,19 @@ function restoreEnv(key: string, value: string | undefined) {
   else process.env[key] = value;
 }
 
+function configureSandboxOnly() {
+  delete process.env.GROW_USER_ID;
+  delete process.env.GROW_PAGE_CODE_PLUS;
+  delete process.env.GROW_PAGE_CODE_DATABASE;
+  process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
+  process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
+}
+
 afterEach(() => {
   restoreEnv("NODE_ENV", originalEnv.nodeEnv);
+  restoreEnv("GROW_USER_ID", originalEnv.productionUserId);
   restoreEnv("GROW_PAGE_CODE_PLUS", originalEnv.productionPageCode);
+  restoreEnv("GROW_PAGE_CODE_DATABASE", originalEnv.databasePageCode);
   restoreEnv("GROW_SANDBOX_USER_ID", originalEnv.sandboxUserId);
   restoreEnv("GROW_SANDBOX_RECURRING_PAGE_CODE", originalEnv.sandboxPageCode);
   globalThis.fetch = originalFetch;
@@ -27,11 +39,9 @@ afterEach(() => {
 });
 
 describe("Database Plus public checkout", () => {
-  it("keeps the displayed product price at 99 ILS while an explicitly configured Sandbox form uses 1 ILS", () => {
-    delete process.env.GROW_PAGE_CODE_PLUS;
+  it("keeps the displayed product price at 99 ILS while an isolated Sandbox form uses 1 ILS", () => {
+    configureSandboxOnly();
     process.env.NODE_ENV = "test";
-    process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
-    process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
 
     expect(PRODUCT_CONFIGS.plus.sum).toBe(99);
     expect(getPlusCheckoutConfig()).toEqual({
@@ -42,11 +52,9 @@ describe("Database Plus public checkout", () => {
     });
   });
 
-  it("keeps the explicitly configured Sandbox available for the published test entry point", () => {
-    delete process.env.GROW_PAGE_CODE_PLUS;
+  it("keeps Sandbox available only when no production credentials are configured", () => {
+    configureSandboxOnly();
     process.env.NODE_ENV = "production";
-    process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
-    process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
 
     expect(getPlusCheckoutConfig()).toEqual({
       configured: true,
@@ -56,9 +64,11 @@ describe("Database Plus public checkout", () => {
     });
   });
 
-  it("prefers the production recurring page when Grow production configuration is added", () => {
+  it("prefers a dedicated production Plus page when it is configured", () => {
     process.env.NODE_ENV = "production";
-    process.env.GROW_PAGE_CODE_PLUS = "synthetic-production-page";
+    process.env.GROW_USER_ID = "synthetic-production-user";
+    process.env.GROW_PAGE_CODE_PLUS = "synthetic-production-plus-page";
+    process.env.GROW_PAGE_CODE_DATABASE = "synthetic-database-page";
     process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
     process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
 
@@ -70,7 +80,23 @@ describe("Database Plus public checkout", () => {
     });
   });
 
-  it("recognizes both the 99 ILS launch amount and the explicit 1 ILS Sandbox webhook amount", () => {
+  it("uses the existing production database page when a dedicated Plus page is not configured", () => {
+    process.env.NODE_ENV = "production";
+    process.env.GROW_USER_ID = "synthetic-production-user";
+    delete process.env.GROW_PAGE_CODE_PLUS;
+    process.env.GROW_PAGE_CODE_DATABASE = "synthetic-database-page";
+    process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
+    process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
+
+    expect(getPlusCheckoutConfig()).toEqual({
+      configured: true,
+      mode: "production",
+      checkoutAmount: 99,
+      displayAmount: 99,
+    });
+  });
+
+  it("recognizes the 99 ILS production amount and isolates the old 1 ILS Sandbox amount", () => {
     expect(isPotentialPlusCharge(99, false)).toBe(true);
     expect(isPotentialPlusCharge(1, true)).toBe(true);
     expect(isPotentialPlusCharge(1, false)).toBe(false);
@@ -78,11 +104,9 @@ describe("Database Plus public checkout", () => {
     expect(isPotentialPlusCharge(299, true)).toBe(false);
   });
 
-  it("creates the hosted Sandbox form on the server with synthetic customer data", async () => {
-    delete process.env.GROW_PAGE_CODE_PLUS;
+  it("creates the hosted Sandbox form on the server when production credentials are absent", async () => {
+    configureSandboxOnly();
     process.env.NODE_ENV = "test";
-    process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
-    process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
 
     const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const form = init?.body as FormData;
@@ -118,6 +142,43 @@ describe("Database Plus public checkout", () => {
     });
   });
 
+  it("creates a 99 ILS recurring Plus process against the production endpoint", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.GROW_USER_ID = "synthetic-production-user";
+    delete process.env.GROW_PAGE_CODE_PLUS;
+    process.env.GROW_PAGE_CODE_DATABASE = "synthetic-database-page";
+
+    const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toBe("https://secure.meshulam.co.il/api/light/server/1.0/createPaymentProcess");
+      const params = new URLSearchParams(String(init?.body));
+      expect(params.get("userId")).toBe("synthetic-production-user");
+      expect(params.get("pageCode")).toBe("synthetic-database-page");
+      expect(params.get("chargeType")).toBe("1");
+      expect(params.get("sum")).toBe("99");
+      expect(params.get("description")).toBe("Database Plus - מנוי חודשי");
+      expect(params.get("notifyUrl")).toBe("https://hilitcaspi.com/api/grow/webhook?plus_ref=synthetic-plus-reference");
+      return new Response(JSON.stringify({
+        status: 1,
+        data: { authCode: "synthetic-production-auth", processToken: "synthetic-production-process" },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const result = await createPaymentProcess({
+      product: "plus",
+      fullName: "Production Test Member",
+      email: "production.member@example.com",
+      phone: "0500000000",
+      plusWebhookReference: "synthetic-plus-reference",
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(result).toEqual({
+      authCode: "synthetic-production-auth",
+      processToken: "synthetic-production-process",
+    });
+  });
+
   it("keeps the checkout open to everyone while enforcing all three consents and a server-side intent", () => {
     const page = fs.readFileSync(path.join(process.cwd(), "client/src/pages/DatabasePlusSales.tsx"), "utf8");
     const wallet = fs.readFileSync(path.join(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
@@ -125,6 +186,7 @@ describe("Database Plus public checkout", () => {
     const webhook = fs.readFileSync(path.join(process.cwd(), "server/growWebhook.ts"), "utf8");
     const index = fs.readFileSync(path.join(process.cwd(), "server/_core/index.ts"), "utf8");
     const thankYou = fs.readFileSync(path.join(process.cwd(), "client/src/pages/ThankYouPlus.tsx"), "utf8");
+    const growPayment = fs.readFileSync(path.join(process.cwd(), "server/growPayment.ts"), "utf8");
     const plusBlock = router.slice(router.indexOf('if (input.product === "plus")'), router.indexOf("// Server-side coupon validation"));
 
     expect(page).toContain("checkoutConfig?.configured && !alreadyActive");
@@ -146,5 +208,6 @@ describe("Database Plus public checkout", () => {
     expect(router).toContain("activatePendingPlusAfterRegistration");
     expect(thankYou).toContain("אם עדיין אין פרופיל");
     expect(thankYou).toContain("קישור להשלמת הפרטים והשאלון");
+    expect(growPayment).not.toContain('JSON.stringify(json).slice(0, 500)');
   });
 });

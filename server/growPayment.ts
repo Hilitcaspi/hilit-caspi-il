@@ -58,8 +58,9 @@ const PAGE_CODES: Record<string, string> = {
   // wallet page. Product identity is preserved by its unique description and
   // by the pending Boost request created before Grow is opened.
   match_boost: process.env.GROW_PAGE_CODE_MATCH_BOOST || process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
-  // No fallback by design: Plus requires a dedicated recurring-payment page.
-  plus:         process.env.GROW_PAGE_CODE_PLUS || "",
+  // Prefer a dedicated Plus page when one is supplied. Until then, reuse the
+  // verified production database page with chargeType=1 for monthly billing.
+  plus:         process.env.GROW_PAGE_CODE_PLUS || process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
 };
 
 const SITE_BASE = "https://hilitcaspi.com";
@@ -93,7 +94,11 @@ export function getPlusCheckoutConfig(): {
   checkoutAmount: number | null;
   displayAmount: number;
 } {
-  if (process.env.GROW_PAGE_CODE_PLUS?.trim()) {
+  const productionConfigured = Boolean(
+    process.env.GROW_USER_ID?.trim()
+    && (process.env.GROW_PAGE_CODE_PLUS?.trim() || process.env.GROW_PAGE_CODE_DATABASE?.trim()),
+  );
+  if (productionConfigured) {
     return { configured: true, mode: "production", checkoutAmount: 99, displayAmount: 99 };
   }
   const sandboxConfigured = Boolean(
@@ -193,17 +198,25 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     };
   }
 
-  const pageCode = PAGE_CODES[input.product];
-  if (!pageCode) {
+  const pageCode = input.product === "plus"
+    ? process.env.GROW_PAGE_CODE_PLUS?.trim() || process.env.GROW_PAGE_CODE_DATABASE?.trim() || PAGE_CODES.plus
+    : PAGE_CODES[input.product];
+  const growUserId = input.product === "plus"
+    ? process.env.GROW_USER_ID?.trim() || GROW_USER_ID
+    : GROW_USER_ID;
+  if (!pageCode || !growUserId) {
     throw new Error("The selected Grow payment product is not configured yet");
   }
   const sum = input.sum ?? config.sum;
 
   const params = new URLSearchParams();
   params.append("pageCode", pageCode);
-  params.append("userId", GROW_USER_ID);
+  params.append("userId", growUserId);
   params.append("sum", String(sum));
   params.append("description", config.description);
+  if (input.product === "plus") {
+    params.append("chargeType", "1");
+  }
   const SUCCESS_PATHS: Record<string, string> = {
     guide:        "/thank-you/digital",
     database:     "/thank-you/database",
@@ -276,7 +289,11 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   }
 
   const json = (await res.json()) as any;
-  console.log("[GrowPayment] createPaymentProcess response:", JSON.stringify(json).slice(0, 500));
+  console.log("[GrowPayment] createPaymentProcess response", {
+    status: json?.status,
+    hasAuthCode: Boolean(json?.data?.authCode),
+    hasProcessToken: Boolean(json?.data?.processToken),
+  });
 
   if (!json.status || !json.data?.authCode) {
     void notifyPaymentFailure({
@@ -309,10 +326,16 @@ export async function approveTransaction(
   const data = webhookData ?? {};
   const plusCheckout = product === "plus" ? getPlusCheckoutConfig() : null;
   const usePlusSandbox = plusCheckout?.mode === "sandbox";
-  const growUserId = usePlusSandbox ? process.env.GROW_SANDBOX_USER_ID || "" : GROW_USER_ID;
+  const productionUserId = product === "plus"
+    ? process.env.GROW_USER_ID?.trim() || GROW_USER_ID
+    : GROW_USER_ID;
+  const productionPageCode = product === "plus"
+    ? process.env.GROW_PAGE_CODE_PLUS?.trim() || process.env.GROW_PAGE_CODE_DATABASE?.trim() || PAGE_CODES.plus
+    : product ? (PAGE_CODES[product] ?? GROW_USER_ID) : GROW_USER_ID;
+  const growUserId = usePlusSandbox ? process.env.GROW_SANDBOX_USER_ID || "" : productionUserId;
   const pageCode = usePlusSandbox
     ? process.env.GROW_SANDBOX_RECURRING_PAGE_CODE || ""
-    : product ? (PAGE_CODES[product] ?? GROW_USER_ID) : GROW_USER_ID;
+    : productionPageCode;
   const approveUrl = usePlusSandbox ? GROW_SANDBOX_APPROVE_URL : GROW_APPROVE_URL;
 
   const params = new URLSearchParams();
@@ -363,7 +386,7 @@ export async function approveTransaction(
       },
     });
     const json = (await res.json()) as any;
-    console.log("[GrowPayment] approveTransaction response:", JSON.stringify(json).slice(0, 500));
+    console.log("[GrowPayment] approveTransaction response", { status: json?.status });
     return json.status === true || json.status === 1 || json.status === "1";
   } catch (err) {
     console.error("[GrowPayment] approveTransaction failed:", err);
