@@ -498,7 +498,25 @@ export async function buildMatchExplanation(
   return `בחרתי לחבר ביניכם כי: ${parts.join(" ")} ציון תאימות כולל: ${breakdown.total}%.`;
 }
 
-async function generateMatchesForSingle(singleId: number, gender: "female" | "male") {
+export function selectFreshCandidatesForRerun<T extends {
+  candidate: { id: number };
+  breakdown: { total: number };
+  candidateAnswers: unknown[];
+}>(
+  allScored: T[],
+  existingCandidateIds: Set<number>,
+  limit = 6,
+): T[] {
+  const freshWithAnswers = allScored.filter(({ candidate, candidateAnswers }) =>
+    !existingCandidateIds.has(candidate.id) && candidateAnswers.length > 0
+  );
+  const preferred = freshWithAnswers.filter(({ breakdown }) => breakdown.total >= 45).slice(0, limit);
+  if (preferred.length > 0) return preferred;
+  const fallback = freshWithAnswers.filter(({ breakdown }) => breakdown.total >= 30).slice(0, limit);
+  return fallback.length > 0 ? fallback : freshWithAnswers.slice(0, limit);
+}
+
+export async function generateMatchesForSingle(singleId: number, gender: "female" | "male") {
   const db = await getDb();
   if (!db) return;
 
@@ -516,6 +534,8 @@ async function generateMatchesForSingle(singleId: number, gender: "female" | "ma
         ? sql`1=1`
         : eq(singles.gender, seekingGender as "female" | "male"),
       eq(singles.isActive, true),
+      eq(singles.isPaid, true),
+      eq(singles.consentMatchmaking, true),
       ne(singles.id, singleId)
     ));
 
@@ -534,6 +554,24 @@ async function generateMatchesForSingle(singleId: number, gender: "female" | "ma
     : [];
   const answersMap = new Map(candidateAnswerRows.map(r => [r.singleId, JSON.parse(r.answersJson) as MatchAnswer[]]));
 
+  const existingMatches = await db.select().from(matches).where(or(
+    eq(matches.singleAId, singleId),
+    eq(matches.singleBId, singleId),
+    eq(matches.singleId, singleId),
+    eq(matches.matchedSingleId, singleId),
+  ));
+  const existingCandidateIds = new Set<number>();
+  for (const existingMatch of existingMatches) {
+    for (const relatedId of [
+      existingMatch.singleAId,
+      existingMatch.singleBId,
+      existingMatch.singleId,
+      existingMatch.matchedSingleId,
+    ]) {
+      if (relatedId && relatedId !== singleId) existingCandidateIds.add(relatedId);
+    }
+  }
+
   // Use computeFullScore (v6.0 algorithm, 0-100 per dimension)
   const allScored = compatibleCandidates
     .map((c: SingleRow) => {
@@ -543,17 +581,9 @@ async function generateMatchesForSingle(singleId: number, gender: "female" | "ma
     })
     .sort((a, b) => b.breakdown.total - a.breakdown.total);
 
-  // Take top 6 candidates (not 3) so that after skipping already-matched pairs,
-  // we still end up with at least 3 new match records. This ensures every single
-  // always sees 3 matches in the CRM even if some candidates were previously matched.
-  let scored = allScored.filter(({ breakdown }) => breakdown.total >= 45).slice(0, 6);
-  if (scored.length === 0) {
-    scored = allScored.filter(({ breakdown }) => breakdown.total >= 30).slice(0, 6);
-  }
-  if (scored.length === 0) {
-    // Last resort: take top 6 regardless of score
-    scored = allScored.slice(0, 6);
-  }
+  // Exclude every pair already present before slicing, so a rerun really adds up to
+  // six fresh options instead of repeatedly selecting top-ranked duplicates.
+  const scored = selectFreshCandidatesForRerun(allScored, existingCandidateIds, 6);
 
   for (const { candidate, breakdown, candidateAnswers } of scored) {
     // Skip if a match already exists (including rejected) — never re-propose a rejected pair
