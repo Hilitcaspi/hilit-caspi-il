@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildBoostApprovalLinkEmail } from "./matchBoostPilotRouter";
+import { buildBoostApprovalLinkEmail, canReceiveBoostApprovalLink } from "./matchBoostPilotRouter";
 
 const read = (relative: string) => fs.readFileSync(path.join(process.cwd(), relative), "utf8");
 
@@ -21,13 +21,28 @@ describe("Boost personal approval link funnel", () => {
     const submitFlow = routerSource.slice(routerSource.indexOf("submitInterest:"), routerSource.indexOf("overview:"));
     expect(submitFlow).toContain("requestLink: z.literal(true)");
     expect(submitFlow).toContain("matchBoostPilotInterests");
-    expect(submitFlow).toContain("single?.isPaid");
-    expect(submitFlow).toContain("single?.isActive");
-    expect(submitFlow).toContain("single?.consentMatchmaking");
+    expect(submitFlow).toContain("canReceiveBoostApprovalLink(single)");
+    expect(submitFlow).not.toContain("single?.consentMatchmaking");
     expect(submitFlow).toContain("BOOST_LINK_COOLDOWN_MS");
     expect(submitFlow).toContain("sendEmail");
+    expect(submitFlow).toContain('journeyKey: "boost_approval_link"');
     expect(submitFlow).toContain("אם כתובת המייל מקושרת לחבר מאגר פעיל");
     expect(submitFlow).not.toContain("insert(matchBoostMemberships)");
+  });
+
+  it("allows an active paid legacy member to request the approval link before explicit Boost consent", () => {
+    expect(canReceiveBoostApprovalLink({ isPaid: true, isActive: true, questionnaireToken: "personal-token" })).toBe(true);
+    expect(canReceiveBoostApprovalLink({ isPaid: true, isActive: false, questionnaireToken: "personal-token" })).toBe(false);
+    expect(canReceiveBoostApprovalLink({ isPaid: false, isActive: true, questionnaireToken: "personal-token" })).toBe(false);
+    expect(canReceiveBoostApprovalLink({ isPaid: true, isActive: true, questionnaireToken: null })).toBe(false);
+  });
+
+  it("uses explicit Boost membership consent instead of the legacy generic matchmaking flag", () => {
+    expect(boostSource).not.toContain("!single.consentMatchmaking");
+    expect(boostSource).not.toContain("!candidate.consentMatchmaking");
+    expect(boostSource).not.toContain("!input.single.consentMatchmaking");
+    expect(boostSource).not.toContain("!party.consentMatchmaking");
+    expect(boostSource).not.toContain("eq(singles.consentMatchmaking, true)");
   });
 
   it("matches member emails case-insensitively throughout the Boost approval flow", () => {

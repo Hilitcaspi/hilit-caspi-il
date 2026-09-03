@@ -115,7 +115,6 @@ export function selectOnDemandBoostCandidates(input: {
       if (
         !candidate.isPaid
         || !candidate.isActive
-        || !candidate.consentMatchmaking
         || !getBoostProfileReadiness(candidate).ready
         || !hasActiveBoostConsent(membership)
         || recentActivityAt < now - 90 * DAY_MS
@@ -144,7 +143,7 @@ async function ensureBoostCandidatesForSingle(db: any, single: any, now = Date.n
   ]);
   const membership = membershipRows[0];
   if (!hasActiveBoostConsent(membership) || !getBoostProfileReadiness(single).ready) return 0;
-  if (!single.isPaid || !single.isActive || !single.consentMatchmaking) return 0;
+  if (!single.isPaid || !single.isActive) return 0;
   if (memberMatches.some((match: any) => !match.returnedToPoolAt && ["proposed", "matched"].includes(match.status))) return 0;
   if (requests.some((request: any) =>
     OPEN_BOOST_STATUSES.includes(request.status)
@@ -165,7 +164,6 @@ async function ensureBoostCandidatesForSingle(db: any, single: any, now = Date.n
       inArray(singles.id, candidateIds),
       eq(singles.isActive, true),
       eq(singles.isPaid, true),
-      eq(singles.consentMatchmaking, true),
     )),
     db.select({ singleAId: matches.singleAId, singleBId: matches.singleBId }).from(matches).where(and(
       isNull(matches.returnedToPoolAt),
@@ -426,7 +424,7 @@ export function evaluateBoostEligibility(input: {
   );
 
   const blockers: string[] = [];
-  if (!input.single.isPaid || !input.single.isActive || !input.single.consentMatchmaking) blockers.push("החברות במאגר אינה פעילה");
+  if (!input.single.isPaid || !input.single.isActive) blockers.push("החברות במאגר אינה פעילה");
   if (missingFields.length > 0) blockers.push("יש להשלים את הפרופיל לפני הפעלת בוסט");
   if (!input.single.questionnaireCompletedAt) blockers.push("יש להשלים את השאלון המדעי");
   if (!input.single.photoUrl) blockers.push("יש להוסיף תמונה לפרופיל");
@@ -512,7 +510,6 @@ async function loadBoostContext(db: any, single: any) {
       profile
       && profile.isPaid
       && profile.isActive
-      && profile.consentMatchmaking
       && getMissingProfileFields(profile).length === 0
       && Boolean(profile.questionnaireCompletedAt)
       && Boolean(profile.photoUrl)
@@ -707,7 +704,6 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     const recentActivityAt = Number(membership?.lastActiveAt || membership?.consentedAt || 0);
     return party.isPaid
       && party.isActive
-      && party.consentMatchmaking
       && getMissingProfileFields(party).length === 0
       && hasActiveBoostConsent(membership)
       && recentActivityAt >= Date.now() - 90 * DAY_MS;
@@ -949,7 +945,7 @@ export const matchBoostRouter = router({
       const [single] = await db.select().from(singles)
         .where(normalizedEmailEquals(singles.email, normalizedEmail)).limit(1);
       if (!single) throw new TRPCError({ code: "NOT_FOUND", message: "לא נמצא חבר מאגר עם המייל הזה" });
-      if (!single.isPaid || !single.isActive || !single.consentMatchmaking) {
+      if (!single.isPaid || !single.isActive) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "אפשר להזמין רק חבר מאגר פעיל ומשלם" });
       }
       const [existing] = await db.select().from(matchBoostMemberships)
@@ -1095,7 +1091,7 @@ export const matchBoostRouter = router({
       if (hasActiveBoostConsent(existingMembership)) {
         return { success: true, status: "active" as const, consentedAt: existingMembership.consentedAt };
       }
-      if (!single.isPaid || !single.isActive || !single.consentMatchmaking) {
+      if (!single.isPaid || !single.isActive) {
         throw new TRPCError({ code: "FORBIDDEN", message: "ההצטרפות פתוחה לחברי מאגר פעילים בלבד" });
       }
 

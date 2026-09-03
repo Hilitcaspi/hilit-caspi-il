@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
+  emailLog,
   matchBoostMemberships,
   matchBoostPilotInterests,
   matchBoostRequests,
@@ -14,6 +15,14 @@ import { normalizeEmail, normalizedEmailEquals } from "./emailNormalization";
 
 export const BOOST_INTEREST_CONSENT_VERSION = "2026-08-27-interest-v1";
 const BOOST_LINK_COOLDOWN_MS = 10 * 60 * 1000;
+
+export function canReceiveBoostApprovalLink(single: {
+  isPaid?: boolean | null;
+  isActive?: boolean | null;
+  questionnaireToken?: string | null;
+} | null | undefined) {
+  return Boolean(single?.isPaid && single?.isActive && single?.questionnaireToken);
+}
 
 function escapeEmailHtml(value: string) {
   return value
@@ -93,7 +102,6 @@ export const matchBoostPilotRouter = router({
         email: singles.email,
         isPaid: singles.isPaid,
         isActive: singles.isActive,
-        consentMatchmaking: singles.consentMatchmaking,
         questionnaireToken: singles.questionnaireToken,
       })
         .from(singles)
@@ -114,12 +122,10 @@ export const matchBoostPilotRouter = router({
         .then(rows => rows[0] || null);
       const now = Date.now();
       const status = membership?.status === "active" ? "joined" : "interested";
-      const canReceiveLink = Boolean(
-        single?.isPaid
-        && single?.isActive
-        && single?.consentMatchmaking
-        && single?.questionnaireToken,
-      );
+      // Requesting the personal approval link is not itself consent to Boost.
+      // Legacy profiles may not carry the newer generic consentMatchmaking flag;
+      // the explicit three-part Boost consent is collected inside the personal area.
+      const canReceiveLink = canReceiveBoostApprovalLink(single);
       const cooldownElapsed = !existingInterest
         || now - Number(existingInterest.updatedAt || 0) >= BOOST_LINK_COOLDOWN_MS;
 
@@ -156,16 +162,41 @@ export const matchBoostPilotRouter = router({
         if (cooldownElapsed) {
           const approvalUrl = `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken!)}&tab=matches#boost-card`;
           const emailContent = buildBoostApprovalLinkEmail({ firstName: single.firstName, approvalUrl });
+          let logId = 0;
           try {
-            await sendEmail({
-              to: { email, name: single.firstName || undefined },
+            const insertResult = await db.insert(emailLog).values({
+              recipientEmail: email,
+              recipientName: single.firstName || null,
+              journeyKey: "boost_approval_link",
+              emailIndex: 1,
               subject: emailContent.subject,
-              htmlContent: emailContent.htmlContent,
-              textContent: emailContent.textContent,
+              htmlBody: emailContent.htmlContent,
+              textBody: emailContent.textContent,
+              scheduledAt: now,
+              status: "processing",
+              createdAt: now,
             });
+            logId = Number((insertResult as any)[0]?.insertId || 0);
           } catch (error) {
-            console.error(`[MatchBoost] Failed to send approval link for single ${single.id}`, error);
+            console.error(`[MatchBoost] Failed to create approval email log for single ${single.id}`, error);
           }
+          const result = await sendEmail({
+            to: { email, name: single.firstName || undefined },
+            subject: emailContent.subject,
+            htmlContent: emailContent.htmlContent,
+            textContent: emailContent.textContent,
+          });
+          if (logId) {
+            try {
+              await db.update(emailLog).set(result.success
+                ? { status: "sent", sentAt: Date.now(), errorMessage: null }
+                : { status: "failed", errorMessage: result.error || "send_failed" })
+                .where(eq(emailLog.id, logId));
+            } catch (error) {
+              console.error(`[MatchBoost] Failed to update approval email log for single ${single.id}`, error);
+            }
+          }
+          if (!result.success) console.error(`[MatchBoost] Failed to send approval link for single ${single.id}: ${result.error || "send_failed"}`);
         }
       }
       return {
