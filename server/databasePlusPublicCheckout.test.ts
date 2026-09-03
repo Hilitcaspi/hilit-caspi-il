@@ -196,6 +196,16 @@ describe("Database Plus public checkout", () => {
     expect(page).not.toContain("לחברים פעילים במאגר בלבד");
     expect(wallet).toContain("if (result.url)");
     expect(wallet).not.toContain("https://hilitcaspi.com/api/plus/recurring-mandate");
+    expect(wallet).not.toContain('if (product === "plus") return;');
+    expect(wallet).not.toContain('if (product !== "plus") {');
+    expect(wallet).toContain("await preloadGrowSDKScript();");
+    expect(wallet).toContain("await waitForGrowRuntime(12000);");
+    expect(wallet).toContain('typeof growPaymentSdk.renderPaymentOptions !== "function"');
+    expect(wallet).toContain("לא ניתן להתחבר כרגע למערכת התשלום");
+    expect(wallet).not.toContain("שגיאה ביצירת תהליך תשלום: ${err?.message");
+    expect(wallet).toContain('authCode=${result.authCode ? "present" : "missing"}');
+    expect(wallet).not.toContain("result.authCode?.slice(0,8)");
+    expect(wallet).not.toContain("token=${result.processToken");
     expect(plusBlock).toContain("input.plusRenewalAccepted !== true");
     expect(plusBlock).toContain("input.plusTermsAccepted !== true");
     expect(plusBlock).toContain("input.plusBoostAccepted !== true");

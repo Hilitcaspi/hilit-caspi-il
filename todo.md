@@ -2118,3 +2118,15 @@
 - [x] לבדוק בדסקטופ ובמובייל שהודעת Sandbox הוסרה והמחיר מוצג כ־99 ₪ לחודש
 - [x] להריץ 82 קובצי בדיקה ו־372 בדיקות שעברו, TypeScript, build, git diff --check וסריקת פרטיות; שתי בדיקות חיות נשארו opt-in
 - [x] לפרסם ולסנכרן את אותו checkpoint ל־GitHub
+
+## תקלה בהצגת Grow Plus בייצור: renderPaymentOptions — 03.09.2026
+
+- [x] לבדוק בלוגי הייצור והדפדפן ולאשר שה־SDK לא נטען במסלול Plus לפני הקריאה ל־renderPaymentOptions
+- [x] להשוות את מסלול Plus למסלולי Grow הקיימים שעובדים באתר
+- [x] לטעון ולאתחל את Grow SDK גם ב־Plus, לוודא ש־init ו־renderPaymentOptions זמינות ולהציג שגיאה ברורה אם ה־SDK לא מוכן
+- [x] לשמור את מנגנון ה־intent האידמפוטנטי כדי ש־retry לא יוצר כפל רשומות
+- [x] להוסיף בדיקות רגרסיה לטעינת SDK במסלול Plus, ל־renderPaymentOptions חסר ולמניעת טוקנים בלוגים
+- [x] לבדוק בדפדפן ש־GrowWallet נטען, ה־SDK מכיל init ו־renderPaymentOptions ו־createProcess מופעל רק לאחר כל האישורים; סביבת ה־preview נחסמה ב־WAF של Grow לפני authCode
+- [x] להסיר ממסד LEGACY את intent וליד התשלום הסינתטיים שנוצרו בבדיקת ה־preview
+- [x] להריץ 82 קובצי בדיקה ו־372 בדיקות שעברו, TypeScript, build, git diff --check וסריקת פרטיות; שתי בדיקות חיות נשארו opt-in
+- [x] לפרסם ולסנכרן את אותו checkpoint ל־GitHub

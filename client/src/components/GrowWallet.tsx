@@ -88,7 +88,20 @@ function preloadGrowSDKScript(): Promise<void> {
     script.async = true;
     script.src = GROW_SDK_URL;
     script.setAttribute("data-grow-sdk", "true");
-    script.onload = () => resolve();
+    script.onload = () => {
+      let tries = 0;
+      const poll = setInterval(() => {
+        tries++;
+        if (window.growPayment) {
+          clearInterval(poll);
+          resolve();
+        } else if (tries > 100) {
+          clearInterval(poll);
+          scriptLoadPromise = null;
+          reject(new Error("Grow SDK API did not initialize after script load"));
+        }
+      }, 50);
+    };
     script.onerror = () => {
       scriptLoadPromise = null; // allow retry
       reject(new Error("Failed to load Grow SDK script"));
@@ -274,7 +287,6 @@ export default function GrowWallet({
 
   // Preload SDK script on mount (background, no init yet)
   useEffect(() => {
-    if (product === "plus") return;
     preloadGrowSDKScript().catch(err => {
       console.warn("[GrowWallet] Script preload failed:", err);
     });
@@ -326,19 +338,19 @@ export default function GrowWallet({
     };
 
     try {
-      if (product !== "plus") {
-        // Step 1: Ensure script is loaded
-        logStep("1_script_load_start");
-        await preloadGrowSDKScript();
-        if (!window.growPayment) throw new Error("Grow SDK not available after script load");
-        logStep("1_script_load_done");
+      // Step 1: Ensure script is loaded for every production authCode flow,
+      // including Plus. Sandbox Plus may still return a redirect URL later.
+      logStep("1_script_load_start");
+      await preloadGrowSDKScript();
+      if (!window.growPayment) throw new Error("Grow SDK not available after script load");
+      logStep("1_script_load_done");
 
-        // Step 2: Always call init() fresh — it's idempotent and ensures runtime is started
-        logStep("2_init_start");
-        await window.growPayment.init({
-          environment: GROW_ENV,
-          version: GROW_VERSION,
-          events: {
+      // Step 2: Always call init() fresh — it's idempotent and ensures runtime is started
+      logStep("2_init_start");
+      await window.growPayment.init({
+        environment: GROW_ENV,
+        version: GROW_VERSION,
+        events: {
           onSuccess: (r: any) => {
             setWalletLoading(false);
             callbacksRef.current.onSuccess?.(r);
@@ -387,16 +399,15 @@ export default function GrowWallet({
               processToken: lastProcessTokenRef.current || undefined,
             });
           },
-          },
-        });
+        },
+      });
 
-        logStep("2_init_done");
+      logStep("2_init_done");
 
-        // Step 3: Wait for runtime to be fully ready
-        logStep("3_wait_runtime_start");
-        await waitForGrowRuntime(12000);
-        logStep("3_wait_runtime_done");
-      }
+      // Step 3: Wait for runtime to be fully ready
+      logStep("3_wait_runtime_start");
+      await waitForGrowRuntime(12000);
+      logStep("3_wait_runtime_done");
 
       // Step 4: Create payment process via server-side tRPC (secure, no CORS issues)
       // Calculate discounted price if coupon is applied
@@ -493,18 +504,28 @@ export default function GrowWallet({
 
       // Save processToken for failure reporting (if SDK payment fails later)
       lastProcessTokenRef.current = result.processToken || null;
-      logStep("4_createProcess_done", `authCode=${result.authCode?.slice(0,8)}... token=${result.processToken || 'N/A'}`);
+      logStep("4_createProcess_done", `authCode=${result.authCode ? "present" : "missing"} processToken=${result.processToken ? "present" : "missing"}`);
 
       // Step 5: Render wallet (opens the payment overlay)
       logStep("5_renderPaymentOptions_start");
-      window.growPayment!.renderPaymentOptions(result.authCode);
+      const growPaymentSdk = window.growPayment;
+      if (!growPaymentSdk || typeof growPaymentSdk.renderPaymentOptions !== "function") {
+        throw new Error("מערכת התשלום לא נטענה במלואה. אפשר לרענן את העמוד ולנסות שוב.");
+      }
+      growPaymentSdk.renderPaymentOptions(result.authCode);
       logStep("5_renderPaymentOptions_done");
 
     } catch (err: any) {
-      const errDetail = `${err?.message || 'Unknown'} | stack: ${err?.stack?.slice(0, 200) || 'N/A'}`;
+      const technicalMessage = String(err?.message || "Unknown");
+      const errDetail = `${technicalMessage} | stack: ${err?.stack?.slice(0, 200) || 'N/A'}`;
       logStep("ERROR", errDetail);
       setWalletLoading(false);
-      toast.error(`שגיאה ביצירת תהליך תשלום: ${err?.message || "נסי שוב בעוד מספר שניות."}`);
+      const isConnectivityFailure = /Grow API error|fetch failed|Failed to fetch|HTTP\s*\d+/i.test(technicalMessage);
+      toast.error(
+        isConnectivityFailure
+          ? "לא ניתן להתחבר כרגע למערכת התשלום. אפשר לנסות שוב בעוד כמה רגעים."
+          : technicalMessage,
+      );
       reportFailureMutation.mutate({
         customerName: name.trim(),
         customerEmail: email.trim(),
