@@ -92,7 +92,7 @@ describe("Database Plus public checkout", () => {
       expect(form.get("chargeType")).toBe("1");
       expect(form.get("sum")).toBe("1");
       expect(form.get("description")).toBe("Database Plus Monthly");
-      expect(form.get("notifyUrl")).toBe("https://preview.example/api/grow/webhook");
+      expect(form.get("notifyUrl")).toBe("https://preview.example/api/grow/webhook?plus_ref=synthetic-plus-reference");
       return new Response(JSON.stringify({
         status: 1,
         data: { url: "https://sandbox.meshulam.co.il/hosted/test", processToken: "synthetic-process-token" },
@@ -106,6 +106,7 @@ describe("Database Plus public checkout", () => {
       email: "member@example.com",
       phone: "0500000000",
       origin: "https://preview.example",
+      plusWebhookReference: "synthetic-plus-reference",
     });
 
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -117,21 +118,33 @@ describe("Database Plus public checkout", () => {
     });
   });
 
-  it("keeps the checkout public while enforcing server-side membership and all three consents", () => {
+  it("keeps the checkout open to everyone while enforcing all three consents and a server-side intent", () => {
     const page = fs.readFileSync(path.join(process.cwd(), "client/src/pages/DatabasePlusSales.tsx"), "utf8");
     const wallet = fs.readFileSync(path.join(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
     const router = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
+    const webhook = fs.readFileSync(path.join(process.cwd(), "server/growWebhook.ts"), "utf8");
+    const index = fs.readFileSync(path.join(process.cwd(), "server/_core/index.ts"), "utf8");
+    const thankYou = fs.readFileSync(path.join(process.cwd(), "client/src/pages/ThankYouPlus.tsx"), "utf8");
     const plusBlock = router.slice(router.indexOf('if (input.product === "plus")'), router.indexOf("// Server-side coupon validation"));
 
     expect(page).toContain("checkoutConfig?.configured && !alreadyActive");
     expect(page).not.toContain("isPersonalLink && plusData?.paymentConfigured");
-    expect(page).toContain("הזכאות נבדקת לפי האימייל והטלפון לפני פתיחת טופס התשלום");
+    expect(page).toContain("אפשר להצטרף ישירות מהעמוד");
+    expect(page).toContain("הצטרפות פתוחה לכולם");
+    expect(page).not.toContain("לחברים פעילים במאגר בלבד");
     expect(wallet).toContain("if (result.url)");
     expect(wallet).not.toContain("https://hilitcaspi.com/api/plus/recurring-mandate");
     expect(plusBlock).toContain("input.plusRenewalAccepted !== true");
     expect(plusBlock).toContain("input.plusTermsAccepted !== true");
     expect(plusBlock).toContain("input.plusBoostAccepted !== true");
-    expect(plusBlock).toContain("!single.isActive || !single.isPaid");
+    expect(plusBlock).toContain("plusCheckoutIntents");
+    expect(plusBlock).toContain("createPlusCheckoutReference");
+    expect(plusBlock).not.toContain("Plus זמין לחברים פעילים במאגר בלבד");
     expect(plusBlock).not.toContain("assessPlusEligibility");
+    expect(index).toContain('req.query.plus_ref === "string"');
+    expect(webhook).toContain("verifyPlusCheckoutReference(context.plusCheckoutReference, email)");
+    expect(router).toContain("activatePendingPlusAfterRegistration");
+    expect(thankYou).toContain("אם עדיין אין פרופיל");
+    expect(thankYou).toContain("קישור להשלמת הפרטים והשאלון");
   });
 });

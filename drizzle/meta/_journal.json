@@ -155,6 +155,13 @@
       "when": 1788340971137,
       "tag": "0021_cloudy_thunderbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1788454805709,
+      "tag": "0022_chilly_black_tarantula",
+      "breakpoints": true
     }
   ]
 }

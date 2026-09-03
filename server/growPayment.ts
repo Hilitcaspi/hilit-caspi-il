@@ -118,6 +118,8 @@ export interface CreatePaymentInput {
   personalToken?: string;
   /** Signed server-generated reference used to bind a Boost webhook to one request. */
   webhookReference?: string;
+  /** Signed non-PII reference used to bind a public Plus webhook to one checkout. */
+  plusWebhookReference?: string;
   /** Browser origin used only for Plus Sandbox callbacks in the temporary preview. */
   origin?: string;
 }
@@ -157,7 +159,9 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     form.append("pageField[email]", input.email);
     form.append("successUrl", `${callbackBase}/thank-you/plus`);
     form.append("cancelUrl", callbackBase);
-    form.append("notifyUrl", `${callbackBase}/api/grow/webhook`);
+    const sandboxNotifyUrl = new URL(`${callbackBase}/api/grow/webhook`);
+    if (input.plusWebhookReference) sandboxNotifyUrl.searchParams.set("plus_ref", input.plusWebhookReference);
+    form.append("notifyUrl", sandboxNotifyUrl.toString());
 
     const response = await globalThis.fetch(GROW_SANDBOX_API_URL, {
       method: "POST",
@@ -222,6 +226,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   params.append("cancelUrl", `${SITE_BASE}`);
   const notifyUrl = new URL(`${SITE_BASE}/api/grow/webhook`);
   if (input.webhookReference) notifyUrl.searchParams.set("boost_ref", input.webhookReference);
+  if (input.plusWebhookReference) notifyUrl.searchParams.set("plus_ref", input.plusWebhookReference);
   params.append("notifyUrl", notifyUrl.toString());
   params.append("pageField[fullName]", input.fullName);
   params.append("pageField[email]", input.email);

@@ -808,6 +808,38 @@ export const plusPilotMembers = mysqlTable("plus_pilot_members", {
 export type PlusPilotMember = typeof plusPilotMembers.$inferSelect;
 export type InsertPlusPilotMember = typeof plusPilotMembers.$inferInsert;
 
+/**
+ * Public Database Plus checkout lifecycle before a full singles profile exists.
+ * The row is keyed by normalized email so retries update the same intent and a
+ * confirmed payment can later be linked to the profile without placeholders.
+ */
+export const plusCheckoutIntents = mysqlTable("plus_checkout_intents", {
+  id: int("id").primaryKey().autoincrement(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  fullName: varchar("full_name", { length: 200 }).notNull(),
+  phone: varchar("phone", { length: 40 }).notNull(),
+  status: mysqlEnum("status", ["pending", "paid_pending_profile", "active", "failed", "cancelled"]).default("pending").notNull(),
+  checkoutMode: mysqlEnum("checkout_mode", ["sandbox", "production"]).notNull(),
+  renewalAccepted: boolean("renewal_accepted").default(false).notNull(),
+  termsAccepted: boolean("terms_accepted").default(false).notNull(),
+  boostAccepted: boolean("boost_accepted").default(false).notNull(),
+  processToken: varchar("process_token", { length: 200 }),
+  providerTransactionId: varchar("provider_transaction_id", { length: 200 }),
+  providerSubscriptionId: varchar("provider_subscription_id", { length: 200 }),
+  amountAgorot: int("amount_agorot"),
+  singleId: int("single_id"),
+  plusMemberId: int("plus_member_id"),
+  paidAt: bigint("paid_at", { mode: "number" }),
+  activatedAt: bigint("activated_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  statusUpdatedIdx: index("plus_checkout_status_updated_idx").on(t.status, t.updatedAt),
+  transactionIdx: uniqueIndex("plus_checkout_transaction_idx").on(t.providerTransactionId),
+}));
+export type PlusCheckoutIntent = typeof plusCheckoutIntents.$inferSelect;
+export type InsertPlusCheckoutIntent = typeof plusCheckoutIntents.$inferInsert;
+
 /** Auditable lifecycle of Plus recurring billing. One event per provider transaction/status change. */
 export const plusPaymentEvents = mysqlTable("plus_payment_events", {
   id: int("id").primaryKey().autoincrement(),

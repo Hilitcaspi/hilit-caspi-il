@@ -7,7 +7,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, matchBoostMemberships } from "../drizzle/schema";
+import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, plusCheckoutIntents, matchBoostMemberships } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
 import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, buildAnonymousBoostCard, cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
@@ -26,6 +26,8 @@ import { startJourney, getJourneyKey } from "./automation";
 import { ga4GenerateLead, ga4SignUp, clientIdFromEmail } from "./_core/ga4";
 import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as buildMatchProposalEmailTemplate, buildContactRevealEmail as buildContactRevealEmailTemplate, buildMatchRejectionAckEmail, buildOwnerMatchApprovalEmail, buildConsolationEmail, WOMEN_MATCHMAKING_EMAIL_1, MEN_MATCHMAKING_EMAIL_1, DNA_PROFILES, buildMatchFollowUpEmail } from "./emailTemplates";
 import { sendEmail } from "./brevo";
+import { createPlusCheckoutReference } from "./plusCheckoutReference";
+import { activatePendingPlusAfterRegistration } from "./plusFulfillment";
 import { verifyBoostNewsletterUnsubscribeToken } from "./boostNewsletterCampaign";
 import {
   applyEmailUnsubscribe,
@@ -2048,6 +2050,15 @@ export const appRouter = router({
               }).catch(err => console.error("[RegisterBasic] notifyOwner failed:", err));
               ga4SignUp(clientIdFromEmail(input.email), "free_token").catch(() => {});
             }
+            if (!input.deferUntilPayment) {
+              await activatePendingPlusAfterRegistration({
+                id: existingProfile.id,
+                email: normalizedEmail,
+                firstName: input.firstName,
+                lastName: input.lastName || null,
+                questionnaireToken: existingProfile.questionnaireToken || null,
+              });
+            }
             return { singleId: existingProfile.id, questionnaireToken: existingProfile.questionnaireToken || "", success: true, alreadyExists: false };
           }
 
@@ -2060,6 +2071,15 @@ export const appRouter = router({
               subject: "קישור לשאלון המדעי - הילית כספי",
               htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;padding:24px;color:#191265"><h2>שלום ${existingProfile.firstName},</h2><p>כבר נרשמת למאגר. הנה הקישור לשאלון המדעי:</p><p style="margin:24px 0"><a href="${questionnaireUrl}" style="background:#ffe27c;color:#191265;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">למילוי השאלון</a></p><p style="color:#888;font-size:12px">אם לא ביקשת זאת, התעלם/י מהודעה זו.</p></div>`,
             }).catch(err => console.error("[RegisterBasic] Resend email failed:", err));
+          }
+          if (!input.deferUntilPayment && existingProfile.isPaid && existingProfile.isActive) {
+            await activatePendingPlusAfterRegistration({
+              id: existingProfile.id,
+              email: normalizedEmail,
+              firstName: existingProfile.firstName,
+              lastName: input.lastName || null,
+              questionnaireToken: existingProfile.questionnaireToken || null,
+            });
           }
           return { singleId: existingProfile.id, questionnaireToken: existingProfile.questionnaireToken || "", success: true, alreadyExists: true };
         }
@@ -2244,6 +2264,15 @@ export const appRouter = router({
         ga4SignUp(clientIdFromEmail(input.email), input.freeToken ? "free_token" : "database").catch(() => {});
         }
 
+        if (!input.deferUntilPayment) {
+          await activatePendingPlusAfterRegistration({
+            id: newSingleId,
+            email: normalizedEmail,
+            firstName: input.firstName,
+            lastName: input.lastName || null,
+            questionnaireToken,
+          });
+        }
         return { singleId: newSingleId, questionnaireToken, success: true };
       }),
 
@@ -7317,6 +7346,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
         let preparedBoostRequestId: number | null = null;
         let preparedBoostCheckoutReference: string | null = null;
+        let preparedPlusCheckoutReference: string | null = null;
         let verifiedPaymentIdentity: { fullName: string; email: string; phone: string } | null = null;
 
         if (input.product === "match_boost") {
@@ -7350,46 +7380,62 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           if (normalizedPhone.length < 9) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "יש להזין מספר טלפון תקין" });
           }
-          const [single] = await db.select().from(singles)
+          const now = Date.now();
+          const [existingIntent] = await db.select({ status: plusCheckoutIntents.status })
+            .from(plusCheckoutIntents)
+            .where(eq(plusCheckoutIntents.email, normalizedEmail))
+            .limit(1);
+          if (existingIntent?.status === "paid_pending_profile" || existingIntent?.status === "active") {
+            throw new TRPCError({ code: "CONFLICT", message: "התשלום עבור Plus כבר נקלט. אין צורך לשלם שוב" });
+          }
+          const [existingSingle] = await db.select({ id: singles.id })
+            .from(singles)
             .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`)
             .limit(1);
-          const storedPhone = (single?.phone || "").replace(/\D/g, "");
-          if (!single || !single.isActive || !single.isPaid || !storedPhone || storedPhone.slice(-9) !== normalizedPhone.slice(-9)) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Plus זמין לחברים פעילים במאגר בלבד" });
+          if (existingSingle) {
+            const [existingMember] = await db.select({ id: plusPilotMembers.id })
+              .from(plusPilotMembers)
+              .where(and(
+                eq(plusPilotMembers.singleId, existingSingle.id),
+                eq(plusPilotMembers.status, "active"),
+                eq(plusPilotMembers.billingStatus, "active"),
+              ))
+              .limit(1);
+            if (existingMember) {
+              throw new TRPCError({ code: "CONFLICT", message: "מנוי Plus כבר פעיל עבור כתובת המייל הזו" });
+            }
           }
-          if (input.personalToken && input.personalToken !== single.questionnaireToken) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "הקישור האישי אינו תואם לפרופיל" });
-          }
-          const [existingMember] = await db.select().from(plusPilotMembers)
-            .where(eq(plusPilotMembers.singleId, single.id)).limit(1);
-          if (existingMember?.status === "active" && existingMember.billingStatus === "active") {
-            throw new TRPCError({ code: "CONFLICT", message: "מנוי Plus כבר פעיל בפרופיל הזה" });
-          }
-          const now = Date.now();
-          await db.insert(plusPilotMembers).values({
-            singleId: single.id,
-            status: "eligible",
-            billingStatus: "pending",
-            monthlyMatchTarget: 2,
-            premiumSupportEnabled: false,
-            eligibilityScore: 100,
-            eligibilityReasons: JSON.stringify({ reasons: ["active_paid_database_member"], blockers: [] }),
-            source: plusCheckout.mode === "sandbox" ? "plus_checkout_sandbox" : "plus_checkout_public",
-            waitlistedAt: now,
-            lastEngagedAt: now,
+          await db.insert(plusCheckoutIntents).values({
+            email: normalizedEmail,
+            fullName: input.fullName.trim(),
+            phone: input.phone?.trim() || normalizedPhone,
+            status: "pending",
+            checkoutMode: plusCheckout.mode === "production" ? "production" : "sandbox",
+            renewalAccepted: true,
+            termsAccepted: true,
+            boostAccepted: true,
             createdAt: now,
             updatedAt: now,
           }).onDuplicateKeyUpdate({ set: {
-            billingStatus: "pending",
-            eligibilityScore: 100,
-            eligibilityReasons: JSON.stringify({ reasons: ["active_paid_database_member"], blockers: [] }),
-            lastEngagedAt: now,
+            fullName: input.fullName.trim(),
+            phone: input.phone?.trim() || normalizedPhone,
+            status: "pending",
+            checkoutMode: plusCheckout.mode === "production" ? "production" : "sandbox",
+            renewalAccepted: true,
+            termsAccepted: true,
+            boostAccepted: true,
+            processToken: null,
+            providerTransactionId: null,
+            providerSubscriptionId: null,
+            amountAgorot: null,
+            paidAt: null,
             updatedAt: now,
           }});
+          preparedPlusCheckoutReference = createPlusCheckoutReference(normalizedEmail);
           verifiedPaymentIdentity = {
-            fullName: `${single.firstName || ""} ${single.lastName || ""}`.trim() || input.fullName,
-            email: single.email?.trim().toLowerCase() || normalizedEmail,
-            phone: single.phone || input.phone || "",
+            fullName: input.fullName.trim(),
+            email: normalizedEmail,
+            phone: input.phone?.trim() || normalizedPhone,
           };
         }
 
@@ -7494,11 +7540,25 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             ...(verifiedPaymentIdentity || {}),
             sum: finalSum,
             webhookReference: preparedBoostCheckoutReference || undefined,
+            plusWebhookReference: preparedPlusCheckoutReference || undefined,
           });
+          if (input.product === "plus" && db) {
+            await db.update(plusCheckoutIntents)
+              .set({ processToken: result.processToken || null, updatedAt: Date.now() })
+              .where(eq(plusCheckoutIntents.email, input.email.trim().toLowerCase()));
+          }
           return { ...result, boostRequestId: preparedBoostRequestId }; // { authCode, processToken?, boostRequestId? }
         } catch (error: any) {
           if (preparedBoostRequestId) {
             await cancelPaidBoostCheckout(preparedBoostRequestId, error?.message || "grow_create_process_failed");
+          }
+          if (input.product === "plus" && db) {
+            await db.update(plusCheckoutIntents)
+              .set({ status: "failed", updatedAt: Date.now() })
+              .where(and(
+                eq(plusCheckoutIntents.email, input.email.trim().toLowerCase()),
+                eq(plusCheckoutIntents.status, "pending"),
+              ));
           }
           throw error;
         }

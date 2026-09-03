@@ -31,9 +31,9 @@
  */
 
 import crypto from "crypto";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusPaymentEvents } from "../drizzle/schema";
+import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, freeAccessTokens, plusPilotMembers, plusCheckoutIntents } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
 import { queueProductFeedbackAfterPurchase } from "./feedbackAutomation";
@@ -41,6 +41,8 @@ import { startJourney } from "./automation";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
 import { buildNewYearBundleAccessEmail } from "./newYearBundleEmail";
+import { activatePlusForSingle } from "./plusFulfillment";
+import { verifyPlusCheckoutReference } from "./plusCheckoutReference";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -486,77 +488,84 @@ async function handleBundleNewYear(email: string, name: string, phone: string, t
   console.log(`[GrowWebhook] New Year bundle completed for ${email} (database + guide + course)`);
 }
 
-async function handlePlus(email: string, name: string, transactionId: string, sum: number, data: any) {
+export async function handlePlus(email: string, name: string, transactionId: string, sum: number, data: any) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   const [single] = await db.select().from(singles).where(eq(singles.email, email)).limit(1);
-  if (!single || !single.isActive || !single.isPaid) {
-    throw new Error(`Plus payment received for non-active database member: ${email}`);
-  }
-
-  const { addOneBillingMonth } = await import("./plusSubscription");
   const now = Date.now();
-  const cycleEnd = addOneBillingMonth(now);
   const providerSubscriptionId = String(
     data.subscriptionId || data.recurringPaymentId || data.paymentLinkProcessToken || "",
   ).slice(0, 200) || null;
-  const [existing] = await db.select().from(plusPilotMembers)
-    .where(eq(plusPilotMembers.singleId, single.id)).limit(1);
 
-  const memberValues = {
-    status: "active" as const,
-    billingStatus: "active" as const,
-    pilotPriceAgorot: Math.round(sum * 100) || 9900,
-    monthlyMatchTarget: 2,
-    billingCycleStartedAt: now,
-    billingCycleEndsAt: cycleEnd,
-    nextBillingAt: cycleEnd,
+  await db.update(plusCheckoutIntents).set({
+    status: single?.isActive && single?.isPaid ? "active" : "paid_pending_profile",
+    providerTransactionId: transactionId || null,
     providerSubscriptionId,
-    lastPaymentTransactionId: transactionId || null,
-    lastPaymentAt: now,
-    premiumSupportEnabled: true,
-    activatedAt: existing?.activatedAt || now,
-    endedAt: null,
-    cancelledAt: null,
-    lastEngagedAt: now,
+    amountAgorot: Math.round(sum * 100) || 9900,
+    singleId: single?.id || null,
+    paidAt: now,
     updatedAt: now,
-  };
+  }).where(eq(plusCheckoutIntents.email, email));
 
-  if (existing) {
-    await db.update(plusPilotMembers).set(memberValues).where(eq(plusPilotMembers.id, existing.id));
-  } else {
-    await db.insert(plusPilotMembers).values({
-      singleId: single.id,
-      source: "grow_recurring",
-      waitlistedAt: now,
-      createdAt: now,
-      ...memberValues,
-    });
-  }
-
-  const [member] = await db.select().from(plusPilotMembers)
-    .where(eq(plusPilotMembers.singleId, single.id)).limit(1);
-  if (member) {
-    await db.insert(plusPaymentEvents).values({
-      plusMemberId: member.id,
-      singleId: single.id,
-      eventType: existing?.billingStatus === "active" ? "payment_succeeded" : "subscription_started",
+  if (single?.isActive && single?.isPaid) {
+    await activatePlusForSingle({
+      single,
+      email,
+      name,
+      transactionId,
       amountAgorot: Math.round(sum * 100) || 9900,
-      providerTransactionId: transactionId || null,
       providerSubscriptionId,
-      billingPeriodStartedAt: now,
-      billingPeriodEndsAt: cycleEnd,
+      paidAt: now,
+    });
+    return;
+  }
+
+  const [existingToken] = await db.select().from(freeAccessTokens).where(and(
+    eq(freeAccessTokens.email, email),
+    eq(freeAccessTokens.source, "plus_subscription"),
+    isNull(freeAccessTokens.usedAt),
+    gt(freeAccessTokens.expiresAt, now),
+  )).limit(1);
+  const token = existingToken?.token || crypto.randomBytes(32).toString("hex");
+  if (!existingToken) {
+    await db.insert(freeAccessTokens).values({
+      token,
+      email,
+      source: "plus_subscription",
+      expiresAt: now + 30 * 24 * 60 * 60 * 1000,
       createdAt: now,
     });
   }
 
-  const personalUrl = `${SITE_BASE}/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(single.questionnaireToken || "")}`;
+  const [existingCrm] = await db.select({ id: crmLeads.id }).from(crmLeads)
+    .where(sql`LOWER(TRIM(${crmLeads.email})) = ${email}`).limit(1);
+  if (existingCrm) {
+    await db.update(crmLeads).set({
+      name,
+      phone: data.payerPhone || data.phone || undefined,
+      paymentRef: transactionId || undefined,
+      updatedAt: now,
+    }).where(eq(crmLeads.id, existingCrm.id));
+  } else {
+    await db.insert(crmLeads).values({
+      name,
+      email,
+      phone: data.payerPhone || data.phone || null,
+      source: "direct",
+      status: "new_lead",
+      paymentRef: transactionId || null,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const registrationUrl = `${SITE_BASE}/join?free_token=${encodeURIComponent(token)}`;
   await sendEmail({
     to: { email, name },
-    subject: "Database Plus שלך פעיל",
-    htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">ברוכים הבאים ל־Database Plus</h2><p style="line-height:1.8">המנוי שלך פעיל. במחזור הנוכחי נשלח לפחות שתי הצעות התאמה חדשות שנבדקו. באזור האישי ניתן לראות את מונה 0/2–2/2 ולפנות לערוץ השירות בעדיפות.</p><p style="line-height:1.8;font-size:13px;color:#666">ההבטחה היא להצעות שנבדקו ונשלחו; אישור הדדי, דייט או זוגיות אינם מובטחים.</p><p style="text-align:center;margin:28px 0"><a href="${personalUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">כניסה לאזור האישי</a></p></div>`,
+    subject: "התשלום ל־Database Plus התקבל",
+    htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">ברוכים הבאים ל־Database Plus</h2><p style="line-height:1.8">התשלום התקבל בהצלחה. כדי שאוכל להתחיל לעבוד על ההתאמות שלך, נשאר להשלים את הפרופיל והשאלון.</p><p style="text-align:center;margin:28px 0"><a href="${registrationUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">להשלמת הפרופיל</a></p><p style="font-size:13px;color:#666;line-height:1.7">הקישור אישי ומחובר לכתובת המייל שבה בוצע התשלום.</p></div>`,
   });
-  await notifyOwner({ title: "מנוי Database Plus חדש", content: `${name} (${email}) הפעיל/ה Plus ב־${sum} ש״ח לחודש.` });
+  await notifyOwner({ title: "רכישת Database Plus חדשה", content: `${name} (${email}) רכש/ה Plus וממתין/ה להשלמת פרופיל.` });
 }
 
 async function handleMatchBoost(email: string, transactionId: string, sum: number, checkoutReference?: string) {
@@ -611,7 +620,7 @@ function extractUtmFromWebhook(data: any): { utmSource?: string; utmMedium?: str
 }
 
 // ─── Main webhook handler (exported, registered in index.ts) ──────────────────
-export async function handleGrowWebhook(body: any, context: { boostCheckoutReference?: string } = {}): Promise<void> {
+export async function handleGrowWebhook(body: any, context: { boostCheckoutReference?: string; plusCheckoutReference?: string } = {}): Promise<void> {
   // Support both PaymentLinks (new) and legacy formats
   const data = body?.data ?? body;
   const email: string = (data.payerEmail || data.email || "").trim().toLowerCase();
@@ -622,6 +631,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   const desc: string = data.description || data.paymentDesc || "";
   const transactionId: string = data.transactionId || data.transactionCode || "";
   const processToken: string = data.paymentLinkProcessToken || "";
+  const hasVerifiedPlusReference = verifyPlusCheckoutReference(context.plusCheckoutReference, email);
   // Extract UTM attribution data from the webhook payload
   let utm = extractUtmFromWebhook(data);
   if (utm.utmSource) console.log(`[GrowWebhook] UTM detected from webhook: source=${utm.utmSource} medium=${utm.utmMedium} campaign=${utm.utmCampaign}`);
@@ -690,6 +700,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       product = descProduct;
     }
   }
+  if (hasVerifiedPlusReference) product = "plus";
   // 3. A 99₪ charge is ambiguous with the historical live event, and the temporary
   // Plus Sandbox uses 1₪. If this email has a pending Plus checkout, prefer Plus;
   // otherwise continue to the normal amount fallback.
@@ -697,10 +708,9 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     try {
       const db = await getDb();
       if (db) {
-        const [pendingPlus] = await db.select({ id: plusPilotMembers.id })
-          .from(plusPilotMembers)
-          .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
-          .where(and(eq(singles.email, email), eq(plusPilotMembers.billingStatus, "pending")))
+        const [pendingPlus] = await db.select({ id: plusCheckoutIntents.id })
+          .from(plusCheckoutIntents)
+          .where(and(eq(plusCheckoutIntents.email, email), eq(plusCheckoutIntents.status, "pending")))
           .limit(1);
         if (pendingPlus) product = "plus";
       }

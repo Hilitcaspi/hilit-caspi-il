@@ -21,9 +21,6 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
     { email, token },
     { enabled: Boolean(email && token), retry: false },
   );
-  const joinWaitlist = trpc.plusPilot.joinWaitlist.useMutation({
-    onSuccess: () => utils.plusPilot.getMyStatus.invalidate({ email, token }),
-  });
   const updateSocialConsent = trpc.plusPilot.updateSocialExposureConsent.useMutation({
     onSuccess: () => utils.plusPilot.getMyStatus.invalidate({ email, token }),
   });
@@ -53,7 +50,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
       <div className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-bold text-[#8b7420]">שירות פרימיום לחברים פעילים במאגר</p>
+            <p className="text-[11px] font-bold text-[#8b7420]">מסלול פרימיום להיכרות אישית</p>
             <h4 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h4>
             <p className="mt-1 max-w-xl text-xs leading-6 text-[#555]">
               99 ש״ח לחודש, ביטול בכל עת, עם לפחות שתי הצעות שנבדקו ידנית ובוסט אלגוריתמי אחד נוסף בכל מחזור חיוב.
@@ -121,7 +118,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
         {status === "active" && (pilot as any)?.billingStatus === "active" && (
           <details className="mt-4 rounded-xl border border-[#e6dfcc] bg-white/70 p-4 text-[11px] text-[#666]">
             <summary className="cursor-pointer font-bold text-[#191265]">ניהול וביטול המנוי</summary>
-            <p className="mt-2 leading-5">אפשר לבטל בכל עת. הטבות Plus נשארות עד סוף המחזור הנוכחי והחברות הרגילה במאגר אינה נפגעת.</p>
+            <p className="mt-2 leading-5">אפשר לבטל בכל עת. הטבות Plus נשארות עד סוף המחזור הנוכחי ופרטי הפרופיל וההיסטוריה נשמרים.</p>
             <button
               type="button"
               disabled={cancelPlus.isPending}
@@ -143,7 +140,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
 
         {(status === "eligible" || status === "invited") && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadf9e] pt-4">
-            <p className="text-[11px] leading-5 text-[#6b6250]">הצטרפות חודשית אופציונלית, בנוסף לחברות הרגילה במאגר.</p>
+            <p className="text-[11px] leading-5 text-[#6b6250]">הצטרפות חודשית אופציונלית למסלול Plus.</p>
             <a href={checkoutUrl} className="rounded-xl bg-[#191265] px-5 py-2.5 text-xs font-black text-white">לפרטים ולמסך התשלום</a>
           </div>
         )}
@@ -151,16 +148,9 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
         {!registered && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadf9e] pt-4">
             <p className="text-[11px] leading-5 text-[#6b6250]">
-              ההצטרפות לרשימה אינה רכישה ואינה יוצרת חיוב. לאחר בדיקת זכאות נשלח קישור אישי להצעה המלאה.
+              אפשר לעבור ישירות לעמוד Plus, לקרוא את כל הפרטים ולהמשיך לתשלום לאחר אישור התנאים.
             </p>
-            <button
-              type="button"
-              onClick={() => joinWaitlist.mutate({ email, token, source: "personal_area" })}
-              disabled={joinWaitlist.isPending}
-              className="rounded-xl bg-[#191265] px-5 py-2.5 text-xs font-black text-white transition-colors hover:bg-[#1800ad] disabled:opacity-50"
-            >
-              {joinWaitlist.isPending ? "מצרף/ת..." : "רוצה להצטרף לרשימת ההמתנה"}
-            </button>
+            <a href={checkoutUrl} className="rounded-xl bg-[#191265] px-5 py-2.5 text-xs font-black text-white">לפרטים ולמסך התשלום</a>
           </div>
         )}
       </div>

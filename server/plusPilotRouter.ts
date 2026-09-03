@@ -349,10 +349,10 @@ export const plusPilotRouter = router({
             subject: "הזמנה אישית ל־Database Plus — יותר קדימות, יותר הזדמנויות",
             htmlContent: `
               <div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;background:#fff;color:#292552;padding:28px;border-radius:18px">
-                <p style="font-size:12px;font-weight:bold;color:#9a7e15">קבוצה מצומצמת לחברים פעילים במאגר</p>
+                <p style="font-size:12px;font-weight:bold;color:#9a7e15">מסלול אישי עם יותר הזדמנויות להכיר</p>
                 <h2 style="color:#191265">היי ${member.single.firstName}, יש לך הזמנה ל־Database Plus</h2>
                 <p style="line-height:1.8">Plus מוסיף עבודה יזומה וקדימות סביב הפרופיל שלך: לפחות <strong>שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב</strong>, ובנוסף <strong>בוסט אלגוריתמי אחד כלול בכל מחזור</strong>, קדימות בבדיקה האנושית, שירות לקוחות בעדיפות ואפשרות לחשיפה בסושיאל רק לאחר אישור מפורש.</p>
-                <p style="line-height:1.8"><strong>99 ש״ח לחודש</strong>, בנוסף לחברות הרגילה במאגר, עם אפשרות ביטול בכל עת.</p>
+                <p style="line-height:1.8"><strong>99 ש״ח לחודש</strong>, ללא צורך ברכישה קודמת של המאגר ועם אפשרות ביטול בכל עת.</p>
                 <p style="line-height:1.8;font-size:13px;color:#666"><strong>חשוב:</strong> ההבטחה היא להצעות שנבדקו ונשלחו. אישור הדדי, דייט או זוגיות תלויים גם בצד השני ואינם מובטחים.</p>
                 <p style="text-align:center;margin:28px 0"><a href="${personalUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">לפרטים ולהצטרפות</a></p>
                 <p style="font-size:12px;color:#777;line-height:1.7">לא יתבצע חיוב ללא אישור תנאי המנוי ומסך התשלום.</p>
