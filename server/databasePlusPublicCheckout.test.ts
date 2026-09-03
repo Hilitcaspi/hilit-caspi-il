@@ -52,7 +52,7 @@ describe("Database Plus public checkout", () => {
     });
   });
 
-  it("keeps Sandbox available only when no production credentials are configured", () => {
+  it("keeps Sandbox active in the published environment", () => {
     configureSandboxOnly();
     process.env.NODE_ENV = "production";
 
@@ -64,7 +64,7 @@ describe("Database Plus public checkout", () => {
     });
   });
 
-  it("prefers a dedicated production Plus page when it is configured", () => {
+  it("keeps Plus on the recurring Sandbox even when regular production credentials exist", () => {
     process.env.NODE_ENV = "production";
     process.env.GROW_USER_ID = "synthetic-production-user";
     process.env.GROW_PAGE_CODE_PLUS = "synthetic-production-plus-page";
@@ -72,26 +72,21 @@ describe("Database Plus public checkout", () => {
     process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
     process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
 
-    expect(getPlusCheckoutConfig()).toEqual({
-      configured: true,
-      mode: "production",
-      checkoutAmount: 99,
-      displayAmount: 99,
-    });
+    expect(getPlusCheckoutConfig()).toEqual({ configured: true, mode: "sandbox", checkoutAmount: 1, displayAmount: 99 });
   });
 
-  it("uses the existing production database page when a dedicated Plus page is not configured", () => {
+  it("does not fall back to a regular production page when Sandbox recurring credentials are missing", () => {
     process.env.NODE_ENV = "production";
     process.env.GROW_USER_ID = "synthetic-production-user";
     delete process.env.GROW_PAGE_CODE_PLUS;
     process.env.GROW_PAGE_CODE_DATABASE = "synthetic-database-page";
-    process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
-    process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
+    delete process.env.GROW_SANDBOX_USER_ID;
+    delete process.env.GROW_SANDBOX_RECURRING_PAGE_CODE;
 
     expect(getPlusCheckoutConfig()).toEqual({
-      configured: true,
-      mode: "production",
-      checkoutAmount: 99,
+      configured: false,
+      mode: "unconfigured",
+      checkoutAmount: null,
       displayAmount: 99,
     });
   });
@@ -142,41 +137,26 @@ describe("Database Plus public checkout", () => {
     });
   });
 
-  it("creates a 99 ILS recurring Plus process against the production endpoint", async () => {
+  it("refuses to create Plus checkout through the regular production fallback", async () => {
     process.env.NODE_ENV = "production";
     process.env.GROW_USER_ID = "synthetic-production-user";
     delete process.env.GROW_PAGE_CODE_PLUS;
     process.env.GROW_PAGE_CODE_DATABASE = "synthetic-database-page";
 
-    const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      expect(String(url)).toBe("https://secure.meshulam.co.il/api/light/server/1.0/createPaymentProcess");
-      const params = new URLSearchParams(String(init?.body));
-      expect(params.get("userId")).toBe("synthetic-production-user");
-      expect(params.get("pageCode")).toBe("synthetic-database-page");
-      expect(params.get("chargeType")).toBe("1");
-      expect(params.get("sum")).toBe("99");
-      expect(params.get("description")).toBe("Database Plus - מנוי חודשי");
-      expect(params.get("notifyUrl")).toBe("https://hilitcaspi.com/api/grow/webhook?plus_ref=synthetic-plus-reference");
-      return new Response(JSON.stringify({
-        status: 1,
-        data: { authCode: "synthetic-production-auth", processToken: "synthetic-production-process" },
-      }), { status: 200, headers: { "Content-Type": "application/json" } });
-    });
+    delete process.env.GROW_SANDBOX_USER_ID;
+    delete process.env.GROW_SANDBOX_RECURRING_PAGE_CODE;
+    const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as typeof fetch;
 
-    const result = await createPaymentProcess({
+    await expect(createPaymentProcess({
       product: "plus",
       fullName: "Production Test Member",
       email: "production.member@example.com",
       phone: "0500000000",
       plusWebhookReference: "synthetic-plus-reference",
-    });
+    })).rejects.toThrow("Database Plus payment product is not configured");
 
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(result).toEqual({
-      authCode: "synthetic-production-auth",
-      processToken: "synthetic-production-process",
-    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("keeps the checkout open to everyone while enforcing all three consents and a server-side intent", () => {
@@ -197,7 +177,7 @@ describe("Database Plus public checkout", () => {
     expect(wallet).toContain("if (result.url)");
     expect(wallet).not.toContain("https://hilitcaspi.com/api/plus/recurring-mandate");
     expect(wallet).not.toContain('if (product === "plus") return;');
-    expect(wallet).not.toContain('if (product !== "plus") {');
+    expect(wallet).toContain('if (product !== "plus") {');
     expect(wallet).toContain("await preloadGrowSDKScript();");
     expect(wallet).toContain("await waitForGrowRuntime(12000);");
     expect(wallet).toContain('typeof growPaymentSdk.renderPaymentOptions !== "function"');
@@ -219,5 +199,7 @@ describe("Database Plus public checkout", () => {
     expect(thankYou).toContain("אם עדיין אין פרופיל");
     expect(thankYou).toContain("קישור להשלמת הפרטים והשאלון");
     expect(growPayment).not.toContain('JSON.stringify(json).slice(0, 500)');
+    expect(growPayment).not.toContain('process.env.GROW_PAGE_CODE_DATABASE?.trim() || PAGE_CODES.plus');
+    expect(growPayment).toContain('process.env.GROW_SANDBOX_RECURRING_PAGE_CODE?.trim()');
   });
 });

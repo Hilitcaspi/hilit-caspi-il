@@ -2130,3 +2130,22 @@
 - [x] להסיר ממסד LEGACY את intent וליד התשלום הסינתטיים שנוצרו בבדיקת ה־preview
 - [x] להריץ 82 קובצי בדיקה ו־372 בדיקות שעברו, TypeScript, build, git diff --check וסריקת פרטיות; שתי בדיקות חיות נשארו opt-in
 - [x] לפרסם ולסנכרן את אותו checkpoint ל־GitHub
+
+## החזרת Database Plus להוראת קבע עם מזהי Grow ייצור — 03.09.2026
+
+- [x] לאתר מהמשימה הקודמת את פרמטרי Sandbox Recurring ולבדוק את מסלול הייצור שנבחר
+- [x] לאמת בתיעוד Grow ש־chargeType=1 הוא Regular Charge ושנדרש pageCode ייצור ייעודי ל־Recurring Payment
+- [x] לאשר שלא קיים כרגע GROW_PAGE_CODE_PLUS ייעודי להוראת קבע בייצור ולכן אין להשתמש ב־pageCode של המאגר
+- [x] לבטל את מעבר הייצור לפי בקשת המשתמש ולהחזיר את Plus ל־Sandbox Recurring
+
+## החזרת Database Plus ל־Grow Sandbox Recurring — 03.09.2026
+
+- [x] לבטל את השימוש ב־pageCode של סליקה רגילה בייצור עבור Plus
+- [x] להשתמש רק ב־GROW_SANDBOX_USER_ID וב־GROW_SANDBOX_RECURRING_PAGE_CODE שסופקו
+- [x] לקבוע חיוב בדיקה של 1 ₪ ולהחזיר redirect לטופס הוראת הקבע המאוחסן של Sandbox
+- [x] להחזיר לעמוד הודעת Sandbox ברורה לצד מחיר ההשקה העתידי של 99 ₪ לחודש
+- [x] למנוע fallback אוטומטי לסליקת ייצור רגילה כשסודות Sandbox חסרים
+- [x] לעדכן בדיקות רגרסיה ל־Sandbox Recurring, SDK והודעות הלקוח
+- [x] לבדוק בדסקטופ ובמובייל בלי להזין כרטיס ובלי לבצע חיוב
+- [x] להריץ 82 קובצי בדיקה ו־372 בדיקות שעברו, TypeScript, build, git diff --check וסריקת פרטיות; בדיקת Sandbox חיה אחת נשארה opt-in
+- [x] לפרסם ולסנכרן את אותו checkpoint ל־GitHub

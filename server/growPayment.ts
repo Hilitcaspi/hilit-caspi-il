@@ -58,9 +58,9 @@ const PAGE_CODES: Record<string, string> = {
   // wallet page. Product identity is preserved by its unique description and
   // by the pending Boost request created before Grow is opened.
   match_boost: process.env.GROW_PAGE_CODE_MATCH_BOOST || process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
-  // Prefer a dedicated Plus page when one is supplied. Until then, reuse the
-  // verified production database page with chargeType=1 for monthly billing.
-  plus:         process.env.GROW_PAGE_CODE_PLUS || process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
+  // Plus uses the dedicated recurring-payment Sandbox branch below. Never
+  // fall back to a regular production payment page for this product.
+  plus:         process.env.GROW_PAGE_CODE_PLUS || "",
 };
 
 const SITE_BASE = "https://hilitcaspi.com";
@@ -94,13 +94,6 @@ export function getPlusCheckoutConfig(): {
   checkoutAmount: number | null;
   displayAmount: number;
 } {
-  const productionConfigured = Boolean(
-    process.env.GROW_USER_ID?.trim()
-    && (process.env.GROW_PAGE_CODE_PLUS?.trim() || process.env.GROW_PAGE_CODE_DATABASE?.trim()),
-  );
-  if (productionConfigured) {
-    return { configured: true, mode: "production", checkoutAmount: 99, displayAmount: 99 };
-  }
   const sandboxConfigured = Boolean(
     process.env.GROW_SANDBOX_USER_ID?.trim()
     && process.env.GROW_SANDBOX_RECURRING_PAGE_CODE?.trim(),
@@ -198,12 +191,8 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     };
   }
 
-  const pageCode = input.product === "plus"
-    ? process.env.GROW_PAGE_CODE_PLUS?.trim() || process.env.GROW_PAGE_CODE_DATABASE?.trim() || PAGE_CODES.plus
-    : PAGE_CODES[input.product];
-  const growUserId = input.product === "plus"
-    ? process.env.GROW_USER_ID?.trim() || GROW_USER_ID
-    : GROW_USER_ID;
+  const pageCode = PAGE_CODES[input.product];
+  const growUserId = GROW_USER_ID;
   if (!pageCode || !growUserId) {
     throw new Error("The selected Grow payment product is not configured yet");
   }
@@ -214,9 +203,6 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   params.append("userId", growUserId);
   params.append("sum", String(sum));
   params.append("description", config.description);
-  if (input.product === "plus") {
-    params.append("chargeType", "1");
-  }
   const SUCCESS_PATHS: Record<string, string> = {
     guide:        "/thank-you/digital",
     database:     "/thank-you/database",
@@ -330,7 +316,7 @@ export async function approveTransaction(
     ? process.env.GROW_USER_ID?.trim() || GROW_USER_ID
     : GROW_USER_ID;
   const productionPageCode = product === "plus"
-    ? process.env.GROW_PAGE_CODE_PLUS?.trim() || process.env.GROW_PAGE_CODE_DATABASE?.trim() || PAGE_CODES.plus
+    ? process.env.GROW_PAGE_CODE_PLUS?.trim() || ""
     : product ? (PAGE_CODES[product] ?? GROW_USER_ID) : GROW_USER_ID;
   const growUserId = usePlusSandbox ? process.env.GROW_SANDBOX_USER_ID || "" : productionUserId;
   const pageCode = usePlusSandbox

@@ -338,16 +338,17 @@ export default function GrowWallet({
     };
 
     try {
-      // Step 1: Ensure script is loaded for every production authCode flow,
-      // including Plus. Sandbox Plus may still return a redirect URL later.
-      logStep("1_script_load_start");
-      await preloadGrowSDKScript();
-      if (!window.growPayment) throw new Error("Grow SDK not available after script load");
-      logStep("1_script_load_done");
+      // Plus Sandbox returns a hosted recurring-payment URL, so it must not
+      // depend on the regular Grow wallet SDK. Other products still use the
+      // embedded authCode flow and initialize the SDK before creating it.
+      if (product !== "plus") {
+        logStep("1_script_load_start");
+        await preloadGrowSDKScript();
+        if (!window.growPayment) throw new Error("Grow SDK not available after script load");
+        logStep("1_script_load_done");
 
-      // Step 2: Always call init() fresh — it's idempotent and ensures runtime is started
-      logStep("2_init_start");
-      await window.growPayment.init({
+        logStep("2_init_start");
+        await window.growPayment.init({
         environment: GROW_ENV,
         version: GROW_VERSION,
         events: {
@@ -400,14 +401,13 @@ export default function GrowWallet({
             });
           },
         },
-      });
+        });
 
-      logStep("2_init_done");
-
-      // Step 3: Wait for runtime to be fully ready
-      logStep("3_wait_runtime_start");
-      await waitForGrowRuntime(12000);
-      logStep("3_wait_runtime_done");
+        logStep("2_init_done");
+        logStep("3_wait_runtime_start");
+        await waitForGrowRuntime(12000);
+        logStep("3_wait_runtime_done");
+      }
 
       // Step 4: Create payment process via server-side tRPC (secure, no CORS issues)
       // Calculate discounted price if coupon is applied
