@@ -145,6 +145,7 @@ export async function sendEmailBatch(input: {
   versions: Array<{
     to: Array<{ email: string; name?: string }>;
     htmlContent: string;
+    textContent?: string;
   }>;
   idempotencyKey: string;
 }): Promise<{ success: boolean; messageIds?: string[]; duplicate?: boolean; error?: string }> {
@@ -156,6 +157,9 @@ export async function sendEmailBatch(input: {
       .map((version) => ({
         ...version,
         htmlContent: upgradeLegacyUnsubscribeLinks(version.htmlContent, version.to[0]?.email || ""),
+        ...(version.textContent
+          ? { textContent: upgradeLegacyUnsubscribeLinks(version.textContent, version.to[0]?.email || "") }
+          : {}),
       }));
     if (deliverable.length === 0) return { success: true, messageIds: [] };
 

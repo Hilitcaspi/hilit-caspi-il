@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowDown,
@@ -30,6 +30,11 @@ const WHATSAPP_URL =
   "https://wa.me/972552442334?text=" +
   encodeURIComponent("היי הילית, ראיתי את חבילת חגי תשרי ויש לי שאלה");
 const OFFER_END = new Date("2026-09-30T23:59:59+03:00").getTime();
+
+export function getHolidayBundleCouponFromSearch(search: string) {
+  const requested = new URLSearchParams(search).get("coupon")?.trim().toUpperCase();
+  return requested === "HOLIDAY10" ? requested : undefined;
+}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -258,6 +263,7 @@ function PricePanel({ condensed = false }: { condensed?: boolean }) {
 
 export default function NewYearLoveBundle() {
   const paymentRef = useRef<HTMLDivElement>(null);
+  const newsletterCoupon = useMemo(() => getHolidayBundleCouponFromSearch(window.location.search), []);
   const { data: approvedTestimonials = [] } = trpc.publicProof.approvedTestimonials.useQuery(undefined, { staleTime: 10 * 60 * 1000 });
 
   useEffect(() => {
@@ -272,8 +278,11 @@ export default function NewYearLoveBundle() {
     meta.setAttribute("content", description);
     trackViewContent({ content_name: "new_year_love_bundle", content_category: "holiday_bundle" });
     gaViewItem("bundle_new_year");
-    track({ eventType: "page_view", page: "/new-year-love", metadata: { product: "bundle_new_year", value: 399 } });
-  }, []);
+    track({ eventType: "page_view", page: "/new-year-love", metadata: { product: "bundle_new_year", value: 399, ...(newsletterCoupon ? { coupon: newsletterCoupon } : {}) } });
+    if (window.location.hash === "#payment") {
+      window.setTimeout(() => paymentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 250);
+    }
+  }, [newsletterCoupon]);
 
   const openPayment = (placement: string) => {
     track({ eventType: "product_click", page: "/new-year-love", metadata: { product: "bundle_new_year", action: "scroll_to_payment", placement } });
@@ -396,7 +405,7 @@ export default function NewYearLoveBundle() {
           <section className="bg-[#eee7df] px-5 py-20 md:px-8 md:py-28" aria-labelledby="approved-stories-title"><Reveal className="mx-auto max-w-6xl"><motion.div variants={fadeUp} className="mx-auto max-w-3xl text-center"><p className="text-sm font-black text-[#806650]">סיפורים אמיתיים, באישור מפורש</p><h2 id="approved-stories-title" className="mt-3 text-3xl font-black text-[#29211c] md:text-5xl">לפעמים הכול מתחיל מהסכמה לתת הזדמנות.</h2></motion.div><div className="mt-10 grid gap-5 md:grid-cols-2">{approvedTestimonials.map((testimonial) => <motion.blockquote key={testimonial.id} variants={fadeUp} className="relative overflow-hidden rounded-[1.75rem] border border-[#735c49]/14 bg-white p-7 shadow-[0_15px_40px_rgba(55,42,33,0.07)]"><Flower2 className="absolute -left-2 -top-2 h-14 w-14 text-[#bca58f]/20" /><p className="relative text-base leading-8 text-[#5b4d44]">״{testimonial.text}״</p><footer className="relative mt-6 flex items-center gap-3 border-t border-[#735c49]/12 pt-5">{testimonial.photoUrl ? <img src={testimonial.photoUrl} alt="" className="h-11 w-11 rounded-full object-cover" /> : <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#29211c] text-white"><Flower2 className="h-4 w-4" /></div>}<span className="text-sm font-black text-[#29211c]">{testimonial.displayName}</span></footer></motion.blockquote>)}</div></Reveal></section>
         ) : null}
 
-        <section ref={paymentRef} id="payment" className="relative isolate overflow-hidden bg-[#1c1815] px-5 py-20 text-white md:px-8 md:py-28"><FlowerField /><Reveal className="relative mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:gap-16"><motion.div variants={fadeUp} className="text-center lg:text-right"><div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/[0.07] px-4 py-2 text-xs font-black text-[#eee3d8]"><Clock3 className="h-4 w-4" /> הטבת חגי תשרי מסתיימת בעוד</div><div className="mt-5"><Countdown /></div><h2 className="mt-8 text-4xl font-black leading-tight tracking-[-0.04em] md:text-5xl">השנה לא רק מאחלים. פותחים מקום.</h2><p className="mt-5 text-lg leading-8 text-white/72">שלושה כלים עם שאלות, תרגילים, מפה והזדמנות אמיתית להכיר, במחיר חג אחד.</p><div className="mt-7"><PricePanel condensed /></div></motion.div><motion.div variants={fadeUp} className="rounded-[2rem] border border-white/13 bg-[#f9f6f1] p-6 text-[#29211c] shadow-[0_30px_85px_rgba(10,7,5,0.44)] md:p-9"><p className="text-sm font-black text-[#806650]">הצטרפות לחבילת החג</p><h3 className="mt-2 text-3xl font-black tracking-[-0.03em]">399 ₪ בתשלום חד־פעמי</h3><p className="mt-3 text-sm leading-6 text-[#6a5a50]">לאחר אישור Grow יישלחו קישורי הגישה למוצרים הדיגיטליים ויתחיל תהליך ההצטרפות למאגר.</p><div className="mt-6"><GrowWallet product="bundle_new_year" buttonLabel="להצטרפות לחבילת החג" buttonClassName="!bg-[#29211c] !text-white !font-black !text-lg !rounded-full hover:!bg-[#3a2e27] !py-4" termsPath="/terms/new-year-love" onSuccess={() => { window.location.href = "/thank-you/new-year-love"; }} /></div><div className="mt-5 flex items-center justify-center gap-4 text-center text-[11px] font-medium text-[#6f6056]"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> תשלום מאובטח</span><span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> ללא חיוב מתחדש</span></div><p className="mt-4 text-center text-[11px] leading-5 text-[#82736a]">תנאי הביטול והגישה מפורטים בתקנון החבילה.</p></motion.div></Reveal></section>
+        <section ref={paymentRef} id="payment" className="relative isolate overflow-hidden bg-[#1c1815] px-5 py-20 text-white md:px-8 md:py-28"><FlowerField /><Reveal className="relative mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:gap-16"><motion.div variants={fadeUp} className="text-center lg:text-right"><div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/[0.07] px-4 py-2 text-xs font-black text-[#eee3d8]"><Clock3 className="h-4 w-4" /> הטבת חגי תשרי מסתיימת בעוד</div><div className="mt-5"><Countdown /></div><h2 className="mt-8 text-4xl font-black leading-tight tracking-[-0.04em] md:text-5xl">השנה לא רק מאחלים. פותחים מקום.</h2><p className="mt-5 text-lg leading-8 text-white/72">שלושה כלים עם שאלות, תרגילים, מפה והזדמנות אמיתית להכיר, במחיר חג אחד.</p><div className="mt-7"><PricePanel condensed /></div></motion.div><motion.div variants={fadeUp} className="rounded-[2rem] border border-white/13 bg-[#f9f6f1] p-6 text-[#29211c] shadow-[0_30px_85px_rgba(10,7,5,0.44)] md:p-9"><p className="text-sm font-black text-[#806650]">הצטרפות לחבילת החג</p><h3 className="mt-2 text-3xl font-black tracking-[-0.03em]">399 ₪ בתשלום חד־פעמי</h3>{newsletterCoupon ? <div className="mt-3 rounded-2xl border border-[#d9bea2] bg-[#efe1d2] px-4 py-3 text-sm font-bold text-[#5c3824]">קוד HOLIDAY10 מהניוזלטר יחכה כאן ויופעל לאחר הזנת המייל.</div> : null}<p className="mt-3 text-sm leading-6 text-[#6a5a50]">לאחר אישור Grow יישלחו קישורי הגישה למוצרים הדיגיטליים ויתחיל תהליך ההצטרפות למאגר.</p><div className="mt-6"><GrowWallet product="bundle_new_year" prefillCoupon={newsletterCoupon} buttonLabel="להצטרפות לחבילת החג" buttonClassName="!bg-[#29211c] !text-white !font-black !text-lg !rounded-full hover:!bg-[#3a2e27] !py-4" termsPath="/terms/new-year-love" onSuccess={() => { window.location.href = "/thank-you/new-year-love"; }} /></div><div className="mt-5 flex items-center justify-center gap-4 text-center text-[11px] font-medium text-[#6f6056]"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> תשלום מאובטח</span><span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> ללא חיוב מתחדש</span></div><p className="mt-4 text-center text-[11px] leading-5 text-[#82736a]">תנאי הביטול והגישה מפורטים בתקנון החבילה.</p></motion.div></Reveal></section>
 
         <section className="bg-[#f9f6f1] px-5 py-20 md:px-8 md:py-28"><Reveal className="mx-auto max-w-4xl"><motion.div variants={fadeUp} className="text-center"><p className="text-sm font-black text-[#806650]">לפני שמתחילים</p><h2 className="mt-3 text-3xl font-black text-[#29211c] md:text-5xl">שאלות נפוצות</h2></motion.div><div className="mt-10 space-y-3">{faqs.map(({ q, a }) => <motion.details key={q} variants={fadeUp} className="group rounded-2xl border border-[#735c49]/12 bg-white p-5 shadow-[0_8px_24px_rgba(55,42,33,0.04)] md:p-6"><summary className="cursor-pointer list-none pr-1 text-base font-black text-[#342922] marker:hidden md:text-lg">{q}<span className="float-left text-2xl font-medium leading-5 text-[#806650] transition-transform group-open:rotate-45">+</span></summary><p className="mt-4 border-t border-[#735c49]/10 pt-4 text-sm leading-7 text-[#5f5148]">{a}</p></motion.details>)}</div></Reveal></section>
 
