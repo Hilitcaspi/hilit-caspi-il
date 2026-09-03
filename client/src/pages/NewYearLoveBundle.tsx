@@ -246,9 +246,8 @@ function PricePanel({ condensed = false }: { condensed?: boolean }) {
           <span className="rounded-full bg-[#f2eee8] px-3 py-1.5 text-xs font-black text-[#33271f]">חיסכון של 298 ₪</span>
           <span className="text-xs font-medium text-white/60">תשלום חד־פעמי · ללא מנוי</span>
         </div>
-        <div className="mt-5 grid grid-cols-3 gap-2 text-center md:gap-3">
+        <div className="mt-5 grid grid-cols-2 gap-2 text-center md:gap-3">
           <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-1 py-3"><div className="text-[10px] font-bold text-white/45">שווי מקורי</div><div className="mt-1 text-base font-black text-white/65 line-through md:text-lg">1,245 ₪</div></div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-1 py-3"><div className="text-[10px] font-bold text-white/45">כיום בנפרד</div><div className="mt-1 text-base font-black text-white/65 line-through md:text-lg">697 ₪</div></div>
           <div className="rounded-2xl bg-[#f4efe8] px-1 py-3 text-[#2c211a] shadow-[0_12px_28px_rgba(220,205,190,0.18)]"><div className="text-[10px] font-black">מחיר החג</div><div className="mt-1 text-2xl font-black md:text-3xl">399 ₪</div></div>
         </div>
         {!condensed ? <p className="mt-4 text-center text-xs leading-5 text-white/58">מאגר הרווקים והרווקות · המדריך ״לבחור נכון״ · הקורס ״המסע לזוגיות״</p> : null}
