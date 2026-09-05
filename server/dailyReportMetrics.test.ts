@@ -7,6 +7,7 @@ import {
   deriveDailyReportMetrics,
   getDailyBusinessWeight,
   getDailyReportMediaPlan,
+  getDailyReportRevenuePlan,
   getReportDateForMidnightRun,
   getReportDateRange,
   weightedTargetForDate,
@@ -19,10 +20,10 @@ const targets: DailyReportTargets = {
   databaseMonthlyMinTarget: 350,
   databaseMonthlyStretchTarget: 400,
   databaseMonthlyBudgetAgorot: 1_000_000,
-  boostMonthlyTarget: null,
-  bundleMonthlyTarget: null,
+  boostMonthlyTarget: 90,
+  bundleMonthlyTarget: 70,
   leadMonthlyTarget: null,
-  revenueMonthlyTargetAgorot: null,
+  revenueMonthlyTargetAgorot: 14_000_000,
 };
 
 const metrics: DailyReportMetrics = {
@@ -119,6 +120,11 @@ describe("daily report metrics and message", () => {
     expect(parts.map(part => part.key)).toEqual(["sales_targets", "campaigns", "database"]);
     expect(parts[0].message).toContain("דוח 1/3");
     expect(parts[0].message).toContain("מצטבר");
+    expect(parts[0].message).toContain("הכנסה ₪598/₪104,650");
+    expect(parts[0].message).toContain("הכנסה ₪0/₪27,930");
+    expect(parts[0].message).toContain("הכנסה ₪20/₪1,791");
+    expect(parts[0].message).toContain("יעד הכנסה כולל: ₪897/₪140,000");
+    expect(parts[0].message).toContain("יעד 3 מוצרים: ₪134,371 | נוספים להשלמת 140K: ₪5,629");
     expect(parts[1].message).toContain("CTR 3%");
     expect(parts[1].message).toContain("Meta מאגר: יום");
     expect(parts[1].message).toContain("תוכנית ספטמבר שאושרה");
@@ -166,5 +172,15 @@ describe("daily report metrics and message", () => {
     expect(plan.bundleMonthlyBudgetAgorot).toBe(700_000);
     expect(plan.boostMonthlyBudgetAgorot).toBe(35_000);
     expect(weightedTargetToDate(plan.databaseMonthlyBudgetAgorot, "2026-09-05")).toBeGreaterThan(0);
+  });
+
+  it("calculates the exact monthly revenue targets from product quantities and prices", () => {
+    const plan = getDailyReportRevenuePlan(targets);
+    expect(plan.databaseMonthlyTargetAgorot).toBe(10_465_000);
+    expect(plan.bundleMonthlyTargetAgorot).toBe(2_793_000);
+    expect(plan.boostMonthlyTargetAgorot).toBe(179_100);
+    expect(plan.trackedProductsMonthlyTargetAgorot).toBe(13_437_100);
+    expect(plan.otherRevenueMonthlyTargetAgorot).toBe(562_900);
+    expect(plan.totalMonthlyTargetAgorot).toBe(14_000_000);
   });
 });

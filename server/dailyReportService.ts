@@ -45,7 +45,7 @@ function targetsFromSettings(
     boostMonthlyTarget: settings.boostMonthlyTarget,
     bundleMonthlyTarget: settings.bundleMonthlyTarget,
     leadMonthlyTarget: settings.leadMonthlyTarget,
-    revenueMonthlyTargetAgorot: settings.revenueMonthlyTargetAgorot,
+    revenueMonthlyTargetAgorot: settings.revenueMonthlyTargetAgorot ?? 14_000_000,
     weekdayWeights,
     pacingBasisLabel: historicalProducts
       ? `יעדי העסק + 60 ימי היסטוריה (${historicalProducts}) + סופ״ש וחגים`
@@ -121,7 +121,7 @@ export async function getOrCreateDailyReportSettings(db?: Db): Promise<DailyRepo
     boostMonthlyTarget: 90,
     bundleMonthlyTarget: 70,
     leadMonthlyTarget: 2_000,
-    revenueMonthlyTargetAgorot: null,
+    revenueMonthlyTargetAgorot: 14_000_000,
     createdAt: now,
     updatedAt: now,
   });

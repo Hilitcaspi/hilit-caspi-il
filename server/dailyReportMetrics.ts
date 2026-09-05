@@ -109,8 +109,18 @@ export type DailyReportDerived = {
   boostBudgetToDateAgorot: number | null;
   otherDailyBudgetTargetAgorot: number | null;
   otherBudgetToDateAgorot: number | null;
+  revenuePlan: DailyReportRevenuePlan;
   mediaPlan: DailyReportMediaPlan;
   alerts: string[];
+};
+
+export type DailyReportRevenuePlan = {
+  totalMonthlyTargetAgorot: number | null;
+  databaseMonthlyTargetAgorot: number;
+  bundleMonthlyTargetAgorot: number | null;
+  boostMonthlyTargetAgorot: number | null;
+  trackedProductsMonthlyTargetAgorot: number;
+  otherRevenueMonthlyTargetAgorot: number | null;
 };
 
 export type DailyReportMediaPlan = {
@@ -131,6 +141,10 @@ export type DailyReportMessagePart = {
   key: "sales_targets" | "campaigns" | "database";
   message: string;
 };
+
+const DATABASE_PRICE_AGOROT = 29_900;
+const BUNDLE_PRICE_AGOROT = 39_900;
+const BOOST_PRICE_AGOROT = 1_990;
 
 function zonedParts(timestamp: number, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -320,6 +334,30 @@ export function getDailyReportMediaPlan(reportDate: string, databaseMonthlyBudge
   };
 }
 
+export function getDailyReportRevenuePlan(targets: DailyReportTargets): DailyReportRevenuePlan {
+  const databaseMonthlyTargetAgorot = targets.databaseMonthlyMinTarget * DATABASE_PRICE_AGOROT;
+  const bundleMonthlyTargetAgorot = targets.bundleMonthlyTarget === null
+    ? null
+    : targets.bundleMonthlyTarget * BUNDLE_PRICE_AGOROT;
+  const boostMonthlyTargetAgorot = targets.boostMonthlyTarget === null
+    ? null
+    : targets.boostMonthlyTarget * BOOST_PRICE_AGOROT;
+  const trackedProductsMonthlyTargetAgorot = databaseMonthlyTargetAgorot
+    + (bundleMonthlyTargetAgorot || 0)
+    + (boostMonthlyTargetAgorot || 0);
+  const otherRevenueMonthlyTargetAgorot = targets.revenueMonthlyTargetAgorot === null
+    ? null
+    : Math.max(0, targets.revenueMonthlyTargetAgorot - trackedProductsMonthlyTargetAgorot);
+  return {
+    totalMonthlyTargetAgorot: targets.revenueMonthlyTargetAgorot,
+    databaseMonthlyTargetAgorot,
+    bundleMonthlyTargetAgorot,
+    boostMonthlyTargetAgorot,
+    trackedProductsMonthlyTargetAgorot,
+    otherRevenueMonthlyTargetAgorot,
+  };
+}
+
 function divideAgorot(numeratorAgorot: number | null, denominator: number): number | null {
   if (numeratorAgorot === null || denominator <= 0) return null;
   return Math.round(numeratorAgorot / denominator);
@@ -341,6 +379,7 @@ export function deriveDailyReportMetrics(metrics: DailyReportMetrics, targets: D
   const boostWeights = targets.weekdayWeights?.boost;
   const leadWeights = targets.weekdayWeights?.leads;
   const mediaPlan = getDailyReportMediaPlan(metrics.reportDate, targets.databaseMonthlyBudgetAgorot);
+  const revenuePlan = getDailyReportRevenuePlan(targets);
   const databaseDailyTarget = weightedTargetForDate(targets.databaseMonthlyMinTarget, metrics.reportDate, databaseWeights) || 0;
   const databaseWeekTarget = weightedTargetForWeek(targets.databaseMonthlyMinTarget, metrics.reportDate, databaseWeights) || 0;
   const expectedDatabaseToDate = Math.ceil(weightedTargetToDate(targets.databaseMonthlyMinTarget, metrics.reportDate, databaseWeights) || 0);
@@ -435,6 +474,7 @@ export function deriveDailyReportMetrics(metrics: DailyReportMetrics, targets: D
     boostBudgetToDateAgorot,
     otherDailyBudgetTargetAgorot,
     otherBudgetToDateAgorot,
+    revenuePlan,
     mediaPlan,
     alerts,
   };
@@ -517,13 +557,16 @@ export function buildDailyReportMessages(
   const sales = [
     `דוח 1/3 | מכירות | נתוני ${dateLabel}`,
     `הכנסה: יום ${ils(metrics.revenueTodayAgorot)} | חודש ${ils(metrics.revenueMonthAgorot)}`,
-    `מאגר 299₪: ${targetLine(metrics.databasePurchasesToday, metrics.databasePurchasesWeek, metrics.databasePurchasesMonth, targets.databaseMonthlyMinTarget, metrics.reportDate, targets.weekdayWeights?.database)} | הכנסה יום ${ils(metrics.databaseRevenueTodayAgorot)}`,
-    `באנדל 399₪: ${targetLine(metrics.bundlePurchasesToday, metrics.bundlePurchasesWeek, metrics.bundlePurchasesMonth, targets.bundleMonthlyTarget, metrics.reportDate, targets.weekdayWeights?.bundle)} | הכנסה יום ${ils(metrics.bundleRevenueTodayAgorot)}`,
-    `Boost 19.90₪: ${targetLine(metrics.boostPurchasesToday, metrics.boostPurchasesWeek, metrics.boostPurchasesMonth, targets.boostMonthlyTarget, metrics.reportDate, targets.weekdayWeights?.boost)} | הכנסה יום ${ils(metrics.boostRevenueTodayAgorot)}`,
+    `מאגר 299₪: ${targetLine(metrics.databasePurchasesToday, metrics.databasePurchasesWeek, metrics.databasePurchasesMonth, targets.databaseMonthlyMinTarget, metrics.reportDate, targets.weekdayWeights?.database)} | הכנסה ${ils(metrics.databaseRevenueMonthAgorot)}/${ils(derived.revenuePlan.databaseMonthlyTargetAgorot)}`,
+    `באנדל 399₪: ${targetLine(metrics.bundlePurchasesToday, metrics.bundlePurchasesWeek, metrics.bundlePurchasesMonth, targets.bundleMonthlyTarget, metrics.reportDate, targets.weekdayWeights?.bundle)} | הכנסה ${ils(metrics.bundleRevenueMonthAgorot)}/${ils(derived.revenuePlan.bundleMonthlyTargetAgorot)}`,
+    `Boost 19.90₪: ${targetLine(metrics.boostPurchasesToday, metrics.boostPurchasesWeek, metrics.boostPurchasesMonth, targets.boostMonthlyTarget, metrics.reportDate, targets.weekdayWeights?.boost)} | הכנסה ${ils(metrics.boostRevenueMonthAgorot)}/${ils(derived.revenuePlan.boostMonthlyTargetAgorot)}`,
     `לידים: ${targetLine(metrics.leadsToday, metrics.leadsWeek, metrics.leadsMonth, targets.leadMonthlyTarget, metrics.reportDate, targets.weekdayWeights?.leads)}`,
     targets.revenueMonthlyTargetAgorot === null
       ? "יעד הכנסה חודשי: טרם הוגדר"
-      : `יעד הכנסה חודשי: ${ils(targets.revenueMonthlyTargetAgorot)} | חסר ${ils(Math.max(0, targets.revenueMonthlyTargetAgorot - metrics.revenueMonthAgorot))}`,
+      : `יעד הכנסה כולל: ${ils(metrics.revenueMonthAgorot)}/${ils(targets.revenueMonthlyTargetAgorot)} | חסר ${ils(Math.max(0, targets.revenueMonthlyTargetAgorot - metrics.revenueMonthAgorot))}`,
+    derived.revenuePlan.otherRevenueMonthlyTargetAgorot === null
+      ? `יעד 3 מוצרים: ${ils(derived.revenuePlan.trackedProductsMonthlyTargetAgorot)}`
+      : `יעד 3 מוצרים: ${ils(derived.revenuePlan.trackedProductsMonthlyTargetAgorot)} | נוספים להשלמת 140K: ${ils(derived.revenuePlan.otherRevenueMonthlyTargetAgorot)}`,
     `בסיס קצב: ${targets.pacingBasisLabel || "יעדי העסק + משקלי סופ״ש וחגים"}`,
   ];
 
