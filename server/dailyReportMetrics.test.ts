@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildHistoricalWeekdayWeights,
   buildDailyReportMessage,
   buildDailyReportMessages,
   DAILY_REPORT_MAX_MESSAGE_LENGTH,
   deriveDailyReportMetrics,
   getDailyBusinessWeight,
+  getDailyReportMediaPlan,
   getReportDateForMidnightRun,
   getReportDateRange,
   weightedTargetForDate,
+  weightedTargetToDate,
   type DailyReportMetrics,
   type DailyReportTargets,
 } from "./dailyReportMetrics";
@@ -59,6 +62,20 @@ const metrics: DailyReportMetrics = {
   boostCampaignImpressionsToday: 2_000,
   boostCampaignClicksToday: 50,
   boostCampaignLeadsToday: 5,
+  databaseCampaignSpendTodayAgorot: 7_000,
+  databaseCampaignSpendMonthAgorot: 35_000,
+  databaseCampaignPurchasesToday: 2,
+  databaseCampaignClicksToday: 200,
+  databaseCampaignImpressionsToday: 8_000,
+  databaseCampaignLeadsToday: 15,
+  bundleCampaignSpendTodayAgorot: 3_000,
+  bundleCampaignSpendMonthAgorot: 15_000,
+  bundleCampaignPurchasesToday: 0,
+  boostProductCampaignSpendTodayAgorot: 500,
+  boostProductCampaignSpendMonthAgorot: 2_500,
+  boostProductCampaignPurchasesToday: 1,
+  otherCampaignSpendTodayAgorot: 5_500,
+  otherCampaignSpendMonthAgorot: 27_500,
   matchesSentToday: 5,
   matchesMutualYesToday: 2,
   activeSinglesNoMatch14Days: 17,
@@ -67,14 +84,17 @@ const metrics: DailyReportMetrics = {
 };
 
 describe("daily report Israel date boundaries", () => {
-  it("summarizes the day that just ended at Israel midnight", () => {
+  it("summarizes the day that just ended even when the midnight heartbeat is delayed", () => {
     expect(getReportDateForMidnightRun(Date.parse("2026-09-01T21:00:10Z"))).toBe("2026-09-01");
+    expect(getReportDateForMidnightRun(Date.parse("2026-09-01T21:05:18Z"))).toBe("2026-09-01");
+    expect(getReportDateForMidnightRun(Date.parse("2026-09-01T21:59:59Z"))).toBe("2026-09-01");
   });
 
   it("uses UTC+3 in September and UTC+2 in January", () => {
     expect(getReportDateRange("2026-09-01").dayStart).toBe(Date.parse("2026-08-31T21:00:00Z"));
     expect(getReportDateRange("2026-09-01").dayEnd).toBe(Date.parse("2026-09-01T21:00:00Z"));
     expect(getReportDateRange("2026-01-01").dayStart).toBe(Date.parse("2025-12-31T22:00:00Z"));
+    expect(getReportDateForMidnightRun(Date.parse("2026-01-01T22:05:00Z"))).toBe("2026-01-01");
   });
 });
 
@@ -98,7 +118,11 @@ describe("daily report metrics and message", () => {
     expect(parts).toHaveLength(3);
     expect(parts.map(part => part.key)).toEqual(["sales_targets", "campaigns", "database"]);
     expect(parts[0].message).toContain("דוח 1/3");
+    expect(parts[0].message).toContain("מצטבר");
     expect(parts[1].message).toContain("CTR 3%");
+    expect(parts[1].message).toContain("Meta מאגר: יום");
+    expect(parts[1].message).toContain("תוכנית ספטמבר שאושרה");
+    expect(parts[1].message).toContain("%)");
     expect(parts[2].message).toContain("התאמות: 5 נשלחו | 2 זוגות אמרו כן");
     expect(parts[2].message).toContain("17 ללא התאמה מעל 14 יום");
     expect(parts[2].message).toContain("מקור לא זמין: Meta");
@@ -122,5 +146,25 @@ describe("daily report metrics and message", () => {
     const total = Array.from({ length: 30 }, (_, index) => weightedTargetForDate(350, `2026-09-${String(index + 1).padStart(2, "0")}`) || 0)
       .reduce((sum, value) => sum + value, 0);
     expect(total).toBeCloseTo(350, 8);
+  });
+
+  it("derives strong-day weights from historical verified events and keeps the monthly goal intact", () => {
+    const historyStart = Date.parse("2026-07-01T00:00:00Z");
+    const historyEnd = Date.parse("2026-08-31T00:00:00Z");
+    const timestamps = Array.from({ length: 30 }, (_, index) => Date.parse(`2026-07-${String((index % 20) + 1).padStart(2, "0")}T09:00:00Z`))
+      .concat(Array.from({ length: 20 }, (_, index) => Date.parse(`2026-08-${String((index % 20) + 1).padStart(2, "0")}T09:00:00Z`)));
+    const weights = buildHistoricalWeekdayWeights(timestamps, historyStart, historyEnd);
+    expect(weights).not.toBeNull();
+    const total = Array.from({ length: 30 }, (_, index) => weightedTargetForDate(350, `2026-09-${String(index + 1).padStart(2, "0")}`, weights || undefined) || 0)
+      .reduce((sum, value) => sum + value, 0);
+    expect(total).toBeCloseTo(350, 8);
+  });
+
+  it("uses the approved September media plan and calculates planned spend to date", () => {
+    const plan = getDailyReportMediaPlan("2026-09-05", 1_000_000);
+    expect(plan.totalMonthlyBudgetAgorot).toBe(2_000_000);
+    expect(plan.bundleMonthlyBudgetAgorot).toBe(700_000);
+    expect(plan.boostMonthlyBudgetAgorot).toBe(35_000);
+    expect(weightedTargetToDate(plan.databaseMonthlyBudgetAgorot, "2026-09-05")).toBeGreaterThan(0);
   });
 });

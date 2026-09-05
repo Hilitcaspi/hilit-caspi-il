@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildManualDailyReportRunKey,
   buildScheduledDailyReportRunKey,
+  classifyDailyReportCampaign,
   getDailyReportDeliveryMode,
   isDailyReportLocalMidnight,
   maskRecipient,
@@ -11,6 +12,13 @@ import {
 } from "./dailyReportService";
 
 describe("daily report delivery safeguards", () => {
+  it("classifies Meta campaigns into the approved budget families", () => {
+    expect(classifyDailyReportCampaign({ name: "קהל חם | מכירה | database אוגוסט", objective: "OUTCOME_SALES" })).toBe("database");
+    expect(classifyDailyReportCampaign({ name: "sales | שאלון DNA | באנדל חג", objective: "OUTCOME_SALES" })).toBe("bundle");
+    expect(classifyDailyReportCampaign({ name: "קהל חם רכשו | מכירה - בוסט", objective: "OUTCOME_SALES" })).toBe("boost");
+    expect(classifyDailyReportCampaign({ name: "קהל קר | Lead | שאלון dna", objective: "OUTCOME_LEADS" })).toBe("other");
+  });
+
   it("uses one deterministic run key per settings row and report date", () => {
     expect(buildScheduledDailyReportRunKey(7, "2026-09-01")).toBe("daily-report:7:2026-09-01");
     expect(buildScheduledDailyReportRunKey(7, "2026-09-01")).toBe(buildScheduledDailyReportRunKey(7, "2026-09-01"));

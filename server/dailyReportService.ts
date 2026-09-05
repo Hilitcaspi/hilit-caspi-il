@@ -12,6 +12,7 @@ import { getDb } from "./db";
 import { fetchMetaAdsInsights, fetchSocialInsights } from "./dashboardRouter";
 import { calculateMatchmakingMetrics, getMissingProfileFields } from "./matchmakingMetrics";
 import {
+  buildHistoricalWeekdayWeights,
   buildDailyReportMessage,
   buildDailyReportMessages,
   DAILY_REPORT_TIMEZONE,
@@ -20,6 +21,7 @@ import {
   type DailyReportMetrics,
   type DailyReportSourceStatus,
   type DailyReportTargets,
+  type DailyReportWeightProfiles,
 } from "./dailyReportMetrics";
 import { sendSMS } from "./vibrate";
 
@@ -29,7 +31,13 @@ const EXTERNAL_SOURCE_TIMEOUT_MS = 8_000;
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
-function targetsFromSettings(settings: DailyReportSettings): DailyReportTargets {
+function targetsFromSettings(
+  settings: DailyReportSettings,
+  weekdayWeights?: DailyReportWeightProfiles,
+): DailyReportTargets {
+  const historicalProducts = [weekdayWeights?.database && "מאגר", weekdayWeights?.boost && "Boost", weekdayWeights?.leads && "לידים"]
+    .filter(Boolean)
+    .join(", ");
   return {
     databaseMonthlyMinTarget: settings.databaseMonthlyMinTarget,
     databaseMonthlyStretchTarget: settings.databaseMonthlyStretchTarget,
@@ -38,6 +46,10 @@ function targetsFromSettings(settings: DailyReportSettings): DailyReportTargets 
     bundleMonthlyTarget: settings.bundleMonthlyTarget,
     leadMonthlyTarget: settings.leadMonthlyTarget,
     revenueMonthlyTargetAgorot: settings.revenueMonthlyTargetAgorot,
+    weekdayWeights,
+    pacingBasisLabel: historicalProducts
+      ? `יעדי העסק + 60 ימי היסטוריה (${historicalProducts}) + סופ״ש וחגים`
+      : "יעדי העסק + סופ״ש וחגים; אין עדיין מספיק היסטוריה",
   };
 }
 
@@ -128,11 +140,42 @@ function isSalesCampaign(campaign: { name?: string; objective?: string; purchase
     || /(מכירות|מאגר|באנדל|קורס|מדריך|רכישה|sale|database|bundle|course|guide)/i.test(name);
 }
 
+function isBundleCampaign(campaign: { name?: string }) {
+  return /(באנדל|bundle)/i.test(String(campaign.name || ""));
+}
+
+function isBoostProductCampaign(campaign: { name?: string }) {
+  return /(בוסט|boost)/i.test(String(campaign.name || ""));
+}
+
+function isOtherNamedProductCampaign(campaign: { name?: string; objective?: string }) {
+  const name = String(campaign.name || "");
+  const objective = String(campaign.objective || "").toUpperCase();
+  return /(dna|שאלון|מדריך|קורס|פגישה|ליווי|guide|course|coaching|session)/i.test(name)
+    || objective.includes("LEAD");
+}
+
+function isDatabaseCampaign(campaign: { name?: string; objective?: string; purchases?: number }) {
+  return isSalesCampaign(campaign)
+    && !isBundleCampaign(campaign)
+    && !isBoostProductCampaign(campaign)
+    && !isOtherNamedProductCampaign(campaign);
+}
+
+export type DailyReportCampaignFamily = "database" | "bundle" | "boost" | "other";
+
+export function classifyDailyReportCampaign(campaign: { name?: string; objective?: string; purchases?: number }): DailyReportCampaignFamily {
+  if (isBundleCampaign(campaign)) return "bundle";
+  if (isBoostProductCampaign(campaign)) return "boost";
+  if (isDatabaseCampaign(campaign)) return "database";
+  return "other";
+}
+
 function sumSpendAgorot(campaigns: Array<{ spend?: number }>): number {
   return Math.round(campaigns.reduce((sum, campaign) => sum + Number(campaign.spend || 0), 0) * 100);
 }
 
-function sumCampaignMetric(campaigns: Array<Record<string, unknown>>, key: "impressions" | "clicks" | "leads"): number {
+function sumCampaignMetric(campaigns: Array<Record<string, unknown>>, key: "impressions" | "clicks" | "leads" | "purchases"): number {
   return campaigns.reduce((sum, campaign) => sum + Number(campaign[key] || 0), 0);
 }
 
@@ -174,6 +217,8 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const range = getReportDateRange(reportDate, settings.timezone);
+  const historyEnd = range.monthStart;
+  const historyStart = historyEnd - 60 * 24 * 60 * 60 * 1000;
 
   const [paymentRows, leadRows, singleRows, matchRows, dayMeta, monthMeta, social] = await Promise.all([
     db.select({
@@ -182,11 +227,11 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
       amountSource: completedPayments.amountSource,
       paidAt: completedPayments.paidAt,
     }).from(completedPayments).where(and(
-      gte(completedPayments.paidAt, range.monthStart),
+      gte(completedPayments.paidAt, historyStart),
       lt(completedPayments.paidAt, range.dayEnd),
     )),
     db.select({ createdAt: crmLeads.createdAt }).from(crmLeads).where(and(
-      gte(crmLeads.createdAt, range.monthStart),
+      gte(crmLeads.createdAt, historyStart),
       lt(crmLeads.createdAt, range.dayEnd),
     )),
     db.select({
@@ -243,6 +288,16 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
   });
   const daySalesCampaigns = dayMeta?.campaigns.filter(isSalesCampaign) || [];
   const monthSalesCampaigns = monthMeta?.campaigns.filter(isSalesCampaign) || [];
+  const allDayCampaigns = dayMeta ? [...dayMeta.campaigns, ...dayMeta.boosts] : [];
+  const allMonthCampaigns = monthMeta ? [...monthMeta.campaigns, ...monthMeta.boosts] : [];
+  const dayDatabaseCampaigns = allDayCampaigns.filter(campaign => classifyDailyReportCampaign(campaign) === "database");
+  const monthDatabaseCampaigns = allMonthCampaigns.filter(campaign => classifyDailyReportCampaign(campaign) === "database");
+  const dayBundleCampaigns = allDayCampaigns.filter(campaign => classifyDailyReportCampaign(campaign) === "bundle");
+  const monthBundleCampaigns = allMonthCampaigns.filter(campaign => classifyDailyReportCampaign(campaign) === "bundle");
+  const dayBoostProductCampaigns = allDayCampaigns.filter(campaign => classifyDailyReportCampaign(campaign) === "boost");
+  const monthBoostProductCampaigns = allMonthCampaigns.filter(campaign => classifyDailyReportCampaign(campaign) === "boost");
+  const dayOtherCampaigns = allDayCampaigns.filter(campaign => classifyDailyReportCampaign(campaign) === "other");
+  const monthOtherCampaigns = allMonthCampaigns.filter(campaign => classifyDailyReportCampaign(campaign) === "other");
   const metaConfigured = Boolean(process.env.META_ADS_TOKEN);
   const metaAvailable = Boolean(metaConfigured && dayMeta && monthMeta);
   const sources: DailyReportSourceStatus = {
@@ -256,7 +311,7 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
       freshAt: metaAvailable ? Date.now() : null,
       note: !metaAvailable ? "הקריאה החיצונית לא הושלמה בזמן" : dayMeta!.campaigns.length > 0 && daySalesCampaigns.length === 0 ? "לא זוהה קמפיין מכירה לפי מטרה או שם" : "קמפיינים עם מטרת מכירה או רכישה",
     },
-    metaBoost: { available: metaAvailable, label: "Meta חשבון Boost", freshAt: metaAvailable ? Date.now() : null, note: metaAvailable ? undefined : "הקריאה החיצונית לא הושלמה בזמן" },
+    metaBoost: { available: metaAvailable, label: "Meta קמפייני Boost", freshAt: metaAvailable ? Date.now() : null, note: metaAvailable ? "סיווג לפי שם הקמפיין" : "הקריאה החיצונית לא הושלמה בזמן" },
     instagram: { available: Boolean(social), label: "Instagram עוקבים", freshAt: social ? Date.now() : null },
   };
 
@@ -285,18 +340,32 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
     bundleRevenueMonthAgorot: monthPayments.bundle.revenueAgorot,
     leadsToday: leadRows.filter(row => row.createdAt >= range.dayStart && row.createdAt < range.dayEnd).length,
     leadsWeek: leadRows.filter(row => row.createdAt >= range.weekStart && row.createdAt < range.dayEnd).length,
-    leadsMonth: leadRows.length,
+    leadsMonth: leadRows.filter(row => row.createdAt >= range.monthStart && row.createdAt < range.dayEnd).length,
     instagramFollowersNew: social?.instagram.followerGrowth ?? null,
     salesCampaignSpendTodayAgorot: metaAvailable ? sumSpendAgorot(daySalesCampaigns) : null,
     salesCampaignSpendMonthAgorot: metaAvailable ? sumSpendAgorot(monthSalesCampaigns) : null,
     salesCampaignImpressionsToday: metaAvailable ? sumCampaignMetric(daySalesCampaigns, "impressions") : null,
     salesCampaignClicksToday: metaAvailable ? sumCampaignMetric(daySalesCampaigns, "clicks") : null,
     salesCampaignLeadsToday: metaAvailable ? sumCampaignMetric(daySalesCampaigns, "leads") : null,
-    boostCampaignSpendTodayAgorot: metaAvailable ? sumSpendAgorot(dayMeta!.boosts) : null,
-    boostCampaignSpendMonthAgorot: metaAvailable ? sumSpendAgorot(monthMeta!.boosts) : null,
-    boostCampaignImpressionsToday: metaAvailable ? sumCampaignMetric(dayMeta!.boosts, "impressions") : null,
-    boostCampaignClicksToday: metaAvailable ? sumCampaignMetric(dayMeta!.boosts, "clicks") : null,
-    boostCampaignLeadsToday: metaAvailable ? sumCampaignMetric(dayMeta!.boosts, "leads") : null,
+    boostCampaignSpendTodayAgorot: metaAvailable ? sumSpendAgorot(dayBoostProductCampaigns) : null,
+    boostCampaignSpendMonthAgorot: metaAvailable ? sumSpendAgorot(monthBoostProductCampaigns) : null,
+    boostCampaignImpressionsToday: metaAvailable ? sumCampaignMetric(dayBoostProductCampaigns, "impressions") : null,
+    boostCampaignClicksToday: metaAvailable ? sumCampaignMetric(dayBoostProductCampaigns, "clicks") : null,
+    boostCampaignLeadsToday: metaAvailable ? sumCampaignMetric(dayBoostProductCampaigns, "leads") : null,
+    databaseCampaignSpendTodayAgorot: metaAvailable ? sumSpendAgorot(dayDatabaseCampaigns) : null,
+    databaseCampaignSpendMonthAgorot: metaAvailable ? sumSpendAgorot(monthDatabaseCampaigns) : null,
+    databaseCampaignPurchasesToday: metaAvailable ? sumCampaignMetric(dayDatabaseCampaigns, "purchases") : null,
+    databaseCampaignClicksToday: metaAvailable ? sumCampaignMetric(dayDatabaseCampaigns, "clicks") : null,
+    databaseCampaignImpressionsToday: metaAvailable ? sumCampaignMetric(dayDatabaseCampaigns, "impressions") : null,
+    databaseCampaignLeadsToday: metaAvailable ? sumCampaignMetric(dayDatabaseCampaigns, "leads") : null,
+    bundleCampaignSpendTodayAgorot: metaAvailable ? sumSpendAgorot(dayBundleCampaigns) : null,
+    bundleCampaignSpendMonthAgorot: metaAvailable ? sumSpendAgorot(monthBundleCampaigns) : null,
+    bundleCampaignPurchasesToday: metaAvailable ? sumCampaignMetric(dayBundleCampaigns, "purchases") : null,
+    boostProductCampaignSpendTodayAgorot: metaAvailable ? sumSpendAgorot(dayBoostProductCampaigns) : null,
+    boostProductCampaignSpendMonthAgorot: metaAvailable ? sumSpendAgorot(monthBoostProductCampaigns) : null,
+    boostProductCampaignPurchasesToday: metaAvailable ? sumCampaignMetric(dayBoostProductCampaigns, "purchases") : null,
+    otherCampaignSpendTodayAgorot: metaAvailable ? sumSpendAgorot(dayOtherCampaigns) : null,
+    otherCampaignSpendMonthAgorot: metaAvailable ? sumSpendAgorot(monthOtherCampaigns) : null,
     matchesSentToday: matchRows.filter(match => Number(match.proposedAt || 0) >= range.dayStart && Number(match.proposedAt || 0) < range.dayEnd).length,
     matchesMutualYesToday: matchRows.filter(match => Number(match.matchedAt || 0) >= range.dayStart && Number(match.matchedAt || 0) < range.dayEnd).length,
     activeSinglesNoMatch14Days: matchmaking.noMatchDuration.over14,
@@ -304,7 +373,15 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
     excludedEstimatedPaymentsToday: todayPayments.estimatedExcluded,
   };
 
-  const targets = targetsFromSettings(settings);
+  const historicalPayments = paymentRows.filter(row => row.amountSource === "grow" && row.paidAt >= historyStart && row.paidAt < historyEnd);
+  const historicalLeads = leadRows.filter(row => row.createdAt >= historyStart && row.createdAt < historyEnd);
+  const weekdayWeights: DailyReportWeightProfiles = {
+    database: buildHistoricalWeekdayWeights(historicalPayments.filter(row => row.product === "database").map(row => row.paidAt), historyStart, historyEnd) || undefined,
+    bundle: buildHistoricalWeekdayWeights(historicalPayments.filter(row => row.product === "bundle_new_year").map(row => row.paidAt), historyStart, historyEnd) || undefined,
+    boost: buildHistoricalWeekdayWeights(historicalPayments.filter(row => row.product === "match_boost").map(row => row.paidAt), historyStart, historyEnd) || undefined,
+    leads: buildHistoricalWeekdayWeights(historicalLeads.map(row => row.createdAt), historyStart, historyEnd) || undefined,
+  };
+  const targets = targetsFromSettings(settings, weekdayWeights);
   return {
     metrics,
     targets,
