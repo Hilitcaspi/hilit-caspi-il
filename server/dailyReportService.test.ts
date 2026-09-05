@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDailyReportSettingsUpdate,
   buildManualDailyReportRunKey,
   buildScheduledDailyReportRunKey,
   classifyDailyReportCampaign,
@@ -46,6 +47,23 @@ describe("daily report delivery safeguards", () => {
     expect(getDailyReportDeliveryMode({ isEnabled: true, dryRun: false, recipientPhone: "0521234567,0547654321" })).toBe("send");
   });
 
+  it("does not disable an active report when targets are edited", () => {
+    const update = buildDailyReportSettingsUpdate({
+      databaseMonthlyMinTarget: 350,
+      databaseMonthlyStretchTarget: 400,
+      databaseMonthlyBudgetAgorot: 1_000_000,
+      revenueMonthlyTargetAgorot: 14_000_000,
+    }, 123);
+    expect(update).not.toHaveProperty("isEnabled");
+    expect(update).not.toHaveProperty("dryRun");
+    expect(update).toMatchObject({
+      timezone: "Asia/Jerusalem",
+      deliveryHour: 0,
+      deliveryMinute: 0,
+      updatedAt: 123,
+    });
+  });
+
   it("accepts the summer UTC trigger only when it is midnight in Israel", () => {
     expect(isDailyReportLocalMidnight(Date.parse("2026-09-01T21:00:00Z"))).toBe(true);
     expect(isDailyReportLocalMidnight(Date.parse("2026-09-01T22:00:00Z"))).toBe(false);
@@ -72,6 +90,6 @@ describe("daily report delivery safeguards", () => {
     );
     expect(calls).toHaveLength(6);
     expect(deliveries).toHaveLength(6);
-    expect(deliveries.filter(delivery => delivery.sent)).toHaveLength(5);
+    expect(deliveries.filter(delivery => delivery.accepted)).toHaveLength(5);
   });
 });

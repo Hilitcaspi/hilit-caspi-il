@@ -412,6 +412,28 @@ export async function getDailyReportOverview() {
   };
 }
 
+export function buildDailyReportSettingsUpdate(
+  input: {
+    recipientPhone?: string | null;
+    databaseMonthlyMinTarget: number;
+    databaseMonthlyStretchTarget: number;
+    databaseMonthlyBudgetAgorot: number;
+    boostMonthlyTarget?: number | null;
+    bundleMonthlyTarget?: number | null;
+    leadMonthlyTarget?: number | null;
+    revenueMonthlyTargetAgorot?: number | null;
+  },
+  now = Date.now(),
+) {
+  return {
+    ...input,
+    timezone: DAILY_REPORT_TIMEZONE,
+    deliveryHour: 0,
+    deliveryMinute: 0,
+    updatedAt: now,
+  };
+}
+
 export async function updateDailyReportSettings(input: {
   recipientPhone?: string | null;
   databaseMonthlyMinTarget: number;
@@ -425,15 +447,9 @@ export async function updateDailyReportSettings(input: {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const settings = await getOrCreateDailyReportSettings(db);
-  await db.update(dailyReportSettings).set({
-    ...input,
-    isEnabled: false,
-    dryRun: true,
-    timezone: DAILY_REPORT_TIMEZONE,
-    deliveryHour: 0,
-    deliveryMinute: 0,
-    updatedAt: Date.now(),
-  }).where(eq(dailyReportSettings.id, settings.id));
+  await db.update(dailyReportSettings)
+    .set(buildDailyReportSettingsUpdate(input))
+    .where(eq(dailyReportSettings.id, settings.id));
   return getOrCreateDailyReportSettings(db);
 }
 
@@ -481,12 +497,12 @@ export async function sendDailyReportMessages(
   messages: Array<{ key: string; message: string }>,
   sender: (phone: string, message: string) => Promise<boolean> = sendSMS,
 ) {
-  const deliveries: Array<{ recipientIndex: number; messageKey: string; sent: boolean }> = [];
+  const deliveries: Array<{ recipientIndex: number; messageKey: string; accepted: boolean }> = [];
   for (let recipientIndex = 0; recipientIndex < recipients.length; recipientIndex += 1) {
     const recipient = recipients[recipientIndex];
     for (const part of messages) {
-      const sent = await sender(recipient, part.message);
-      deliveries.push({ recipientIndex, messageKey: part.key, sent });
+      const accepted = await sender(recipient, part.message);
+      deliveries.push({ recipientIndex, messageKey: part.key, accepted });
     }
   }
   return deliveries;
@@ -526,7 +542,7 @@ export async function runManualDailyReportBackfill(reportDate: string, recipient
   if (!run) throw new Error("Failed to create manual daily report run");
 
   const deliveries = await sendDailyReportMessages(recipients, preview.messages);
-  const sentCount = deliveries.filter(delivery => delivery.sent).length;
+  const sentCount = deliveries.filter(delivery => delivery.accepted).length;
   const expectedCount = recipients.length * preview.messages.length;
   const ok = sentCount === expectedCount;
   await db.update(dailyReportRuns).set({
@@ -538,7 +554,9 @@ export async function runManualDailyReportBackfill(reportDate: string, recipient
   return {
     ok,
     sent: sentCount,
+    accepted: sentCount,
     expected: expectedCount,
+    deliveryConfirmed: false,
     runId: run.id,
     messageLengths: preview.messages.map(part => part.message.length),
   };
@@ -596,7 +614,7 @@ export async function runScheduledDailyReport(taskUid: string, now = Date.now())
 
   const recipients = parseRecipientPhones(settings.recipientPhone);
   const deliveries = await sendDailyReportMessages(recipients, preview.messages);
-  const sentCount = deliveries.filter(delivery => delivery.sent).length;
+  const sentCount = deliveries.filter(delivery => delivery.accepted).length;
   const expectedCount = recipients.length * preview.messages.length;
   const sent = sentCount === expectedCount;
   await db.update(dailyReportRuns).set({
@@ -605,5 +623,12 @@ export async function runScheduledDailyReport(taskUid: string, now = Date.now())
     error: sent ? null : `Vibrate accepted ${sentCount} of ${expectedCount} messages`,
     completedAt: Date.now(),
   }).where(eq(dailyReportRuns.id, run.id));
-  return { ok: sent, sent, accepted: sentCount, expected: expectedCount, runId: run.id };
+  return {
+    ok: sent,
+    sent,
+    accepted: sentCount,
+    expected: expectedCount,
+    deliveryConfirmed: false,
+    runId: run.id,
+  };
 }

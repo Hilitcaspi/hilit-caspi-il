@@ -5,6 +5,7 @@
  * Sends operational SMS messages that still use the Vibrate channel.
  * Initial match proposals are sent through the Make WhatsApp webhook instead.
  * Fire-and-forget pattern — never throws, never blocks the main flow.
+ * HTTP 202 confirms provider acceptance only; it is not handset delivery proof.
  */
 
 const VIBRATE_API_KEY = process.env.VIBRATE_API_KEY ?? "";
@@ -31,7 +32,7 @@ function normalizePhone(phone: string): string | null {
  * Send an SMS via Vibrate API
  * @param phone - Phone number in any Israeli format (05X, +972, 972...)
  * @param message - Message text (plain text)
- * @returns true if sent successfully, false otherwise
+ * @returns true only when Vibrate accepts the request with HTTP 202; this does not confirm handset delivery
  */
 export async function sendSMS(phone: string, message: string): Promise<boolean> {
   if (!VIBRATE_API_KEY) {
@@ -62,7 +63,7 @@ export async function sendSMS(phone: string, message: string): Promise<boolean> 
 
     if (res.status === 202) {
       const data = await res.json().catch(() => ({}));
-      console.log(`[Vibrate] SMS sent to ${normalizedPhone.slice(0, 4)}****${normalizedPhone.slice(-2)}, runId: ${data.runId ?? "unknown"}`);
+      console.log(`[Vibrate] SMS accepted by provider for ${normalizedPhone.slice(0, 4)}****${normalizedPhone.slice(-2)}, runId: ${data.runId ?? "unknown"}`);
       return true;
     }
 

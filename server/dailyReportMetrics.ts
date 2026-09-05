@@ -546,6 +546,12 @@ function capMessage(message: string): string {
     : `${message.slice(0, DAILY_REPORT_MAX_MESSAGE_LENGTH - 1).trimEnd()}…`;
 }
 
+function pacingExplanation(label?: string): string {
+  return label?.includes("60")
+    ? "יעדי החודש + ביצועי 60 הימים האחרונים + התאמה לסופי שבוע וחגים"
+    : "יעדי החודש + התאמה לסופי שבוע וחגים";
+}
+
 export function buildDailyReportMessages(
   metrics: DailyReportMetrics,
   targets: DailyReportTargets,
@@ -563,11 +569,11 @@ export function buildDailyReportMessages(
     `לידים: ${targetLine(metrics.leadsToday, metrics.leadsWeek, metrics.leadsMonth, targets.leadMonthlyTarget, metrics.reportDate, targets.weekdayWeights?.leads)}`,
     targets.revenueMonthlyTargetAgorot === null
       ? "יעד הכנסה חודשי: טרם הוגדר"
-      : `יעד הכנסה כולל: ${ils(metrics.revenueMonthAgorot)}/${ils(targets.revenueMonthlyTargetAgorot)} | חסר ${ils(Math.max(0, targets.revenueMonthlyTargetAgorot - metrics.revenueMonthAgorot))}`,
+      : `הכנסה החודש: ${ils(metrics.revenueMonthAgorot)} מתוך יעד ${ils(targets.revenueMonthlyTargetAgorot)} | נשארו ${ils(Math.max(0, targets.revenueMonthlyTargetAgorot - metrics.revenueMonthAgorot))}`,
     derived.revenuePlan.otherRevenueMonthlyTargetAgorot === null
-      ? `יעד 3 מוצרים: ${ils(derived.revenuePlan.trackedProductsMonthlyTargetAgorot)}`
-      : `יעד 3 מוצרים: ${ils(derived.revenuePlan.trackedProductsMonthlyTargetAgorot)} | נוספים להשלמת 140K: ${ils(derived.revenuePlan.otherRevenueMonthlyTargetAgorot)}`,
-    `בסיס קצב: ${targets.pacingBasisLabel || "יעדי העסק + משקלי סופ״ש וחגים"}`,
+      ? `מתוך היעד: ${ils(derived.revenuePlan.trackedProductsMonthlyTargetAgorot)} אמורים להגיע מהמאגר, הבאנדל וה־Boost`
+      : `מתוך היעד: ${ils(derived.revenuePlan.trackedProductsMonthlyTargetAgorot)} מהמאגר, הבאנדל וה־Boost | ${ils(derived.revenuePlan.otherRevenueMonthlyTargetAgorot)} ממקורות נוספים`,
+    `איך נקבע היעד היומי: ${pacingExplanation(targets.pacingBasisLabel)}`,
   ];
 
   const otherMonthlyPlanAgorot = derived.mediaPlan.dnaMonthlyBudgetAgorot === null

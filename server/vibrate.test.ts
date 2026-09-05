@@ -12,7 +12,7 @@ describe("Vibrate SMS Service", () => {
     mockFetch.mockReset();
   });
 
-  it("should normalize Israeli phone numbers correctly", async () => {
+  it("treats HTTP 202 as provider acceptance while normalizing Israeli phone numbers", async () => {
     const { sendSMS } = await import("./vibrate");
     
     // Valid phone - should attempt to send

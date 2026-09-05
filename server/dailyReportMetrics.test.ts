@@ -123,8 +123,10 @@ describe("daily report metrics and message", () => {
     expect(parts[0].message).toContain("הכנסה ₪598/₪104,650");
     expect(parts[0].message).toContain("הכנסה ₪0/₪27,930");
     expect(parts[0].message).toContain("הכנסה ₪20/₪1,791");
-    expect(parts[0].message).toContain("יעד הכנסה כולל: ₪897/₪140,000");
-    expect(parts[0].message).toContain("יעד 3 מוצרים: ₪134,371 | נוספים להשלמת 140K: ₪5,629");
+    expect(parts[0].message).toContain("הכנסה החודש: ₪897 מתוך יעד ₪140,000");
+    expect(parts[0].message).toContain("₪134,371 מהמאגר, הבאנדל וה־Boost | ₪5,629 ממקורות נוספים");
+    expect(parts[0].message).toContain("איך נקבע היעד היומי: יעדי החודש + התאמה לסופי שבוע וחגים");
+    expect(parts[0].message).not.toContain("בסיס קצב");
     expect(parts[1].message).toContain("תקציב מול תכנון");
     expect(parts[1].message).toContain("Meta מאגר: היום ₪70 מתוך");
     expect(parts[1].message).toContain("עד היום ₪350 מתוך");
@@ -137,6 +139,14 @@ describe("daily report metrics and message", () => {
     expect(parts[2].message).toContain("מקור לא זמין: Meta");
     expect(parts.every(part => part.message.length <= DAILY_REPORT_MAX_MESSAGE_LENGTH)).toBe(true);
     expect(buildDailyReportMessage(metrics, targets, {})).toContain("דוח 3/3");
+  });
+
+  it("explains when the daily pace also uses the recent 60-day history", () => {
+    const parts = buildDailyReportMessages(metrics, {
+      ...targets,
+      pacingBasisLabel: "יעדי העסק + 60 ימי היסטוריה + סופ״ש וחגים",
+    }, {});
+    expect(parts[0].message).toContain("איך נקבע היעד היומי: יעדי החודש + ביצועי 60 הימים האחרונים + התאמה לסופי שבוע וחגים");
   });
 
   it("hard-limits every SMS even when many sources are unavailable", () => {
