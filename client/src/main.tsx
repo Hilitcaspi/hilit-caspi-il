@@ -9,11 +9,22 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 import { initBehaviorTracker } from "@/lib/behaviorTracker";
+import {
+  shouldRetryTransientQuery,
+  transientQueryRetryDelay,
+} from "@/lib/queryRetry";
 
 // Initialize behavior tracking (Hotjar-style)
 initBehaviorTracker();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: shouldRetryTransientQuery,
+      retryDelay: transientQueryRetryDelay,
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
