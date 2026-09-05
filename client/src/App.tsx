@@ -69,9 +69,6 @@ const TermsSingleSession = lazy(() => import("@/pages/TermsSingleSession"));
 const TuBavBundle = lazy(() => import("@/pages/TuBavBundle"));
 const ThankYouBundle = lazy(() => import("@/pages/ThankYouBundle"));
 const TeamLogin = lazy(() => import("@/pages/TeamLogin"));
-const DatabasePlusSales = lazy(() => import("@/pages/DatabasePlusSales"));
-const TermsPlus = lazy(() => import("@/pages/TermsPlus"));
-const ThankYouPlus = lazy(() => import("@/pages/ThankYouPlus"));
 const SeptemberOffers = lazy(() => import("@/pages/SeptemberOffers"));
 const NewYearLoveBundle = lazy(() => import("@/pages/NewYearLoveBundle"));
 const ThankYouNewYearBundle = lazy(() => import("@/pages/ThankYouNewYearBundle"));
@@ -284,9 +281,9 @@ function HeRouter() {
           <Route path={"/database"} component={DatabaseSales} />
           <Route path={"/maagar"} component={DatabaseLanding} />
           <Route path={"/terms/database"} component={TermsDatabase} />
-          <Route path={"/database-plus"} component={DatabasePlusSales} />
-          <Route path={"/terms/plus"} component={TermsPlus} />
-          <Route path={"/thank-you/plus"} component={ThankYouPlus} />
+          <Route path={"/database-plus"} component={NotFound} />
+          <Route path={"/terms/plus"} component={NotFound} />
+          <Route path={"/thank-you/plus"} component={NotFound} />
           <Route path="/september" component={SeptemberOffers} />
           <Route path="/new-year-love" component={NewYearLoveBundle} />
           <Route path="/terms/new-year-love" component={TermsNewYearBundle} />

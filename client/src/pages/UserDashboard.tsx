@@ -35,7 +35,6 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
 
   const { status, pilot, eligibility, benefits, cycleProgress } = statusQuery.data;
   const registered = (status as string) !== "none";
-  const checkoutUrl = `/database-plus?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
   const statusLabel: Record<string, string> = {
     waitlist: "ברשימת ההמתנה",
     eligible: "מתאים/ה לפיילוט",
@@ -138,20 +137,10 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
           <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">בקשת הביטול התקבלה. Plus נשאר פעיל עד סוף המחזור הנוכחי ולא יתחדש לאחר מכן.</p>
         )}
 
-        {(status === "eligible" || status === "invited") && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadf9e] pt-4">
-            <p className="text-[11px] leading-5 text-[#6b6250]">הצטרפות חודשית אופציונלית למסלול Plus.</p>
-            <a href={checkoutUrl} className="rounded-xl bg-[#191265] px-5 py-2.5 text-xs font-black text-white">לפרטים ולמסך התשלום</a>
-          </div>
-        )}
-
-        {!registered && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadf9e] pt-4">
-            <p className="text-[11px] leading-5 text-[#6b6250]">
-              אפשר לעבור ישירות לעמוד Plus, לקרוא את כל הפרטים ולהמשיך לתשלום לאחר אישור התנאים.
-            </p>
-            <a href={checkoutUrl} className="rounded-xl bg-[#191265] px-5 py-2.5 text-xs font-black text-white">לפרטים ולמסך התשלום</a>
-          </div>
+        {(status === "eligible" || status === "invited" || !registered) && (
+          <p className="mt-4 border-t border-[#eadf9e] pt-4 text-[11px] font-bold leading-5 text-[#6b6250]">
+            ההצטרפות למסלול סגורה כרגע. נעדכן כאן כשהיא תיפתח מחדש.
+          </p>
         )}
       </div>
     </section>

@@ -7,6 +7,7 @@ import { sendEmail } from "./brevo";
 import { getMissingProfileFields } from "./matchmakingMetrics";
 import { calculatePlusCycleProgress } from "./plusSubscription";
 import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved } from "./plusPilotCapacity";
+import { PLUS_CHECKOUT_PUBLICLY_AVAILABLE } from "./growPayment";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 
 const PLUS_STATUSES = ["waitlist", "eligible", "invited", "active", "declined", "churned"] as const;
@@ -107,7 +108,7 @@ export const plusPilotRouter = router({
         },
         eligibility,
         cycleProgress: pilot[0] ? calculatePlusCycleProgress(pilot[0], memberMatches) : null,
-        paymentConfigured: Boolean(process.env.GROW_PAGE_CODE_PLUS?.trim()),
+        paymentConfigured: PLUS_CHECKOUT_PUBLICLY_AVAILABLE,
         benefits: [
           "לפחות שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב",
           "בוסט אלגוריתמי אחד כלול בכל מחזור, בנוסף לשתי ההצעות שנבדקו ידנית",
@@ -341,7 +342,7 @@ export const plusPilotRouter = router({
         updatedAt: now,
       }).where(eq(plusPilotMembers.id, input.id));
 
-      if (input.status === "invited" && member.single.email && member.single.questionnaireToken) {
+      if (PLUS_CHECKOUT_PUBLICLY_AVAILABLE && input.status === "invited" && member.single.email && member.single.questionnaireToken) {
         const personalUrl = `https://hilitcaspi.com/database-plus?email=${encodeURIComponent(member.single.email)}&token=${encodeURIComponent(member.single.questionnaireToken)}`;
         try {
           await sendEmail({

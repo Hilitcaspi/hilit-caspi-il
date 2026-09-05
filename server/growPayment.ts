@@ -87,6 +87,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
 };
 
 export type PlusCheckoutMode = "production" | "sandbox" | "unconfigured";
+export const PLUS_CHECKOUT_PUBLICLY_AVAILABLE = false;
 
 export function getPlusCheckoutConfig(): {
   configured: boolean;
@@ -94,6 +95,9 @@ export function getPlusCheckoutConfig(): {
   checkoutAmount: number | null;
   displayAmount: number;
 } {
+  if (!PLUS_CHECKOUT_PUBLICLY_AVAILABLE) {
+    return { configured: false, mode: "unconfigured", checkoutAmount: null, displayAmount: 99 };
+  }
   const sandboxConfigured = Boolean(
     process.env.GROW_SANDBOX_USER_ID?.trim()
     && process.env.GROW_SANDBOX_RECURRING_PAGE_CODE?.trim(),
