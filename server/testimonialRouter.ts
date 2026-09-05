@@ -19,7 +19,13 @@ import { storageGetSignedUrl } from "./storage";
 import { parseMatchOutcomeNotes } from "./matchOutcome";
 import { isEligibleMatchCandidate, matchCandidateProofType, matchCandidateReason } from "./testimonialCandidates";
 import { isPermanentlyBlockedEmail } from "./brevo";
-import { prepareHistoricalMatchDrafts, prepareSatisfactionSurveyDrafts } from "./feedbackCampaignDrafts";
+import {
+  FEEDBACK_CAMPAIGN_AUDIENCES,
+  prepareFeedbackCampaignAudienceDrafts,
+  prepareHistoricalMatchDrafts,
+  prepareSatisfactionSurveyDrafts,
+  previewFeedbackCampaignAudiences,
+} from "./feedbackCampaignDrafts";
 import { buildFeedbackRequestKey, buildFeedbackUrl } from "./feedbackAutomation";
 import {
   buildTestimonialDraft,
@@ -279,6 +285,26 @@ export const testimonialRouter = router({
       return { eligible: eligible.length, requested, breakdown, createsNothing: true };
     }),
 
+    feedbackCampaignAudiencePreview: teamProcedure.query(async () => ({
+      audiences: await previewFeedbackCampaignAudiences(),
+      draftOnly: true,
+      outboundLocked: true,
+      requiresSeparateSendApproval: true,
+    })),
+
+    prepareFeedbackCampaignAudienceDrafts: teamProcedure.input(z.object({
+      audience: z.enum(FEEDBACK_CAMPAIGN_AUDIENCES),
+      confirmedDraftOnly: z.literal(true),
+    })).mutation(async ({ input }) => {
+      const result = await prepareFeedbackCampaignAudienceDrafts(input.audience);
+      return {
+        ...result,
+        draftOnly: true,
+        outboundLocked: true,
+        note: "הטיוטות הוכנו בלבד. לא נשלח מייל, SMS או WhatsApp.",
+      };
+    }),
+
     prepareHistoricalDrafts: teamProcedure.mutation(async () => {
       return prepareHistoricalMatchDrafts({ execute: true });
     }),
@@ -490,6 +516,9 @@ export const testimonialRouter = router({
     approveContact: teamProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
       const { db, record } = await getRecordById(input.id);
       if (!["draft", "candidate"].includes(record.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "הרשומה אינה ממתינה לאישור פנייה" });
+      if (record.requestKey?.startsWith("campaign:")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "טיוטת קמפיין דורשת אישור שליחה קבוצתי נפרד" });
+      }
       const now = Date.now();
       await db.update(testimonialRecords).set({
         status: "approved_to_contact",

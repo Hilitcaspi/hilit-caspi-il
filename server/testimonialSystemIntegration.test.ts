@@ -28,9 +28,18 @@ describe("testimonial system integration policy", () => {
 
   it("keeps new outreach as drafts and does not call an email sender", () => {
     const router = read("server/testimonialRouter.ts");
+    const campaignDrafts = read("server/feedbackCampaignDrafts.ts");
     expect(router).toContain("approved_to_contact");
     expect(router).toContain("sent: 0");
+    expect(router).toContain("confirmedDraftOnly: z.literal(true)");
+    expect(router).toContain("outboundLocked: true");
+    expect(router).toContain('record.requestKey?.startsWith("campaign:")');
+    expect(router).toContain("טיוטת קמפיין דורשת אישור שליחה קבוצתי נפרד");
     expect(router).not.toMatch(/sendEmail\s*\(/);
+    expect(campaignDrafts).toContain('status: "draft" as const');
+    expect(campaignDrafts).toContain("scheduledAt: null");
+    expect(campaignDrafts).toContain("requestSentAt: null");
+    expect(campaignDrafts).not.toMatch(/sendEmail\s*\(/);
   });
 
   it("states that media upload is not publication consent", () => {

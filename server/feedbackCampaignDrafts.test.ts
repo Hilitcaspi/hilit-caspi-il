@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectBalancedSatisfactionSample } from "./feedbackCampaignDrafts";
+import { buildFeedbackCampaignRequestKey, classifyFeedbackCampaignContact, selectBalancedSatisfactionSample } from "./feedbackCampaignDrafts";
 
 const DAY = 86_400_000;
 const NOW = 1_788_300_000_000;
@@ -34,5 +34,43 @@ describe("feedback campaign drafts", () => {
     const second = selectBalancedSatisfactionSample(people, 50, NOW);
     expect(first.selected.map(person => person.id)).toEqual(second.selected.map(person => person.id));
     expect(first.selected).toHaveLength(people.length);
+  });
+
+  it("keeps only valid, active and consented contacts without an existing request", () => {
+    expect(classifyFeedbackCampaignContact({
+      email: "member@example.com",
+      profiles: [{ isActive: true, consentEmailMarketing: true }],
+    })).toBeNull();
+    expect(classifyFeedbackCampaignContact({ email: "not-an-email" })).toBe("invalid_or_blocked");
+    expect(classifyFeedbackCampaignContact({ email: "member@example.com", unsubscribed: true })).toBe("unsubscribed");
+    expect(classifyFeedbackCampaignContact({
+      email: "member@example.com",
+      profiles: [{ isActive: false, consentEmailMarketing: true }],
+    })).toBe("inactive_or_no_consent");
+    expect(classifyFeedbackCampaignContact({
+      email: "member@example.com",
+      profiles: [{ isActive: true, consentEmailMarketing: false }],
+    })).toBe("inactive_or_no_consent");
+    expect(classifyFeedbackCampaignContact({ email: "member@example.com", existingRequest: true })).toBe("existing_request");
+  });
+
+  it("deduplicates within an audience and gives successful matches priority over DNA", () => {
+    expect(classifyFeedbackCampaignContact({
+      email: "member@example.com",
+      duplicateContact: true,
+      unsubscribed: true,
+    })).toBe("duplicate_contact");
+    expect(classifyFeedbackCampaignContact({
+      email: "member@example.com",
+      higherPriorityAudience: true,
+      existingRequest: true,
+    })).toBe("higher_priority_audience");
+  });
+
+  it("uses separate key namespaces for match members and DNA results", () => {
+    expect(buildFeedbackCampaignRequestKey("successful_matches", 42)).toContain(":single-42");
+    expect(buildFeedbackCampaignRequestKey("dna_completers", 42)).toContain(":result-42");
+    expect(buildFeedbackCampaignRequestKey("successful_matches", 42))
+      .not.toBe(buildFeedbackCampaignRequestKey("dna_completers", 42));
   });
 });

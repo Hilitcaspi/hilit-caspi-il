@@ -6,6 +6,7 @@ import {
   isFeedbackTouchpointEnabled,
   shouldApplyFeedbackCooldown,
 } from "./feedbackAutomation";
+import { buildTestimonialDraft } from "./testimonialService";
 
 const disabledSettings = {
   matchImmediateEnabled: false,
@@ -45,6 +46,18 @@ describe("feedback automation", () => {
     expect(email.htmlContent).toContain("לעוד אנשים שמחפשים אהבה");
     expect(email.htmlContent).toContain("/unsubscribe?token=");
     expect(email.htmlContent).not.toContain("/unsubscribe?email=");
+  });
+
+  it("builds distinct recommendation requests for mutual matches and DNA completers", () => {
+    const match = buildTestimonialDraft({ firstName: "נועה", sourceType: "match" });
+    const dna = buildTestimonialDraft({ firstName: "נועם", sourceType: "dna" });
+
+    expect(match.subject).toContain("החוויה שלך מההתאמה");
+    expect(match.body).toContain("הסכמה משני הצדדים");
+    expect(match.body).toContain("להגדיל את מספר ההזדמנויות וההתאמות עבור כולם");
+    expect(dna.subject).toContain("מה לקחת משאלון ה־DNA");
+    expect(dna.body).toContain("התוצאה האישית");
+    expect(dna.body).toContain("גם בלי אישור לפרסם");
   });
 
   it("keeps the satisfaction survey neutral and separate from the testimonial gift", () => {

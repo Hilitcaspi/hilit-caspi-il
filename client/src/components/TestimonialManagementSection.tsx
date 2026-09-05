@@ -120,15 +120,18 @@ export default function TestimonialManagementSection({ preview = false }: { prev
   const detailQuery = trpc.testimonial.team.getById.useQuery({ id: selectedId || 0 }, { enabled: !preview && Boolean(selectedId) });
   const automationQuery = trpc.testimonial.team.automationOverview.useQuery(undefined, { enabled: !preview });
   const sampleQuery = trpc.testimonial.team.satisfactionSamplePreview.useQuery({ sampleSize: 60 }, { enabled: !preview });
+  const campaignAudienceQuery = trpc.testimonial.team.feedbackCampaignAudiencePreview.useQuery(undefined, { enabled: !preview });
   const syncCandidates = trpc.testimonial.team.syncMatchCandidates.useMutation();
   const prepareHistorical = trpc.testimonial.team.prepareHistoricalDrafts.useMutation();
   const prepareSatisfaction = trpc.testimonial.team.prepareSatisfactionDrafts.useMutation();
+  const prepareCampaignAudience = trpc.testimonial.team.prepareFeedbackCampaignAudienceDrafts.useMutation();
 
   async function refreshAll() {
     await Promise.all([
       utils.testimonial.team.stats.invalidate(),
       utils.testimonial.team.list.invalidate(),
       utils.testimonial.team.automationOverview.invalidate(),
+      utils.testimonial.team.feedbackCampaignAudiencePreview.invalidate(),
       selectedId ? utils.testimonial.team.getById.invalidate({ id: selectedId }) : Promise.resolve(),
     ]);
   }
@@ -137,6 +140,7 @@ export default function TestimonialManagementSection({ preview = false }: { prev
   const records = listQuery.data || [];
   const automation = automationQuery.data;
   const sample = sampleQuery.data;
+  const campaignAudiences = campaignAudienceQuery.data?.audiences || [];
 
   return (
     <section dir="rtl" className="rounded-2xl bg-[#f7f3ef] p-4 md:p-6">
@@ -175,6 +179,52 @@ export default function TestimonialManagementSection({ preview = false }: { prev
             ].map(([label, enabled]) => <Badge key={String(label)} variant="outline" className={enabled ? "border-emerald-300 bg-white text-emerald-800" : "border-slate-200 bg-white/70 text-slate-500"}>{label}: {enabled ? "פעיל" : "כבוי"}</Badge>)}
           </div>
           {!preview && <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" disabled={prepareHistorical.isPending} onClick={async () => { try { const result = await prepareHistorical.mutateAsync(); toast.success(`נוצרו ${result.created} טיוטות היסטוריות. לא נשלח דבר.`); await refreshAll(); } catch (error) { toast.error(error instanceof Error ? error.message : "הכנת הטיוטות נכשלה"); } }}>הכנת טיוטות לזוגות שאמרו כן</Button><Button variant="outline" disabled={prepareSatisfaction.isPending} onClick={async () => { try { const result = await prepareSatisfaction.mutateAsync({ sampleSize: 60 }); toast.success(`נוצרו ${result.created} טיוטות סקר. לא נשלח דבר.`); await refreshAll(); } catch (error) { toast.error(error instanceof Error ? error.message : "הכנת המדגם נכשלה"); } }}>הכנת מדגם סקר של 60</Button></div>}
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-[#dac8bc] bg-white p-4 shadow-sm md:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold tracking-[.12em] text-[#9b6d55]">קמפיין המלצות מוכן לאישור</p>
+              <h3 className="mt-1 text-xl font-bold text-[#2a1712]">התאמות מוצלחות ומסיימי שאלון DNA</h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6f5d55]">המערכת מסננת הסרות דיוור, פרופילים לא פעילים, חוסר הסכמה ובקשות קיימות. כל אדם מופיע פעם אחת בלבד, והתאמות מוצלחות מקבלות קדימות על פני קהל ה־DNA.</p>
+            </div>
+            <Badge className="w-fit border border-amber-300 bg-amber-50 text-amber-900">שליחה נעולה עד אישור נפרד</Badge>
+          </div>
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            {campaignAudienceQuery.isLoading ? <LoadingCard /> : campaignAudiences.map(audience => (
+              <div key={audience.audience} className="rounded-2xl border border-[#eadfd7] bg-[#fbf8f5] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><p className="font-bold text-[#2a1712]">{audience.label}</p><p className="mt-1 text-xs text-[#806c62]">מקור: {audience.sourceTotal.toLocaleString("he-IL")} · אנשי קשר ייחודיים: {audience.uniqueContacts.toLocaleString("he-IL")}</p></div>
+                  <div className="text-left"><p className="text-2xl font-bold text-[#6f3f52]">{audience.eligible.toLocaleString("he-IL")}</p><p className="text-xs text-[#806c62]">זכאים חדשים</p></div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <Badge variant="outline">טיוטות מוכנות: {audience.preparedDrafts.toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">אושרו לפנייה: {audience.approvedForContact.toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">תוזמנו: {audience.scheduledForSend.toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">נשלחו: {audience.sent.toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">בקשה קיימת: {audience.exclusions.existing_request.toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">הסרה מדיוור: {audience.exclusions.unsubscribed.toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">לא פעיל או ללא הסכמה: {audience.exclusions.inactive_or_no_consent.toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">כפילויות: {(audience.exclusions.duplicate_contact + audience.exclusions.higher_priority_audience).toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">פרטים לא תקינים או חסומים: {audience.exclusions.invalid_or_blocked.toLocaleString("he-IL")}</Badge>
+                </div>
+                <div className="mt-4 rounded-xl bg-white p-3 text-sm text-[#5f4b43]">
+                  <p className="font-semibold">נושא לדוגמה</p><p className="mt-1 leading-6">{audience.sampleSubject}</p>
+                  <p className="mt-3 font-semibold">גוף הטיוטה</p><p className="mt-1 whitespace-pre-wrap leading-6">{audience.sampleBody}</p>
+                </div>
+                {!preview && <Button variant="outline" className="mt-4 w-full border-[#6f3f52] text-[#6f3f52]" disabled={audience.eligible === 0 || prepareCampaignAudience.isPending} onClick={async () => {
+                  const approved = window.confirm(`להכין ${audience.eligible.toLocaleString("he-IL")} טיוטות לקהל ${audience.label}? הפעולה לא תשלח מייל, SMS או WhatsApp.`);
+                  if (!approved) return;
+                  try {
+                    const result = await prepareCampaignAudience.mutateAsync({ audience: audience.audience, confirmedDraftOnly: true });
+                    toast.success(`נוצרו ${result.created.toLocaleString("he-IL")} טיוטות. לא נשלח דבר.`);
+                    await refreshAll();
+                  } catch (error) { toast.error(error instanceof Error ? error.message : "הכנת הטיוטות נכשלה"); }
+                }}>{audience.eligible > 0 ? `הכנת ${audience.eligible.toLocaleString("he-IL")} טיוטות בלבד` : "אין פניות חדשות להכנה"}</Button>}
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><strong>בקרת שליחה:</strong> הכנת הטיוטות אינה מאשרת פנייה ואינה קובעת מועד. הפעלת שליחה תתבצע במסך ובפעולה נפרדים ורק לאחר אישור מפורש.</p>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-8">
