@@ -535,9 +535,9 @@ function budgetLine(
   const variance = actualMonthAgorot - toDatePlanAgorot;
   const variancePercent = toDatePlanAgorot > 0 ? Math.round((variance / toDatePlanAgorot) * 100) : 0;
   const varianceText = variance === 0
-    ? "בקצב"
-    : `${ils(Math.abs(variance))} ${variance > 0 ? "מעל" : "מתחת"} (${variancePercent > 0 ? "+" : ""}${variancePercent}%)`;
-  return `${label}: יום ${ils(actualTodayAgorot)}/${ils(dailyPlanAgorot)} | מצטבר ${ils(actualMonthAgorot)}/${ils(toDatePlanAgorot)} (${varianceText}) | חודש ${ils(monthlyPlanAgorot)}`;
+    ? "בדיוק לפי התכנון"
+    : `${ils(Math.abs(variance))} ו־${Math.abs(variancePercent)}% ${variance > 0 ? "יותר" : "פחות"} מהתכנון`;
+  return `${label}: היום ${ils(actualTodayAgorot)} מתוך ${ils(dailyPlanAgorot)} | עד היום ${ils(actualMonthAgorot)} מתוך ${ils(toDatePlanAgorot)} | ${varianceText} | יעד חודש ${ils(monthlyPlanAgorot)}`;
 }
 
 function capMessage(message: string): string {
@@ -576,15 +576,15 @@ export function buildDailyReportMessages(
     ? null
     : derived.mediaPlan.dnaMonthlyBudgetAgorot + derived.mediaPlan.coachingMonthlyBudgetAgorot + derived.mediaPlan.reserveMonthlyBudgetAgorot;
   const campaigns = [
-    `דוח 2/3 | תקציב ויעילות | נתוני ${dateLabel}`,
+    `דוח 2/3 | תקציב מול תכנון | נתוני ${dateLabel}`,
     budgetLine("Meta מאגר", metrics.databaseCampaignSpendTodayAgorot, metrics.databaseCampaignSpendMonthAgorot, derived.databaseDailyBudgetTargetAgorot, derived.databaseBudgetToDateAgorot, derived.mediaPlan.databaseMonthlyBudgetAgorot),
     budgetLine("Meta באנדל", metrics.bundleCampaignSpendTodayAgorot, metrics.bundleCampaignSpendMonthAgorot, derived.bundleDailyBudgetTargetAgorot, derived.bundleBudgetToDateAgorot, derived.mediaPlan.bundleMonthlyBudgetAgorot),
     budgetLine("Meta Boost", metrics.boostProductCampaignSpendTodayAgorot, metrics.boostProductCampaignSpendMonthAgorot, derived.boostDailyBudgetTargetAgorot, derived.boostBudgetToDateAgorot, derived.mediaPlan.boostMonthlyBudgetAgorot),
     budgetLine("DNA/פגישות/רזרבה", metrics.otherCampaignSpendTodayAgorot, metrics.otherCampaignSpendMonthAgorot, derived.otherDailyBudgetTargetAgorot, derived.otherBudgetToDateAgorot, otherMonthlyPlanAgorot),
-    `יעילות מכירות: קליקים ${metric(metrics.salesCampaignClicksToday)} | CTR ${metric(derived.salesCtr, "%")} | CPL ${ils(derived.salesCplAgorot)} | CPA Grow ${ils(derived.salesCpaAgorot)} | ROAS Grow ${roas(derived.salesRoas)}`,
-    `יעילות Boost: CTR ${metric(derived.boostCtr, "%")} | CPL ${ils(derived.boostCplAgorot)} | CPA Grow ${ils(derived.boostCpaAgorot)} | ROAS Grow ${roas(derived.boostRoas)}`,
-    `תוכנית: ${derived.mediaPlan.basisLabel} | סה״כ חודש ${ils(derived.mediaPlan.totalMonthlyBudgetAgorot)}`,
-    `אזהרות: ${derived.alerts.length ? derived.alerts.join("; ") : "אין חריגה אוטומטית"}`,
+    `יעילות מאגר+באנדל: ${metric(metrics.salesCampaignClicksToday)} קליקים | ${metric(derived.salesCtr, "%")} הקליקו | ליד עלה ${ils(derived.salesCplAgorot)} | רכישה עלתה ${ils(derived.salesCpaAgorot)} | כל ₪1 החזיר ${derived.salesRoas === null ? "לא זמין" : `₪${derived.salesRoas.toFixed(2)}`}`,
+    `יעילות Boost: ${metric(derived.boostCtr, "%")} הקליקו | ליד עלה ${ils(derived.boostCplAgorot)} | רכישה עלתה ${ils(derived.boostCpaAgorot)} | כל ₪1 החזיר ${derived.boostRoas === null ? "לא זמין" : `₪${derived.boostRoas.toFixed(2)}`}`,
+    `תקציב חודשי כולל: ${ils(derived.mediaPlan.totalMonthlyBudgetAgorot)} | ${derived.mediaPlan.basisLabel}`,
+    `לתשומת לב: ${derived.alerts.length ? derived.alerts.join("; ") : "אין חריגה מהקצב"}`,
   ];
 
   const unavailable = Object.values(sources).filter(source => !source.available).map(source => source.label);

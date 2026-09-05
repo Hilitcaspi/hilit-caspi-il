@@ -6,7 +6,8 @@ import {
   updateDailyReportSettings,
 } from "./dailyReportService";
 
-const optionalTarget = z.number().int().min(0).max(1_000_000).nullable().optional();
+export const dailyReportOptionalCountTargetSchema = z.number().int().min(0).max(1_000_000).nullable().optional();
+export const dailyReportOptionalRevenueTargetAgorotSchema = z.number().int().min(0).max(100_000_000).nullable().optional();
 
 export const dailyReportRouter = router({
   overview: teamProcedure.query(async () => getDailyReportOverview()),
@@ -15,10 +16,10 @@ export const dailyReportRouter = router({
     databaseMonthlyMinTarget: z.number().int().min(1).max(10_000),
     databaseMonthlyStretchTarget: z.number().int().min(1).max(10_000),
     databaseMonthlyBudgetAgorot: z.number().int().min(0).max(1_000_000_000),
-    boostMonthlyTarget: optionalTarget,
-    bundleMonthlyTarget: optionalTarget,
-    leadMonthlyTarget: optionalTarget,
-    revenueMonthlyTargetAgorot: optionalTarget,
+    boostMonthlyTarget: dailyReportOptionalCountTargetSchema,
+    bundleMonthlyTarget: dailyReportOptionalCountTargetSchema,
+    leadMonthlyTarget: dailyReportOptionalCountTargetSchema,
+    revenueMonthlyTargetAgorot: dailyReportOptionalRevenueTargetAgorotSchema,
   })).mutation(async ({ input }) => updateDailyReportSettings(input)),
   saveDryRun: teamProcedure.mutation(async () => recordDailyReportDryRun()),
 });

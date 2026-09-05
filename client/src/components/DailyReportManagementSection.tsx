@@ -46,7 +46,14 @@ export default function DailyReportManagementSection() {
       setRecipientPhone("");
       await utils.dailyReport.overview.invalidate();
     },
-    onError: error => toast.error(error.message || "לא ניתן לשמור את ההגדרות"),
+    onError: error => {
+      const isValidationError = error.message.includes("revenueMonthlyTargetAgorot")
+        || error.message.includes("Too big")
+        || error.message.includes("maximum");
+      toast.error(isValidationError
+        ? "יעד ההכנסה חייב להיות מספר בין 0 ל־1,000,000 ₪"
+        : error.message || "לא ניתן לשמור את ההגדרות");
+    },
   });
   const saveDryRun = trpc.dailyReport.saveDryRun.useMutation({
     onSuccess: async () => {
@@ -165,17 +172,17 @@ export default function DailyReportManagementSection() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            ["יעד מאגר מינימום", databaseMin, setDatabaseMin, "רכישות"],
-            ["יעד מאגר עבודה", databaseStretch, setDatabaseStretch, "רכישות"],
-            ["תקציב מאגר", databaseBudget, setDatabaseBudget, "₪"],
-            ["יעד Boost", boostTarget, setBoostTarget, "אופציונלי"],
-            ["יעד באנדל", bundleTarget, setBundleTarget, "אופציונלי"],
-            ["יעד לידים", leadTarget, setLeadTarget, "אופציונלי"],
-            ["יעד הכנסה", revenueTarget, setRevenueTarget, "₪, אופציונלי"],
-          ].map(([label, value, setter, hint]) => (
+            ["יעד מאגר מינימום", databaseMin, setDatabaseMin, "רכישות", 10_000],
+            ["יעד מאגר עבודה", databaseStretch, setDatabaseStretch, "רכישות", 10_000],
+            ["תקציב מאגר", databaseBudget, setDatabaseBudget, "₪", 10_000_000],
+            ["יעד Boost", boostTarget, setBoostTarget, "אופציונלי", 1_000_000],
+            ["יעד באנדל", bundleTarget, setBundleTarget, "אופציונלי", 1_000_000],
+            ["יעד לידים", leadTarget, setLeadTarget, "אופציונלי", 1_000_000],
+            ["יעד הכנסה", revenueTarget, setRevenueTarget, "₪, אופציונלי", 1_000_000],
+          ].map(([label, value, setter, hint, max]) => (
             <label key={label as string} className="text-xs font-bold text-[#191265]">
               {label as string}
-              <input value={value as string} onChange={event => (setter as (value: string) => void)(event.target.value)} inputMode="numeric" className="mt-1 w-full rounded-xl border border-[#dedbd2] bg-[#fbfaf7] px-3 py-2 text-sm outline-none focus:border-[#191265]" placeholder={hint as string} />
+              <input type="number" min={0} max={max as number} value={value as string} onChange={event => (setter as (value: string) => void)(event.target.value)} inputMode="numeric" className="mt-1 w-full rounded-xl border border-[#dedbd2] bg-[#fbfaf7] px-3 py-2 text-sm outline-none focus:border-[#191265]" placeholder={hint as string} />
             </label>
           ))}
           <label className="text-xs font-bold text-[#191265]">

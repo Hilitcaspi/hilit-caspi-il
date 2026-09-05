@@ -125,10 +125,13 @@ describe("daily report metrics and message", () => {
     expect(parts[0].message).toContain("הכנסה ₪20/₪1,791");
     expect(parts[0].message).toContain("יעד הכנסה כולל: ₪897/₪140,000");
     expect(parts[0].message).toContain("יעד 3 מוצרים: ₪134,371 | נוספים להשלמת 140K: ₪5,629");
-    expect(parts[1].message).toContain("CTR 3%");
-    expect(parts[1].message).toContain("Meta מאגר: יום");
+    expect(parts[1].message).toContain("תקציב מול תכנון");
+    expect(parts[1].message).toContain("Meta מאגר: היום ₪70 מתוך");
+    expect(parts[1].message).toContain("עד היום ₪350 מתוך");
+    expect(parts[1].message).toContain("רכישה עלתה");
+    expect(parts[1].message).toContain("כל ₪1 החזיר");
     expect(parts[1].message).toContain("תוכנית ספטמבר שאושרה");
-    expect(parts[1].message).toContain("%)");
+    expect(parts[1].message).toContain("% פחות מהתכנון");
     expect(parts[2].message).toContain("התאמות: 5 נשלחו | 2 זוגות אמרו כן");
     expect(parts[2].message).toContain("17 ללא התאמה מעל 14 יום");
     expect(parts[2].message).toContain("מקור לא זמין: Meta");
