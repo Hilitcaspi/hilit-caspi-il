@@ -224,7 +224,9 @@ export default function Register() {
       setStep("done");
     },
     onError: (err) => {
-      setRegisterError(err.message || "אירעה שגיאה בשמירת הפרופיל. אנא נסי שוב.");
+      setRegisterError(err.message || (gender === "female"
+        ? "אירעה שגיאה בשמירת הפרופיל. אנא נסי שוב."
+        : "אירעה שגיאה בשמירת הפרופיל. אנא נסה שוב."));
       setStep("uploading_error");
     },
   });
@@ -413,7 +415,9 @@ export default function Register() {
         utmContent: sessionStorage.getItem("utm_content") || localStorage.getItem("utm_content") || undefined,
       });
     } catch (err: any) {
-      setFreeTokenError(err?.message || "שגיאה - אנא בדקי/י את המייל");
+      setFreeTokenError(err?.message || (gender === "female"
+        ? "שגיאה, אנא בדקי את כתובת המייל"
+        : "שגיאה, אנא בדוק את כתובת המייל"));
     }
   };
 
@@ -674,7 +678,7 @@ export default function Register() {
                   </p>
                   <div className="bg-[#ffe27c]/10 border border-[#ffe27c]/30 rounded-xl p-3">
                     <p className="text-[#ffe27c] text-xs font-bold mb-1">איך מצטרפים:</p>
-                    <p className="text-white/70 text-xs">מלא/י פרטים ושאלון DNA → תשלום ₪299 → מייל עם קישור לשאלון המדעי → אישור כניסה למאגר</p>
+                    <p className="text-white/70 text-xs">{isFemale ? "מלאי פרטים ושאלון DNA" : "מלא פרטים ושאלון DNA"} → תשלום ₪299 → מייל עם קישור לשאלון המדעי → אישור כניסה למאגר</p>
                     <p className="mt-2 text-[11px] leading-5 text-white/50">זמן ההמתנה משתנה לפי הפרופיל, ההעדפות והזמינות במאגר, ואין התחייבות למועד או לכמות קבועה של הצעות.</p>
                   </div>
                 </div>
@@ -688,7 +692,7 @@ export default function Register() {
               {freeTokenFromUrl && freeTokenStatus === "valid" && (
                 <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6 text-right">
                   <p className="text-green-700 font-bold text-sm mb-1">✓ כניסה חינמית למאגר אושרה!</p>
-                  <p className="text-green-600 text-xs">מלאי את הפרטים ותצטרפי למאגר ללא תשלום.</p>
+                  <p className="text-green-600 text-xs">{isFemale ? "מלאי את הפרטים ותצטרפי למאגר ללא תשלום." : "מלא את הפרטים ותצטרף למאגר ללא תשלום."}</p>
                 </div>
               )}
               {freeTokenFromUrl && freeTokenStatus === "invalid" && (
@@ -701,7 +705,7 @@ export default function Register() {
               <div className="text-center mb-8">
                 <div className="text-4xl mb-3">🧬</div>
                 <h1 className="text-2xl md:text-3xl font-black text-[#191265] mb-2">
-                  בואי נבנה את הפרופיל שלך
+                  {isFemale ? "בואי נבנה את הפרופיל שלך" : "בוא נבנה את הפרופיל שלך"}
                 </h1>
                 {dnaFromQuiz ? (
                   <div className="inline-block bg-[#191265] text-[#ffe27c] text-sm font-bold px-4 py-2 rounded-full mt-2">
@@ -710,11 +714,11 @@ export default function Register() {
                 ) : (
                   <div className="mt-3 bg-[#f0eadc] border border-[#ffe27c] rounded-2xl px-5 py-4 text-right max-w-md mx-auto">
                     <p className="text-[#191265] font-bold text-sm">🧬 שאלון ה-DNA הזוגי יופיע בשלב הבא</p>
-                    <p className="text-[#727272] text-xs mt-1 leading-relaxed">לאחר מילוי הפרטים, תעבר/י לשאלון קצר שיקבע את הדמות שלך ויוזן אוטומטית לפרופיל.</p>
+                    <p className="text-[#727272] text-xs mt-1 leading-relaxed">{isFemale ? "לאחר מילוי הפרטים, תעברי לשאלון קצר שיקבע את הדמות שלך ויוזן אוטומטית לפרופיל." : "לאחר מילוי הפרטים, תעבור לשאלון קצר שיקבע את הדמות שלך ויוזן אוטומטית לפרופיל."}</p>
                   </div>
                 )}
                 <p className="text-[#727272] mt-3 text-sm">
-                  כל שאלון עובר בעיניי אישית לפני שמוזן למאגר - ככל שתמלא/י יותר, ההתאמות יהיו מדויקות יותר
+                  {isFemale ? "כל שאלון עובר בעיניי אישית לפני שמוזן למאגר. ככל שתמלאי יותר, ההתאמות יהיו מדויקות יותר." : "כל שאלון עובר בעיניי אישית לפני שמוזן למאגר. ככל שתמלא יותר, ההתאמות יהיו מדויקות יותר."}
                 </p>
               </div>
 
@@ -740,7 +744,7 @@ export default function Register() {
                     <div>
                       <button type="button" onClick={() => fileInputRef.current?.click()}
                         className="bg-[#f0eadc] text-[#191265] font-medium px-5 py-2.5 rounded-xl hover:bg-[#e9e8e8] transition-colors text-sm">
-                        בחרי תמונה
+                        {isFemale ? "בחרי תמונה" : "בחר תמונה"}
                       </button>
                       <p className="text-[#727272] text-xs mt-2">JPG, PNG עד 5MB</p>
                     </div>
@@ -846,7 +850,7 @@ export default function Register() {
                       <label className="block text-sm font-medium text-[#191265] mb-1">עיר מגורים *</label>
                       <select value={city} onChange={e => setCity(e.target.value)} required
                         className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] focus:outline-none focus:border-[#191265] text-right bg-white">
-                        <option value="">בחרי עיר</option>
+                        <option value="">{isFemale ? "בחרי עיר" : "בחר עיר"}</option>
                         {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
@@ -1113,7 +1117,7 @@ export default function Register() {
                 </label>
                 <button type="submit" disabled={paymentLoading}
                   className="w-full bg-[#191265] text-white font-black text-lg py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 shadow-xl disabled:opacity-60 disabled:cursor-wait">
-                  {paymentLoading ? "שומרת את הפרטים..." : "המשך לתשלום ₪299 ←"}
+                  {paymentLoading ? "שומרים את הפרטים..." : "המשך לתשלום ₪299 ←"}
                 </button>
               </form>
             </motion.div>
@@ -1149,7 +1153,7 @@ export default function Register() {
                   {/* Answer options */}
                   {q.type === "rankTop3" ? (
                     <div className="space-y-2.5 mb-6">
-                      <p className="text-xs text-[#727272] mb-2">בחר/י עד 3, לפי סדר עדיפות (הראשון = הכי חשוב)</p>
+                      <p className="text-xs text-[#727272] mb-2">{isFemale ? "בחרי עד 3 לפי סדר עדיפות, הראשון הוא החשוב ביותר" : "בחר עד 3 לפי סדר עדיפות, הראשון הוא החשוב ביותר"}</p>
                       {q.options.map((opt, idx) => {
                         const rank = Array.isArray(ans?.myAnswer) ? (ans.myAnswer as number[]) : [];
                         const pos = rank.indexOf(idx);
@@ -1249,7 +1253,7 @@ export default function Register() {
                 <h1 className="text-2xl md:text-3xl font-black text-[#191265] mb-2">
                   אימות כניסה חינמית
                 </h1>
-                <p className="text-[#727272] text-sm">אנא אשרי את כתובת המייל שבה קיבלת את הלינק</p>
+                <p className="text-[#727272] text-sm">{isFemale ? "אנא אשרי את כתובת המייל שבה קיבלת את הקישור" : "אנא אשר את כתובת המייל שבה קיבלת את הקישור"}</p>
               </div>
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 <form onSubmit={handleFreeTokenVerify} className="space-y-4">
@@ -1360,6 +1364,7 @@ export default function Register() {
                       prefillName={firstName && lastName ? `${firstName} ${lastName}` : firstName || undefined}
                       prefillEmail={email || undefined}
                       prefillPhone={phone || undefined}
+                      customerGender={gender === "male" ? "male" : "female"}
                       onSuccess={handlePaymentSuccess}
                     />
 
@@ -1471,7 +1476,7 @@ export default function Register() {
             <motion.div key="uploading" {...slideIn} className="text-center py-20">
               <div className="text-6xl mb-6 animate-bounce">💛</div>
               <h2 className="text-2xl font-black text-[#191265] mb-4">
-                שומרת את הפרופיל שלך...
+                שומרים את הפרופיל שלך...
               </h2>
               <p className="text-[#727272]">
                 הילית תצור איתך קשר ברגע שתהיה התאמה מתאימה
@@ -1495,7 +1500,7 @@ export default function Register() {
                 אירעה שגיאה
               </h2>
               <p className="text-[#727272] mb-6 max-w-sm mx-auto">
-                {registerError || "לא הצלחנו לשמור את הפרופיל. אנא נסי שוב."}
+                {registerError || (isFemale ? "לא הצלחנו לשמור את הפרופיל. אנא נסי שוב." : "לא הצלחנו לשמור את הפרופיל. אנא נסה שוב.")}
               </p>
               <div className="flex flex-col gap-3 max-w-xs mx-auto">
                 <button
@@ -1520,7 +1525,7 @@ export default function Register() {
                   }}
                   className="bg-[#191265] text-white font-bold py-3 rounded-2xl hover:bg-[#1800ad] transition-all"
                 >
-                  נסי שוב
+                  {isFemale ? "נסי שוב" : "נסה שוב"}
                 </button>
                 <a href="https://wa.me/972552442334" target="_blank" rel="noopener noreferrer"
                   className="border-2 border-[#191265] text-[#191265] font-bold py-3 rounded-2xl text-center hover:bg-[#191265] hover:text-white transition-all">
@@ -1546,7 +1551,7 @@ export default function Register() {
               {questionnaireToken && (
                 <div className="bg-[#191265] rounded-2xl p-6 mb-6 text-center max-w-md mx-auto">
                   <p className="text-white font-bold mb-2">שלב אחרון — השאלון המדעי</p>
-                  <p className="text-white/70 text-sm mb-4">מלאי את השאלון כדי שהאלגוריתם יוכל למצוא לך התאמות מדויקות.</p>
+                  <p className="text-white/70 text-sm mb-4">{isFemale ? "מלאי את השאלון כדי שהאלגוריתם יוכל למצוא לך התאמות מדויקות." : "מלא את השאלון כדי שהאלגוריתם יוכל למצוא לך התאמות מדויקות."}</p>
                   <a
                     href={`/join/questionnaire?token=${questionnaireToken}`}
                     className="inline-block bg-[#ffe27c] text-[#191265] font-black px-8 py-3 rounded-xl hover:bg-white transition-colors text-sm"

@@ -164,6 +164,7 @@ interface GrowWalletProps {
   prefillName?: string;
   prefillEmail?: string;
   prefillPhone?: string;
+  customerGender?: "female" | "male";
   prefillCoupon?: string;
   onSuccess?: (response: any) => void;
   onFailure?: (response: any) => void;
@@ -186,6 +187,7 @@ export default function GrowWallet({
   prefillName,
   prefillEmail,
   prefillPhone,
+  customerGender,
   prefillCoupon,
   onSuccess,
   onFailure,
@@ -627,7 +629,11 @@ export default function GrowWallet({
       <div className="flex items-start gap-2 mb-2">
         <Checkbox id={`gw-age-${instanceId}`} checked={ageConfirmed} onCheckedChange={(v) => setAgeConfirmed(!!v)} className="mt-0.5 shrink-0" />
         <label htmlFor={`gw-age-${instanceId}`} className="text-sm cursor-pointer leading-snug" style={{ color: '#191265' }}>
-          אני מאשר/ת שאני בן/בת 18 ומעלה
+          {customerGender === "male"
+            ? "אני מאשר שאני בן 18 ומעלה"
+            : customerGender === "female"
+              ? "אני מאשרת שאני בת 18 ומעלה"
+              : "אני מעל גיל 18"}
         </label>
       </div>
 

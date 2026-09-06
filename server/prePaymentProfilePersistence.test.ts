@@ -5,6 +5,7 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const routerSource = fs.readFileSync(path.join(root, "server/routers.ts"), "utf8");
 const registerSource = fs.readFileSync(path.join(root, "client/src/pages/Register.tsx"), "utf8");
+const growWalletSource = fs.readFileSync(path.join(root, "client/src/components/GrowWallet.tsx"), "utf8");
 const webhookSource = fs.readFileSync(path.join(root, "server/growWebhook.ts"), "utf8");
 
 describe("paid profile persistence before Grow", () => {
@@ -24,6 +25,15 @@ describe("paid profile persistence before Grow", () => {
   it("keeps missing email and phone editable for legacy DNA journey links", () => {
     expect(registerSource).toContain("const fromDna = !!(nameFromDna && emailFromDna && phoneFromDna)");
     expect(registerSource).not.toContain("const fromDna = !!(nameFromDna || emailFromDna)");
+  });
+
+  it("renders the male registration path in natural masculine Hebrew", () => {
+    expect(registerSource).toContain('isFemale ? "בואי נבנה את הפרופיל שלך" : "בוא נבנה את הפרופיל שלך"');
+    expect(registerSource).toContain('customerGender={gender === "male" ? "male" : "female"}');
+    expect(registerSource).toContain('isFemale ? "בחרי עיר" : "בחר עיר"');
+    expect(growWalletSource).toContain('"אני מאשר שאני בן 18 ומעלה"');
+    expect(registerSource).not.toContain("מלא/י פרטים ושאלון DNA");
+    expect(registerSource).not.toContain("ככל שתמלא/י יותר");
   });
 
   it("does not save the profile a second time after payment when the draft succeeded", () => {
