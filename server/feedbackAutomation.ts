@@ -16,7 +16,9 @@ import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUn
 import {
   buildTestimonialDraft,
   normalizeTestimonialEmail,
+  type TestimonialCampaignVariant,
   type TestimonialProofType,
+  type TestimonialRewardType,
   type TestimonialSourceType,
   type TestimonialSurveyKind,
   type TestimonialTouchpoint,
@@ -114,20 +116,36 @@ export function buildFeedbackRequestEmail(input: {
   surveyKind?: TestimonialSurveyKind;
   feedbackUrl: string;
   reminder?: boolean;
+  campaignVariant?: TestimonialCampaignVariant;
+  draftSubject?: string | null;
+  draftBody?: string | null;
+  rewardType?: TestimonialRewardType;
 }): { subject: string; htmlContent: string; textContent: string } {
   const surveyKind = input.surveyKind ?? "positive_experience";
   const draft = buildTestimonialDraft({
     firstName: input.firstName,
     sourceType: input.sourceType,
     surveyKind,
+    campaignVariant: input.campaignVariant,
   });
   const isSatisfactionSurvey = surveyKind === "satisfaction_survey";
-  const subject = input.reminder
+  const subject = input.draftSubject?.trim() || (input.reminder
     ? `${input.firstName}, אשמח לשמוע איך מתקדמת החוויה שלך`
-    : draft.subject;
-  const intro = input.reminder
+    : draft.subject);
+  const intro = input.draftBody?.trim() || (input.reminder
     ? "עבר שבוע מאז החיבור, ואם ההיכרות עדיין ממשיכה אשמח לשמוע בכמה מילים איך זה מרגיש עד עכשיו."
-    : draft.body;
+    : draft.body);
+  const hasReward = (input.rewardType ?? "date_map") !== "none";
+  const heading = input.campaignVariant === "match_success_followup"
+    ? "אשמח לשמוע מה שלומכם היום"
+    : input.campaignVariant === "dna_engaged_nonbuyers"
+      ? "אשמח לשמוע איך היה שאלון ה־DNA"
+      : "אשמח לשמוע על החוויה שלך";
+  const ctaLabel = input.campaignVariant === "match_success_followup"
+    ? "לספר מה שלומכם"
+    : hasReward
+      ? "אשמח לשתף ולקבל את המתנה שלי"
+      : "אשמח לשתף";
   const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.contactEmail });
   if (isSatisfactionSurvey) {
     return {
@@ -136,10 +154,16 @@ export function buildFeedbackRequestEmail(input: {
       textContent: `היי ${input.firstName},\n\n${intro}\n\nזהו סקר שביעות רצון קצר ונפרד. המטרה היא להבין מה עובד ומה נכון לשפר. התשובות נשמרות לצורכי למידה ולא יפורסמו ללא בקשת רשות נפרדת.\n\nלמילוי הסקר:\n${input.feedbackUrl}\n\nתודה על הזמן ועל הכנות,\nהילית\n\nלהסרה מרשימת התפוצה:\n${unsubscribeUrl}`,
     };
   }
+  const rewardHtml = hasReward
+    ? `<p style="font-size:16px;line-height:1.8">בסיום מחכה לך מתנה אישית ממני: <strong>מפת הדייט הבא</strong>. המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם.</p>`
+    : "";
+  const rewardText = hasReward
+    ? "\n\nבסיום מחכה לך מתנה אישית ממני: מפת הדייט הבא. המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם."
+    : "";
   return {
     subject,
-    htmlContent: `<!doctype html><html dir="rtl" lang="he"><body style="margin:0;background:#fff3f6;font-family:Arial,sans-serif;color:#432432"><div style="max-width:620px;margin:0 auto;padding:28px 14px"><div style="background:linear-gradient(135deg,#6f3f52,#a75f78);color:#fff;border-radius:28px 28px 0 0;padding:34px 30px"><div style="font-size:13px;letter-spacing:2px;color:#f6d9e4">הילית כספי</div><h1 style="font-size:30px;line-height:1.3;margin:14px 0 0">אשמח לשמוע על החוויה שלך</h1></div><div style="background:#fff;border-radius:0 0 28px 28px;padding:30px;box-shadow:0 18px 50px rgba(102,49,70,.12)"><p style="font-size:17px;line-height:1.8;margin:0">היי ${input.firstName},</p><p style="font-size:17px;line-height:1.8">${intro}</p><div style="background:#fff2f6;border:1px solid #efcad7;border-radius:16px;padding:18px 20px;margin:22px 0"><p style="font-size:16px;line-height:1.8;margin:0"><strong>החוויה שלך יכולה לעזור לקהילה הזאת לגדול.</strong> הפלטפורמה נולדה כדי לעזור לאנשים למצוא אהבה בדרך אנושית ומדויקת יותר. כשמשתפים חוויה אמיתית ומאפשרים לנו לפרסם אותה, עוד אנשים יכולים להכיר את הדרך, להצטרף לקהילה ולהוסיף עוד הזדמנויות להיכרות ולהתאמות עבור כולם.</p><p style="font-size:16px;line-height:1.8;margin:12px 0 0"><strong>גם כמה מילים שלך יכולות לעזור לאדם נוסף לעשות את הצעד הראשון.</strong></p></div><p style="font-size:16px;line-height:1.8">בסיום מחכה לך מתנה אישית ממני: <strong>מפת הדייט הבא</strong>. המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם.</p><div style="text-align:center;margin:30px 0"><a href="${input.feedbackUrl}" style="display:inline-block;background:#a75f78;color:#fff;text-decoration:none;border-radius:999px;padding:16px 30px;font-size:17px;font-weight:bold">אשמח לשתף ולקבל את המתנה שלי</a></div><p style="font-size:14px;line-height:1.7;color:#795e69">רק אם מתאים לך, אפשר לבחור בטופס בנפרד מה מותר לנו לשתף, היכן ובאיזו זהות. שום דבר לא מתפרסם אוטומטית.</p><p style="font-size:16px;line-height:1.8;margin-top:28px">באהבה,<br><strong>הילית</strong></p><p style="margin:28px 0 0;text-align:center;font-size:12px;color:#9b7b87"><a href="${unsubscribeUrl}" style="color:#9b7b87;text-decoration:underline">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
-    textContent: `היי ${input.firstName},\n\n${intro}\n\nהחוויה שלך יכולה לעזור לקהילה הזאת לגדול. הפלטפורמה נולדה כדי לעזור לאנשים למצוא אהבה בדרך אנושית ומדויקת יותר. כשמשתפים חוויה אמיתית ומאפשרים לנו לפרסם אותה, עוד אנשים יכולים להכיר את הדרך, להצטרף לקהילה ולהוסיף עוד הזדמנויות להיכרות ולהתאמות עבור כולם. גם כמה מילים שלך יכולות לעזור לאדם נוסף לעשות את הצעד הראשון.\n\nבסיום מחכה לך מתנה אישית ממני: מפת הדייט הבא. המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם.\n\n${input.feedbackUrl}\n\nבאהבה,\nהילית\n\nלהסרה מרשימת התפוצה:\n${unsubscribeUrl}`,
+    htmlContent: `<!doctype html><html dir="rtl" lang="he"><body style="margin:0;background:#fff3f6;font-family:Arial,sans-serif;color:#432432"><div style="max-width:620px;margin:0 auto;padding:28px 14px"><div style="background:linear-gradient(135deg,#6f3f52,#a75f78);color:#fff;border-radius:28px 28px 0 0;padding:34px 30px"><div style="font-size:13px;letter-spacing:2px;color:#f6d9e4">הילית כספי</div><h1 style="font-size:30px;line-height:1.3;margin:14px 0 0">${heading}</h1></div><div style="background:#fff;border-radius:0 0 28px 28px;padding:30px;box-shadow:0 18px 50px rgba(102,49,70,.12)"><p style="font-size:17px;line-height:1.8;margin:0">היי ${input.firstName},</p><p style="font-size:17px;line-height:1.8">${intro}</p><div style="background:#fff2f6;border:1px solid #efcad7;border-radius:16px;padding:18px 20px;margin:22px 0"><p style="font-size:16px;line-height:1.8;margin:0"><strong>החוויה שלך יכולה לעזור לקהילה הזאת לגדול.</strong> הפלטפורמה נולדה כדי לעזור לאנשים למצוא אהבה בדרך אנושית ומדויקת יותר. כשמשתפים חוויה אמיתית ומאפשרים לנו לפרסם אותה, עוד אנשים יכולים להכיר את הדרך, להצטרף לקהילה ולהוסיף עוד הזדמנויות להיכרות ולהתאמות עבור כולם.</p><p style="font-size:16px;line-height:1.8;margin:12px 0 0"><strong>גם כמה מילים שלך יכולות לעזור לאדם נוסף לעשות את הצעד הראשון.</strong></p></div>${rewardHtml}<div style="text-align:center;margin:30px 0"><a href="${input.feedbackUrl}" style="display:inline-block;background:#a75f78;color:#fff;text-decoration:none;border-radius:999px;padding:16px 30px;font-size:17px;font-weight:bold">${ctaLabel}</a></div><p style="font-size:14px;line-height:1.7;color:#795e69">רק אם מתאים לך, אפשר לבחור בטופס בנפרד מה מותר לנו לשתף, היכן ובאיזו זהות. שום דבר לא מתפרסם אוטומטית.</p><p style="font-size:16px;line-height:1.8;margin-top:28px">באהבה,<br><strong>הילית</strong></p><p style="margin:28px 0 0;text-align:center;font-size:12px;color:#9b7b87"><a href="${unsubscribeUrl}" style="color:#9b7b87;text-decoration:underline">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
+    textContent: `היי ${input.firstName},\n\n${intro}\n\nהחוויה שלך יכולה לעזור לקהילה הזאת לגדול. הפלטפורמה נולדה כדי לעזור לאנשים למצוא אהבה בדרך אנושית ומדויקת יותר. כשמשתפים חוויה אמיתית ומאפשרים לנו לפרסם אותה, עוד אנשים יכולים להכיר את הדרך, להצטרף לקהילה ולהוסיף עוד הזדמנויות להיכרות ולהתאמות עבור כולם. גם כמה מילים שלך יכולות לעזור לאדם נוסף לעשות את הצעד הראשון.${rewardText}\n\n${input.feedbackUrl}\n\nבאהבה,\nהילית\n\nלהסרה מרשימת התפוצה:\n${unsubscribeUrl}`,
   };
 }
 
