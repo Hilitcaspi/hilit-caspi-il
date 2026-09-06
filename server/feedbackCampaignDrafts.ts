@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
-import { crmLeads, dnaQuizResults, matches, singles, testimonialEvents, testimonialRecords } from "../drizzle/schema";
+import { and, desc, eq, inArray, isNotNull, like } from "drizzle-orm";
+import { completedPayments, crmLeads, dnaQuizResults, emailLog, matches, singles, testimonialEvents, testimonialRecords } from "../drizzle/schema";
 import { getDb } from "./db";
 import { isPermanentlyBlockedEmail } from "./brevo";
-import { buildTestimonialDraft, normalizeTestimonialEmail } from "./testimonialService";
+import { buildTestimonialDraft, normalizeTestimonialEmail, type TestimonialCampaignVariant } from "./testimonialService";
 
 type DraftSummary = {
   eligible: number;
@@ -27,6 +27,67 @@ type SatisfactionSamplePerson = {
 
 function stableRank(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+const DNA_JOURNEY_LENGTHS: Record<string, number> = {
+  women_first_step_v2: 6,
+  men_first_step_v2: 6,
+  women_first_step: 3,
+  men_first_step: 3,
+  meta_lead_dna: 3,
+};
+
+type DnaJourneyEmail = {
+  journeyKey: string;
+  emailIndex: number;
+  status: string;
+  sentAt?: number | null;
+  openedAt?: number | null;
+  openCount?: number | null;
+};
+
+export function summarizeCompletedDnaJourney(rows: DnaJourneyEmail[]): { completed: boolean; opened: boolean; openCount: number } {
+  const completed = Object.entries(DNA_JOURNEY_LENGTHS).some(([journeyKey, expected]) => {
+    const indexes = new Set(rows
+      .filter(row => row.journeyKey === journeyKey && row.status === "sent" && row.sentAt)
+      .map(row => row.emailIndex));
+    return indexes.size >= expected && Array.from({ length: expected }, (_, index) => index + 1).every(index => indexes.has(index));
+  });
+  const openCount = rows.reduce((sum, row) => sum + Math.max(Number(row.openCount || 0), row.openedAt ? 1 : 0), 0);
+  return { completed, opened: openCount > 0, openCount };
+}
+
+type EngagedDnaCandidate = {
+  contactEmail: string;
+  gender: "female" | "male" | null;
+  openCount: number;
+  completedAt: number;
+};
+
+export function selectEngagedDnaSample<T extends EngagedDnaCandidate>(candidates: T[], sampleSize = 100): T[] {
+  const target = Math.min(Math.max(0, sampleSize), candidates.length);
+  const femaleTarget = Math.min(Math.round(target * 0.75), candidates.filter(candidate => candidate.gender === "female").length);
+  const maleTarget = Math.min(target - femaleTarget, candidates.filter(candidate => candidate.gender === "male").length);
+  const rank = (items: T[]) => [...items].sort((a, b) => b.openCount - a.openCount
+    || b.completedAt - a.completedAt
+    || stableRank(a.contactEmail).localeCompare(stableRank(b.contactEmail)));
+  const selected = [
+    ...rank(candidates.filter(candidate => candidate.gender === "female")).slice(0, femaleTarget),
+    ...rank(candidates.filter(candidate => candidate.gender === "male")).slice(0, maleTarget),
+  ];
+  const selectedEmails = new Set(selected.map(candidate => candidate.contactEmail));
+  if (selected.length < target) {
+    selected.push(...rank(candidates.filter(candidate => !selectedEmails.has(candidate.contactEmail))).slice(0, target - selected.length));
+  }
+  return selected;
+}
+
+export function excludeExistingRequestsFromFixedSample<T extends { requestKey: string }>(
+  selected: T[],
+  existingRequestKeys: Set<string>,
+): { eligible: T[]; existingCount: number } {
+  const eligible = selected.filter(candidate => !existingRequestKeys.has(candidate.requestKey));
+  return { eligible, existingCount: selected.length - eligible.length };
 }
 
 export function classifySurveyRegion(city?: string | null): string {
@@ -380,7 +441,7 @@ export async function prepareSatisfactionSurveyDrafts(options: { execute: boolea
   return { eligible: selected.length, created, skippedExisting, skippedUnsubscribed, skippedInvalid, sent: 0, breakdown: { ...breakdown, ...Object.fromEntries(Object.entries(dimensions).flatMap(([dimension, values]) => Object.entries(values).map(([key, count]) => [`${dimension}:${key}`, count]))) } };
 }
 
-export const FEEDBACK_CAMPAIGN_AUDIENCES = ["successful_matches", "dna_completers"] as const;
+export const FEEDBACK_CAMPAIGN_AUDIENCES = ["successful_matches", "match_success_followup", "dna_completers"] as const;
 export type FeedbackCampaignAudience = typeof FEEDBACK_CAMPAIGN_AUDIENCES[number];
 
 type FeedbackCampaignExclusion =
@@ -389,7 +450,13 @@ type FeedbackCampaignExclusion =
   | "inactive_or_no_consent"
   | "invalid_or_blocked"
   | "duplicate_contact"
-  | "higher_priority_audience";
+  | "higher_priority_audience"
+  | "already_responded"
+  | "already_contacted"
+  | "journey_incomplete"
+  | "no_email_open"
+  | "purchased"
+  | "sample_not_selected";
 
 export type FeedbackCampaignAudienceSummary = {
   audience: FeedbackCampaignAudience;
@@ -403,6 +470,7 @@ export type FeedbackCampaignAudienceSummary = {
   exclusions: Record<FeedbackCampaignExclusion, number>;
   sampleSubject: string;
   sampleBody: string;
+  details?: Record<string, number>;
   sent: number;
 };
 
@@ -415,7 +483,7 @@ type CampaignCandidate = {
   audience: FeedbackCampaignAudience;
   requestKey: string;
   sourceType: "match" | "dna";
-  touchpoint: "historical_match" | "dna_result";
+  touchpoint: "historical_match" | "match_week" | "dna_result";
   proofType: "success" | "product";
   singleId: number | null;
   crmLeadId: number | null;
@@ -424,6 +492,7 @@ type CampaignCandidate = {
   contactEmail: string;
   contactPhone: string | null;
   sourceSnapshot: Record<string, unknown>;
+  campaignVariant: TestimonialCampaignVariant;
 };
 
 type AudiencePlan = {
@@ -432,14 +501,17 @@ type AudiencePlan = {
   candidateEmails: Set<string>;
 };
 
-const CAMPAIGN_VERSION = "2026-09-v1";
+const CAMPAIGN_VERSION = "2026-09-v2";
 const CAMPAIGN_REQUEST_PREFIX: Record<FeedbackCampaignAudience, string> = {
   successful_matches: `campaign:successful-matches:${CAMPAIGN_VERSION}:`,
+  match_success_followup: `campaign:match-success-followup:${CAMPAIGN_VERSION}:`,
   dna_completers: `campaign:dna-completers:${CAMPAIGN_VERSION}:`,
 };
 
+const LEGACY_DNA_CAMPAIGN_PREFIX = "campaign:dna-completers:2026-09-v1:";
+
 export function buildFeedbackCampaignRequestKey(audience: FeedbackCampaignAudience, subjectId: number): string {
-  const subjectType = audience === "successful_matches" ? "single" : "result";
+  const subjectType = audience === "dna_completers" ? "result" : "single";
   return `${CAMPAIGN_REQUEST_PREFIX[audience]}${subjectType}-${subjectId}`;
 }
 
@@ -451,6 +523,12 @@ function emptyExclusions(): Record<FeedbackCampaignExclusion, number> {
     invalid_or_blocked: 0,
     duplicate_contact: 0,
     higher_priority_audience: 0,
+    already_responded: 0,
+    already_contacted: 0,
+    journey_incomplete: 0,
+    no_email_open: 0,
+    purchased: 0,
+    sample_not_selected: 0,
   };
 }
 
@@ -473,18 +551,25 @@ export function classifyFeedbackCampaignContact(input: {
   return null;
 }
 
+function campaignVariantForAudience(audience: FeedbackCampaignAudience): TestimonialCampaignVariant {
+  if (audience === "successful_matches") return "match_testimonial_reminder";
+  if (audience === "match_success_followup") return "match_success_followup";
+  return "dna_engaged_nonbuyers";
+}
+
 function campaignCopy(audience: FeedbackCampaignAudience) {
   return buildTestimonialDraft({
     firstName: "שם פרטי",
-    sourceType: audience === "successful_matches" ? "match" : "dna",
+    sourceType: audience === "dna_completers" ? "dna" : "match",
     surveyKind: "positive_experience",
+    campaignVariant: campaignVariantForAudience(audience),
   });
 }
 
 async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCampaignAudience, AudiencePlan>> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const [matchRows, singleRows, dnaRows, leadRows, testimonialRows] = await Promise.all([
+  const [matchRows, singleRows, dnaRows, leadRows, testimonialRows, emailRows, paymentRows] = await Promise.all([
     db.select({
       id: matches.id,
       singleAId: matches.singleAId,
@@ -497,13 +582,30 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
     db.select().from(dnaQuizResults).orderBy(desc(dnaQuizResults.createdAt)),
     db.select().from(crmLeads),
     db.select({
+      id: testimonialRecords.id,
+      singleId: testimonialRecords.singleId,
       contactEmail: testimonialRecords.contactEmail,
       requestKey: testimonialRecords.requestKey,
       surveyKind: testimonialRecords.surveyKind,
+      sourceType: testimonialRecords.sourceType,
       status: testimonialRecords.status,
       scheduledAt: testimonialRecords.scheduledAt,
       requestSentAt: testimonialRecords.requestSentAt,
+      lastResponseAt: testimonialRecords.lastResponseAt,
+      feedbackText: testimonialRecords.feedbackText,
+      testimonialTextOriginal: testimonialRecords.testimonialTextOriginal,
+      consentPhoto: testimonialRecords.consentPhoto,
     }).from(testimonialRecords),
+    db.select({
+      recipientEmail: emailLog.recipientEmail,
+      journeyKey: emailLog.journeyKey,
+      emailIndex: emailLog.emailIndex,
+      status: emailLog.status,
+      sentAt: emailLog.sentAt,
+      openedAt: emailLog.openedAt,
+      openCount: emailLog.openCount,
+    }).from(emailLog),
+    db.select({ email: completedPayments.email, amountAgorot: completedPayments.amountAgorot }).from(completedPayments),
   ]);
 
   const singlesById = new Map(singleRows.map(person => [person.id, person]));
@@ -517,10 +619,30 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
   }
   const leadsBySession = new Map(leadRows.filter(lead => lead.quizSessionId).map(lead => [lead.quizSessionId!, lead]));
   const unsubscribedEmails = new Set(leadRows.filter(lead => lead.emailUnsubscribed).map(lead => normalizeTestimonialEmail(lead.email)).filter(Boolean));
-  const existingPositiveEmails = new Set(testimonialRows
-    .filter(row => row.surveyKind === "positive_experience")
-    .map(row => normalizeTestimonialEmail(row.contactEmail))
+  const positiveRowsByEmail = new Map<string, typeof testimonialRows>();
+  const positiveRowsBySingle = new Map<number, typeof testimonialRows>();
+  for (const row of testimonialRows.filter(row => row.surveyKind === "positive_experience" && !["archived", "revoked"].includes(row.status))) {
+    const email = normalizeTestimonialEmail(row.contactEmail);
+    if (email) positiveRowsByEmail.set(email, [...(positiveRowsByEmail.get(email) || []), row]);
+    if (row.singleId) positiveRowsBySingle.set(row.singleId, [...(positiveRowsBySingle.get(row.singleId) || []), row]);
+  }
+  const hasResponse = (rows: typeof testimonialRows) => rows.some(row => Boolean(
+    row.lastResponseAt
+    || row.feedbackText?.trim()
+    || row.testimonialTextOriginal?.trim()
+    || ["submitted", "awaiting_consent", "awaiting_verification", "approved", "published"].includes(row.status),
+  ));
+  const journeyRowsByEmail = new Map<string, typeof emailRows>();
+  for (const row of emailRows) {
+    if (!(row.journeyKey in DNA_JOURNEY_LENGTHS)) continue;
+    const email = normalizeTestimonialEmail(row.recipientEmail);
+    if (email) journeyRowsByEmail.set(email, [...(journeyRowsByEmail.get(email) || []), row]);
+  }
+  const purchaserEmails = new Set(paymentRows
+    .filter(row => row.amountAgorot >= 1_000)
+    .map(row => normalizeTestimonialEmail(row.email))
     .filter(Boolean));
+  const existingRequestKeys = new Set(testimonialRows.map(row => row.requestKey).filter((value): value is string => Boolean(value)));
   const campaignState = (audience: FeedbackCampaignAudience) => {
     const rows = testimonialRows.filter(row => row.requestKey?.startsWith(CAMPAIGN_REQUEST_PREFIX[audience]));
     return {
@@ -532,7 +654,10 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
   };
 
   const successfulExclusions = emptyExclusions();
-  const mutualMatches = matchRows.filter(match => match.approvedByA && match.approvedByB && match.matchedAt);
+  const followupExclusions = emptyExclusions();
+  const mutualMatches = matchRows
+    .filter(match => match.approvedByA && match.approvedByB && match.matchedAt)
+    .sort((a, b) => Number(b.matchedAt || 0) - Number(a.matchedAt || 0));
   const latestMatchBySingle = new Map<number, { matchId: number; matchedAt: number }>();
   for (const match of mutualMatches) {
     for (const singleId of [match.singleAId, match.singleBId]) {
@@ -543,21 +668,78 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
   }
   const successfulCandidates: CampaignCandidate[] = [];
   const successfulEmails = new Set<string>();
+  const followupCandidates: CampaignCandidate[] = [];
+  const followupEmails = new Set<string>();
+  const mutualAudienceEmails = new Set<string>();
   const seenSuccessfulEmails = new Set<string>();
+  const matchDetails = { neverAsked: 0, previouslyContactedNoResponse: 0, existingDraftNoResponse: 0 };
+  const followupDetails = { priorResponses: 0, priorPhotoConsent: 0 };
   for (const [singleId, match] of Array.from(latestMatchBySingle.entries())) {
     const person = singlesById.get(singleId);
     const email = normalizeTestimonialEmail(person?.email || "");
-    const exclusion = classifyFeedbackCampaignContact({
+    const baseExclusion = classifyFeedbackCampaignContact({
       email,
       isSeed: Boolean(person?.isSeed),
       unsubscribed: unsubscribedEmails.has(email),
       profiles: profilesByEmail.get(email),
-      existingRequest: existingPositiveEmails.has(email),
       duplicateContact: Boolean(email && seenSuccessfulEmails.has(email)),
     });
     if (email) seenSuccessfulEmails.add(email);
-    if (exclusion) {
-      successfulExclusions[exclusion] += 1;
+    if (baseExclusion) {
+      successfulExclusions[baseExclusion] += 1;
+      followupExclusions[baseExclusion] += 1;
+      continue;
+    }
+    mutualAudienceEmails.add(email);
+    const existingRows = [...(positiveRowsBySingle.get(singleId) || []), ...(positiveRowsByEmail.get(email) || [])]
+      .filter((row, index, rows) => rows.findIndex(item => item.id === row.id) === index)
+      .filter(row => row.sourceType === "match");
+    const historicalRows = existingRows.filter(row => !row.requestKey?.startsWith(CAMPAIGN_REQUEST_PREFIX.successful_matches)
+      && !row.requestKey?.startsWith(CAMPAIGN_REQUEST_PREFIX.match_success_followup));
+    const responded = hasResponse(historicalRows);
+    const contactName = `${person?.firstName || ""} ${person?.lastName || ""}`.trim() || "שלום";
+    if (responded) {
+      followupDetails.priorResponses += 1;
+      successfulExclusions.already_responded += 1;
+      if (historicalRows.some(row => row.consentPhoto)) followupDetails.priorPhotoConsent += 1;
+      if (existingRows.some(row => row.requestKey?.startsWith(CAMPAIGN_REQUEST_PREFIX.match_success_followup))) {
+        followupExclusions.existing_request += 1;
+        continue;
+      }
+      followupEmails.add(email);
+      followupCandidates.push({
+        audience: "match_success_followup",
+        requestKey: buildFeedbackCampaignRequestKey("match_success_followup", singleId),
+        sourceType: "match",
+        touchpoint: "match_week",
+        proofType: "success",
+        singleId,
+        crmLeadId: null,
+        matchId: match.matchId,
+        contactName,
+        contactEmail: email,
+        contactPhone: person?.phone || null,
+        campaignVariant: "match_success_followup",
+        sourceSnapshot: {
+          campaignAudience: "match_success_followup",
+          campaignVariant: "match_success_followup",
+          campaignVersion: CAMPAIGN_VERSION,
+          mutualApproval: true,
+          priorResponse: true,
+          priorPhotoConsent: historicalRows.some(row => row.consentPhoto),
+          matchedAt: match.matchedAt,
+          draftOnly: true,
+        },
+      });
+      continue;
+    }
+    const contacted = historicalRows.some(row => row.requestSentAt);
+    const hasDraft = historicalRows.length > 0;
+    if (contacted) matchDetails.previouslyContactedNoResponse += 1;
+    else if (hasDraft) matchDetails.existingDraftNoResponse += 1;
+    else matchDetails.neverAsked += 1;
+    if (existingRows.some(row => row.requestKey?.startsWith(CAMPAIGN_REQUEST_PREFIX.successful_matches))) {
+      successfulExclusions.existing_request += 1;
       continue;
     }
     successfulEmails.add(email);
@@ -570,13 +752,16 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
       singleId,
       crmLeadId: null,
       matchId: match.matchId,
-      contactName: `${person?.firstName || ""} ${person?.lastName || ""}`.trim() || "שלום",
+      contactName,
       contactEmail: email,
       contactPhone: person?.phone || null,
+      campaignVariant: contacted ? "match_testimonial_reminder" : "match_testimonial_request",
       sourceSnapshot: {
         campaignAudience: "successful_matches",
+        campaignVariant: contacted ? "match_testimonial_reminder" : "match_testimonial_request",
         campaignVersion: CAMPAIGN_VERSION,
         mutualApproval: true,
+        previousRequestSent: contacted,
         matchedAt: match.matchedAt,
         draftOnly: true,
       },
@@ -589,7 +774,7 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
     candidateEmails: successfulEmails,
     summary: {
       audience: "successful_matches",
-      label: "התאמות שבהן שני הצדדים אמרו כן",
+      label: "מאץ׳ הדדי ללא עדות",
       sourceTotal: mutualMatches.length,
       uniqueContacts: latestMatchBySingle.size,
       eligible: successfulCandidates.length,
@@ -597,34 +782,65 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
       exclusions: successfulExclusions,
       sampleSubject: successfulCopy.subject,
       sampleBody: successfulCopy.body,
+      details: matchDetails,
+    },
+  };
+
+  const followupCopy = campaignCopy("match_success_followup");
+  const followupState = campaignState("match_success_followup");
+  const followupPlan: AudiencePlan = {
+    candidates: followupCandidates,
+    candidateEmails: followupEmails,
+    summary: {
+      audience: "match_success_followup",
+      label: "נתנו עדות בעבר: בדיקת המשך הקשר ותמונה",
+      sourceTotal: mutualMatches.length,
+      uniqueContacts: latestMatchBySingle.size,
+      eligible: followupCandidates.length,
+      ...followupState,
+      exclusions: followupExclusions,
+      sampleSubject: followupCopy.subject,
+      sampleBody: followupCopy.body,
+      details: followupDetails,
     },
   };
 
   const dnaExclusions = emptyExclusions();
-  const dnaCandidates: CampaignCandidate[] = [];
+  const dnaPool: CampaignCandidate[] = [];
   const dnaEmails = new Set<string>();
   const seenDnaEmails = new Set<string>();
+  const dnaDetails = { journeyComplete: 0, openedJourney: 0, eligibleBeforeSample: 0, selectedFemale: 0, selectedMale: 0, legacyDraftsToArchive: testimonialRows.filter(row => row.requestKey?.startsWith(LEGACY_DNA_CAMPAIGN_PREFIX) && row.status === "draft").length };
   for (const result of dnaRows) {
     const lead = leadsBySession.get(result.sessionId);
-    const linkedSingle = result.singleId ? singlesById.get(result.singleId) : undefined;
+    const linkedSingle = result.singleId ? singlesById.get(result.singleId) : lead?.singleId ? singlesById.get(lead.singleId) : undefined;
     const email = normalizeTestimonialEmail(lead?.email || linkedSingle?.email || "");
-    const exclusion = classifyFeedbackCampaignContact({
+    const baseExclusion = classifyFeedbackCampaignContact({
       email,
       isSeed: Boolean(linkedSingle?.isSeed),
       unsubscribed: unsubscribedEmails.has(email),
       profiles: profilesByEmail.get(email),
-      existingRequest: existingPositiveEmails.has(email),
       duplicateContact: Boolean(email && seenDnaEmails.has(email)),
-      higherPriorityAudience: successfulEmails.has(email),
+      higherPriorityAudience: mutualAudienceEmails.has(email),
     });
     if (email) seenDnaEmails.add(email);
-    if (exclusion) {
-      dnaExclusions[exclusion] += 1;
+    if (baseExclusion) {
+      dnaExclusions[baseExclusion] += 1;
       continue;
     }
-    dnaEmails.add(email);
+    const journey = summarizeCompletedDnaJourney(journeyRowsByEmail.get(email) || []);
+    if (!journey.completed) { dnaExclusions.journey_incomplete += 1; continue; }
+    dnaDetails.journeyComplete += 1;
+    if (!journey.opened) { dnaExclusions.no_email_open += 1; continue; }
+    dnaDetails.openedJourney += 1;
+    const purchased = purchaserEmails.has(email)
+      || Boolean(linkedSingle?.isPaid)
+      || Boolean(lead && ["client_database", "client_guide", "client_course", "client_coaching"].includes(lead.status));
+    if (purchased) { dnaExclusions.purchased += 1; continue; }
+    const existingRows = (positiveRowsByEmail.get(email) || []).filter(row => row.sourceType === "dna");
+    if (hasResponse(existingRows)) { dnaExclusions.already_responded += 1; continue; }
+    if (existingRows.some(row => row.requestSentAt)) { dnaExclusions.already_contacted += 1; continue; }
     const singleId = linkedSingle?.id || lead?.singleId || null;
-    dnaCandidates.push({
+    dnaPool.push({
       audience: "dna_completers",
       requestKey: buildFeedbackCampaignRequestKey("dna_completers", result.id),
       sourceType: "dna",
@@ -636,15 +852,38 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
       contactName: lead?.name || `${linkedSingle?.firstName || ""} ${linkedSingle?.lastName || ""}`.trim() || "שלום",
       contactEmail: email,
       contactPhone: lead?.phone || linkedSingle?.phone || null,
+      campaignVariant: "dna_engaged_nonbuyers",
       sourceSnapshot: {
         campaignAudience: "dna_completers",
+        campaignVariant: "dna_engaged_nonbuyers",
         campaignVersion: CAMPAIGN_VERSION,
         dnaResultId: result.id,
         completedAt: result.createdAt,
+        journeyCompleted: true,
+        journeyOpened: true,
+        journeyOpenCount: journey.openCount,
+        noVerifiedPurchase: true,
+        gender: lead?.gender || result.gender || linkedSingle?.gender || null,
         captureConsentRequired: Boolean(lead),
         draftOnly: true,
       },
     });
+  }
+  dnaDetails.eligibleBeforeSample = dnaPool.length;
+  const selectedDnaSample = selectEngagedDnaSample(dnaPool.map(candidate => ({
+    ...candidate,
+    gender: (candidate.sourceSnapshot.gender === "female" || candidate.sourceSnapshot.gender === "male") ? candidate.sourceSnapshot.gender : null,
+    openCount: Number(candidate.sourceSnapshot.journeyOpenCount || 0),
+    completedAt: Number(new Date(candidate.sourceSnapshot.completedAt as string | number | Date).getTime() || 0),
+  })), 100);
+  dnaExclusions.sample_not_selected = Math.max(0, dnaPool.length - selectedDnaSample.length);
+  const fixedSampleState = excludeExistingRequestsFromFixedSample(selectedDnaSample, existingRequestKeys);
+  const dnaCandidates = fixedSampleState.eligible;
+  dnaExclusions.existing_request += fixedSampleState.existingCount;
+  for (const candidate of selectedDnaSample) {
+    dnaEmails.add(candidate.contactEmail);
+    if (candidate.gender === "female") dnaDetails.selectedFemale += 1;
+    if (candidate.gender === "male") dnaDetails.selectedMale += 1;
   }
   const dnaCopy = campaignCopy("dna_completers");
   const dnaState = campaignState("dna_completers");
@@ -653,7 +892,7 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
     candidateEmails: dnaEmails,
     summary: {
       audience: "dna_completers",
-      label: "מסיימי שאלון ה־DNA",
+      label: "מסיימי מסע DNA שפתחו מיילים ולא רכשו: מדגם 100",
       sourceTotal: dnaRows.length,
       uniqueContacts: seenDnaEmails.size,
       eligible: dnaCandidates.length,
@@ -661,10 +900,11 @@ async function buildFeedbackCampaignAudiencePlans(): Promise<Record<FeedbackCamp
       exclusions: dnaExclusions,
       sampleSubject: dnaCopy.subject,
       sampleBody: dnaCopy.body,
+      details: dnaDetails,
     },
   };
 
-  return { successful_matches: successfulPlan, dna_completers: dnaPlan };
+  return { successful_matches: successfulPlan, match_success_followup: followupPlan, dna_completers: dnaPlan };
 }
 
 export async function previewFeedbackCampaignAudiences(): Promise<FeedbackCampaignAudienceSummary[]> {
@@ -677,10 +917,22 @@ export async function prepareFeedbackCampaignAudienceDrafts(audience: FeedbackCa
   created: number;
   remainingEligible: number;
   preparedDrafts: number;
+  archivedSupersededDrafts: number;
   sent: number;
 }> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+  let archivedSupersededDrafts = 0;
+  if (audience === "dna_completers") {
+    const legacyRows = await db.select({ id: testimonialRecords.id }).from(testimonialRecords)
+      .where(and(like(testimonialRecords.requestKey, `${LEGACY_DNA_CAMPAIGN_PREFIX}%`), eq(testimonialRecords.status, "draft")));
+    if (legacyRows.length) {
+      const now = Date.now();
+      await db.update(testimonialRecords).set({ status: "archived", archivedAt: now, updatedAt: now })
+        .where(and(like(testimonialRecords.requestKey, `${LEGACY_DNA_CAMPAIGN_PREFIX}%`), eq(testimonialRecords.status, "draft")));
+      archivedSupersededDrafts = legacyRows.length;
+    }
+  }
   const plans = await buildFeedbackCampaignAudiencePlans();
   const candidates = plans[audience].candidates;
   let created = 0;
@@ -690,7 +942,7 @@ export async function prepareFeedbackCampaignAudienceDrafts(audience: FeedbackCa
     const now = Date.now();
     try {
       await db.insert(testimonialRecords).values(chunk.map(candidate => {
-        const draft = buildTestimonialDraft({ firstName: candidate.contactName, sourceType: candidate.sourceType, surveyKind: "positive_experience" });
+        const draft = buildTestimonialDraft({ firstName: candidate.contactName, sourceType: candidate.sourceType, surveyKind: "positive_experience", campaignVariant: candidate.campaignVariant });
         return {
           publicToken: crypto.randomBytes(32).toString("hex"),
           requestKey: candidate.requestKey,
@@ -711,7 +963,7 @@ export async function prepareFeedbackCampaignAudienceDrafts(audience: FeedbackCa
           draftBody: draft.body,
           scheduledAt: null,
           requestSentAt: null,
-          rewardType: "date_map" as const,
+          rewardType: candidate.campaignVariant === "match_success_followup" ? "none" as const : "date_map" as const,
           incentiveDisclosureRequired: true,
           createdAt: now,
           updatedAt: now,
@@ -736,5 +988,5 @@ export async function prepareFeedbackCampaignAudienceDrafts(audience: FeedbackCa
   }
   const after = await previewFeedbackCampaignAudiences();
   const summary = after.find(item => item.audience === audience)!;
-  return { audience, created, remainingEligible: summary.eligible, preparedDrafts: summary.preparedDrafts, sent: summary.sent };
+  return { audience, created, remainingEligible: summary.eligible, preparedDrafts: summary.preparedDrafts, archivedSupersededDrafts, sent: summary.sent };
 }

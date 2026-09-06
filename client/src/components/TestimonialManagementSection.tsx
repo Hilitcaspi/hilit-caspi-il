@@ -185,12 +185,12 @@ export default function TestimonialManagementSection({ preview = false }: { prev
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-semibold tracking-[.12em] text-[#9b6d55]">קמפיין המלצות מוכן לאישור</p>
-              <h3 className="mt-1 text-xl font-bold text-[#2a1712]">התאמות מוצלחות ומסיימי שאלון DNA</h3>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6f5d55]">המערכת מסננת הסרות דיוור, פרופילים לא פעילים, חוסר הסכמה ובקשות קיימות. כל אדם מופיע פעם אחת בלבד, והתאמות מוצלחות מקבלות קדימות על פני קהל ה־DNA.</p>
+              <h3 className="mt-1 text-xl font-bold text-[#2a1712]">עדויות ממאץ׳ הדדי, מעקב הצלחה ומדגם DNA</h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6f5d55]">המערכת מפרידה בין מי שעדיין לא נתנו עדות, מי שכבר שיתפו ומתאימים לבדיקת המשך הקשר, ומסיימי מסע DNA שפתחו מיילים ולא רכשו. הסרות דיוור, חוסר הסכמה, פרופילים לא פעילים וכפילויות מוחרגים.</p>
             </div>
             <Badge className="w-fit border border-amber-300 bg-amber-50 text-amber-900">שליחה נעולה עד אישור נפרד</Badge>
           </div>
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+          <div className="mt-4 grid gap-4 xl:grid-cols-3">
             {campaignAudienceQuery.isLoading ? <LoadingCard /> : campaignAudiences.map(audience => (
               <div key={audience.audience} className="rounded-2xl border border-[#eadfd7] bg-[#fbf8f5] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -203,11 +203,36 @@ export default function TestimonialManagementSection({ preview = false }: { prev
                   <Badge variant="outline">תוזמנו: {audience.scheduledForSend.toLocaleString("he-IL")}</Badge>
                   <Badge variant="outline">נשלחו: {audience.sent.toLocaleString("he-IL")}</Badge>
                   <Badge variant="outline">בקשה קיימת: {audience.exclusions.existing_request.toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">כבר נתנו עדות: {audience.exclusions.already_responded.toLocaleString("he-IL")}</Badge>
+                  <Badge variant="outline">פנייה קודמת נשלחה: {audience.exclusions.already_contacted.toLocaleString("he-IL")}</Badge>
                   <Badge variant="outline">הסרה מדיוור: {audience.exclusions.unsubscribed.toLocaleString("he-IL")}</Badge>
                   <Badge variant="outline">לא פעיל או ללא הסכמה: {audience.exclusions.inactive_or_no_consent.toLocaleString("he-IL")}</Badge>
                   <Badge variant="outline">כפילויות: {(audience.exclusions.duplicate_contact + audience.exclusions.higher_priority_audience).toLocaleString("he-IL")}</Badge>
                   <Badge variant="outline">פרטים לא תקינים או חסומים: {audience.exclusions.invalid_or_blocked.toLocaleString("he-IL")}</Badge>
+                  {audience.exclusions.journey_incomplete > 0 && <Badge variant="outline">המסע טרם הושלם: {audience.exclusions.journey_incomplete.toLocaleString("he-IL")}</Badge>}
+                  {audience.exclusions.no_email_open > 0 && <Badge variant="outline">לא פתחו מייל במסע: {audience.exclusions.no_email_open.toLocaleString("he-IL")}</Badge>}
+                  {audience.exclusions.purchased > 0 && <Badge variant="outline">המשיכו לרכישה: {audience.exclusions.purchased.toLocaleString("he-IL")}</Badge>}
+                  {audience.exclusions.sample_not_selected > 0 && <Badge variant="outline">זכאים שלא נבחרו למדגם: {audience.exclusions.sample_not_selected.toLocaleString("he-IL")}</Badge>}
                 </div>
+                {audience.details && <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  {audience.audience === "successful_matches" && <>
+                    <Badge className="bg-[#efe7e1] text-[#5f4337]">לא נשאלו בעבר: {(audience.details.neverAsked || 0).toLocaleString("he-IL")}</Badge>
+                    <Badge className="bg-[#efe7e1] text-[#5f4337]">פנייה קודמת ללא תשובה: {(audience.details.previouslyContactedNoResponse || 0).toLocaleString("he-IL")}</Badge>
+                    <Badge className="bg-[#efe7e1] text-[#5f4337]">טיוטה קודמת בלבד: {(audience.details.existingDraftNoResponse || 0).toLocaleString("he-IL")}</Badge>
+                  </>}
+                  {audience.audience === "match_success_followup" && <>
+                    <Badge className="bg-[#f6e4ec] text-[#6f3f52]">עדויות קיימות: {(audience.details.priorResponses || 0).toLocaleString("he-IL")}</Badge>
+                    <Badge className="bg-[#f6e4ec] text-[#6f3f52]">אישור תמונה קיים: {(audience.details.priorPhotoConsent || 0).toLocaleString("he-IL")}</Badge>
+                  </>}
+                  {audience.audience === "dna_completers" && <>
+                    <Badge className="bg-[#e8eef7] text-[#314e70]">השלימו מסע: {(audience.details.journeyComplete || 0).toLocaleString("he-IL")}</Badge>
+                    <Badge className="bg-[#e8eef7] text-[#314e70]">פתחו מייל: {(audience.details.openedJourney || 0).toLocaleString("he-IL")}</Badge>
+                    <Badge className="bg-[#e8eef7] text-[#314e70]">זכאים לפני מדגם: {(audience.details.eligibleBeforeSample || 0).toLocaleString("he-IL")}</Badge>
+                    <Badge className="bg-[#e8eef7] text-[#314e70]">נשים במדגם: {(audience.details.selectedFemale || 0).toLocaleString("he-IL")}</Badge>
+                    <Badge className="bg-[#e8eef7] text-[#314e70]">גברים במדגם: {(audience.details.selectedMale || 0).toLocaleString("he-IL")}</Badge>
+                    <Badge className="bg-[#e8eef7] text-[#314e70]">טיוטות רחבות שיוחלפו: {(audience.details.legacyDraftsToArchive || 0).toLocaleString("he-IL")}</Badge>
+                  </>}
+                </div>}
                 <div className="mt-4 rounded-xl bg-white p-3 text-sm text-[#5f4b43]">
                   <p className="font-semibold">נושא לדוגמה</p><p className="mt-1 leading-6">{audience.sampleSubject}</p>
                   <p className="mt-3 font-semibold">גוף הטיוטה</p><p className="mt-1 whitespace-pre-wrap leading-6">{audience.sampleBody}</p>

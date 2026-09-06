@@ -35,6 +35,12 @@ export const TESTIMONIAL_TOUCHPOINTS = [
   "manual",
 ] as const;
 export const TESTIMONIAL_REWARD_TYPES = ["none", "date_map", "boost_free", "boost_one_shekel"] as const;
+export const TESTIMONIAL_CAMPAIGN_VARIANTS = [
+  "match_testimonial_request",
+  "match_testimonial_reminder",
+  "match_success_followup",
+  "dna_engaged_nonbuyers",
+] as const;
 
 export type TestimonialStatus = typeof TESTIMONIAL_STATUSES[number];
 export type TestimonialProofType = typeof TESTIMONIAL_PROOF_TYPES[number];
@@ -44,6 +50,7 @@ export type TestimonialChannel = typeof TESTIMONIAL_CHANNELS[number];
 export type TestimonialSurveyKind = typeof TESTIMONIAL_SURVEY_KINDS[number];
 export type TestimonialTouchpoint = typeof TESTIMONIAL_TOUCHPOINTS[number];
 export type TestimonialRewardType = typeof TESTIMONIAL_REWARD_TYPES[number];
+export type TestimonialCampaignVariant = typeof TESTIMONIAL_CAMPAIGN_VARIANTS[number];
 
 export function normalizeTestimonialEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -95,6 +102,7 @@ export function buildTestimonialDraft(input: {
   firstName: string;
   sourceType: TestimonialSourceType;
   surveyKind?: TestimonialSurveyKind;
+  campaignVariant?: TestimonialCampaignVariant;
 }): { subject: string; body: string } {
   const sourceLabels: Record<TestimonialSourceType, string> = {
     match: "החוויה מההתאמה",
@@ -112,6 +120,30 @@ export function buildTestimonialDraft(input: {
     return {
       subject: `${firstName}, נשמח לשמוע מה דעתך`,
       body: `היי ${firstName}, הכנו סקר קצר על ${sourceLabels[input.sourceType]}. המטרה היא להבין מה עובד ומה נכון לשפר. התשובות נשמרות לצורכי למידה, ולא ישמשו לפרסום ללא בקשת רשות נפרדת.`,
+    };
+  }
+  if (input.campaignVariant === "match_testimonial_request") {
+    return {
+      subject: `${firstName}, אשמח לשמוע על החוויה שלך מהמאגר ולהעניק לך מתנה אישית ממני`,
+      body: `היי ${firstName}, בעבר נוצרה עבורך התאמה שבה הייתה הסכמה משני הצדדים. אשמח לשמוע איך הייתה החוויה שלך מהמאגר, מה הרגיש שונה או מדויק בדרך שבה ההתאמה נבחרה והוצגה, ומה היית רוצה לומר לאדם שמתלבט אם להצטרף. המילים שלך יכולות לעזור לעוד אנשים שמחפשים אהבה להכיר את השיטה ולהגדיל את מספר ההזדמנויות במאגר. בסיום מחכה לך מתנה אישית ממני. המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם. רק אם מתאים לך, אפשר לבחור בנפרד מה מותר לנו לשתף, היכן ובאיזו זהות.`,
+    };
+  }
+  if (input.campaignVariant === "match_testimonial_reminder") {
+    return {
+      subject: `${firstName}, תזכורת קטנה: אשמח לשמוע על החוויה שלך מהמאגר`,
+      body: `היי ${firstName}, לפני זמן מה הזמנתי אותך לשתף בחוויה שלך מההתאמה ומהמאגר, ורציתי להזכיר בעדינות שהקישור האישי עדיין מחכה לך. אשמח לשמוע מה הרגיש שונה או מדויק בדרך שבה ההתאמה נבחרה והוצגה, ומה היית רוצה לומר לאדם שמתלבט אם להצטרף. גם כמה מילים יכולות לעזור לעוד אנשים שמחפשים אהבה להכיר את השיטה ולהגדיל את מספר ההזדמנויות במאגר. בסיום מחכה לך מתנה אישית ממני. המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם.`,
+    };
+  }
+  if (input.campaignVariant === "match_success_followup") {
+    return {
+      subject: `${firstName}, האם הקשר עדיין ממשיך? אשמח לשמוע מה שלומכם`,
+      body: `היי ${firstName}, בעבר שיתפת אותי בחוויה שלך מההתאמה ומהמאגר, ורציתי לשאול בעדינות מה שלומכם היום והאם הקשר עדיין ממשיך. אם כן, ורק אם מתאים לשניכם, אשמח שתשתפו עוד כמה מילים על הדרך, השיטה והמאגר, ואפשר גם לצרף תמונה משותפת. סיפור אמיתי שלכם יכול לתת תקווה ולעזור לעוד אנשים שמחפשים אהבה להכיר את האפשרות הזאת. צירוף תמונה ואישור לפרסם אותה הם בחירה נפרדת לחלוטין, ושום דבר לא יפורסם בלי רשות מפורשת ובדיקת הצוות.`,
+    };
+  }
+  if (input.campaignVariant === "dna_engaged_nonbuyers") {
+    return {
+      subject: `${firstName}, אשמח לשמוע איך היה שאלון ה־DNA החינמי`,
+      body: `היי ${firstName}, אחרי שסיימת את שאלון ה־DNA הזוגי ואת סדרת המיילים שקיבלת בעקבותיו, אשמח לשמוע איך הייתה החוויה. מה הרגיש מדויק או משמעותי, איזו תובנה לקחת, והאם היית ממליץ לעוד אנשים שמחפשים אהבה לעשות את השאלון החינמי. זו אינה פנייה לרכישה, אלא בקשה קצרה לשמוע מה היה בעל ערך עבורך. בסיום מחכה לך מתנה אישית ממני. המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם. רק אם מתאים לך, אפשר לבחור בנפרד מה מותר לנו לשתף.`,
     };
   }
   if (input.sourceType === "match") {
@@ -132,7 +164,11 @@ export function buildTestimonialDraft(input: {
   };
 }
 
-export function publicQuestionsForSource(sourceType: TestimonialSourceType, surveyKind: TestimonialSurveyKind = "positive_experience"): {
+export function publicQuestionsForSource(
+  sourceType: TestimonialSourceType,
+  surveyKind: TestimonialSurveyKind = "positive_experience",
+  campaignVariant?: TestimonialCampaignVariant,
+): {
   heading: string;
   intro: string;
   primaryQuestion: string;
@@ -154,6 +190,48 @@ export function publicQuestionsForSource(sourceType: TestimonialSourceType, surv
       showRatings: true,
       showImprovement: true,
       rewardLabel: null,
+    };
+  }
+
+  if (campaignVariant === "match_testimonial_request" || campaignVariant === "match_testimonial_reminder") {
+    return {
+      heading: "אשמח לשמוע על החוויה שלך מהמאגר",
+      intro: "כמה מילים ממך יעזרו לנו להבין מה היה משמעותי בחוויה ולהציג לעוד אנשים דרך אנושית ומדויקת יותר להכיר. בסיום מחכה לך מתנה אישית מהילית.",
+      primaryQuestion: "מה במאגר ובדרך שבה ההתאמה נבחרה והוצגה הרגיש לך שונה, אישי או מדויק?",
+      secondaryQuestion: "מה בתהליך, בשיטה או בליווי של הילית נתן לך תחושת ביטחון או ערך?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה מתלבט אם להצטרף למאגר, מה היית רוצה לומר לו?",
+      outcomeQuestion: "אם מתאים לך, אפשר לשתף גם איך הייתה ההיכרות עצמה ומה היה טוב בחיבור שנוצר.",
+      showRatings: false,
+      showImprovement: false,
+      rewardLabel: "מפת הדייט הבא",
+    };
+  }
+
+  if (campaignVariant === "match_success_followup") {
+    return {
+      heading: "אשמח לשמוע מה שלומכם היום",
+      intro: "בעבר שיתפת בחוויה שלך, ועכשיו נשמח לשמוע אם הקשר עדיין ממשיך ומה נוצר מאז. אם מתאים לשניכם, אפשר לצרף גם תמונה משותפת. שום דבר לא יפורסם בלי רשות מפורשת.",
+      primaryQuestion: "האם הקשר שנוצר דרך המאגר עדיין ממשיך היום? נשמח לשמוע בכמה מילים איפה אתם נמצאים.",
+      secondaryQuestion: "מה במאגר, בשיטה או בדרך שבה הילית חיברה ביניכם תרם לחיבור?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה שואל מה שונה במאגר ולמה כדאי לתת לו הזדמנות, מה הייתם רוצים לומר?",
+      outcomeQuestion: "אם מתאים לשניכם, אפשר לצרף תמונה משותפת בחלק הבא. העלאת התמונה ואישור הפרסום הן שתי בחירות נפרדות.",
+      showRatings: false,
+      showImprovement: false,
+      rewardLabel: null,
+    };
+  }
+
+  if (campaignVariant === "dna_engaged_nonbuyers") {
+    return {
+      heading: "אשמח לשמוע איך היה שאלון ה־DNA החינמי",
+      intro: "זו אינה פנייה לרכישה. נשמח לשמוע מה היה מדויק או מועיל בשאלון ובתוצאה שקיבלת, והאם היית ממליץ לעוד אנשים לעשות אותו. בסיום מחכה לך מתנה אישית מהילית.",
+      primaryQuestion: "איזו תובנה חדשה קיבלת מהשאלון על עצמך, על הבחירות שלך או על הזוגיות שמתאימה לך?",
+      secondaryQuestion: "מה גרם לשאלון החינמי ולתוצאה להרגיש מדויקים, מעניינים או בעלי ערך עבורך?",
+      testimonialPrompt: "אם אדם שמחפש אהבה היה שואל אם כדאי לעשות את שאלון ה־DNA החינמי, מה היית רוצה לומר לו?",
+      outcomeQuestion: "האם היית ממליץ לעוד אנשים לעשות את השאלון, ולמה?",
+      showRatings: false,
+      showImprovement: false,
+      rewardLabel: "מפת הדייט הבא",
     };
   }
 

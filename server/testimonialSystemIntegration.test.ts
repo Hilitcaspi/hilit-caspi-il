@@ -39,6 +39,9 @@ describe("testimonial system integration policy", () => {
     expect(campaignDrafts).toContain('status: "draft" as const');
     expect(campaignDrafts).toContain("scheduledAt: null");
     expect(campaignDrafts).toContain("requestSentAt: null");
+    expect(campaignDrafts).toContain('"match_success_followup"');
+    expect(campaignDrafts).toContain('"dna_engaged_nonbuyers"');
+    expect(campaignDrafts).toContain("sampleSize = 100");
     expect(campaignDrafts).not.toMatch(/sendEmail\s*\(/);
   });
 
@@ -47,6 +50,8 @@ describe("testimonial system integration policy", () => {
     const form = read("client/src/pages/TestimonialFeedback.tsx");
     expect(upload).toContain("העלאה אינה אישור לפרסום");
     expect(form).toContain("עצם ההעלאה אינה אישור לפרסום");
+    expect(form).toContain("תמונה משותפת");
+    expect(form).toContain('data.campaignVariant === "match_success_followup"');
   });
 
   it("exposes a dedicated public form and CRM management tab", () => {

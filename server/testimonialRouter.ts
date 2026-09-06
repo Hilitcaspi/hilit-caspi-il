@@ -36,6 +36,7 @@ import {
   publicDisplayName,
   publicQuestionsForSource,
   resolveFeedbackRewardGrant,
+  TESTIMONIAL_CAMPAIGN_VARIANTS,
   TESTIMONIAL_CHANNELS,
   TESTIMONIAL_CONSENT_VERSION,
   TESTIMONIAL_IDENTITY_SCOPES,
@@ -45,6 +46,7 @@ import {
   TESTIMONIAL_STATUSES,
   TESTIMONIAL_SURVEY_KINDS,
   TESTIMONIAL_TOUCHPOINTS,
+  type TestimonialCampaignVariant,
 } from "./testimonialService";
 
 const proofTypeSchema = z.enum(TESTIMONIAL_PROOF_TYPES);
@@ -68,6 +70,18 @@ function actorFromContext(ctx: { user?: { email?: string | null; name?: string |
 
 function safeMetadata(value: Record<string, unknown> | undefined): string | null {
   return value ? JSON.stringify(value) : null;
+}
+
+function campaignVariantFromSnapshot(value?: string | null): TestimonialCampaignVariant | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value) as { campaignVariant?: unknown };
+    return TESTIMONIAL_CAMPAIGN_VARIANTS.includes(parsed.campaignVariant as TestimonialCampaignVariant)
+      ? parsed.campaignVariant as TestimonialCampaignVariant
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function appendEvent(input: {
@@ -327,7 +341,7 @@ export const testimonialRouter = router({
         media,
         usage,
         events,
-        questions: publicQuestionsForSource(record.sourceType, record.surveyKind),
+        questions: publicQuestionsForSource(record.sourceType, record.surveyKind, campaignVariantFromSnapshot(record.sourceSnapshot)),
         publicFormPath: `/testimonial/feedback?token=${record.publicToken}`,
       };
     }),
@@ -719,6 +733,7 @@ export const testimonialRouter = router({
 
     form: publicProcedure.input(z.object({ token: z.string().length(64) })).query(async ({ input }) => {
       const { db, record } = await getRecordByToken(input.token);
+      const campaignVariant = campaignVariantFromSnapshot(record.sourceSnapshot);
       const media = await db.select({
         id: testimonialMedia.id,
         mediaType: testimonialMedia.mediaType,
@@ -732,8 +747,9 @@ export const testimonialRouter = router({
         proofType: record.proofType,
         surveyKind: record.surveyKind,
         touchpoint: record.touchpoint,
+        campaignVariant: campaignVariant ?? null,
         status: record.status,
-        questions: publicQuestionsForSource(record.sourceType, record.surveyKind),
+        questions: publicQuestionsForSource(record.sourceType, record.surveyKind, campaignVariant),
         canSubmit: !["submitted", "approved", "published", "revoked", "archived"].includes(record.status),
         consentVersion: TESTIMONIAL_CONSENT_VERSION,
         rewardType: record.rewardType,

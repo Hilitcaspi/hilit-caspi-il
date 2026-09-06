@@ -53,6 +53,34 @@ describe("testimonial service", () => {
     expect(questions.primaryQuestion).toContain("כלי בחבילת החג");
   });
 
+  it("uses dedicated copy and questions for the three prepared recommendation audiences", () => {
+    const matchDraft = buildTestimonialDraft({ firstName: "דנה", sourceType: "match", campaignVariant: "match_testimonial_request" });
+    const reminderDraft = buildTestimonialDraft({ firstName: "דנה", sourceType: "match", campaignVariant: "match_testimonial_reminder" });
+    const followupDraft = buildTestimonialDraft({ firstName: "דנה", sourceType: "match", campaignVariant: "match_success_followup" });
+    const dnaDraft = buildTestimonialDraft({ firstName: "נועם", sourceType: "dna", campaignVariant: "dna_engaged_nonbuyers" });
+    expect(matchDraft.body).toContain("המאגר");
+    expect(matchDraft.body).toContain("הסכמה משני הצדדים");
+    expect(reminderDraft.subject).toContain("תזכורת קטנה");
+    expect(reminderDraft.body).toContain("הקישור האישי עדיין מחכה");
+    expect(followupDraft.subject).toContain("הקשר עדיין ממשיך");
+    expect(followupDraft.body).toContain("תמונה משותפת");
+    expect(followupDraft.body).toContain("בלי רשות מפורשת");
+    expect(dnaDraft.subject).toContain("שאלון ה־DNA");
+    expect(dnaDraft.body).toContain("אינה פנייה לרכישה");
+    expect(dnaDraft.body).toContain("השאלון החינמי");
+
+    const matchQuestions = publicQuestionsForSource("match", "positive_experience", "match_testimonial_request");
+    const reminderQuestions = publicQuestionsForSource("match", "positive_experience", "match_testimonial_reminder");
+    const followupQuestions = publicQuestionsForSource("match", "positive_experience", "match_success_followup");
+    const dnaQuestions = publicQuestionsForSource("dna", "positive_experience", "dna_engaged_nonbuyers");
+    expect(matchQuestions.testimonialPrompt).toContain("להצטרף למאגר");
+    expect(reminderQuestions.testimonialPrompt).toBe(matchQuestions.testimonialPrompt);
+    expect(followupQuestions.primaryQuestion).toContain("עדיין ממשיך");
+    expect(followupQuestions.outcomeQuestion).toContain("העלאת התמונה");
+    expect(dnaQuestions.intro).toContain("אינה פנייה לרכישה");
+    expect(dnaQuestions.outcomeQuestion).toContain("ממליץ");
+  });
+
   it("grants the thank-you gift once without depending on publication consent", () => {
     const now = 1_788_300_000_000;
     expect(resolveFeedbackRewardGrant({ surveyKind: "positive_experience", rewardType: "date_map", now }))

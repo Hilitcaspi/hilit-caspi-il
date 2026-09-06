@@ -67,6 +67,7 @@ export default function TestimonialFeedback() {
     sourceType: "course",
     surveyKind: "positive_experience",
     touchpoint: "course_complete",
+    campaignVariant: null,
     productLabel: "המסע לזוגיות",
     status: "draft",
     canSubmit: true,
@@ -310,8 +311,8 @@ export default function TestimonialFeedback() {
 
             {data.surveyKind === "positive_experience" && <section className="rounded-[2rem] border border-[#edccd8] bg-[#fbe8ef] p-6 md:p-8">
               <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#8b563f]">חלק 2 · רשות בלבד</p>
-              <h2 className="mt-3 text-2xl font-semibold">רוצים לשתף גם תמונה או סרטון?</h2>
-              <p className="mt-3 leading-7 text-[#66534a]">אפשר לצרף חומר אישי. <strong>עצם ההעלאה אינה אישור לפרסום.</strong> ההרשאה נקבעת בנפרד בחלק הבא.</p>
+              <h2 className="mt-3 text-2xl font-semibold">{data.campaignVariant === "match_success_followup" ? "רוצים לשתף גם תמונה משותפת?" : "רוצים לשתף גם תמונה או סרטון?"}</h2>
+              <p className="mt-3 leading-7 text-[#66534a]">{data.campaignVariant === "match_success_followup" ? "אם מתאים לשניכם, אפשר לצרף תמונה משותפת שמספרת את הסיפור שלכם. " : "אפשר לצרף חומר אישי. "}<strong>עצם ההעלאה אינה אישור לפרסום.</strong> ההרשאה נקבעת בנפרד בחלק הבא.</p>
               <label className="mt-6 flex cursor-pointer items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[#b79d8a] bg-white/70 px-5 py-7 text-center transition hover:border-[#7a4937]">
                 {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
                 <span>{uploading ? "מעלה את הקובץ..." : "בחירת תמונה או סרטון"}</span>
