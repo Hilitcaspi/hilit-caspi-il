@@ -57,7 +57,7 @@ export const DNA_PROFILES: Record<string, { label_f: string; label_m: string; su
 const WHATSAPP_LINK = "https://wa.me/972552442334";
 const WA_GROUP = "https://hilitcaspi.com/api/wa/email";
 const GUIDE_PURCHASE = "https://hilitcaspi.com/guide?utm_source=email&utm_medium=brevo&utm_campaign=guide";
-const MATCHMAKING_JOIN = "https://hilitcaspi.com/join?utm_source=email&utm_medium=brevo&utm_campaign=database&dna={{dnaType}}&gender={{gender}}&name={{firstName}}";
+const MATCHMAKING_JOIN = "https://hilitcaspi.com/join?utm_source=email&utm_medium=brevo&utm_campaign=database&dna={{joinDnaType}}&gender={{joinGender}}&name={{joinFirstName}}";
 const COACHING_PAGE = "https://hilitcaspi.com/coaching?utm_source=email&utm_medium=brevo&utm_campaign=coaching";
 const COURSE_PAGE = "https://hilitcaspi.com/course?utm_source=email&utm_medium=brevo&utm_campaign=course";
 const DATABASE_PAGE = "https://hilitcaspi.com/database?utm_source=email&utm_medium=brevo&utm_campaign=database";

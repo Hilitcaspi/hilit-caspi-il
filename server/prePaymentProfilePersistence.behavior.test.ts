@@ -140,6 +140,22 @@ describe("registerBasicProfile pre-payment draft behavior", () => {
     expect(harness.updates.some(update => update.status === "client_database")).toBe(false);
   });
 
+  it("resolves the legacy email-link gender placeholder from the matching CRM lead", async () => {
+    const harness: DbHarness = createDbHarness([[{ gender: "male" }], [], [{ id: 91 }]]);
+    mocks.getDb.mockResolvedValue(harness.db);
+
+    const result = await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
+      ...fullDraftInput,
+      gender: "{{gender}}",
+      seekingGender: "male",
+    });
+    await Promise.resolve();
+
+    expect(result).toMatchObject({ singleId: 42, success: true });
+    expect(harness.inserts[0]).toMatchObject({ gender: "male", seekingGender: "female" });
+    expect(harness.updates).toContainEqual(expect.objectContaining({ gender: "male" }));
+  });
+
   it("updates the same unpaid draft on retry instead of inserting a duplicate", async () => {
     const harness: DbHarness = createDbHarness([[
       {

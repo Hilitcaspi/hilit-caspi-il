@@ -1837,7 +1837,7 @@ export const appRouter = router({
         z.object({
           firstName: z.string().min(1),
           lastName: z.string().nullish(),
-          gender: z.enum(["female", "male"]),
+          gender: z.union([z.enum(["female", "male"]), z.literal("{{gender}}")]),
           seekingGender: z.enum(["female", "male", "any"]).nullish(),
           age: z.number().min(18).max(80),
           birthDate: z.string().optional(),
@@ -1895,6 +1895,23 @@ export const appRouter = router({
         // Normalize email and phone to match Grow webhook storage format
         const normalizedEmail = input.email.trim().toLowerCase();
         const normalizedPhone = input.phone.trim().replace(/[\s\-]/g, "");
+        let resolvedGender: "female" | "male";
+        if (input.gender === "{{gender}}") {
+          const [leadGender] = await db.select({ gender: crmLeads.gender })
+            .from(crmLeads)
+            .where(sql`LOWER(TRIM(${crmLeads.email})) = ${normalizedEmail}`)
+            .orderBy(desc(crmLeads.createdAt))
+            .limit(1);
+          if (!leadGender?.gender) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "יש לבחור מגדר לפני המעבר לתשלום" });
+          }
+          resolvedGender = leadGender.gender;
+        } else {
+          resolvedGender = input.gender;
+        }
+        const resolvedSeekingGender = input.gender === "{{gender}}"
+          ? (resolvedGender === "female" ? "male" : "female")
+          : (input.seekingGender ?? (resolvedGender === "female" ? "male" : "female"));
 
         // Bug #1 fix: Prevent duplicate registrations
         // Also handles race condition: Grow webhook may create skeleton record (age=0, city="") before form submission
@@ -1951,8 +1968,8 @@ export const appRouter = router({
             await db.update(singles).set({
               firstName: input.firstName,
               lastName: input.lastName,
-              gender: input.gender,
-              seekingGender: input.seekingGender ?? (input.gender === "female" ? "male" : "female"),
+              gender: resolvedGender,
+              seekingGender: resolvedSeekingGender,
               age: input.birthDate ? Math.floor((Date.now() - new Date(input.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : (input.age ?? 0),
               birthDate: input.birthDate || null,
               city: input.city,
@@ -2033,7 +2050,7 @@ export const appRouter = router({
                   name: `${input.firstName} ${input.lastName || ""}`.trim(),
                   email: normalizedEmail,
                   phone: normalizedPhone || input.phone,
-                  gender: input.gender,
+                  gender: resolvedGender,
                   dnaType: input.dnaType,
                   quizSessionId: input.dnaSessionId,
                   source: "direct",
@@ -2108,8 +2125,8 @@ export const appRouter = router({
         const inserted = await db.insert(singles).values({
           firstName: input.firstName,
           lastName: input.lastName,
-          gender: input.gender,
-          seekingGender: input.seekingGender ?? (input.gender === "female" ? "male" : "female"),
+          gender: resolvedGender,
+          seekingGender: resolvedSeekingGender,
           age: input.birthDate ? Math.floor((Date.now() - new Date(input.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : (input.age ?? 0),
           birthDate: input.birthDate || null,
           city: input.city,
@@ -2193,7 +2210,7 @@ export const appRouter = router({
           .then(async ([leadByEmail]) => {
             if (leadByEmail && input.deferUntilPayment) {
               await db.update(crmLeads)
-                .set({ singleId: newSingleId, gender: input.gender, dnaType: input.dnaType, quizSessionId: input.dnaSessionId, updatedAt: now })
+                .set({ singleId: newSingleId, gender: resolvedGender, dnaType: input.dnaType, quizSessionId: input.dnaSessionId, updatedAt: now })
                 .where(eq(crmLeads.id, leadByEmail.id));
             } else if (leadByEmail) {
               await db.update(crmLeads)
@@ -2204,7 +2221,7 @@ export const appRouter = router({
                 name: `${input.firstName} ${input.lastName || ""}`.trim(),
                 email: normalizedEmail,
                 phone: normalizedPhone || input.phone,
-                gender: input.gender,
+                gender: resolvedGender,
                 dnaType: input.dnaType,
                 quizSessionId: input.dnaSessionId,
                 source: "direct",

@@ -153,7 +153,10 @@ export default function Register() {
   // If name from DNA has a space, split into first/last
   const firstNameFromDna = nameFromDna.includes(" ") ? nameFromDna.split(" ")[0] : nameFromDna;
   const lastNameFromDna = nameFromDna.includes(" ") ? nameFromDna.split(" ").slice(1).join(" ") : "";
-  const fromDna = !!(nameFromDna || emailFromDna); // true = came from DNA quiz with pre-filled data
+  // Lock contact fields only when the DNA handoff supplied every required value.
+  // Older journey emails included only a first name, which previously made the
+  // empty email and phone fields read-only and blocked checkout permanently.
+  const fromDna = !!(nameFromDna && emailFromDna && phoneFromDna);
 
   // Profile form state
   const [firstName, setFirstName] = useState(firstNameFromDna);

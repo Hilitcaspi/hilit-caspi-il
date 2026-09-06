@@ -262,6 +262,9 @@ export async function startJourney({
       dnaTypeSuperpower: dnaProfile?.superpower ?? "",
       dnaTypeChallenge: dnaProfile?.challenge ?? "",
       dnaTypeMatch: dnaProfile ? (isF ? dnaProfile.match_f : dnaProfile.match_m) : "",
+      joinDnaType: encodeURIComponent(dnaType ?? ""),
+      joinGender: gender,
+      joinFirstName: encodeURIComponent(firstName),
       guideLink,
       courseLink,
     }, email, leadId);

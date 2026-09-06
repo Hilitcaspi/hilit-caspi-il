@@ -21,6 +21,11 @@ describe("paid profile persistence before Grow", () => {
     expect(registerSource.match(/if \(freeTokenFromUrl\)/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("keeps missing email and phone editable for legacy DNA journey links", () => {
+    expect(registerSource).toContain("const fromDna = !!(nameFromDna && emailFromDna && phoneFromDna)");
+    expect(registerSource).not.toContain("const fromDna = !!(nameFromDna || emailFromDna)");
+  });
+
   it("does not save the profile a second time after payment when the draft succeeded", () => {
     expect(registerSource).toContain("if (draftSavedBeforePayment)");
     expect(registerSource).toContain("Fallback for a legacy or resumed checkout");
