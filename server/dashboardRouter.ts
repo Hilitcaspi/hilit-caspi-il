@@ -3,9 +3,10 @@ import { router, teamProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
-import { businessExpenses, businessRecurringItems } from "../drizzle/schema";
+import { businessExpenses, businessRecurringItems, completedPayments } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { calculatePnlSummary, prorateMonthlyAmountAgorot } from "./businessFinance";
+import { aggregateVerifiedGrowPayments, summarizeVerifiedGrowPayments } from "./dashboardRevenue";
 
 import { sendSMS } from "./vibrate";
 import crypto from "crypto";
@@ -686,22 +687,19 @@ export const dashboardRouter = router({
       `) as any;
       const totalLeads = Number(leadRow?.cnt ?? 0);
 
-      // Total purchases in period
-      const [[purchaseRow]] = await db.execute(sql`
-        SELECT COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${startDate} AND created_at <= ${endDate}
-      `) as any;
-      const totalPurchases = Number(purchaseRow?.cnt ?? 0);
-
-      // Revenue by product in period
-      const [revenueRows] = await db.execute(sql`
-        SELECT product, COUNT(*) as cnt FROM payment_leads 
-        WHERE created_at >= ${startDate} AND created_at <= ${endDate}
-        GROUP BY product
-      `) as any;
-      let totalRevenue = 0;
-      for (const row of (revenueRows as any[])) {
-        totalRevenue += Number(row.cnt) * (PRODUCT_PRICES[row.product] ?? 0);
-      }
+      const verifiedPayments = await db.select({
+        product: completedPayments.product,
+        amountAgorot: completedPayments.amountAgorot,
+        amountSource: completedPayments.amountSource,
+        paidAt: completedPayments.paidAt,
+      }).from(completedPayments).where(and(
+        gte(completedPayments.paidAt, startDate),
+        lte(completedPayments.paidAt, endDate),
+        eq(completedPayments.amountSource, "grow"),
+      ));
+      const paymentSummary = summarizeVerifiedGrowPayments(verifiedPayments);
+      const totalPurchases = paymentSummary.purchases;
+      const totalRevenue = paymentSummary.revenue;
 
       // Conversion rate (leads → purchase)
       const conversionRate = totalLeads > 0 ? (totalPurchases / totalLeads * 100) : 0;
@@ -761,7 +759,6 @@ export const dashboardRouter = router({
       const [[curr]] = await db.execute(sql`
         SELECT 
           (SELECT COUNT(*) FROM crm_leads WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}) as leads,
-          (SELECT COUNT(*) FROM payment_leads WHERE created_at >= ${startDate} AND created_at <= ${endDate}) as purchases,
           (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'dna_quiz_complete' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as dna
       `) as any;
       
@@ -769,24 +766,36 @@ export const dashboardRouter = router({
       const [[prev]] = await db.execute(sql`
         SELECT 
           (SELECT COUNT(*) FROM crm_leads WHERE createdAt >= ${prevStart} AND createdAt <= ${prevEnd}) as leads,
-          (SELECT COUNT(*) FROM payment_leads WHERE created_at >= ${prevStart} AND created_at <= ${prevEnd}) as purchases,
           (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'dna_quiz_complete' AND createdAt >= ${prevStart} AND createdAt <= ${prevEnd}) as dna
       `) as any;
       
-      // Revenue current
-      const [revCurr] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${startDate} AND created_at <= ${endDate} GROUP BY product`) as any;
-      let revenueCurr = 0;
-      const productSales: Record<string, number> = {};
-      for (const row of (revCurr as any[])) { 
-        const cnt = Number(row.cnt); 
-        revenueCurr += cnt * (PRODUCT_PRICES[row.product] ?? 0); 
-        productSales[row.product] = cnt;
-      }
-      
-      // Revenue previous
-      const [revPrev] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${prevStart} AND created_at <= ${prevEnd} GROUP BY product`) as any;
-      let revenuePrev = 0;
-      for (const row of (revPrev as any[])) { revenuePrev += Number(row.cnt) * (PRODUCT_PRICES[row.product] ?? 0); }
+      const [verifiedCurrentRows, verifiedPreviousRows] = await Promise.all([
+        db.select({
+          product: completedPayments.product,
+          amountAgorot: completedPayments.amountAgorot,
+          amountSource: completedPayments.amountSource,
+          paidAt: completedPayments.paidAt,
+        }).from(completedPayments).where(and(
+          gte(completedPayments.paidAt, startDate),
+          lte(completedPayments.paidAt, endDate),
+          eq(completedPayments.amountSource, "grow"),
+        )),
+        db.select({
+          product: completedPayments.product,
+          amountAgorot: completedPayments.amountAgorot,
+          amountSource: completedPayments.amountSource,
+          paidAt: completedPayments.paidAt,
+        }).from(completedPayments).where(and(
+          gte(completedPayments.paidAt, prevStart),
+          lte(completedPayments.paidAt, prevEnd),
+          eq(completedPayments.amountSource, "grow"),
+        )),
+      ]);
+      const currentPayments = summarizeVerifiedGrowPayments(verifiedCurrentRows);
+      const previousPayments = summarizeVerifiedGrowPayments(verifiedPreviousRows);
+      const revenueCurr = currentPayments.revenue;
+      const revenuePrev = previousPayments.revenue;
+      const productSales = currentPayments.productSales;
       
       // Lead journey attribution: leads from campaigns that converted
       const [journeyAttribution] = await db.execute(sql`
@@ -797,7 +806,10 @@ export const dashboardRouter = router({
           COUNT(DISTINCT cl.id) as totalLeads,
           COUNT(DISTINCT CASE WHEN pl.id IS NOT NULL THEN cl.email END) as converted
         FROM crm_leads cl
-        LEFT JOIN payment_leads pl ON pl.email = cl.email AND pl.product = 'database' AND pl.created_at >= cl.createdAt
+        LEFT JOIN completed_payments pl ON LOWER(TRIM(pl.email)) = LOWER(TRIM(cl.email))
+          AND pl.product = 'database'
+          AND pl.amount_source = 'grow'
+          AND pl.paid_at >= cl.createdAt
         WHERE cl.createdAt >= ${startDate} AND cl.createdAt <= ${endDate}
         GROUP BY cl.utmCampaign, cl.utmSource, cl.utmMedium
         HAVING totalLeads > 2
@@ -806,10 +818,10 @@ export const dashboardRouter = router({
       `) as any;
       
       const leads = Number(curr?.leads ?? 0);
-      const purchases = Number(curr?.purchases ?? 0);
+      const purchases = currentPayments.purchases;
       const dna = Number(curr?.dna ?? 0);
       const prevLeads = Number(prev?.leads ?? 0);
-      const prevPurchases = Number(prev?.purchases ?? 0);
+      const prevPurchases = previousPayments.purchases;
       const prevDna = Number(prev?.dna ?? 0);
       
       function pctChange(curr: number, prev: number): number {
@@ -862,28 +874,22 @@ export const dashboardRouter = router({
         GROUP BY day ORDER BY day ASC
       `) as any;
 
-      // Daily purchases
-      const [purchaseRows] = await db.execute(sql`
-        SELECT FROM_UNIXTIME(created_at/1000, '%Y-%m-%d') as day, product, COUNT(*) as cnt
-        FROM payment_leads
-        WHERE created_at >= ${startDate} AND created_at <= ${endDate}
-        GROUP BY day, product ORDER BY day ASC
-      `) as any;
-
-      // Aggregate daily revenue
-      const dailyRevenue: Record<string, number> = {};
-      const dailyPurchases: Record<string, number> = {};
-      for (const row of (purchaseRows as any[])) {
-        const day = row.day;
-        const revenue = Number(row.cnt) * (PRODUCT_PRICES[row.product] ?? 0);
-        dailyRevenue[day] = (dailyRevenue[day] ?? 0) + revenue;
-        dailyPurchases[day] = (dailyPurchases[day] ?? 0) + Number(row.cnt);
-      }
+      const verifiedPayments = await db.select({
+        product: completedPayments.product,
+        amountAgorot: completedPayments.amountAgorot,
+        amountSource: completedPayments.amountSource,
+        paidAt: completedPayments.paidAt,
+      }).from(completedPayments).where(and(
+        gte(completedPayments.paidAt, startDate),
+        lte(completedPayments.paidAt, endDate),
+        eq(completedPayments.amountSource, "grow"),
+      ));
+      const dailyPayments = aggregateVerifiedGrowPayments(verifiedPayments);
 
       return {
         leads: (leadRows as any[]).map((r: any) => ({ day: r.day, count: Number(r.cnt) })),
-        revenue: Object.entries(dailyRevenue).map(([day, amount]) => ({ day, amount })).sort((a, b) => a.day.localeCompare(b.day)),
-        purchases: Object.entries(dailyPurchases).map(([day, count]) => ({ day, count })).sort((a, b) => a.day.localeCompare(b.day)),
+        revenue: dailyPayments.map(day => ({ day: day.date, amount: day.revenue })),
+        purchases: dailyPayments.map(day => ({ day: day.date, count: day.purchases })),
       };
     }),
 
@@ -917,18 +923,28 @@ export const dashboardRouter = router({
         ORDER BY leads DESC
       `) as any;
 
-      // Purchases by source/campaign (join crm_leads to get UTM)
+      // Verified Grow purchases by source/campaign (join latest CRM lead to get UTM)
       const [purchaseRows] = await db.execute(sql`
         SELECT 
           COALESCE(cl.utmSource, cl.source, 'direct') as channel,
           cl.utmMedium as medium,
           cl.utmCampaign as campaign,
-          pl.product,
-          COUNT(*) as purchases
-        FROM payment_leads pl
-        JOIN crm_leads cl ON cl.email = pl.email
-        WHERE pl.created_at >= ${startDate} AND pl.created_at <= ${endDate}
-        GROUP BY channel, medium, campaign, pl.product
+          cp.product,
+          COUNT(*) as purchases,
+          SUM(cp.amount_agorot) / 100 as revenue
+        FROM completed_payments cp
+        LEFT JOIN (
+          SELECT currentLead.*
+          FROM crm_leads currentLead
+          INNER JOIN (
+            SELECT LOWER(TRIM(email)) AS normalizedEmail, MAX(id) AS latestId
+            FROM crm_leads
+            GROUP BY LOWER(TRIM(email))
+          ) latestLead ON currentLead.id = latestLead.latestId
+        ) cl ON LOWER(TRIM(cl.email)) = LOWER(TRIM(cp.email))
+        WHERE cp.paid_at >= ${startDate} AND cp.paid_at <= ${endDate}
+          AND cp.amount_source = 'grow'
+        GROUP BY channel, medium, campaign, cp.product
         ORDER BY purchases DESC
       `) as any;
 
@@ -943,17 +959,27 @@ export const dashboardRouter = router({
         GROUP BY channel, medium
       `) as any;
 
-      // Previous period purchases by channel
+      // Previous period verified Grow purchases by channel
       const [prevPurchaseRows] = await db.execute(sql`
         SELECT 
           COALESCE(cl.utmSource, cl.source, 'direct') as channel,
           cl.utmMedium as medium,
-          pl.product,
-          COUNT(*) as purchases
-        FROM payment_leads pl
-        JOIN crm_leads cl ON cl.email = pl.email
-        WHERE pl.created_at >= ${sameLastMonthStart} AND pl.created_at <= ${sameLastMonthEnd}
-        GROUP BY channel, medium, pl.product
+          cp.product,
+          COUNT(*) as purchases,
+          SUM(cp.amount_agorot) / 100 as revenue
+        FROM completed_payments cp
+        LEFT JOIN (
+          SELECT previousLead.*
+          FROM crm_leads previousLead
+          INNER JOIN (
+            SELECT LOWER(TRIM(email)) AS normalizedEmail, MAX(id) AS latestId
+            FROM crm_leads
+            GROUP BY LOWER(TRIM(email))
+          ) latestLead ON previousLead.id = latestLead.latestId
+        ) cl ON LOWER(TRIM(cl.email)) = LOWER(TRIM(cp.email))
+        WHERE cp.paid_at >= ${sameLastMonthStart} AND cp.paid_at <= ${sameLastMonthEnd}
+          AND cp.amount_source = 'grow'
+        GROUP BY channel, medium, cp.product
       `) as any;
 
       // Build previous period channel totals
@@ -968,7 +994,7 @@ export const dashboardRouter = router({
         if (!prevChannelData[ch]) prevChannelData[ch] = { leads: 0, purchases: 0, revenue: 0 };
         const cnt = Number(row.purchases);
         prevChannelData[ch].purchases += cnt;
-        prevChannelData[ch].revenue += cnt * (PRODUCT_PRICES[row.product] ?? 0);
+        prevChannelData[ch].revenue += Number(row.revenue || 0);
       }
 
       // Aggregate by channel
@@ -987,7 +1013,7 @@ export const dashboardRouter = router({
         const ch = mapChannel(row.channel, row.medium);
         if (!channelData[ch]) channelData[ch] = { leads: 0, purchases: 0, revenue: 0, campaigns: {} };
         const cnt = Number(row.purchases);
-        const rev = cnt * (PRODUCT_PRICES[row.product] ?? 0);
+        const rev = Number(row.revenue || 0);
         channelData[ch].purchases += cnt;
         channelData[ch].revenue += rev;
         const camp = row.campaign || "(ללא קמפיין)";
@@ -1649,21 +1675,17 @@ export const dashboardRouter = router({
         GROUP BY day ORDER BY day DESC
       `) as any;
 
-      // Daily purchases
-      const [dailyPurchases] = await db.execute(sql`
-        SELECT DATE(FROM_UNIXTIME(created_at/1000)) as day, COUNT(*) as total_purchases
-        FROM payment_leads 
-        WHERE created_at >= ${startDate} AND created_at <= ${endDate}
-        GROUP BY day ORDER BY day DESC
-      `) as any;
-
-      // Database purchases only
-      const [dailyDbPurchases] = await db.execute(sql`
-        SELECT DATE(FROM_UNIXTIME(created_at/1000)) as day, COUNT(*) as db_purchases
-        FROM payment_leads 
-        WHERE created_at >= ${startDate} AND created_at <= ${endDate} AND product = 'database'
-        GROUP BY day ORDER BY day DESC
-      `) as any;
+      const verifiedPayments = await db.select({
+        product: completedPayments.product,
+        amountAgorot: completedPayments.amountAgorot,
+        amountSource: completedPayments.amountSource,
+        paidAt: completedPayments.paidAt,
+      }).from(completedPayments).where(and(
+        gte(completedPayments.paidAt, startDate),
+        lte(completedPayments.paidAt, endDate),
+        eq(completedPayments.amountSource, "grow"),
+      ));
+      const dailyPayments = aggregateVerifiedGrowPayments(verifiedPayments);
 
       // Hourly distribution for insights
       const [hourlyLeads] = await db.execute(sql`
@@ -1685,36 +1707,38 @@ export const dashboardRouter = router({
 
       // Hourly purchases for conversion insights
       const [hourlyPurchases] = await db.execute(sql`
-        SELECT HOUR(FROM_UNIXTIME(created_at/1000)) as hour_of_day, COUNT(*) as purchases
-        FROM payment_leads 
-        WHERE created_at >= ${startDate} AND created_at <= ${endDate}
-          AND product = 'database'
+        SELECT HOUR(FROM_UNIXTIME(paid_at/1000)) as hour_of_day, COUNT(*) as purchases
+        FROM completed_payments
+        WHERE paid_at >= ${startDate} AND paid_at <= ${endDate}
+          AND amount_source = 'grow' AND product = 'database'
         GROUP BY hour_of_day ORDER BY purchases DESC
       `) as any;
 
       // Build purchase map
-      const purchaseMap: Record<string, number> = {};
-      (dailyPurchases as any[]).forEach((p: any) => { purchaseMap[String(p.day).substring(0, 10)] = Number(p.total_purchases); });
-      const dbPurchaseMap: Record<string, number> = {};
-      (dailyDbPurchases as any[]).forEach((p: any) => { dbPurchaseMap[String(p.day).substring(0, 10)] = Number(p.db_purchases); });
+      const purchaseMap = Object.fromEntries(dailyPayments.map(day => [day.date, day.purchases]));
+      const dbPurchaseMap = Object.fromEntries(dailyPayments.map(day => [day.date, day.databasePurchases]));
+      const revenueMap = Object.fromEntries(dailyPayments.map(day => [day.date, day.revenue]));
       const campaignMap: Record<string, number> = {};
       (dailyCampaignLeads as any[]).forEach((l: any) => { campaignMap[String(l.day).substring(0, 10)] = Number(l.campaign_leads); });
 
       // Build days array
-      const days = (dailyLeadsTotal as any[]).map((l: any) => {
-        const dayKey = String(l.day).substring(0, 10);
+      const totalLeadMap: Record<string, number> = {};
+      (dailyLeadsTotal as any[]).forEach((l: any) => { totalLeadMap[String(l.day).substring(0, 10)] = Number(l.total_leads); });
+      const dayKeys = Array.from(new Set([...Object.keys(totalLeadMap), ...dailyPayments.map(day => day.date)]))
+        .sort((a, b) => b.localeCompare(a));
+      const days = dayKeys.map(dayKey => {
         const totalPurch = purchaseMap[dayKey] || 0;
         const dbPurch = dbPurchaseMap[dayKey] || 0;
         const campLeads = campaignMap[dayKey] || 0;
         return {
           date: dayKey,
-          totalLeads: Number(l.total_leads),
+          totalLeads: totalLeadMap[dayKey] || 0,
           campaignLeads: campLeads,
           coldCampaign: 0,
           warmCampaign: 0,
           totalPurchases: totalPurch,
           databasePurchases: dbPurch,
-          revenue: dbPurch * 299 + (totalPurch - dbPurch) * 200,
+          revenue: revenueMap[dayKey] || 0,
           conversionRate: campLeads > 0 ? Number(((dbPurch / campLeads) * 100).toFixed(1)) : 0,
         };
       });
@@ -1792,15 +1816,20 @@ export const dashboardRouter = router({
           SELECT COUNT(*) as cnt FROM crm_leads
           WHERE createdAt >= ${prevStart} AND createdAt <= ${prevEnd} AND source = 'dna_quiz'
         `) as any;
-        const [prevPurchRows] = await db.execute(sql`
-          SELECT COUNT(*) as cnt, SUM(CASE WHEN product = 'database' THEN 1 ELSE 0 END) as db_cnt
-          FROM payment_leads WHERE created_at >= ${prevStart} AND created_at <= ${prevEnd}
-        `) as any;
+        const previousPayments = await db.select({
+          product: completedPayments.product,
+          amountAgorot: completedPayments.amountAgorot,
+          amountSource: completedPayments.amountSource,
+          paidAt: completedPayments.paidAt,
+        }).from(completedPayments).where(and(
+          gte(completedPayments.paidAt, prevStart),
+          lte(completedPayments.paidAt, prevEnd),
+          eq(completedPayments.amountSource, "grow"),
+        ));
         prevTotalLeads = Number((prevLeadRows as any[])[0]?.cnt || 0);
-        const prevDbPurch = Number((prevPurchRows as any[])[0]?.db_cnt || 0);
-        const prevTotal = Number((prevPurchRows as any[])[0]?.cnt || 0);
-        prevTotalPurch = prevDbPurch;
-        prevTotalRevenue = prevDbPurch * 299 + (prevTotal - prevDbPurch) * 200;
+        const previousSummary = summarizeVerifiedGrowPayments(previousPayments);
+        prevTotalPurch = previousSummary.productSales.database || 0;
+        prevTotalRevenue = previousSummary.revenue;
       } catch (e) { /* ignore */ }
 
       // Add spend to each day

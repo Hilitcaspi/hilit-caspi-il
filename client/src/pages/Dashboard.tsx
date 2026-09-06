@@ -149,7 +149,7 @@ export default function Dashboard() {
               <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-green-500">
                 <div className="flex items-center gap-2 mb-1">
                   <DollarSign size={14} className="text-green-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">הכנסות</span>
+                  <span className="text-[11px] text-gray-500 font-medium">מכירות ברוטו</span>
                 </div>
                 <div className="text-2xl font-black text-gray-900">{fmt(c.current.revenue)}</div>
                 <Change value={c.change.revenue} />
@@ -224,7 +224,7 @@ export default function Dashboard() {
                   <div>
                     <div className="text-[10px] text-gray-500 mb-1 font-medium">רכישות</div>
                     <MiniBarChart
-                      data={dailyTrend.data.leads.map((d: any) => ({ label: new Date(d.day).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' }), value: d.count }))}
+                      data={dailyTrend.data.purchases.map((d: any) => ({ label: new Date(d.day).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' }), value: d.count }))}
                       color="bg-green-400"
                       height={56}
                     />
@@ -343,7 +343,10 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Target size={18} className="text-blue-600" />
-                  <h3 className="font-bold text-gray-900">משפך יומי: ליד → רכישה</h3>
+                    <div>
+                      <h3 className="font-bold text-gray-900">משפך יומי: ליד → רכישה</h3>
+                      <p className="mt-0.5 text-[10px] text-gray-500">המכירות מבוססות על חיובי Grow שהושלמו. סיכום התנועות ב־Grow הוא נטו לאחר זיכויים ועמלות ולכן עשוי להיות נמוך יותר.</p>
+                    </div>
                 </div>
                 {totals && (
                   <div className="text-[11px] text-gray-500">
@@ -378,7 +381,7 @@ export default function Dashboard() {
                  </div>
                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
                    <div className="text-xl font-bold text-emerald-600">₪{totals.totalRevenue.toLocaleString()}</div>
-                   <div className="text-[10px] text-gray-500">הכנסות</div>
+                   <div className="text-[10px] text-gray-500">מכירות ברוטו מאומתות</div>
                     {(totals as any).revenueChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).revenueChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).revenueChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).revenueChange)}% מחודש שעבר</div>}
                  </div>
                </div>
@@ -394,7 +397,7 @@ export default function Dashboard() {
                    <th className="py-2 text-center font-semibold">רכישות</th>
                    <th className="py-2 text-center font-semibold">המרה</th>
                     <th className="py-2 text-center font-semibold">הוצאות</th>
-                   <th className="py-2 text-center font-semibold">הכנסות</th>
+                    <th className="py-2 text-center font-semibold">ברוטו מאומת</th>
                   </tr></thead>
                   <tbody>
                     {days.map((day, i) => {
