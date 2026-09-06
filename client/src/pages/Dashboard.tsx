@@ -25,6 +25,16 @@ function fromDateStr(s: string) { return new Date(s + "T00:00:00").getTime(); }
 function fmt(n: number) { return `₪${Math.round(n).toLocaleString("he-IL")}`; }
 function fmtPct(n: number) { return `${n.toFixed(1)}%`; }
 function fmtDate(ts: number) { return new Date(ts).toLocaleDateString("he-IL", { day: "numeric", month: "short" }); }
+function fmtDateTime(ts: number) { return new Date(ts).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }); }
+
+const PAYMENT_ATTEMPT_LABELS: Record<string, { label: string; className: string }> = {
+  sandbox_plus: { label: "ניסוי Plus", className: "bg-slate-100 text-slate-700" },
+  excluded_contact: { label: "לא לפנות", className: "bg-red-100 text-red-700" },
+  recovery_already_sent: { label: "כבר נשלח מסע", className: "bg-blue-100 text-blue-700" },
+  recovery_clicked: { label: "לחץ ולא השלים", className: "bg-amber-100 text-amber-800" },
+  repeat_purchase_abandoned: { label: "רכישה נוספת", className: "bg-purple-100 text-purple-700" },
+  abandoned_without_recovery: { label: "טרם טופל", className: "bg-orange-100 text-orange-800" },
+};
 
 function Change({ value, suffix = "%" }: { value: number; suffix?: string }) {
   if (value === 0) return null;
@@ -58,6 +68,7 @@ export default function Dashboard() {
   const [preset, setPreset] = useState(2);
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
   const [showAllLeads, setShowAllLeads] = useState(false);
+  const [showPaymentAttempts, setShowPaymentAttempts] = useState(false);
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [useCustom, setUseCustom] = useState(false);
@@ -79,6 +90,7 @@ export default function Dashboard() {
   const channels = trpc.dashboard.channelBreakdown.useQuery(dateInput);
   const metaAds = trpc.dashboard.metaAdsPerformance.useQuery(dateInput);
   const dailyFunnel = trpc.dashboard.dailyLeadFunnel.useQuery(dateInput);
+  const paymentAttempts = trpc.dashboard.paymentAbandonmentAudit.useQuery(dateInput, { enabled: showPaymentAttempts });
   const demographics = trpc.dashboard.databaseDemographics.useQuery(dateInput);
   const emailEngagement = trpc.dashboard.emailEngagement.useQuery(dateInput);
   const socialInsights = trpc.dashboard.socialInsights.useQuery(dateInput);
@@ -450,6 +462,76 @@ export default function Dashboard() {
           </Card>
           );
         })()}
+
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <ShoppingCart size={18} className="text-orange-600" />
+                <div>
+                  <h3 className="font-bold text-gray-900">ניסיונות תשלום שלא הושלמו</h3>
+                  <p className="mt-0.5 text-[10px] text-gray-500">רשימה לקריאה בלבד. פתיחת תשלום אינה הוכחה לכשל: רוב האנשים משלימים בתוך דקות, וניסיונות חוזרים נשמרים כרשומה אחת.</p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" className="bg-white" onClick={() => setShowPaymentAttempts(value => !value)}>
+                {showPaymentAttempts ? "הסתר רשימה" : "הצג פירוט לכל אדם"}
+              </Button>
+            </div>
+          </CardHeader>
+          {showPaymentAttempts && (
+            <CardContent>
+              {paymentAttempts.isLoading && <Skeleton className="h-40 w-full rounded-lg" />}
+              {paymentAttempts.error && <div className="rounded-lg bg-red-50 p-3 text-xs text-red-700">לא ניתן לטעון כרגע את בדיקת ניסיונות התשלום.</div>}
+              {paymentAttempts.data && (
+                <>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 mb-4">
+                    <div className="rounded-lg bg-gray-50 p-3 text-center"><div className="text-xl font-bold">{paymentAttempts.data.summary.started}</div><div className="text-[10px] text-gray-500">פתחו תשלום</div></div>
+                    <div className="rounded-lg bg-green-50 p-3 text-center"><div className="text-xl font-bold text-green-700">{paymentAttempts.data.summary.completedLater}</div><div className="text-[10px] text-gray-500">השלימו אחר כך</div></div>
+                    <div className="rounded-lg bg-orange-50 p-3 text-center"><div className="text-xl font-bold text-orange-700">{paymentAttempts.data.summary.unresolved}</div><div className="text-[10px] text-gray-500">לא השלימו מוצר זה</div></div>
+                    <div className="rounded-lg bg-blue-50 p-3 text-center"><div className="text-xl font-bold text-blue-700">{paymentAttempts.data.summary.reviewReady}</div><div className="text-[10px] text-gray-500">לבדיקה ידנית</div></div>
+                    <div className="rounded-lg bg-slate-50 p-3 text-center"><div className="text-xl font-bold text-slate-700">{paymentAttempts.data.summary.sandboxPlus + paymentAttempts.data.summary.excluded}</div><div className="text-[10px] text-gray-500">לא לפנות</div></div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[920px] text-xs">
+                      <thead><tr className="border-b text-gray-500">
+                        <th className="py-2 text-right font-medium">אדם</th>
+                        <th className="py-2 text-right font-medium">מוצר</th>
+                        <th className="py-2 text-right font-medium">ניסיון אחרון</th>
+                        <th className="py-2 text-right font-medium">מצב</th>
+                        <th className="py-2 text-center font-medium">מסע נטישה</th>
+                        <th className="py-2 text-right font-medium">מה נכון לעשות</th>
+                      </tr></thead>
+                      <tbody>
+                        {paymentAttempts.data.unresolved.map(item => {
+                          const status = PAYMENT_ATTEMPT_LABELS[item.classification] || { label: item.classification, className: "bg-gray-100 text-gray-700" };
+                          return (
+                            <tr key={item.id} className="border-b border-gray-100 align-top">
+                              <td className="py-3 pl-3">
+                                <div className="font-semibold text-gray-900">{item.name}</div>
+                                <div className="text-[10px] text-gray-500">{item.email}</div>
+                                {item.phone && <div className="text-[10px] text-gray-400">{item.phone}</div>}
+                              </td>
+                              <td className="py-3 pl-3 font-medium">{item.productLabel}</td>
+                              <td className="py-3 pl-3 whitespace-nowrap">{fmtDateTime(item.startedAt)}</td>
+                              <td className="py-3 pl-3"><Badge className={`${status.className} border-0 text-[10px]`}>{status.label}</Badge></td>
+                              <td className="py-3 pl-3 text-center">
+                                {item.recoveryEmailsSent > 0 ? `${item.recoveryEmailsSent} נשלחו${item.recoveryClicked ? " · נלחץ" : ""}` : "לא נשלח"}
+                              </td>
+                              <td className="py-3 leading-5 text-gray-700">{item.recommendation}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 rounded-lg bg-amber-50 p-3 text-[11px] leading-5 text-amber-900">
+                    אין כאן כפתור שליחה. לפני כל פנייה יש לבדוק שוב שלא בוצעה רכישה, שהמוצר עדיין זמין ושאין הסרת דיוור. שגיאות תשלום ישנות לא נשמרו בעבר בטבלה ייעודית, ולכן היעדר שגיאה מתועדת אינו הוכחה שלא הייתה תקלה נקודתית.
+                  </div>
+                </>
+              )}
+            </CardContent>
+          )}
+        </Card>
 
         {/* ═══════════════════════════════════════════════════════════════════════
             SECTION 4: DEMOGRAPHICS — VISUAL

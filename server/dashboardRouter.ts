@@ -7,6 +7,7 @@ import { businessExpenses, businessRecurringItems, completedPayments } from "../
 import { sendEmail } from "./brevo";
 import { calculatePnlSummary, prorateMonthlyAmountAgorot } from "./businessFinance";
 import { aggregateVerifiedGrowPayments, summarizeVerifiedGrowPayments } from "./dashboardRevenue";
+import { getPaymentAbandonmentAudit } from "./paymentAbandonmentAudit";
 
 import { sendSMS } from "./vibrate";
 import crypto from "crypto";
@@ -1648,6 +1649,11 @@ export const dashboardRouter = router({
         insights,
       };
     }),
+
+    paymentAbandonmentAudit: teamProcedure.input(z.object({
+      startDate: z.number(),
+      endDate: z.number(),
+    })).query(async ({ input }) => getPaymentAbandonmentAudit(input.startDate, input.endDate)),
 
     dailyLeadFunnel: teamProcedure.input(z.object({
       startDate: z.number(),
