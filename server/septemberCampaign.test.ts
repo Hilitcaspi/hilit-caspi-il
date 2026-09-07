@@ -8,7 +8,9 @@ const growWallet = readFileSync(resolve(root, "client/src/components/GrowWallet.
 
 describe("September holiday campaign landing and checkout tracking", () => {
   it("uses the approved holiday message and the connected bundle product", () => {
-    expect(holidayPage).toContain("פותחים לה מקום.");
+    expect(holidayPage).toContain("מצטרפים למאגר.");
+    expect(holidayPage).toContain("מקבלים גם את הקורס");
+    expect(holidayPage).toContain("שלושתם ב־399 ₪ במקום 697 ₪");
     expect(holidayPage).toContain('product="bundle_new_year"');
     expect(holidayPage).toContain("399 ₪");
   });

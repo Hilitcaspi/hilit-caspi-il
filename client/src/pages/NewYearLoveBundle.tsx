@@ -48,12 +48,11 @@ const fadeUp = {
 const productCards = [
   {
     number: "01",
+    bundleRole: "הלב של חבילת החג",
     eyebrow: "לפתוח הזדמנויות",
     title: "מאגר הרווקים והרווקות",
     subtitle: "לחבר את ההבנה להזדמנות אמיתית להכיר",
     icon: Network,
-    original: "499 ₪",
-    current: "299 ₪",
     includes: [
       "פרופיל אישי ושאלון DNA זוגי",
       "שאלון עומק על ערכים, אורח חיים והעדפות",
@@ -66,12 +65,11 @@ const productCards = [
   },
   {
     number: "02",
+    bundleRole: "כלול בחבילת החג",
     eyebrow: "לדייק את הבחירה",
     title: "המדריך ״לבחור נכון״",
     subtitle: "לא מדריך שקוראים ומניחים בצד",
     icon: BookOpenCheck,
-    original: "249 ₪",
-    current: "149 ₪",
     includes: [
       "שאלון לזיהוי הדפוס הדומיננטי",
       "שלושה תרגילי עומק ומפת פחדים אישית",
@@ -84,12 +82,11 @@ const productCards = [
   },
   {
     number: "03",
+    bundleRole: "כלול בחבילת החג",
     eyebrow: "להפוך הבנה לתנועה",
     title: "הקורס ״המסע לזוגיות״",
     subtitle: "לא קורס צפייה פסיבי",
     icon: Compass,
-    original: "497 ₪",
-    current: "249 ₪",
     includes: [
       "חמישה מודולים על פחדים, דפוסים, בחירה ודייטינג",
       "חוברת עבודה עם שאלות ותרגילים לכל מודול",
@@ -248,14 +245,14 @@ function PricePanel({ condensed = false }: { condensed?: boolean }) {
       <div className="absolute -left-10 -top-10 h-32 w-32 rounded-full bg-[#c8ad92]/18 blur-2xl" />
       <div className="relative">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="rounded-full bg-[#f2eee8] px-3 py-1.5 text-xs font-black text-[#33271f]">חיסכון של 298 ₪</span>
+          <span className="rounded-full bg-[#f2eee8] px-3 py-1.5 text-xs font-black text-[#33271f]">43% הנחה · חיסכון של 298 ₪</span>
           <span className="text-xs font-medium text-white/60">תשלום חד־פעמי · ללא מנוי</span>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2 text-center md:gap-3">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-1 py-3"><div className="text-[10px] font-bold text-white/45">שווי מקורי</div><div className="mt-1 text-base font-black text-white/65 line-through md:text-lg">1,245 ₪</div></div>
-          <div className="rounded-2xl bg-[#f4efe8] px-1 py-3 text-[#2c211a] shadow-[0_12px_28px_rgba(220,205,190,0.18)]"><div className="text-[10px] font-black">מחיר החג</div><div className="mt-1 text-2xl font-black md:text-3xl">399 ₪</div></div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-1 py-3"><div className="text-[10px] font-bold text-white/45">בקנייה נפרדת</div><div className="mt-1 text-base font-black text-white/65 line-through md:text-lg">697 ₪</div></div>
+          <div className="rounded-2xl bg-[#f4efe8] px-1 py-3 text-[#2c211a] shadow-[0_12px_28px_rgba(220,205,190,0.18)]"><div className="text-[10px] font-black">שלושתם בחג</div><div className="mt-1 text-2xl font-black md:text-3xl">399 ₪</div></div>
         </div>
-        {!condensed ? <p className="mt-4 text-center text-xs leading-5 text-white/58">מאגר הרווקים והרווקות · המדריך ״לבחור נכון״ · הקורס ״המסע לזוגיות״</p> : null}
+        <p className={`text-center leading-5 text-white/68 ${condensed ? "mt-3 text-[11px]" : "mt-4 text-xs"}`}>מצטרפים למאגר, ובתוספת 100 ₪ בלבד מקבלים גם את המדריך ואת הקורס.</p>
       </div>
     </div>
   );
@@ -268,7 +265,7 @@ export default function NewYearLoveBundle() {
 
   useEffect(() => {
     document.title = "חבילת חגי תשרי לזוגיות | הילית כספי";
-    const description = "חבילת חגי תשרי של הילית כספי: מאגר הרווקים והרווקות, המדריך לבחור נכון והקורס המסע לזוגיות ב־399 ₪ בתשלום חד־פעמי.";
+    const description = "מצטרפים למאגר הרווקים והרווקות, ובתוספת 100 ₪ בלבד מקבלים גם את המדריך לבחור נכון ואת הקורס המסע לזוגיות. שלושתם ב־399 ₪ במקום 697 ₪.";
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
       meta = document.createElement("meta");
@@ -308,16 +305,16 @@ export default function NewYearLoveBundle() {
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.02fr_0.98fr] lg:gap-16">
           <motion.div initial={{ opacity: 0, y: 26 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.68 }}>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.08] px-4 py-2 text-xs font-black text-[#f4eee7] backdrop-blur-sm"><Flower2 className="h-3.5 w-3.5" /> הטבת חגי תשרי · עד 30.9.2026</div>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.08] px-4 py-2 text-xs font-black text-[#f4eee7] backdrop-blur-sm"><Flower2 className="h-3.5 w-3.5" /> המאגר + המדריך + הקורס · עד 30.9.2026</div>
             <h1 className="max-w-3xl text-[2.8rem] font-black leading-[1.02] tracking-[-0.045em] text-white md:text-6xl lg:text-7xl">
-              בחגים האלה לא רק
-              <span className="mt-2 block text-[#e3d2c1]">מאחלים לאהבה.</span>
-              <span className="mt-2 block">פותחים לה מקום.</span>
+              מצטרפים למאגר.
+              <span className="mt-2 block text-[#e3d2c1]">מקבלים גם את הקורס</span>
+              <span className="mt-2 block">ואת המדריך.</span>
             </h1>
-            <p className="mt-7 max-w-2xl text-lg font-bold leading-8 text-[#f6f0ea]/92 md:text-2xl md:leading-9">שלושה כלים שנבנו כדי לעזור לכם להבין מה מנהל את הבחירות, לזהות מה חוסם, לדייק את הזוגיות שאתם מחפשים ולפתוח הזדמנויות חדשות להכיר.</p>
-            <p className="mt-4 max-w-xl text-base leading-7 text-white/67 md:text-lg">לא עוד מדריך לקריאה ולא עוד קורס צפייה. שאלות, תרגילים, ניתוח ומפה שאפשר באמת לעבוד איתם.</p>
+            <p className="mt-7 max-w-2xl text-lg font-bold leading-8 text-[#f6f0ea]/92 md:text-2xl md:leading-9">מאגר הרווקים והרווקות הוא הלב של ההטבה. בתוספת 100 ₪ בלבד למחיר המאגר, מקבלים גם את המדריך ״לבחור נכון״ ואת הקורס ״המסע לזוגיות״.</p>
+            <p className="mt-4 max-w-xl text-base leading-7 text-white/67 md:text-lg">כדי להיכנס לחגים עם יותר הזדמנויות להכיר, ולצאת מהם עם יותר בהירות, כלים וכיוון.</p>
             <div className="mt-8 max-w-xl"><PricePanel /></div>
-            <button type="button" onClick={() => openPayment("hero")} className="mt-7 inline-flex min-h-15 w-full items-center justify-center gap-3 rounded-full bg-[#f3eee8] px-7 py-4 text-base font-black text-[#2b211b] shadow-[0_18px_44px_rgba(13,10,8,0.32)] transition hover:-translate-y-0.5 hover:bg-white active:scale-[0.98] sm:w-auto sm:text-lg">לפתוח מקום לאהבה <ArrowDown className="h-5 w-5" /></button>
+            <button type="button" onClick={() => openPayment("hero")} className="mt-7 inline-flex min-h-15 w-full items-center justify-center gap-3 rounded-full bg-[#f3eee8] px-7 py-4 text-base font-black text-[#2b211b] shadow-[0_18px_44px_rgba(13,10,8,0.32)] transition hover:-translate-y-0.5 hover:bg-white active:scale-[0.98] sm:w-auto sm:text-lg">אני רוצה את שלושתם ב־399 ₪ <ArrowDown className="h-5 w-5" /></button>
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-white/58"><span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-4 w-4" /> תשלום מאובטח</span><span className="inline-flex items-center gap-1.5"><BookOpenCheck className="h-4 w-4" /> גישה דיגיטלית מיידית</span><span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4" /> ללא חיוב מתחדש</span></div>
           </motion.div>
 
@@ -333,6 +330,24 @@ export default function NewYearLoveBundle() {
       </header>
 
       <main className="pb-24 md:pb-0">
+        <section className="relative overflow-hidden bg-[#f9f6f1] px-5 py-16 md:px-8 md:py-20">
+          <Reveal className="mx-auto max-w-6xl">
+            <motion.div variants={fadeUp} className="mx-auto max-w-3xl text-center">
+              <p className="text-sm font-black text-[#806650]">ההטבה, פשוט וברור</p>
+              <h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.035em] text-[#29211c] md:text-5xl">המאגר הוא הלב. הקורס והמדריך עוזרים להגיע אליו אחרת.</h2>
+              <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-[#68594f]">מצטרפים למאגר ב־299 ₪, ובתוספת 100 ₪ בלבד מקבלים גם שני כלים דיגיטליים ששווים יחד 398 ₪.</p>
+            </motion.div>
+            <motion.div variants={fadeUp} className="mt-10 grid items-stretch gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
+              <div className="rounded-[1.75rem] border border-[#715b49]/14 bg-[#2a221d] p-6 text-white shadow-[0_18px_45px_rgba(55,42,33,0.12)]"><p className="text-xs font-black text-[#d9c5b2]">המוצר המרכזי</p><h3 className="mt-2 text-2xl font-black">מאגר הרווקים והרווקות</h3><p className="mt-3 text-sm leading-7 text-white/70">פרופיל, שאלוני עומק ובחינת התאמות עם אנשים שמחפשים קשר רציני.</p><p className="mt-5 text-lg font-black">299 ₪</p></div>
+              <div className="hidden items-center justify-center text-3xl font-black text-[#92745c] md:flex">+</div>
+              <div className="rounded-[1.75rem] border border-[#715b49]/14 bg-[#eee7df] p-6 text-[#29211c]"><p className="text-xs font-black text-[#806650]">שני כלי עבודה</p><h3 className="mt-2 text-2xl font-black">המדריך + הקורס</h3><p className="mt-3 text-sm leading-7 text-[#5f5148]">שאלות, תרגילים ומפה אישית שעוזרים לדייק את הבחירה ולזהות מה חוסם.</p><p className="mt-5 text-lg font-black">שווי 398 ₪</p></div>
+              <div className="hidden items-center justify-center text-3xl font-black text-[#92745c] md:flex">=</div>
+              <div className="rounded-[1.75rem] border border-[#806650]/20 bg-[#e6d5c4] p-6 text-[#29211c] shadow-[0_18px_45px_rgba(55,42,33,0.1)]"><p className="text-xs font-black text-[#806650]">חבילת חג אחת</p><h3 className="mt-2 text-2xl font-black">שלושתם יחד</h3><p className="mt-3 text-sm leading-7 text-[#5f5148]">להיכנס לחגים עם הזדמנות להכיר ולצאת מהם עם יותר בהירות וכלים.</p><p className="mt-5 text-3xl font-black">399 ₪</p></div>
+            </motion.div>
+            <motion.p variants={fadeUp} className="mx-auto mt-6 max-w-3xl text-center text-sm font-bold leading-7 text-[#5f5148]">בקנייה נפרדת: 697 ₪. מחיר החג: 399 ₪. החיסכון: 298 ₪, שהם 43%.</motion.p>
+          </Reveal>
+        </section>
+
         <section className="relative overflow-hidden bg-[#eee7df] px-5 py-18 md:px-8 md:py-26">
           <FlowerField subtle />
           <Reveal className="relative mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[0.86fr_1.14fr] md:gap-16">
@@ -354,7 +369,7 @@ export default function NewYearLoveBundle() {
 
         <section className="relative bg-[#f9f6f1] px-5 py-20 md:px-8 md:py-28">
           <Reveal className="mx-auto max-w-7xl">
-            <motion.div variants={fadeUp} className="mx-auto max-w-4xl text-center"><p className="text-sm font-black text-[#806650]">מה בדיוק מקבלים</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.035em] text-[#29211c] md:text-5xl">שלושה כלים. בכל אחד עובדים באמת.</h2><p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-[#68594f]">כל כלי נותן שכבה אחרת: היכרות, בחירה ותנועה. יחד הם מחברים בין הבנה על עצמכם לבין דרך מעשית להתקדם.</p></motion.div>
+            <motion.div variants={fadeUp} className="mx-auto max-w-4xl text-center"><p className="text-sm font-black text-[#806650]">מה בדיוק מקבלים</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.035em] text-[#29211c] md:text-5xl">מאגר להיכרויות. ושני כלים שמכינים אתכם אליהן.</h2><p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-[#68594f]">המאגר פותח הזדמנויות להכיר. המדריך והקורס עוזרים להבין את הדפוסים, לדייק את הבחירה ולהגיע להיכרות מוכנים יותר.</p></motion.div>
             <div className="mt-12 grid gap-6 lg:grid-cols-3">
               {productCards.map((product, index) => {
                 const Icon = product.icon;
@@ -367,7 +382,7 @@ export default function NewYearLoveBundle() {
                     <div className="relative mt-6 border-t border-[#5c4738]/12 pt-5"><p className="text-xs font-black text-[#5f4a3b]">מה יש בפנים</p><ul className="mt-3 space-y-2.5 text-sm leading-6 text-[#5f5148]">{product.includes.map((item) => <li key={item} className="flex gap-2.5"><Check className="mt-1 h-4 w-4 shrink-0 text-[#806650]" />{item}</li>)}</ul></div>
                     <div className="relative mt-6 rounded-2xl bg-[#fbf8f4]/85 p-4"><p className="text-xs font-black text-[#705745]">למה בניתי אותו</p><p className="mt-2 text-sm leading-7 text-[#5b4d44]">{product.why}</p></div>
                     <div className="relative mt-4 border-r-2 border-[#b79a80] pr-3"><p className="text-xs font-black text-[#705745]">מה יוצא איתכם</p><p className="mt-1 text-sm leading-6 text-[#5b4d44]">{product.outcome}</p></div>
-                    <div className="relative mt-auto pt-6"><div className="flex items-end justify-between rounded-2xl bg-[#211b17] px-4 py-3 text-white"><div><p className="text-[10px] font-bold text-white/45">מחיר המוצר</p><p className="mt-1 text-sm font-bold text-white/45 line-through">{product.original}</p></div><div className="text-left"><p className="text-[10px] font-bold text-[#d7c0aa]">כיום בנפרד</p><p className="mt-1 text-xl font-black text-white">{product.current}</p></div></div></div>
+                    <div className="relative mt-auto pt-6"><div className="flex items-center gap-2 rounded-2xl bg-[#211b17] px-4 py-3 text-white"><Check className="h-4 w-4 text-[#d7c0aa]" /><p className="text-sm font-black">{product.bundleRole}</p></div></div>
                   </motion.article>
                 );
               })}
@@ -405,14 +420,14 @@ export default function NewYearLoveBundle() {
           <section className="bg-[#eee7df] px-5 py-20 md:px-8 md:py-28" aria-labelledby="approved-stories-title"><Reveal className="mx-auto max-w-6xl"><motion.div variants={fadeUp} className="mx-auto max-w-3xl text-center"><p className="text-sm font-black text-[#806650]">סיפורים אמיתיים, באישור מפורש</p><h2 id="approved-stories-title" className="mt-3 text-3xl font-black text-[#29211c] md:text-5xl">לפעמים הכול מתחיל מהסכמה לתת הזדמנות.</h2></motion.div><div className="mt-10 grid gap-5 md:grid-cols-2">{approvedTestimonials.map((testimonial) => <motion.blockquote key={testimonial.id} variants={fadeUp} className="relative overflow-hidden rounded-[1.75rem] border border-[#735c49]/14 bg-white p-7 shadow-[0_15px_40px_rgba(55,42,33,0.07)]"><Flower2 className="absolute -left-2 -top-2 h-14 w-14 text-[#bca58f]/20" /><p className="relative text-base leading-8 text-[#5b4d44]">״{testimonial.text}״</p><footer className="relative mt-6 flex items-center gap-3 border-t border-[#735c49]/12 pt-5">{testimonial.photoUrl ? <img src={testimonial.photoUrl} alt="" className="h-11 w-11 rounded-full object-cover" /> : <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#29211c] text-white"><Flower2 className="h-4 w-4" /></div>}<span className="text-sm font-black text-[#29211c]">{testimonial.displayName}</span></footer></motion.blockquote>)}</div></Reveal></section>
         ) : null}
 
-        <section ref={paymentRef} id="payment" className="relative isolate overflow-hidden bg-[#1c1815] px-5 py-20 text-white md:px-8 md:py-28"><FlowerField /><Reveal className="relative mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:gap-16"><motion.div variants={fadeUp} className="text-center lg:text-right"><div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/[0.07] px-4 py-2 text-xs font-black text-[#eee3d8]"><Clock3 className="h-4 w-4" /> הטבת חגי תשרי מסתיימת בעוד</div><div className="mt-5"><Countdown /></div><h2 className="mt-8 text-4xl font-black leading-tight tracking-[-0.04em] md:text-5xl">השנה לא רק מאחלים. פותחים מקום.</h2><p className="mt-5 text-lg leading-8 text-white/72">שלושה כלים עם שאלות, תרגילים, מפה והזדמנות אמיתית להכיר, במחיר חג אחד.</p><div className="mt-7"><PricePanel condensed /></div></motion.div><motion.div variants={fadeUp} className="rounded-[2rem] border border-white/13 bg-[#f9f6f1] p-6 text-[#29211c] shadow-[0_30px_85px_rgba(10,7,5,0.44)] md:p-9"><p className="text-sm font-black text-[#806650]">הצטרפות לחבילת החג</p><h3 className="mt-2 text-3xl font-black tracking-[-0.03em]">399 ₪ בתשלום חד־פעמי</h3>{newsletterCoupon ? <div className="mt-3 rounded-2xl border border-[#d9bea2] bg-[#efe1d2] px-4 py-3 text-sm font-bold text-[#5c3824]">קוד HOLIDAY10 מהניוזלטר יחכה כאן ויופעל לאחר הזנת המייל.</div> : null}<p className="mt-3 text-sm leading-6 text-[#6a5a50]">לאחר אישור Grow יישלחו קישורי הגישה למוצרים הדיגיטליים ויתחיל תהליך ההצטרפות למאגר.</p><div className="mt-6"><GrowWallet product="bundle_new_year" prefillCoupon={newsletterCoupon} buttonLabel="להצטרפות לחבילת החג" buttonClassName="!bg-[#29211c] !text-white !font-black !text-lg !rounded-full hover:!bg-[#3a2e27] !py-4" termsPath="/terms/new-year-love" onSuccess={() => { window.location.href = "/thank-you/new-year-love"; }} /></div><div className="mt-5 flex items-center justify-center gap-4 text-center text-[11px] font-medium text-[#6f6056]"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> תשלום מאובטח</span><span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> ללא חיוב מתחדש</span></div><p className="mt-4 text-center text-[11px] leading-5 text-[#82736a]">תנאי הביטול והגישה מפורטים בתקנון החבילה.</p></motion.div></Reveal></section>
+        <section ref={paymentRef} id="payment" className="relative isolate overflow-hidden bg-[#1c1815] px-5 py-20 text-white md:px-8 md:py-28"><FlowerField /><Reveal className="relative mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:gap-16"><motion.div variants={fadeUp} className="text-center lg:text-right"><div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/[0.07] px-4 py-2 text-xs font-black text-[#eee3d8]"><Clock3 className="h-4 w-4" /> הטבת חגי תשרי מסתיימת בעוד</div><div className="mt-5"><Countdown /></div><h2 className="mt-8 text-4xl font-black leading-tight tracking-[-0.04em] md:text-5xl">מצטרפים למאגר. מקבלים גם את הקורס והמדריך.</h2><p className="mt-5 text-lg leading-8 text-white/72">שלושתם ב־399 ₪ במקום 697 ₪, בתשלום חד־פעמי וללא מנוי.</p><div className="mt-7"><PricePanel condensed /></div></motion.div><motion.div variants={fadeUp} className="rounded-[2rem] border border-white/13 bg-[#f9f6f1] p-6 text-[#29211c] shadow-[0_30px_85px_rgba(10,7,5,0.44)] md:p-9"><p className="text-sm font-black text-[#806650]">הצטרפות לחבילת החג</p><h3 className="mt-2 text-3xl font-black tracking-[-0.03em]">כל שלושת המוצרים ב־399 ₪</h3>{newsletterCoupon ? <div className="mt-3 rounded-2xl border border-[#d9bea2] bg-[#efe1d2] px-4 py-3 text-sm font-bold text-[#5c3824]">קוד HOLIDAY10 מהניוזלטר יחכה כאן ויופעל לאחר הזנת המייל.</div> : null}<div className="mt-5 space-y-2 rounded-2xl bg-[#eee7df] p-4 text-sm font-bold text-[#4b3b31]">{["מאגר הרווקים והרווקות", "המדריך ״לבחור נכון״", "הקורס ״המסע לזוגיות״"].map((item) => <div key={item} className="flex items-center gap-2"><Check className="h-4 w-4 text-[#806650]" />{item}</div>)}</div><p className="mt-4 text-sm leading-6 text-[#6a5a50]">לאחר אישור Grow יישלחו קישורי הגישה למדריך ולקורס, ויתחיל תהליך ההצטרפות למאגר.</p><div className="mt-6"><GrowWallet product="bundle_new_year" prefillCoupon={newsletterCoupon} buttonLabel="אני רוצה את שלושתם ב־399 ₪" buttonClassName="!bg-[#29211c] !text-white !font-black !text-lg !rounded-full hover:!bg-[#3a2e27] !py-4" termsPath="/terms/new-year-love" onSuccess={() => { window.location.href = "/thank-you/new-year-love"; }} /></div><div className="mt-5 flex items-center justify-center gap-4 text-center text-[11px] font-medium text-[#6f6056]"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> תשלום מאובטח</span><span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> ללא חיוב מתחדש</span></div><p className="mt-4 text-center text-[11px] leading-5 text-[#82736a]">תנאי הביטול והגישה מפורטים בתקנון החבילה.</p></motion.div></Reveal></section>
 
         <section className="bg-[#f9f6f1] px-5 py-20 md:px-8 md:py-28"><Reveal className="mx-auto max-w-4xl"><motion.div variants={fadeUp} className="text-center"><p className="text-sm font-black text-[#806650]">לפני שמתחילים</p><h2 className="mt-3 text-3xl font-black text-[#29211c] md:text-5xl">שאלות נפוצות</h2></motion.div><div className="mt-10 space-y-3">{faqs.map(({ q, a }) => <motion.details key={q} variants={fadeUp} className="group rounded-2xl border border-[#735c49]/12 bg-white p-5 shadow-[0_8px_24px_rgba(55,42,33,0.04)] md:p-6"><summary className="cursor-pointer list-none pr-1 text-base font-black text-[#342922] marker:hidden md:text-lg">{q}<span className="float-left text-2xl font-medium leading-5 text-[#806650] transition-transform group-open:rotate-45">+</span></summary><p className="mt-4 border-t border-[#735c49]/10 pt-4 text-sm leading-7 text-[#5f5148]">{a}</p></motion.details>)}</div></Reveal></section>
 
-        <section className="relative overflow-hidden bg-[#211b17] px-5 py-20 text-center text-white md:px-8 md:py-24"><FlowerField subtle /><Reveal className="relative mx-auto max-w-3xl"><motion.div variants={fadeUp} className="mx-auto flex h-13 w-13 items-center justify-center rounded-2xl border border-white/18 bg-white/[0.07] text-white"><Flower2 className="h-6 w-6" /></motion.div><motion.h2 variants={fadeUp} className="mt-6 text-3xl font-black leading-tight tracking-[-0.04em] md:text-5xl">לפני שעוד שנה מתחילה, אפשר להגיע אליה מוכנים יותר.</motion.h2><motion.p variants={fadeUp} className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-white/70">להבין את עצמכם. לדייק את הבחירה. לפתוח הזדמנויות חדשות להכיר.</motion.p><motion.div variants={fadeUp}><button type="button" onClick={() => openPayment("footer")} className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#f2eee8] px-8 py-5 text-lg font-black text-[#2a211b] transition hover:-translate-y-0.5 active:scale-[0.98]">להצטרפות לחבילת החג ב־399 ₪ <ArrowLeft className="h-5 w-5" /></button></motion.div><motion.div variants={fadeUp} className="mt-10 flex flex-col justify-center gap-3 border-t border-white/10 pt-8 sm:flex-row"><a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/20 bg-white/[0.07] px-6 py-3 text-sm font-bold text-[#f3ece5] transition hover:bg-white/[0.12]">שאלות? כתבו לנו בוואטסאפ</a><a href="/terms/new-year-love" className="rounded-xl border border-white/12 bg-white/[0.04] px-6 py-3 text-sm font-bold text-white/70 transition hover:bg-white/[0.09]">לתקנון החבילה</a></motion.div></Reveal></section>
+        <section className="relative overflow-hidden bg-[#211b17] px-5 py-20 text-center text-white md:px-8 md:py-24"><FlowerField subtle /><Reveal className="relative mx-auto max-w-3xl"><motion.div variants={fadeUp} className="mx-auto flex h-13 w-13 items-center justify-center rounded-2xl border border-white/18 bg-white/[0.07] text-white"><Flower2 className="h-6 w-6" /></motion.div><motion.h2 variants={fadeUp} className="mt-6 text-3xl font-black leading-tight tracking-[-0.04em] md:text-5xl">להיכנס אחרת לחגים. לצאת מהם עם יותר בהירות והזדמנויות להכיר.</motion.h2><motion.p variants={fadeUp} className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-white/70">המאגר, המדריך והקורס יחד ב־399 ₪ במקום 697 ₪.</motion.p><motion.div variants={fadeUp}><button type="button" onClick={() => openPayment("footer")} className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#f2eee8] px-8 py-5 text-lg font-black text-[#2a211b] transition hover:-translate-y-0.5 active:scale-[0.98]">אני רוצה את שלושתם ב־399 ₪ <ArrowLeft className="h-5 w-5" /></button></motion.div><motion.div variants={fadeUp} className="mt-10 flex flex-col justify-center gap-3 border-t border-white/10 pt-8 sm:flex-row"><a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/20 bg-white/[0.07] px-6 py-3 text-sm font-bold text-[#f3ece5] transition hover:bg-white/[0.12]">שאלות? כתבו לנו בוואטסאפ</a><a href="/terms/new-year-love" className="rounded-xl border border-white/12 bg-white/[0.04] px-6 py-3 text-sm font-bold text-white/70 transition hover:bg-white/[0.09]">לתקנון החבילה</a></motion.div></Reveal></section>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/12 bg-[#211b17]/96 px-3 py-2.5 shadow-[0_-12px_30px_rgba(20,15,12,0.25)] backdrop-blur-lg md:hidden"><div className="mx-auto flex max-w-md items-center gap-3"><div className="shrink-0"><p className="text-[10px] font-bold text-white/55">מחיר החג</p><p className="text-lg font-black text-white">399 ₪</p></div><button type="button" onClick={() => openPayment("mobile_sticky")} className="flex min-h-11 flex-1 items-center justify-center rounded-full bg-[#f2eee8] px-3 text-sm font-black text-[#2b211b] active:scale-[0.98]">אני רוצה את החבילה</button></div></div>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/12 bg-[#211b17]/96 px-3 py-2.5 shadow-[0_-12px_30px_rgba(20,15,12,0.25)] backdrop-blur-lg md:hidden"><div className="mx-auto flex max-w-md items-center gap-3"><div className="shrink-0"><p className="text-[10px] font-bold text-white/55">שלושה מוצרים</p><p className="text-lg font-black text-white">399 ₪</p></div><button type="button" onClick={() => openPayment("mobile_sticky")} className="flex min-h-11 flex-1 items-center justify-center rounded-full bg-[#f2eee8] px-3 text-sm font-black text-[#2b211b] active:scale-[0.98]">אני רוצה את שלושתם</button></div></div>
     </div>
   );
 }

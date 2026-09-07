@@ -13,17 +13,33 @@ const pricePanelSource = pageSource.slice(
 );
 
 describe("New Year bundle price panel", () => {
-  it("shows only the original value and the holiday price", () => {
-    expect(pricePanelSource).toContain("שווי מקורי");
-    expect(pricePanelSource).toContain("1,245 ₪");
-    expect(pricePanelSource).toContain("מחיר החג");
+  it("compares the real separate purchase price with the holiday bundle", () => {
+    expect(pricePanelSource).toContain("בקנייה נפרדת");
+    expect(pricePanelSource).toContain("697 ₪");
+    expect(pricePanelSource).toContain("שלושתם בחג");
     expect(pricePanelSource).toContain("399 ₪");
-    expect(pricePanelSource).not.toContain("כיום בנפרד");
-    expect(pricePanelSource).not.toContain("697 ₪");
+    expect(pricePanelSource).toContain("43% הנחה");
+    expect(pricePanelSource).toContain("תוספת 100 ₪ בלבד");
+    expect(pricePanelSource).not.toContain("1,245 ₪");
   });
 
   it("uses a balanced two-column price comparison", () => {
     expect(pricePanelSource).toContain("grid-cols-2");
     expect(pricePanelSource).not.toContain("grid-cols-3");
+  });
+
+  it("keeps the database at the center of the offer and names both included tools", () => {
+    expect(pageSource).toContain("מאגר הרווקים והרווקות הוא הלב של ההטבה");
+    expect(pageSource).toContain("המדריך ״לבחור נכון״");
+    expect(pageSource).toContain("הקורס ״המסע לזוגיות״");
+    expect(pageSource).toContain("אני רוצה את שלושתם ב־399 ₪");
+    expect(pageSource).toContain("אני רוצה את שלושתם");
+  });
+
+  it("does not reintroduce individual price blocks inside the product cards", () => {
+    expect(pageSource).not.toContain("מחיר המוצר");
+    expect(pageSource).not.toContain("כיום בנפרד");
+    expect(pageSource).toContain("הלב של חבילת החג");
+    expect(pageSource).toContain("כלול בחבילת החג");
   });
 });
