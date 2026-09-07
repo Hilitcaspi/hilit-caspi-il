@@ -44,9 +44,58 @@ export function buildPlusHolidayPilotEmail(input: { firstName: string; email: st
 } {
   const checkoutUrl = `${PLUS_PUBLIC_URL}?email=${encodeURIComponent(input.email)}&token=${encodeURIComponent(input.token)}&utm_source=email&utm_medium=pilot_invitation&utm_campaign=${PLUS_HOLIDAY_PILOT_COHORT}`;
   const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.email });
-  const subject = "החגים האלה יכולים להיראות אחרת. הזמנה ל־Database Plus";
-  const textContent = `היי ${input.firstName},\n\nלכבוד החגים אני פותחת עבורך הזדמנות להצטרף לפיילוט הראשון של Database Plus.\n\nבמסלול מחכות לך שתי התאמות שאני בוחנת עבורך בכל חודש, ובוסט אחד חינם בכל מחזור. אני שמה עכשיו גז על ההתאמות, כדי לפתוח עוד הזדמנויות אמיתיות להכיר.\n\nההצטרפות היא ב־99 ₪ לחודש בחיוב מתחדש עד לביטול. השירות יופעל רק לאחר השלמת התשלום.\n\nלהשלמת התשלום והצטרפות לפיילוט: ${checkoutUrl}\n\nבאהבה,\nהילית\n\nלהסרה: ${unsubscribeUrl}`;
-  const htmlContent = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8" /></head><body style="margin:0;background:#f5efe7;font-family:Arial,sans-serif;color:#2b1816"><div style="max-width:620px;margin:0 auto;padding:28px 16px"><div style="background:#2b1816;border-radius:24px 24px 0 0;padding:34px 28px;text-align:center"><div style="font-size:14px;color:#d9b989;letter-spacing:.5px">הילית כספי | מומחית לזוגיות</div><h1 style="margin:16px 0 0;color:#fff8ef;font-size:32px;line-height:1.25">החגים האלה יכולים להיראות אחרת</h1></div><div style="background:#fffdf9;border-radius:0 0 24px 24px;padding:34px 30px;line-height:1.8;font-size:17px"><p style="margin-top:0">היי ${input.firstName},</p><p>לכבוד החגים אני פותחת עבורך הזדמנות להצטרף לפיילוט הראשון של <strong>Database Plus</strong>.</p><div style="background:#f4e4d8;border-radius:16px;padding:20px 22px;margin:24px 0"><p style="margin:0 0 8px"><strong>שתי התאמות שאני בוחנת עבורך בכל חודש</strong></p><p style="margin:0"><strong>בוסט אחד חינם בכל מחזור</strong></p></div><p>אני שמה עכשיו גז על ההתאמות, כדי לפתוח עוד הזדמנויות אמיתיות להכיר.</p><p>ההצטרפות היא ב־<strong>99 ₪ לחודש</strong> בחיוב מתחדש עד לביטול. השירות יופעל רק לאחר השלמת התשלום.</p><div style="text-align:center;margin:30px 0"><a href="${checkoutUrl}" style="display:inline-block;background:#d9a7a7;color:#2b1816;text-decoration:none;font-weight:700;padding:15px 30px;border-radius:999px">להשלמת התשלום והצטרפות לפיילוט</a></div><p style="margin-bottom:0">באהבה,<br /><strong>הילית</strong></p></div><div style="text-align:center;padding:18px;font-size:12px;color:#7d6c64"><a href="${unsubscribeUrl}" style="color:#7d6c64">הסרה מרשימת הדיוור</a></div></div></body></html>`;
+  const subject = "נבחרת להשקה הראשונה של Database Plus";
+  const textContent = `היי ${input.firstName},\n\nראיתי שנרשמת לרשימת ההמתנה, ואני שמחה לבשר לך שנבחרת להצטרף להשקה הראשונה של Database Plus.\n\nזה השירות המתקדם ביותר שיצרתי לחברי המאגר, וזו הזדמנות מיוחדת לקבל ממני יותר תשומת לב, יותר הזדמנויות ועוד דרך טובה להכיר.\n\nמה מחכה לך ב־Database Plus?\n\nשתי התאמות שאני בוחנת עבורך בכל חודש.\n\nבוסט אחד חינם בכל מחזור, בנוסף לשתי ההתאמות.\n\nיותר תשומת לב לפרופיל שלך בתהליך האיתור וההתאמה.\n\nלכבוד ההשקה והחגים אני שמה גז על ההתאמות לחברי המאגר, כדי לפתוח עבורכם עוד הזדמנויות אמיתיות להכיר.\n\nההצטרפות היא ב־99 ₪ לחודש בחיוב מתחדש עד לביטול. השירות יופעל רק לאחר השלמת התשלום.\n\nלהצטרפות ל־Database Plus: ${checkoutUrl}\n\nבאהבה,\nהילית\n\nלהסרה: ${unsubscribeUrl}`;
+  const htmlContent = `<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>${subject}</title>
+</head>
+<body style="margin:0;background:#f4ede5;font-family:Arial,sans-serif;color:#2b1816">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0">נבחרת להשקה הראשונה של השירות המתקדם ביותר שיצרתי לחברי המאגר.</div>
+  <div style="max-width:620px;margin:0 auto;padding:28px 16px">
+    <div style="overflow:hidden;border-radius:26px;box-shadow:0 18px 48px rgba(62,34,29,.13)">
+      <div style="background:linear-gradient(145deg,#2b1816 0%,#56342c 100%);padding:38px 28px 34px;text-align:center">
+        <div style="font-size:13px;color:#e6c99c;letter-spacing:.5px">הילית כספי | מומחית לזוגיות</div>
+        <div style="display:inline-block;margin-top:18px;padding:8px 16px;border:1px solid rgba(255,248,239,.35);border-radius:999px;color:#fff8ef;font-size:13px;font-weight:700">נבחרת להשקה הראשונה</div>
+        <h1 style="margin:18px 0 0;color:#fff8ef;font-size:32px;line-height:1.25">Database Plus נפתח עבורך</h1>
+        <p style="margin:13px auto 0;max-width:470px;color:#eadbd1;font-size:16px;line-height:1.7">הזדמנות חגיגית להכניס יותר תנועה, תשומת לב ואפשרויות חדשות לתהליך ההיכרויות שלך.</p>
+      </div>
+      <div style="background:#fffdf9;padding:34px 30px;line-height:1.8;font-size:17px">
+        <p style="margin-top:0">היי ${input.firstName},</p>
+        <p><strong>ראיתי שנרשמת לרשימת ההמתנה, ואני שמחה לבשר לך שנבחרת</strong> להצטרף להשקה הראשונה של Database Plus.</p>
+        <p><strong>זה השירות המתקדם ביותר שיצרתי לחברי המאגר.</strong> זו הזדמנות מיוחדת לקבל ממני יותר תשומת לב, יותר הזדמנויות ועוד דרך טובה להכיר.</p>
+        <div style="margin:26px 0 16px;text-align:center;color:#6d4438;font-size:14px;font-weight:700;letter-spacing:.2px">מה מחכה לך ב־Database Plus?</div>
+        <div style="background:#f4e4d8;border:1px solid #ecd4c3;border-radius:17px;padding:18px 20px;margin:10px 0">
+          <div style="font-size:19px;font-weight:700;color:#2b1816">שתי התאמות בכל חודש</div>
+          <div style="margin-top:4px;color:#6f5a52;font-size:15px;line-height:1.6">שתי התאמות שאני בוחנת עבורך בכל חודש פעיל.</div>
+        </div>
+        <div style="background:#f8eee7;border:1px solid #ecd9ca;border-radius:17px;padding:18px 20px;margin:10px 0">
+          <div style="font-size:19px;font-weight:700;color:#2b1816">בוסט אחד חינם בכל מחזור</div>
+          <div style="margin-top:4px;color:#6f5a52;font-size:15px;line-height:1.6">הזדמנות היכרות נוספת שמצטרפת לשתי ההתאמות ולא מחליפה אותן.</div>
+        </div>
+        <div style="background:#fbf5ef;border:1px solid #eee0d4;border-radius:17px;padding:18px 20px;margin:10px 0">
+          <div style="font-size:19px;font-weight:700;color:#2b1816">יותר תשומת לב לפרופיל שלך</div>
+          <div style="margin-top:4px;color:#6f5a52;font-size:15px;line-height:1.6">יותר מקום לפרופיל שלך בתהליך האיתור, המיון ועדכון ההעדפות.</div>
+        </div>
+        <div style="margin:26px 0;padding:21px 22px;border-radius:17px;background:#2b1816;color:#fff8ef;text-align:center">
+          <div style="font-size:13px;color:#e6c99c;font-weight:700">לכבוד ההשקה והחגים</div>
+          <div style="margin-top:7px;font-size:20px;font-weight:700;line-height:1.45">אני שמה גז על ההתאמות לחברי המאגר</div>
+          <div style="margin-top:6px;color:#eadbd1;font-size:14px;line-height:1.6">כדי לפתוח עבורכם עוד הזדמנויות אמיתיות להכיר.</div>
+        </div>
+        <p style="text-align:center">ההצטרפות היא ב־<strong>99 ₪ לחודש</strong> בחיוב מתחדש עד לביטול.<br />השירות יופעל רק לאחר השלמת התשלום.</p>
+        <div style="text-align:center;margin:30px 0">
+          <a href="${checkoutUrl}" style="display:inline-block;background:#d9a7a7;color:#2b1816;text-decoration:none;font-weight:700;padding:16px 32px;border-radius:999px">אני רוצה להצטרף ל־Database Plus</a>
+        </div>
+        <p style="margin-bottom:0">באהבה,<br /><strong>הילית</strong></p>
+      </div>
+    </div>
+    <div style="text-align:center;padding:18px;font-size:12px;color:#7d6c64"><a href="${unsubscribeUrl}" style="color:#7d6c64">הסרה מרשימת הדיוור</a></div>
+  </div>
+</body>
+</html>`;
   return { subject, htmlContent, textContent, checkoutUrl };
 }
 

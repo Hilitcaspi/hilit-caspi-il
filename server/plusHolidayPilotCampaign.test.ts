@@ -44,11 +44,15 @@ describe("Plus holiday pilot campaign", () => {
     expect(ranked.map(item => item.single.id)).toEqual([3, 2, 1]);
   });
 
-  it("builds a holiday invitation with two matches, one free Boost and recurring price", () => {
+  it("builds a festive waitlist invitation with separated Plus benefits and recurring price", () => {
     const content = buildPlusHolidayPilotEmail({ firstName: "נועה", email: "noa@example.com", token: "questionnaire-token-123456" });
-    expect(content.subject).toContain("החגים האלה יכולים להיראות אחרת");
-    expect(content.htmlContent).toContain("שתי התאמות");
-    expect(content.htmlContent).toContain("בוסט אחד חינם");
+    expect(content.subject).toContain("נבחרת להשקה הראשונה");
+    expect(content.htmlContent).toContain("נרשמת לרשימת ההמתנה");
+    expect(content.htmlContent).toContain("השירות המתקדם ביותר שיצרתי לחברי המאגר");
+    expect(content.htmlContent).toContain("שתי התאמות בכל חודש");
+    expect(content.htmlContent).toContain("בוסט אחד חינם בכל מחזור");
+    expect(content.htmlContent).toContain("יותר תשומת לב לפרופיל שלך");
+    expect(content.htmlContent).toContain("אני שמה גז על ההתאמות לחברי המאגר");
     expect(content.htmlContent).toContain("99 ₪ לחודש");
     expect(content.htmlContent).toContain("השירות יופעל רק לאחר השלמת התשלום");
     expect(content.checkoutUrl).toContain("/database-plus?");
