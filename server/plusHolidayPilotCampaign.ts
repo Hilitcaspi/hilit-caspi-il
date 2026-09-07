@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
-import { crmLeads, emailLog, matches, plusCheckoutIntents, plusPaymentEvents, plusPilotMembers, singles, type Single } from "../drizzle/schema";
+import { completedPayments, crmLeads, emailLog, leads, matches, plusCheckoutIntents, plusPaymentEvents, plusPilotMembers, singles, type Single } from "../drizzle/schema";
 import { sendEmail, isPermanentlyBlockedEmail } from "./brevo";
 import { getDb } from "./db";
 import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
@@ -9,7 +9,7 @@ export const PLUS_HOLIDAY_PILOT_COHORT = "holiday_plus_pilot_2026_09";
 export const PLUS_HOLIDAY_PILOT_JOURNEY = "plus_holiday_pilot_2026_09";
 export const PLUS_PAYMENT_RECOVERY_COHORT = "plus_payment_recovery_2026_09";
 export const PLUS_PAYMENT_RECOVERY_JOURNEY = "plus_payment_recovery_2026_09";
-export const PLUS_HOLIDAY_PILOT_NEW_COUNTS = { female: 20, male: 15 } as const;
+export const PLUS_HOLIDAY_PILOT_NEW_COUNTS = { female: 30, male: 30 } as const;
 const PLUS_PUBLIC_URL = "https://hilitcaspi.com/database-plus";
 
 type Candidate = {
@@ -18,6 +18,43 @@ type Candidate = {
   eligibilityReasons: string[];
   tenureDays: number;
 };
+
+function normalizeCampaignEmail(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+export function isPlusPilotCoachingClient(
+  single: Pick<Single, "email" | "isCoachingClient">,
+  coachingEmails: Set<string>,
+): boolean {
+  return Boolean(single.isCoachingClient) || coachingEmails.has(normalizeCampaignEmail(single.email));
+}
+
+async function loadCoachingClientEmails(db: NonNullable<Awaited<ReturnType<typeof getDb>>>): Promise<Set<string>> {
+  const [singleRows, crmRows, leadRows, paymentRows] = await Promise.all([
+    db.select({ email: singles.email }).from(singles).where(eq(singles.isCoachingClient, true)),
+    db.select({ email: crmLeads.email, status: crmLeads.status, product: crmLeads.product }).from(crmLeads),
+    db.select({ email: leads.email, source: leads.source }).from(leads),
+    db.select({ email: completedPayments.email, product: completedPayments.product }).from(completedPayments),
+  ]);
+  const emails = new Set(singleRows.map(row => normalizeCampaignEmail(row.email)).filter(Boolean));
+  for (const row of crmRows) {
+    if (row.status === "client_coaching" || row.product === "coaching" || row.product === "coaching_mas") {
+      emails.add(normalizeCampaignEmail(row.email));
+    }
+  }
+  for (const row of leadRows) {
+    if (row.source === "paid_coaching" || row.source === "paid_coaching_mas") {
+      emails.add(normalizeCampaignEmail(row.email));
+    }
+  }
+  for (const row of paymentRows) {
+    if (row.product === "coaching" || row.product === "coaching_mas") {
+      emails.add(normalizeCampaignEmail(row.email));
+    }
+  }
+  return emails;
+}
 
 export function rankPlusHolidayPilotCandidates(candidates: Candidate[]): Candidate[] {
   return [...candidates].sort((a, b) =>
@@ -122,20 +159,14 @@ function trackedEmailContent(htmlContent: string, logId: number, checkoutUrl: st
 export async function preparePlusHolidayPilotCohort(): Promise<{ prepared: number; female: number; male: number }> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const existingCohort = await db.select({ id: plusPilotMembers.id, singleId: plusPilotMembers.singleId })
+  const existingCohort = await db.select()
     .from(plusPilotMembers)
     .where(eq(plusPilotMembers.pilotCohort, PLUS_HOLIDAY_PILOT_COHORT));
-  if (existingCohort.length) {
-    const cohortSingles = await db.select({ gender: singles.gender }).from(singles)
-      .where(inArray(singles.id, existingCohort.map(row => row.singleId)));
-    return {
-      prepared: existingCohort.length,
-      female: cohortSingles.filter(row => row.gender === "female").length,
-      male: cohortSingles.filter(row => row.gender === "male").length,
-    };
+  if (existingCohort.some(row => row.status !== "eligible" || row.billingStatus !== "not_configured" || Boolean(row.invitedAt))) {
+    throw new Error("Existing Plus pilot cohort is no longer safe to rebalance");
   }
 
-  const [singleRows, matchRows, memberRows, blockedLeadRows] = await Promise.all([
+  const [singleRows, matchRows, memberRows, blockedLeadRows, coachingEmails] = await Promise.all([
     db.select().from(singles).where(and(
       eq(singles.isPaid, true),
       eq(singles.isActive, true),
@@ -152,10 +183,11 @@ export async function preparePlusHolidayPilotCohort(): Promise<{ prepared: numbe
       matchDetailStatus: matches.matchDetailStatus,
       returnedToPoolAt: matches.returnedToPoolAt,
     }).from(matches),
-    db.select({ singleId: plusPilotMembers.singleId }).from(plusPilotMembers),
+    db.select().from(plusPilotMembers),
     db.select({ email: crmLeads.email }).from(crmLeads).where(eq(crmLeads.emailUnsubscribed, true)),
+    loadCoachingClientEmails(db),
   ]);
-  const existingSingleIds = new Set(memberRows.map(row => row.singleId));
+  const memberBySingleId = new Map(memberRows.map(row => [row.singleId, row]));
   const blockedEmails = new Set(blockedLeadRows.map(row => String(row.email || "").trim().toLowerCase()));
   const matchesBySingle = new Map<number, any[]>();
   for (const match of matchRows) {
@@ -168,8 +200,15 @@ export async function preparePlusHolidayPilotCohort(): Promise<{ prepared: numbe
   }
   const candidates: Candidate[] = [];
   for (const single of singleRows) {
-    const email = String(single.email || "").trim().toLowerCase();
-    if (!email.includes("@") || !String(single.questionnaireToken || "").trim() || blockedEmails.has(email) || existingSingleIds.has(single.id)) continue;
+    const email = normalizeCampaignEmail(single.email);
+    const member = memberBySingleId.get(single.id);
+    const reusableExistingMember = member?.pilotCohort === PLUS_HOLIDAY_PILOT_COHORT
+      && member.status === "eligible"
+      && member.billingStatus === "not_configured"
+      && !member.invitedAt;
+    if (!email.includes("@") || !String(single.questionnaireToken || "").trim() || blockedEmails.has(email)) continue;
+    if (isPlusPilotCoachingClient(single, coachingEmails)) continue;
+    if (member && !reusableExistingMember) continue;
     const assessment = assessPlusEligibility(single, matchesBySingle.get(single.id) || []);
     if (!assessment.eligible || assessment.activeMatch || assessment.positiveOutcome || assessment.potentialMatchesUnderReview < 2) continue;
     candidates.push({
@@ -186,20 +225,45 @@ export async function preparePlusHolidayPilotCohort(): Promise<{ prepared: numbe
     throw new Error("Insufficient eligible Plus pilot candidates");
   }
   const now = Date.now();
-  await db.insert(plusPilotMembers).values(selected.map(item => ({
-    singleId: item.single.id,
-    status: "eligible" as const,
-    billingStatus: "not_configured" as const,
-    eligibilityScore: item.eligibilityScore,
-    eligibilityReasons: JSON.stringify(item.eligibilityReasons),
-    source: "holiday_pilot_email",
-    pilotCohort: PLUS_HOLIDAY_PILOT_COHORT,
-    pilotPriceAgorot: 9900,
-    monthlyMatchTarget: 2,
-    waitlistedAt: now,
-    createdAt: now,
-    updatedAt: now,
-  })));
+  const selectedSingleIds = new Set(selected.map(item => item.single.id));
+  for (const member of existingCohort) {
+    if (selectedSingleIds.has(member.singleId)) continue;
+    await db.update(plusPilotMembers).set({
+      status: "waitlist",
+      pilotCohort: null,
+      eligibilityReasons: JSON.stringify(["removed_from_holiday_pilot_rebalance"]),
+      updatedAt: now,
+    }).where(and(
+      eq(plusPilotMembers.id, member.id),
+      eq(plusPilotMembers.status, "eligible"),
+      eq(plusPilotMembers.billingStatus, "not_configured"),
+      isNull(plusPilotMembers.invitedAt),
+    ));
+  }
+  for (const item of selected) {
+    const existingMember = memberBySingleId.get(item.single.id);
+    const values = {
+      status: "eligible" as const,
+      billingStatus: "not_configured" as const,
+      eligibilityScore: item.eligibilityScore,
+      eligibilityReasons: JSON.stringify(item.eligibilityReasons),
+      source: "holiday_pilot_email",
+      pilotCohort: PLUS_HOLIDAY_PILOT_COHORT,
+      pilotPriceAgorot: 9900,
+      monthlyMatchTarget: 2,
+      updatedAt: now,
+    };
+    if (existingMember) {
+      await db.update(plusPilotMembers).set(values).where(eq(plusPilotMembers.id, existingMember.id));
+    } else {
+      await db.insert(plusPilotMembers).values({
+        singleId: item.single.id,
+        ...values,
+        waitlistedAt: now,
+        createdAt: now,
+      });
+    }
+  }
   return { prepared: selected.length, female, male };
 }
 
@@ -217,9 +281,10 @@ export async function sendPreparedPlusHolidayPilotInvitations(): Promise<{ total
     ));
   const expectedFemale = rows.filter(row => row.single.gender === "female").length;
   const expectedMale = rows.filter(row => row.single.gender === "male").length;
-  if (rows.length !== 35 || expectedFemale !== 20 || expectedMale !== 15 || rows.some(row => !String(row.single.questionnaireToken || "").trim())) {
+  if (rows.length !== 60 || expectedFemale !== 30 || expectedMale !== 30 || rows.some(row => !String(row.single.questionnaireToken || "").trim())) {
     throw new Error("Plus pilot invitation snapshot mismatch");
   }
+  const coachingEmails = await loadCoachingClientEmails(db);
   const rowIds = rows.map(row => row.single.id);
   const currentMatches = await db.select({
     id: matches.id,
@@ -244,6 +309,7 @@ export async function sendPreparedPlusHolidayPilotInvitations(): Promise<{ total
     const assessment = assessPlusEligibility(row.single, matchesBySingle.get(row.single.id) || []);
     const suppressed = isPermanentlyBlockedEmail(email) || (await isEmailMarketingSuppressed(email)).suppressed;
     if (!row.single.isPaid || !row.single.isActive || row.single.isSeed || !row.single.consentEmailMarketing || suppressed
+      || isPlusPilotCoachingClient(row.single, coachingEmails)
       || !assessment.eligible || assessment.activeMatch || assessment.positiveOutcome || assessment.potentialMatchesUnderReview < 2) {
       throw new Error("Plus pilot recipient is no longer eligible");
     }

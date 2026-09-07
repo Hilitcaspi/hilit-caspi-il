@@ -8,6 +8,7 @@ vi.mock("./emailUnsubscribe", () => ({
 import {
   buildPlusHolidayPilotEmail,
   buildPlusPaymentRecoveryEmail,
+  isPlusPilotCoachingClient,
   PLUS_HOLIDAY_PILOT_NEW_COUNTS,
   rankPlusHolidayPilotCandidates,
   selectBalancedPlusHolidayPilotCandidates,
@@ -23,16 +24,22 @@ function candidate(id: number, gender: "female" | "male", score: number, tenureD
 }
 
 describe("Plus holiday pilot campaign", () => {
-  it("selects exactly 20 women and 15 men deterministically", () => {
+  it("selects exactly 30 women and 30 men deterministically", () => {
     const input = [
-      ...Array.from({ length: 30 }, (_, index) => candidate(index + 1, "female", 90, index)),
-      ...Array.from({ length: 30 }, (_, index) => candidate(index + 101, "male", 90, index)),
+      ...Array.from({ length: 40 }, (_, index) => candidate(index + 1, "female", 90, index)),
+      ...Array.from({ length: 40 }, (_, index) => candidate(index + 101, "male", 90, index)),
     ];
     const selected = selectBalancedPlusHolidayPilotCandidates(input);
     expect(selected.filter(item => item.single.gender === "female")).toHaveLength(PLUS_HOLIDAY_PILOT_NEW_COUNTS.female);
     expect(selected.filter(item => item.single.gender === "male")).toHaveLength(PLUS_HOLIDAY_PILOT_NEW_COUNTS.male);
     expect(selectBalancedPlusHolidayPilotCandidates([...input].reverse()).map(item => item.single.id))
       .toEqual(selected.map(item => item.single.id));
+  });
+
+  it("excludes coaching clients by profile flag or verified coaching history", () => {
+    expect(isPlusPilotCoachingClient({ email: "flagged@example.com", isCoachingClient: true } as any, new Set())).toBe(true);
+    expect(isPlusPilotCoachingClient({ email: "history@example.com", isCoachingClient: false } as any, new Set(["history@example.com"]))).toBe(true);
+    expect(isPlusPilotCoachingClient({ email: "eligible@example.com", isCoachingClient: false } as any, new Set(["history@example.com"]))).toBe(false);
   });
 
   it("prioritizes eligibility score and then longer time without a match", () => {
