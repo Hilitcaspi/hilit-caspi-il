@@ -799,8 +799,6 @@ export const plusPilotMembers = mysqlTable("plus_pilot_members", {
   socialApprovedText: text("social_approved_text"),
   waitlistedAt: bigint("waitlisted_at", { mode: "number" }).notNull(),
   invitedAt: bigint("invited_at", { mode: "number" }),
-  smsInvitedAt: bigint("sms_invited_at", { mode: "number" }),
-  smsProviderRunId: varchar("sms_provider_run_id", { length: 200 }),
   activatedAt: bigint("activated_at", { mode: "number" }),
   endedAt: bigint("ended_at", { mode: "number" }),
   lastEngagedAt: bigint("last_engaged_at", { mode: "number" }),

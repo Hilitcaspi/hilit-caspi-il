@@ -8,8 +8,10 @@ import { normalizeIsraeliMobile, sendSMSDetailed } from "./vibrate";
 
 export const PLUS_HOLIDAY_PILOT_COHORT = "holiday_plus_pilot_2026_09";
 export const PLUS_HOLIDAY_PILOT_JOURNEY = "plus_holiday_pilot_2026_09";
+export const PLUS_HOLIDAY_PILOT_SMS_JOURNEY = "plus_pilot_sms_2026_09";
 export const PLUS_PAYMENT_RECOVERY_COHORT = "plus_payment_recovery_2026_09";
 export const PLUS_PAYMENT_RECOVERY_JOURNEY = "plus_payment_recovery_2026_09";
+export const PLUS_PAYMENT_RECOVERY_SMS_JOURNEY = "plus_recovery_sms_2026_09";
 export const PLUS_HOLIDAY_PILOT_NEW_COUNTS = { female: 30, male: 30 } as const;
 const PLUS_PUBLIC_URL = "https://hilitcaspi.com/database-plus";
 
@@ -448,8 +450,12 @@ export async function sendPreparedPlusHolidayPilotSms(): Promise<{ total: number
 
   let accepted = 0;
   let failed = 0;
+  const smsLogs = await db.select().from(emailLog).where(eq(emailLog.journeyKey, PLUS_HOLIDAY_PILOT_SMS_JOURNEY));
+  const smsLogByEmail = new Map(smsLogs.map(log => [normalizeCampaignEmail(log.recipientEmail), log]));
   for (const row of rows) {
-    if (row.member.smsInvitedAt) {
+    const email = normalizeCampaignEmail(row.single.email);
+    const existingLog = smsLogByEmail.get(email);
+    if (existingLog?.status === "sent" && existingLog.sentAt) {
       accepted += 1;
       continue;
     }
@@ -459,23 +465,42 @@ export async function sendPreparedPlusHolidayPilotSms(): Promise<{ total: number
       continue;
     }
     const content = buildPlusHolidayPilotSms({
-      email: normalizeCampaignEmail(row.single.email),
+      email,
       token: String(row.single.questionnaireToken || ""),
     });
+    const now = Date.now();
+    let logId = existingLog?.id || 0;
+    if (!logId) {
+      const inserted = await db.insert(emailLog).values({
+        recipientEmail: email,
+        recipientName: `${row.single.firstName} ${row.single.lastName || ""}`.trim(),
+        journeyKey: PLUS_HOLIDAY_PILOT_SMS_JOURNEY,
+        emailIndex: 1,
+        subject: "[SMS] נבחרת להשקה הראשונה של Database Plus",
+        htmlBody: "SMS delivery record",
+        textBody: content.message,
+        scheduledAt: now,
+        status: "processing",
+        createdAt: now,
+      });
+      logId = Number((inserted as unknown as [{ insertId?: number }])[0]?.insertId || 0);
+    } else {
+      await db.update(emailLog).set({ status: "processing", errorMessage: null }).where(eq(emailLog.id, logId));
+    }
     const delivery = await sendSMSDetailed(phone, content.message);
+    const sentAt = Date.now();
     if (!delivery.accepted) {
       failed += 1;
+      if (logId) await db.update(emailLog).set({ status: "failed", sentAt, errorMessage: delivery.error || "provider_rejected" }).where(eq(emailLog.id, logId));
       continue;
     }
-    const sentAt = Date.now();
     accepted += 1;
+    if (logId) await db.update(emailLog).set({ status: "sent", sentAt, errorMessage: delivery.providerRunId }).where(eq(emailLog.id, logId));
     await db.update(plusPilotMembers).set({
       status: "invited",
       invitedAt: row.member.invitedAt || sentAt,
-      smsInvitedAt: sentAt,
-      smsProviderRunId: delivery.providerRunId,
       updatedAt: sentAt,
-    }).where(and(eq(plusPilotMembers.id, row.member.id), isNull(plusPilotMembers.smsInvitedAt)));
+    }).where(eq(plusPilotMembers.id, row.member.id));
   }
   return { total: rows.length, accepted, failed, female, male };
 }
@@ -682,8 +707,12 @@ export async function sendPreparedPlusPaymentRecoverySms(): Promise<{ total: num
 
   let accepted = 0;
   let failed = 0;
+  const smsLogs = await db.select().from(emailLog).where(eq(emailLog.journeyKey, PLUS_PAYMENT_RECOVERY_SMS_JOURNEY));
+  const smsLogByEmail = new Map(smsLogs.map(log => [normalizeCampaignEmail(log.recipientEmail), log]));
   for (const row of contactableRows) {
-    if (row.member.smsInvitedAt) {
+    const email = normalizeCampaignEmail(row.single.email);
+    const existingLog = smsLogByEmail.get(email);
+    if (existingLog?.status === "sent" && existingLog.sentAt) {
       accepted += 1;
       continue;
     }
@@ -693,23 +722,42 @@ export async function sendPreparedPlusPaymentRecoverySms(): Promise<{ total: num
       continue;
     }
     const content = buildPlusPaymentRecoverySms({
-      email: normalizeCampaignEmail(row.single.email),
+      email,
       token: String(row.single.questionnaireToken || ""),
     });
+    const now = Date.now();
+    let logId = existingLog?.id || 0;
+    if (!logId) {
+      const inserted = await db.insert(emailLog).values({
+        recipientEmail: email,
+        recipientName: `${row.single.firstName} ${row.single.lastName || ""}`.trim(),
+        journeyKey: PLUS_PAYMENT_RECOVERY_SMS_JOURNEY,
+        emailIndex: 1,
+        subject: "[SMS] השלמת הצטרפות ל־Database Plus",
+        htmlBody: "SMS delivery record",
+        textBody: content.message,
+        scheduledAt: now,
+        status: "processing",
+        createdAt: now,
+      });
+      logId = Number((inserted as unknown as [{ insertId?: number }])[0]?.insertId || 0);
+    } else {
+      await db.update(emailLog).set({ status: "processing", errorMessage: null }).where(eq(emailLog.id, logId));
+    }
     const delivery = await sendSMSDetailed(phone, content.message);
+    const sentAt = Date.now();
     if (!delivery.accepted) {
       failed += 1;
+      if (logId) await db.update(emailLog).set({ status: "failed", sentAt, errorMessage: delivery.error || "provider_rejected" }).where(eq(emailLog.id, logId));
       continue;
     }
-    const sentAt = Date.now();
     accepted += 1;
+    if (logId) await db.update(emailLog).set({ status: "sent", sentAt, errorMessage: delivery.providerRunId }).where(eq(emailLog.id, logId));
     await db.update(plusPilotMembers).set({
       status: "invited",
       invitedAt: row.member.invitedAt || sentAt,
-      smsInvitedAt: sentAt,
-      smsProviderRunId: delivery.providerRunId,
       updatedAt: sentAt,
-    }).where(and(eq(plusPilotMembers.id, row.member.id), isNull(plusPilotMembers.smsInvitedAt)));
+    }).where(eq(plusPilotMembers.id, row.member.id));
   }
   return { total: contactableRows.length, accepted, failed, excluded };
 }
