@@ -1,17 +1,54 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, or } from "drizzle-orm";
 import { z } from "zod";
-import { crmTeamTasks, matchBoostRequests, matches, plusPilotMembers, singles } from "../drizzle/schema";
+import { crmTeamTasks, matchBoostMemberships, matchBoostRequests, matches, plusPaymentEvents, plusPilotMembers, singles } from "../drizzle/schema";
 import { getDb } from "./db";
 import { sendEmail } from "./brevo";
+import { zonedMidnightUtc } from "./dailyReportMetrics";
 import { getMissingProfileFields } from "./matchmakingMetrics";
 import { calculatePlusCycleProgress } from "./plusSubscription";
-import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved } from "./plusPilotCapacity";
+import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
 import { PLUS_CHECKOUT_PUBLICLY_AVAILABLE } from "./growPayment";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 
 const PLUS_STATUSES = ["waitlist", "eligible", "invited", "active", "declined", "churned"] as const;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function getIsraelCalendarMonthRange(now = Date.now()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jerusalem",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date(now));
+  const year = Number(parts.find(part => part.type === "year")?.value || 0);
+  const month = Number(parts.find(part => part.type === "month")?.value || 0);
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+  const nextMonthDate = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  return {
+    start: zonedMidnightUtc(startDate),
+    end: zonedMidnightUtc(nextMonthDate),
+    label: new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", month: "long", year: "numeric" }).format(new Date(now)),
+  };
+}
+
+export function hasConfirmedProductionPlusPayment(events: Array<{ eventType: string; amountAgorot: number; providerTransactionId?: string | null }>) {
+  return events.some(event => ["subscription_started", "payment_succeeded"].includes(event.eventType)
+    && Number(event.amountAgorot || 0) >= 9900
+    && Boolean(event.providerTransactionId));
+}
+
+export function calculatePlusBoostBenefit(member: any, requests: any[]) {
+  const cycleStart = Number(member.billingCycleStartedAt || 0);
+  const request = requests.find(row => row.source === "plus_included"
+    && Number(row.plusBillingCycleStartedAt || 0) === cycleStart);
+  const active = member.status === "active" && member.billingStatus === "active";
+  return {
+    available: active && cycleStart > 0 && !request,
+    used: Boolean(request),
+    requestStatus: request?.status || null,
+    usedAt: request?.requestedAt || null,
+  };
+}
 
 export function assessPlusEligibility(single: any, memberMatches: any[], now = Date.now()) {
   const missingFields = getMissingProfileFields(single);
@@ -249,22 +286,77 @@ export const plusPilotRouter = router({
       .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
       .orderBy(desc(plusPilotMembers.updatedAt));
 
-    const allMatches = await db.select({
-      id: matches.id,
-      singleAId: matches.singleAId,
-      singleBId: matches.singleBId,
-      proposedAt: matches.proposedAt,
-    }).from(matches);
-    const boostRows = await db.select({ matchId: matchBoostRequests.matchId }).from(matchBoostRequests);
+    const [allMatches, boostRows, boostMembershipRows, paymentRows, matchSingles] = await Promise.all([
+      db.select({
+        id: matches.id,
+        singleAId: matches.singleAId,
+        singleBId: matches.singleBId,
+        proposedAt: matches.proposedAt,
+        status: matches.status,
+        matchDetailStatus: matches.matchDetailStatus,
+        score: matches.score,
+      }).from(matches),
+      db.select({
+        matchId: matchBoostRequests.matchId,
+        singleId: matchBoostRequests.singleId,
+        source: matchBoostRequests.source,
+        status: matchBoostRequests.status,
+        plusBillingCycleStartedAt: matchBoostRequests.plusBillingCycleStartedAt,
+        requestedAt: matchBoostRequests.requestedAt,
+      }).from(matchBoostRequests),
+      db.select({
+        singleId: matchBoostMemberships.singleId,
+        status: matchBoostMemberships.status,
+        source: matchBoostMemberships.source,
+        eligibleAt: matchBoostMemberships.eligibleAt,
+      }).from(matchBoostMemberships),
+      db.select({
+        plusMemberId: plusPaymentEvents.plusMemberId,
+        eventType: plusPaymentEvents.eventType,
+        amountAgorot: plusPaymentEvents.amountAgorot,
+        providerTransactionId: plusPaymentEvents.providerTransactionId,
+      }).from(plusPaymentEvents),
+      db.select({ id: singles.id, firstName: singles.firstName, lastName: singles.lastName }).from(singles),
+    ]);
     const boostMatchIds = new Set(boostRows.map(row => Number(row.matchId || 0)).filter(Boolean));
     const countableMatches = allMatches.map(match => ({
       ...match,
       proposalSource: boostMatchIds.has(match.id) ? "boost" : "manual",
     }));
-    const enrichedRows = rows.map(row => ({
-      ...row,
-      cycleProgress: calculatePlusCycleProgress(row.pilot, countableMatches),
-    }));
+    const monthRange = getIsraelCalendarMonthRange();
+    const singleById = new Map(matchSingles.map(single => [single.id, single]));
+    const membershipBySingleId = new Map(boostMembershipRows.map(membership => [membership.singleId, membership]));
+    const enrichedRows = rows.map(row => {
+      const memberMatches = countableMatches.filter(match => match.singleAId === row.single.id || match.singleBId === row.single.id);
+      const monthMatches = memberMatches
+        .filter(match => Number(match.proposedAt || 0) >= monthRange.start && Number(match.proposedAt || 0) < monthRange.end && match.status !== "pending")
+        .sort((a, b) => Number(b.proposedAt || 0) - Number(a.proposedAt || 0))
+        .map(match => {
+          const otherId = match.singleAId === row.single.id ? match.singleBId : match.singleAId;
+          const other = singleById.get(otherId);
+          return {
+            id: match.id,
+            proposedAt: match.proposedAt,
+            status: match.status,
+            matchDetailStatus: match.matchDetailStatus,
+            score: match.score,
+            source: match.proposalSource,
+            other: other ? { id: other.id, firstName: other.firstName, lastName: other.lastName } : null,
+          };
+        });
+      const memberBoostRequests = boostRows.filter(request => request.singleId === row.single.id);
+      const paymentEvents = paymentRows.filter(event => event.plusMemberId === row.pilot.id);
+      return {
+        ...row,
+        confirmedPayment: hasConfirmedProductionPlusPayment(paymentEvents),
+        cycleProgress: calculatePlusCycleProgress(row.pilot, memberMatches),
+        monthMatches,
+        monthMatchCount: monthMatches.filter(match => match.source !== "boost").length,
+        monthLabel: monthRange.label,
+        boostMembership: membershipBySingleId.get(row.single.id) || null,
+        boostBenefit: calculatePlusBoostBenefit(row.pilot, memberBoostRequests),
+      };
+    });
     const counts = Object.fromEntries(PLUS_STATUSES.map(status => [status, rows.filter(row => row.pilot.status === status).length]));
     const invitedBase = counts.invited + counts.active + counts.declined + counts.churned;
     const activatedBase = counts.active + counts.churned;
@@ -284,6 +376,7 @@ export const plusPilotRouter = router({
       waitlistToInviteRate: rows.length > 0 ? Math.round(invitedBase / rows.length * 100) : 0,
       inviteToActiveRate: invitedBase > 0 ? Math.round((counts.active + counts.churned) / invitedBase * 100) : 0,
       retentionRate: activatedBase > 0 ? Math.round(counts.active / activatedBase * 100) : 0,
+      monthLabel: monthRange.label,
       rows: enrichedRows,
     };
   }),
@@ -314,6 +407,17 @@ export const plusPilotRouter = router({
         .limit(1);
       if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "חבר/ת הפיילוט לא נמצא/ה" });
 
+      if (input.status === "active") {
+        const paymentEvents = await db.select({
+          eventType: plusPaymentEvents.eventType,
+          amountAgorot: plusPaymentEvents.amountAgorot,
+          providerTransactionId: plusPaymentEvents.providerTransactionId,
+        }).from(plusPaymentEvents).where(eq(plusPaymentEvents.plusMemberId, member.pilot.id));
+        if (member.pilot.billingStatus !== "active" || !hasConfirmedProductionPlusPayment(paymentEvents)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "אפשר להפעיל Plus רק לאחר תשלום Production מאושר של 99 ₪" });
+        }
+      }
+
       const reservingSlot = input.status === "invited" || input.status === "active";
       if (reservingSlot && !isPlusPilotSlotReserved(member.pilot.status)) {
         const capacityRows = await db.select({
@@ -326,7 +430,7 @@ export const plusPilotRouter = router({
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: member.single.gender === "female" || member.single.gender === "male"
-              ? `מכסת 20 ${genderLabel} בפיילוט Plus מלאה`
+              ? `מכסת ${PLUS_PILOT_LIMIT_PER_GENDER} ${genderLabel} בפיילוט Plus מלאה`
               : "יש לעדכן מגדר בפרופיל לפני הזמנה לפיילוט Plus",
           });
         }

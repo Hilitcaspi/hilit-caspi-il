@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { and, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import {
   crmLeads,
+  emailLog,
   feedbackAutomationSettings,
   matches,
   singles,
@@ -178,9 +179,190 @@ async function getSettings(): Promise<FeedbackAutomationSetting | null> {
 
 async function canEmailContact(email: string): Promise<boolean> {
   const normalizedEmail = normalizeTestimonialEmail(email);
-  if (!normalizedEmail || isPermanentlyBlockedEmail(normalizedEmail)) return false;
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || isPermanentlyBlockedEmail(normalizedEmail)) return false;
   const suppression = await isEmailMarketingSuppressed(normalizedEmail);
   return !suppression.suppressed;
+}
+
+export function isFeedbackDraftSendable(record: Pick<TestimonialRecord, "status" | "requestSentAt" | "contactEmail">) {
+  const normalizedEmail = normalizeTestimonialEmail(record.contactEmail);
+  return Boolean(normalizedEmail
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
+    && !record.requestSentAt
+    && ["draft", "candidate", "approved_to_contact"].includes(record.status));
+}
+
+function campaignVariantFromSnapshot(sourceSnapshot: string | null): TestimonialCampaignVariant | undefined {
+  if (!sourceSnapshot) return undefined;
+  try {
+    const value = (JSON.parse(sourceSnapshot) as { campaignVariant?: unknown }).campaignVariant;
+    return typeof value === "string" ? value as TestimonialCampaignVariant : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function canSendFeedbackRecord(db: any, record: TestimonialRecord) {
+  if (!(await canEmailContact(record.contactEmail))) return false;
+  if (record.singleId) {
+    const [single] = await db.select({ isActive: singles.isActive, consentEmailMarketing: singles.consentEmailMarketing })
+      .from(singles).where(eq(singles.id, record.singleId)).limit(1);
+    if (!single?.isActive || !single.consentEmailMarketing) return false;
+  }
+  if (record.crmLeadId) {
+    const [lead] = await db.select({ emailUnsubscribed: crmLeads.emailUnsubscribed })
+      .from(crmLeads).where(eq(crmLeads.id, record.crmLeadId)).limit(1);
+    if (lead?.emailUnsubscribed) return false;
+  }
+  return true;
+}
+
+function trackedFeedbackEmail(htmlContent: string, emailLogId: number, feedbackUrl: string) {
+  const clickUrl = `${SITE_BASE}/api/email/click/${emailLogId}?url=${encodeURIComponent(feedbackUrl)}`;
+  const pixel = `<img src="${SITE_BASE}/api/email/open/${emailLogId}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;opacity:0" />`;
+  return htmlContent.replace(feedbackUrl, clickUrl).replace("</body>", `${pixel}</body>`);
+}
+
+export async function sendFeedbackRequestNow(input: { recordId: number; approvedBy: string }): Promise<{ status: "accepted" | "already_sent" | "archived" | "failed" }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [record] = await db.select().from(testimonialRecords).where(eq(testimonialRecords.id, input.recordId)).limit(1);
+  if (!record) throw new Error("Feedback draft was not found");
+  if (record.requestSentAt || record.status === "sent") return { status: "already_sent" };
+  if (!isFeedbackDraftSendable(record)) throw new Error("Feedback record is not ready for email delivery");
+
+  const now = Date.now();
+  if (!(await canSendFeedbackRecord(db, record))) {
+    await db.update(testimonialRecords).set({ status: "archived", archivedAt: now, updatedAt: now })
+      .where(and(eq(testimonialRecords.id, record.id), isNull(testimonialRecords.requestSentAt)));
+    await db.insert(testimonialEvents).values({
+      recordId: record.id,
+      eventType: "archived",
+      actorType: "system",
+      actorRef: "testimonial-manual-send-preflight",
+      metadata: JSON.stringify({ reason: "suppressed_inactive_or_no_consent" }),
+      createdAt: now,
+    });
+    return { status: "archived" };
+  }
+
+  const claim = await db.update(testimonialRecords).set({
+    status: "candidate",
+    deliveryChannel: "email",
+    requestApprovedAt: now,
+    requestApprovedBy: input.approvedBy,
+    scheduledAt: null,
+    updatedAt: now,
+  }).where(and(
+    eq(testimonialRecords.id, record.id),
+    isNull(testimonialRecords.requestSentAt),
+    or(eq(testimonialRecords.status, "draft"), eq(testimonialRecords.status, "candidate"), eq(testimonialRecords.status, "approved_to_contact")),
+  ));
+  const claimed = Number((claim as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0);
+  if (claimed !== 1) return { status: "already_sent" };
+
+  await db.insert(testimonialEvents).values({
+    recordId: record.id,
+    eventType: "contact_approved",
+    actorType: "team",
+    actorRef: input.approvedBy,
+    metadata: JSON.stringify({ channel: "email", sentFrom: "testimonial_crm" }),
+    createdAt: now,
+  });
+
+  const feedbackUrl = buildFeedbackUrl(record.publicToken);
+  const email = buildFeedbackRequestEmail({
+    firstName: record.contactName.trim().split(/\s+/)[0] || "שלום",
+    contactEmail: record.contactEmail,
+    sourceType: record.sourceType,
+    surveyKind: record.surveyKind,
+    feedbackUrl,
+    reminder: record.touchpoint === "match_week",
+    campaignVariant: campaignVariantFromSnapshot(record.sourceSnapshot),
+    draftSubject: record.draftSubject,
+    draftBody: record.draftBody,
+    rewardType: record.rewardType,
+  });
+
+  const [existingLog] = await db.select().from(emailLog).where(and(
+    eq(emailLog.journeyKey, "testimonial_request"),
+    eq(emailLog.emailIndex, record.id),
+  )).limit(1);
+  if (existingLog?.status === "sent" && existingLog.sentAt) {
+    await db.update(testimonialRecords).set({ status: "sent", requestSentAt: existingLog.sentAt, updatedAt: Date.now() })
+      .where(eq(testimonialRecords.id, record.id));
+    return { status: "already_sent" };
+  }
+
+  let emailLogId = existingLog?.id || 0;
+  if (!emailLogId) {
+    const inserted = await db.insert(emailLog).values({
+      leadId: record.crmLeadId,
+      recipientEmail: record.contactEmail,
+      recipientName: record.contactName,
+      journeyKey: "testimonial_request",
+      emailIndex: record.id,
+      subject: email.subject,
+      htmlBody: email.htmlContent,
+      textBody: email.textContent,
+      scheduledAt: now,
+      status: "processing",
+      createdAt: now,
+    });
+    emailLogId = Number((inserted as unknown as [{ insertId?: number }])[0]?.insertId || 0);
+  } else {
+    await db.update(emailLog).set({ status: "processing", errorMessage: null }).where(eq(emailLog.id, emailLogId));
+  }
+  const htmlContent = emailLogId ? trackedFeedbackEmail(email.htmlContent, emailLogId, feedbackUrl) : email.htmlContent;
+  if (emailLogId) await db.update(emailLog).set({ htmlBody: htmlContent }).where(eq(emailLog.id, emailLogId));
+
+  const delivery = await sendEmail({
+    to: { email: record.contactEmail, name: record.contactName },
+    subject: email.subject,
+    htmlContent,
+    textContent: email.textContent,
+  });
+  if (!delivery.success || delivery.messageId === "blocked") {
+    if (emailLogId) await db.update(emailLog).set({ status: "failed", errorMessage: (delivery.error || "provider_rejected").slice(0, 500) }).where(eq(emailLog.id, emailLogId));
+    await db.update(testimonialRecords).set({ status: record.status, requestApprovedAt: record.requestApprovedAt, requestApprovedBy: record.requestApprovedBy, requestSentAt: null, updatedAt: Date.now() })
+      .where(and(eq(testimonialRecords.id, record.id), isNull(testimonialRecords.requestSentAt)));
+    return { status: "failed" };
+  }
+
+  const acceptedAt = Date.now();
+  await db.update(testimonialRecords).set({ status: "sent", requestSentAt: acceptedAt, updatedAt: acceptedAt })
+    .where(and(eq(testimonialRecords.id, record.id), isNull(testimonialRecords.requestSentAt)));
+  if (emailLogId) await db.update(emailLog).set({ status: "sent", sentAt: acceptedAt }).where(eq(emailLog.id, emailLogId));
+  await db.insert(testimonialEvents).values({
+    recordId: record.id,
+    eventType: "request_marked_sent",
+    actorType: "team",
+    actorRef: input.approvedBy,
+    metadata: JSON.stringify({ channel: "email", emailLogId, providerMessageId: delivery.messageId || null }),
+    createdAt: acceptedAt,
+  });
+  return { status: "accepted" };
+}
+
+export async function sendFeedbackRequestBatch(input: { recordIds: number[]; approvedBy: string; concurrency?: number }) {
+  const uniqueIds = Array.from(new Set(input.recordIds));
+  if (uniqueIds.length === 0 || uniqueIds.length > 150) throw new Error("Choose between 1 and 150 feedback drafts");
+  const results: Array<{ status: "accepted" | "already_sent" | "archived" | "failed" }> = [];
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(input.concurrency ?? 4, uniqueIds.length) }, async () => {
+    while (cursor < uniqueIds.length) {
+      const id = uniqueIds[cursor++];
+      results.push(await sendFeedbackRequestNow({ recordId: id, approvedBy: input.approvedBy }));
+    }
+  });
+  await Promise.all(workers);
+  return {
+    total: uniqueIds.length,
+    accepted: results.filter(result => result.status === "accepted").length,
+    alreadySent: results.filter(result => result.status === "already_sent").length,
+    archived: results.filter(result => result.status === "archived").length,
+    failed: results.filter(result => result.status === "failed").length,
+  };
 }
 
 export async function ensurePositiveFeedbackRequest(input: {

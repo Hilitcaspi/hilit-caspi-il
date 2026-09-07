@@ -1,4 +1,4 @@
-export const PLUS_PILOT_LIMIT_PER_GENDER = 20;
+export const PLUS_PILOT_LIMIT_PER_GENDER = 30;
 
 export type PlusPilotGender = "female" | "male";
 

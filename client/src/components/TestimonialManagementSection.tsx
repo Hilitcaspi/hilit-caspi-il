@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Archive, CheckCircle2, Clipboard, Eye, FileVideo, Filter, Image as ImageIcon, Loader2, Plus, RefreshCw, Search, ShieldCheck, XCircle } from "lucide-react";
+import { Archive, CheckCircle2, Clipboard, Eye, FileVideo, Filter, Image as ImageIcon, Loader2, MailCheck, Plus, RefreshCw, Search, ShieldCheck, XCircle } from "lucide-react";
 import TestimonialCreativeLibrarySection from "./TestimonialCreativeLibrarySection";
 
 const statusLabels: Record<string, string> = {
@@ -125,6 +125,7 @@ export default function TestimonialManagementSection({ preview = false }: { prev
   const prepareHistorical = trpc.testimonial.team.prepareHistoricalDrafts.useMutation();
   const prepareSatisfaction = trpc.testimonial.team.prepareSatisfactionDrafts.useMutation();
   const prepareCampaignAudience = trpc.testimonial.team.prepareFeedbackCampaignAudienceDrafts.useMutation();
+  const sendDraftEmails = trpc.testimonial.team.sendDraftEmails.useMutation();
 
   async function refreshAll() {
     await Promise.all([
@@ -141,6 +142,7 @@ export default function TestimonialManagementSection({ preview = false }: { prev
   const automation = automationQuery.data;
   const sample = sampleQuery.data;
   const campaignAudiences = campaignAudienceQuery.data?.audiences || [];
+  const sendableRecords = records.filter((record: any) => ["draft", "candidate", "approved_to_contact"].includes(record.status) && !record.requestSentAt);
 
   return (
     <section dir="rtl" className="rounded-2xl bg-[#f7f3ef] p-4 md:p-6">
@@ -188,7 +190,7 @@ export default function TestimonialManagementSection({ preview = false }: { prev
               <h3 className="mt-1 text-xl font-bold text-[#2a1712]">עדויות ממאץ׳ הדדי, מעקב הצלחה ומדגם DNA</h3>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6f5d55]">המערכת מפרידה בין מי שעדיין לא נתנו עדות, מי שכבר שיתפו ומתאימים לבדיקת המשך הקשר, ומסיימי מסע DNA שפתחו מיילים ולא רכשו. הסרות דיוור, חוסר הסכמה, פרופילים לא פעילים וכפילויות מוחרגים.</p>
             </div>
-            <Badge className="w-fit border border-amber-300 bg-amber-50 text-amber-900">שליחה נעולה עד אישור נפרד</Badge>
+            <Badge className="w-fit border border-amber-300 bg-amber-50 text-amber-900">הטיוטות נשלחות רק לאחר לחיצה ואישור</Badge>
           </div>
           <div className="mt-4 grid gap-4 xl:grid-cols-3">
             {campaignAudienceQuery.isLoading ? <LoadingCard /> : campaignAudiences.map(audience => (
@@ -249,7 +251,7 @@ export default function TestimonialManagementSection({ preview = false }: { prev
               </div>
             ))}
           </div>
-          <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><strong>בקרת שליחה:</strong> הכנת הטיוטות אינה מאשרת פנייה ואינה קובעת מועד. הפעלת שליחה תתבצע במסך ובפעולה נפרדים ורק לאחר אישור מפורש.</p>
+          <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><strong>בקרת שליחה:</strong> הכנת הטיוטות אינה שולחת דבר. לאחר ההכנה הן מופיעות במשפך, ושם אפשר לשלוח טיוטה אחת או את כל הטיוטות המוצגות. לפני כל שליחה המערכת מבקשת אישור ובודקת מחדש הסרה, הסכמה, פרופיל פעיל וכפילות.</p>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-8">
@@ -273,6 +275,15 @@ export default function TestimonialManagementSection({ preview = false }: { prev
           <FilterSelect value={sourceType} onChange={value => setSourceType(value as SourceType | "all")} options={sourceLabels} placeholder="כל המקורות" />
           <FilterSelect value={proofType} onChange={value => setProofType(value as ProofType | "all")} options={proofLabels} placeholder="כל סוגי ההוכחה" />
           <Button variant="outline" onClick={() => void refreshAll()} className="gap-2"><RefreshCw className="h-4 w-4" />רענון</Button>
+          {!preview && sendableRecords.length > 0 && <Button disabled={sendDraftEmails.isPending} className="gap-2 bg-[#6f3f52] text-white hover:bg-[#5c3344]" onClick={async () => {
+            const approved = window.confirm(`לשלוח עכשיו ${sendableRecords.length.toLocaleString("he-IL")} מיילי בקשת משוב מהטיוטות המוצגות? לפני כל שליחה תתבצע בדיקה חוזרת של הסרה, הסכמה, פרופיל פעיל וכפילות.`);
+            if (!approved) return;
+            try {
+              const result = await sendDraftEmails.mutateAsync({ ids: sendableRecords.map((record: any) => record.id), confirmedSend: true });
+              toast.success(`התקבלו אצל הספק: ${result.accepted}. כבר נשלחו: ${result.alreadySent}. הוחרגו: ${result.archived}. נכשלו: ${result.failed}.`);
+              await refreshAll();
+            } catch (error) { toast.error(error instanceof Error ? error.message : "שליחת הטיוטות נכשלה"); }
+          }}>{sendDraftEmails.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MailCheck className="h-4 w-4" />}שליחת {sendableRecords.length.toLocaleString("he-IL")} טיוטות מוצגות</Button>}
         </div>
 
         <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(330px,.9fr)_minmax(0,1.5fr)]">
@@ -336,6 +347,7 @@ function RecordDetails({ data, onRefresh }: { data: any; onRefresh: () => Promis
   const structuredAnswers = parseStructuredAnswers(record.structuredAnswers);
   const update = trpc.testimonial.team.update.useMutation();
   const approveContact = trpc.testimonial.team.approveContact.useMutation();
+  const sendEmailNow = trpc.testimonial.team.sendEmailNow.useMutation();
   const verify = trpc.testimonial.team.verify.useMutation();
   const approve = trpc.testimonial.team.approve.useMutation();
   const revoke = trpc.testimonial.team.revoke.useMutation();
@@ -357,7 +369,7 @@ function RecordDetails({ data, onRefresh }: { data: any; onRefresh: () => Promis
   return <div className="space-y-6">
     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-2xl font-bold text-[#2a1712]">{record.contactName}</h3><Badge className={statusTone[record.status] || "bg-[#eee5df] text-[#62473a]"}>{statusLabels[record.status]}</Badge></div><p className="mt-1 text-sm text-[#76645c]">{record.contactEmail} · {surveyKindLabels[record.surveyKind]} · {touchpointLabels[record.touchpoint]}</p></div><Button variant="outline" size="sm" onClick={() => { void navigator.clipboard.writeText(formUrl); toast.success("הקישור הועתק"); }} className="gap-2"><Clipboard className="h-4 w-4" />העתקת טופס</Button></div>
 
-    <div className="rounded-xl bg-[#f6f1ed] p-4 text-sm leading-6 text-[#674f44]"><strong>מצב בטיחות:</strong> האוטומציה הכללית כבויה ואין תזמון פעיל. יצירת טיוטה או אישור לפנייה אינם שולחים דבר.</div>
+    <div className="rounded-xl bg-[#f6f1ed] p-4 text-sm leading-6 text-[#674f44]"><strong>מצב בטיחות:</strong> יצירת טיוטה או אישור לפנייה אינם שולחים דבר. שליחה מתבצעת רק בלחיצה על „שליחת מייל עכשיו” ולאחר אישור נוסף.</div>
 
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><InfoChip label="מקור" value={sourceLabels[record.sourceType]} /><InfoChip label="ערוץ" value={record.deliveryChannel === "email" ? "מייל" : record.deliveryChannel === "onsite" ? "באתר" : "ידני"} /><InfoChip label="מתנה" value={rewardLabels[record.rewardType]} /><InfoChip label="מסירה" value={record.requestSentAt ? new Date(record.requestSentAt).toLocaleDateString("he-IL") : "טרם נשלחה"} /></div>
 
@@ -379,7 +391,14 @@ function RecordDetails({ data, onRefresh }: { data: any; onRefresh: () => Promis
 
     {data.media.length > 0 && <div><h4 className="font-semibold">תמונה וסרטון</h4><div className="mt-3 grid gap-3 sm:grid-cols-2">{data.media.map((media: any) => <div key={media.id} className="rounded-xl border border-[#eadfd7] p-4"><div className="flex items-center gap-2">{media.mediaType === "image" ? <ImageIcon className="h-5 w-5" /> : <FileVideo className="h-5 w-5" />}<span className="min-w-0 flex-1 truncate text-sm">{media.originalFileName}</span><Badge>{media.status}</Badge></div><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void run(async () => { const result = await mediaUrl.mutateAsync({ id: record.id, mediaId: media.id }); window.open(result.url, "_blank", "noopener,noreferrer"); }, "קישור צפייה מאובטח נפתח")}><Eye className="ml-1 h-4 w-4" />צפייה</Button><Button size="sm" variant="outline" onClick={() => void run(() => reviewMedia.mutateAsync({ id: record.id, mediaId: media.id, decision: "approved" }), "המדיה אושרה")}><CheckCircle2 className="ml-1 h-4 w-4" />אישור</Button><Button size="sm" variant="outline" onClick={() => void run(() => reviewMedia.mutateAsync({ id: record.id, mediaId: media.id, decision: "rejected", reason: "לא אושר לשימוש" }), "המדיה נדחתה")}><XCircle className="ml-1 h-4 w-4" />דחייה</Button></div></div>)}</div></div>}
 
-    <div className="flex flex-wrap gap-2">{["draft", "candidate"].includes(record.status) && <Button onClick={() => void run(() => approveContact.mutateAsync({ id: record.id }), "הפנייה אושרה. דבר לא נשלח.")} className="bg-[#654032] text-white">אישור להכנת פנייה</Button>}{["submitted", "awaiting_consent", "awaiting_verification"].includes(record.status) && !record.teamVerifiedAt && <Button onClick={() => void run(() => verify.mutateAsync({ id: record.id }), "המשוב אומת")}>אימות צוות</Button>}{record.teamVerifiedAt && record.status === "awaiting_verification" && <Button onClick={() => void run(() => approve.mutateAsync({ id: record.id, approvedText }), "העדות אושרה לפרסום")}>אישור לפרסום</Button>}{!["revoked", "archived"].includes(record.status) && <Button variant="outline" onClick={() => void run(() => revoke.mutateAsync({ id: record.id, reason: "בוטל ידנית ב־CRM" }), "הסכמת השימוש בוטלה")}><ShieldCheck className="ml-1 h-4 w-4" />ביטול הסכמה</Button>}<Button variant="outline" onClick={() => void run(() => archive.mutateAsync({ id: record.id }), "הרשומה הועברה לארכיון")}><Archive className="ml-1 h-4 w-4" />ארכיון</Button></div>
+    <div className="flex flex-wrap gap-2">{["draft", "candidate"].includes(record.status) && !record.requestKey?.startsWith("campaign:") && <Button onClick={() => void run(() => approveContact.mutateAsync({ id: record.id }), "הפנייה אושרה. דבר לא נשלח.")} className="bg-[#654032] text-white">אישור להכנת פנייה</Button>}{["draft", "candidate", "approved_to_contact"].includes(record.status) && !record.requestSentAt && <Button disabled={sendEmailNow.isPending} onClick={() => {
+      if (!window.confirm(`לשלוח עכשיו מייל בקשת משוב אל ${record.contactName}? לפני השליחה ייבדקו מחדש הסרה, הסכמה, פרופיל פעיל וכפילות.`)) return;
+      void run(async () => {
+        const result = await sendEmailNow.mutateAsync({ id: record.id, confirmedSend: true });
+        if (result.status === "archived") throw new Error("הנמען הוחרג עקב הסרה, חוסר הסכמה או פרופיל לא פעיל");
+        if (result.status === "failed") throw new Error("ספק המייל לא קיבל את בקשת השליחה");
+      }, "המייל התקבל אצל ספק השליחה");
+    }} className="gap-2 bg-[#6f3f52] text-white hover:bg-[#5c3344]"><MailCheck className="h-4 w-4" />{sendEmailNow.isPending ? "שולח..." : "שליחת מייל עכשיו"}</Button>}{["submitted", "awaiting_consent", "awaiting_verification"].includes(record.status) && !record.teamVerifiedAt && <Button onClick={() => void run(() => verify.mutateAsync({ id: record.id }), "המשוב אומת")}>אימות צוות</Button>}{record.teamVerifiedAt && record.status === "awaiting_verification" && <Button onClick={() => void run(() => approve.mutateAsync({ id: record.id, approvedText }), "העדות אושרה לפרסום")}>אישור לפרסום</Button>}{!["revoked", "archived"].includes(record.status) && <Button variant="outline" onClick={() => void run(() => revoke.mutateAsync({ id: record.id, reason: "בוטל ידנית ב־CRM" }), "הסכמת השימוש בוטלה")}><ShieldCheck className="ml-1 h-4 w-4" />ביטול הסכמה</Button>}<Button variant="outline" onClick={() => void run(() => archive.mutateAsync({ id: record.id }), "הרשומה הועברה לארכיון")}><Archive className="ml-1 h-4 w-4" />ארכיון</Button></div>
 
     {["approved", "published"].includes(record.status) && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><h4 className="font-semibold text-emerald-900">תיעוד שימוש מאושר</h4><div className="mt-3 grid gap-3 md:grid-cols-[1fr_1.5fr_auto]"><select value={usageChannel} onChange={e => setUsageChannel(e.target.value)} className="h-10 rounded-md border bg-white px-3 text-sm">{Object.entries(channelLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select><Input value={usageUrl} onChange={e => setUsageUrl(e.target.value)} placeholder="קישור למקום שבו פורסם, לא חובה" /><Button onClick={() => void run(() => recordUsage.mutateAsync({ id: record.id, channel: usageChannel as any, publicUrl: usageUrl || undefined }), "השימוש תועד")}>תיעוד שימוש</Button></div></div>}
 

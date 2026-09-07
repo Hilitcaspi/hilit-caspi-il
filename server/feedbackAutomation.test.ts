@@ -3,6 +3,7 @@ import {
   buildFeedbackRequestEmail,
   buildFeedbackRequestKey,
   feedbackProductPlan,
+  isFeedbackDraftSendable,
   isFeedbackTouchpointEnabled,
   shouldApplyFeedbackCooldown,
 } from "./feedbackAutomation";
@@ -83,5 +84,15 @@ describe("feedback automation", () => {
     expect(feedbackProductPlan("match_boost")).toBeNull();
     expect(feedbackProductPlan("guide")).toEqual({ sourceType: "guide", delayDays: 7 });
     expect(feedbackProductPlan("database")).toBeNull();
+  });
+
+  it("allows only unsent drafts, candidates and approved records to be delivered", () => {
+    const base = { contactEmail: "feedback@example.com", requestSentAt: null };
+    expect(isFeedbackDraftSendable({ ...base, status: "draft" })).toBe(true);
+    expect(isFeedbackDraftSendable({ ...base, status: "candidate" })).toBe(true);
+    expect(isFeedbackDraftSendable({ ...base, status: "approved_to_contact" })).toBe(true);
+    expect(isFeedbackDraftSendable({ ...base, status: "sent" })).toBe(false);
+    expect(isFeedbackDraftSendable({ ...base, status: "draft", requestSentAt: Date.now() })).toBe(false);
+    expect(isFeedbackDraftSendable({ ...base, status: "draft", contactEmail: "not-an-email" })).toBe(false);
   });
 });

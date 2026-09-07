@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfitAndLossSection } from "@/components/ProfitAndLossSection";
+import { getCurrentIsraelMonthStart } from "@/lib/dashboardDateRange";
 import {
   TrendingUp, Users, DollarSign, Mail, MousePointerClick,
   ChevronDown, ChevronUp, ArrowLeft, BarChart3,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 
 const PRESETS = [
+  { label: "החודש", days: null },
   { label: "7 ימים", days: 7 },
   { label: "14 ימים", days: 14 },
   { label: "30 ימים", days: 30 },
@@ -65,7 +67,7 @@ function MiniBarChart({ data, color = "bg-blue-500", height = 64 }: { data: { la
 }
 
 export default function Dashboard() {
-  const [preset, setPreset] = useState(2);
+  const [preset, setPreset] = useState(0);
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
   const [showAllLeads, setShowAllLeads] = useState(false);
   const [showPaymentAttempts, setShowPaymentAttempts] = useState(false);
@@ -79,7 +81,8 @@ export default function Dashboard() {
   }, [useCustom, customEnd]);
   const startDate = useMemo(() => {
     if (useCustom && customStart) return fromDateStr(customStart);
-    return Date.now() - PRESETS[preset].days * 24 * 60 * 60 * 1000;
+    const selected = PRESETS[preset];
+    return selected.days == null ? getCurrentIsraelMonthStart() : Date.now() - selected.days * 24 * 60 * 60 * 1000;
   }, [useCustom, customStart, preset]);
 
   const dateInput = { startDate, endDate };

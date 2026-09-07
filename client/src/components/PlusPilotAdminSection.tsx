@@ -12,7 +12,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function PlusPilotAdminSection() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [cohort, setCohort] = useState("pilot-01");
   const [price, setPrice] = useState("99");
   const overview = trpc.plusPilot.adminOverview.useQuery(undefined, { refetchInterval: 30000 });
@@ -46,7 +46,7 @@ export default function PlusPilotAdminSection() {
         <div>
           <p className="text-[11px] font-bold text-[#8b7420]">מנוי פרימיום · יעד מדיד של 2 הצעות בכל מחזור</p>
           <h3 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h3>
-          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">רשימת המתנה, חיוב, שירות פרימיום, מונה 0/2–2/2 להצעות שנבדקו ידנית ובוסט אלגוריתמי נוסף בכל מחזור. מעבר ל״הוזמן״ שולח מייל אישי עם מסך ההצעה.</p>
+          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">ברירת המחדל מציגה מנויים ששילמו והופעלו. לכל מנוי ניתן לראות את ההתאמות שנשלחו החודש, התקדמות 0/2–2/2 במחזור החיוב והאם הבוסט החינמי עדיין זמין או כבר נוצל.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <label className="rounded-xl border bg-white px-3 py-2">קוהורט <input value={cohort} onChange={event => setCohort(event.target.value)} className="mr-2 w-24 outline-none" /></label>
@@ -70,12 +70,12 @@ export default function PlusPilotAdminSection() {
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
         <div className={`rounded-xl border p-3 ${capacity.female.remaining === 0 ? "border-red-200 bg-red-50 text-red-800" : "border-pink-200 bg-pink-50 text-pink-800"}`}>
-          <strong className="text-lg">{capacity.female.reserved}/20</strong>
+          <strong className="text-lg">{capacity.female.reserved}/{capacity.female.limit}</strong>
           <span className="mr-1">נשים בפיילוט</span>
           <div className="text-[10px]">נותרו {capacity.female.remaining} מקומות</div>
         </div>
         <div className={`rounded-xl border p-3 ${capacity.male.remaining === 0 ? "border-red-200 bg-red-50 text-red-800" : "border-blue-200 bg-blue-50 text-blue-800"}`}>
-          <strong className="text-lg">{capacity.male.reserved}/20</strong>
+          <strong className="text-lg">{capacity.male.reserved}/{capacity.male.limit}</strong>
           <span className="mr-1">גברים בפיילוט</span>
           <div className="text-[10px]">נותרו {capacity.male.remaining} מקומות</div>
         </div>
@@ -116,9 +116,22 @@ export default function PlusPilotAdminSection() {
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold">
                   <span className={`rounded-full px-2 py-1 ${row.cycleProgress.state === "green" ? "bg-emerald-100 text-emerald-800" : row.cycleProgress.state === "red" ? "bg-red-100 text-red-800" : row.cycleProgress.state === "yellow" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"}`}>{row.cycleProgress.delivered}/{row.cycleProgress.target} הצעות · {row.cycleProgress.daysRemaining} ימים</span>
                   <span className={`rounded-full px-2 py-1 ${row.pilot.billingStatus === "active" ? "bg-blue-100 text-blue-800" : row.pilot.billingStatus === "past_due" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}>חיוב: {row.pilot.billingStatus}</span>
+                  {row.confirmedPayment && <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">תשלום 99 ₪ מאומת</span>}
                   {row.pilot.premiumSupportEnabled && <span className="rounded-full bg-[#191265] px-2 py-1 text-[#ffe27c]">שירות פרימיום</span>}
                   {row.pilot.socialExposureConsent === "approved" && <span className="rounded-full bg-pink-100 px-2 py-1 text-pink-800">אושר לסושיאל</span>}
                 </div>
+                {row.pilot.status === "active" && <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-xl border border-[#e4e0f4] bg-[#faf9ff] p-3">
+                    <div className="flex items-center justify-between gap-2"><strong className="text-[11px] text-[#191265]">התאמות ב{row.monthLabel}</strong><span className="text-sm font-black text-[#191265]">{row.monthMatchCount}/2</span></div>
+                    <div className="mt-2 space-y-1 text-[10px] text-[#666]">
+                      {row.monthMatches.length > 0 ? row.monthMatches.map((match: any) => <div key={match.id} className="flex items-center justify-between gap-2"><span>{match.other ? `${match.other.firstName} ${match.other.lastName || ""}`.trim() : `התאמה #${match.id}`}</span><span>{match.source === "boost" ? "בוסט" : "התאמה רגילה"} · {new Date(match.proposedAt).toLocaleDateString("he-IL")}</span></div>) : <span>טרם נשלחו התאמות החודש</span>}
+                    </div>
+                  </div>
+                  <div className={`rounded-xl border p-3 ${row.boostBenefit.used ? "border-violet-200 bg-violet-50" : row.boostBenefit.available ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-gray-50"}`}>
+                    <div className="flex items-center justify-between gap-2"><strong className="text-[11px] text-[#191265]">הבוסט החינמי במחזור</strong><span className="text-[10px] font-black">{row.boostBenefit.used ? "נוצל" : row.boostBenefit.available ? "זמין" : "לא זמין"}</span></div>
+                    <p className="mt-2 text-[10px] text-[#666]">{row.boostBenefit.used ? `סטטוס בקשה: ${row.boostBenefit.requestStatus || "נשלחה"}${row.boostBenefit.usedAt ? ` · ${new Date(row.boostBenefit.usedAt).toLocaleDateString("he-IL")}` : ""}` : row.boostBenefit.available ? "אפשר להפעיל מהאזור האישי" : `חברות Boost: ${row.boostMembership?.status || "לא הוגדרה"}`}</p>
+                  </div>
+                </div>}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {(["eligible", "invited", "active", "declined", "churned"] as const).map(status => (

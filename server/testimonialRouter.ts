@@ -26,7 +26,7 @@ import {
   prepareSatisfactionSurveyDrafts,
   previewFeedbackCampaignAudiences,
 } from "./feedbackCampaignDrafts";
-import { buildFeedbackRequestKey, buildFeedbackUrl } from "./feedbackAutomation";
+import { buildFeedbackRequestKey, buildFeedbackUrl, sendFeedbackRequestBatch, sendFeedbackRequestNow } from "./feedbackAutomation";
 import {
   buildTestimonialDraft,
   consentAllowsChannel,
@@ -542,6 +542,22 @@ export const testimonialRouter = router({
       }).where(eq(testimonialRecords.id, input.id));
       await appendEvent({ db, recordId: input.id, eventType: "contact_approved", actorType: "team", actorRef: actorFromContext(ctx) });
       return { success: true, note: "הפנייה אושרה אך לא נשלחה" };
+    }),
+
+    sendEmailNow: teamProcedure.input(z.object({
+      id: z.number().int().positive(),
+      confirmedSend: z.literal(true),
+    })).mutation(async ({ input, ctx }) => {
+      const result = await sendFeedbackRequestNow({ recordId: input.id, approvedBy: actorFromContext(ctx) });
+      if (result.status === "failed") throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "ספק המייל לא קיבל את בקשת השליחה" });
+      return result;
+    }),
+
+    sendDraftEmails: teamProcedure.input(z.object({
+      ids: z.array(z.number().int().positive()).min(1).max(150),
+      confirmedSend: z.literal(true),
+    })).mutation(async ({ input, ctx }) => {
+      return sendFeedbackRequestBatch({ recordIds: input.ids, approvedBy: actorFromContext(ctx), concurrency: 4 });
     }),
 
     markSent: teamProcedure.input(z.object({ id: z.number().int().positive(), channel: z.enum(["email", "whatsapp", "phone", "personal_area"]) })).mutation(async ({ input, ctx }) => {
