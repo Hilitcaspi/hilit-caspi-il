@@ -36,42 +36,41 @@ afterEach(() => {
 });
 
 describe("Database Plus hidden checkout", () => {
-  it("keeps checkout publicly unavailable even when Production recurring secrets exist", () => {
+  it("exposes checkout when Production recurring secrets exist", () => {
     process.env.GROW_PLUS_USER_ID = "synthetic-production-user";
     process.env.GROW_PAGE_CODE_PLUS = "synthetic-recurring-page";
 
-    expect(PLUS_CHECKOUT_PUBLICLY_AVAILABLE).toBe(false);
+    expect(PLUS_CHECKOUT_PUBLICLY_AVAILABLE).toBe(true);
     expect(PRODUCT_CONFIGS.plus.sum).toBe(99);
     expect(getPlusCheckoutConfig()).toEqual({
-      configured: false,
-      mode: "unconfigured",
-      checkoutAmount: null,
+      configured: true,
+      mode: "production",
+      checkoutAmount: 99,
       displayAmount: 99,
     });
   });
 
-  it("does not expose Plus while the public availability gate is closed", () => {
+  it("requires the dedicated Plus Production identifiers", () => {
     process.env.GROW_PLUS_USER_ID = "synthetic-production-user";
     process.env.GROW_PAGE_CODE_PLUS = "synthetic-production-plus-page";
     process.env.GROW_PAGE_CODE_DATABASE = "synthetic-database-page";
 
-    expect(getPlusCheckoutConfig().configured).toBe(false);
+    expect(getPlusCheckoutConfig()).toEqual({
+      configured: true,
+      mode: "production",
+      checkoutAmount: 99,
+      displayAmount: 99,
+    });
   });
 
-  it("rejects Plus before making any provider request", async () => {
+  it("rejects Plus without all three consents before making any provider request", async () => {
     process.env.GROW_PLUS_USER_ID = "synthetic-production-user";
     process.env.GROW_PAGE_CODE_PLUS = "synthetic-recurring-page";
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as typeof fetch;
 
-    await expect(createPaymentProcess({
-      product: "plus",
-      fullName: "Test Member",
-      email: "member@example.com",
-      phone: "0500000000",
-      origin: "https://preview.example",
-      plusWebhookReference: "synthetic-plus-reference",
-    })).rejects.toThrow("Database Plus payment product is not configured");
+    const appRouterSource = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
+    expect(appRouterSource).toContain('input.plusRenewalAccepted !== true || input.plusTermsAccepted !== true || input.plusBoostAccepted !== true');
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -95,15 +94,15 @@ describe("Database Plus hidden checkout", () => {
     expect(isPotentialPlusCharge(1, false)).toBe(false);
   });
 
-  it("hides all public Plus routes and purchase links", () => {
+  it("publishes the Plus sales, terms and thank-you routes", () => {
     const app = fs.readFileSync(path.join(process.cwd(), "client/src/App.tsx"), "utf8");
     const dashboard = fs.readFileSync(path.join(process.cwd(), "client/src/pages/UserDashboard.tsx"), "utf8");
     const pilotRouter = fs.readFileSync(path.join(process.cwd(), "server/plusPilotRouter.ts"), "utf8");
 
-    expect(app).toContain('<Route path={"/database-plus"} component={NotFound} />');
-    expect(app).toContain('<Route path={"/terms/plus"} component={NotFound} />');
-    expect(app).toContain('<Route path={"/thank-you/plus"} component={NotFound} />');
-    expect(app).not.toContain('import("@/pages/DatabasePlusSales")');
+    expect(app).toContain('<Route path={"/database-plus"} component={DatabasePlusSales} />');
+    expect(app).toContain('<Route path={"/terms/plus"} component={TermsPlus} />');
+    expect(app).toContain('<Route path={"/thank-you/plus"} component={ThankYouPlus} />');
+    expect(app).toContain('import("@/pages/DatabasePlusSales")');
     expect(dashboard).not.toContain("checkoutUrl");
     expect(dashboard).not.toContain("לפרטים ולמסך התשלום");
     expect(pilotRouter).toContain("PLUS_CHECKOUT_PUBLICLY_AVAILABLE && input.status === \"invited\"");

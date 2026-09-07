@@ -78,6 +78,9 @@ const BoostSalesLanding = lazy(() => import("@/pages/BoostSalesLanding"));
 const TermsMatchBoost = lazy(() => import("@/pages/TermsMatchBoost"));
 const ThankYouMatchBoost = lazy(() => import("@/pages/ThankYouMatchBoost"));
 const MatchBoostDemo = lazy(() => import("@/pages/MatchBoostDemo"));
+const DatabasePlusSales = lazy(() => import("@/pages/DatabasePlusSales"));
+const TermsPlus = lazy(() => import("@/pages/TermsPlus"));
+const ThankYouPlus = lazy(() => import("@/pages/ThankYouPlus"));
 
 // US English (EN) pages
 const EnHome = lazy(() => import("@/pages/en/Home"));
@@ -281,9 +284,9 @@ function HeRouter() {
           <Route path={"/database"} component={DatabaseSales} />
           <Route path={"/maagar"} component={DatabaseLanding} />
           <Route path={"/terms/database"} component={TermsDatabase} />
-          <Route path={"/database-plus"} component={NotFound} />
-          <Route path={"/terms/plus"} component={NotFound} />
-          <Route path={"/thank-you/plus"} component={NotFound} />
+          <Route path={"/database-plus"} component={DatabasePlusSales} />
+          <Route path={"/terms/plus"} component={TermsPlus} />
+          <Route path={"/thank-you/plus"} component={ThankYouPlus} />
           <Route path="/september" component={SeptemberOffers} />
           <Route path="/new-year-love" component={NewYearLoveBundle} />
           <Route path="/terms/new-year-love" component={TermsNewYearBundle} />

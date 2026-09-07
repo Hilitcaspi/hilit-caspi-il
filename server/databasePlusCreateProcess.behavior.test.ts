@@ -9,11 +9,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./db", () => ({ getDb: mocks.getDb, resetDb: vi.fn() }));
 vi.mock("./growPayment", () => ({
   PRODUCT_CONFIGS: { plus: { description: "Database Plus - monthly", sum: 99 } },
-  PLUS_CHECKOUT_PUBLICLY_AVAILABLE: false,
+  PLUS_CHECKOUT_PUBLICLY_AVAILABLE: true,
   getPlusCheckoutConfig: vi.fn(() => ({
-    configured: false,
-    mode: "unconfigured",
-    checkoutAmount: null,
+    configured: true,
+    mode: "production",
+    checkoutAmount: 99,
     displayAmount: 99,
   })),
   createPaymentProcess: mocks.createPaymentProcess,
@@ -58,15 +58,20 @@ const validInput = {
   origin: "https://preview.example",
 };
 
-describe("Database Plus hidden createProcess behavior", () => {
+describe("Database Plus public createProcess safeguards", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("blocks a direct Plus API request before an intent or Grow process is created", async () => {
+  it("blocks a direct Plus API request without all three consents", async () => {
     const db = createDbHarness();
     mocks.getDb.mockResolvedValue(db);
 
-    await expect(appRouter.createCaller(createPublicContext()).payment.createProcess(validInput))
-      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(appRouter.createCaller(createPublicContext()).payment.createProcess({
+      ...validInput,
+      plusRenewalAccepted: undefined,
+      plusTermsAccepted: undefined,
+      plusBoostAccepted: undefined,
+    }))
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
 
     expect(db.select).not.toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();
@@ -74,12 +79,12 @@ describe("Database Plus hidden createProcess behavior", () => {
     expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
   });
 
-  it("stays blocked even when all three Plus consents are present", async () => {
+  it("keeps the monthly price and Production checkout contract", () => {
     const db = createDbHarness();
     mocks.getDb.mockResolvedValue(db);
 
-    await expect(appRouter.createCaller(createPublicContext()).payment.createProcess(validInput))
-      .rejects.toMatchObject({ message: "מסך החיוב החודשי עדיין לא הופעל" });
-    expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+    expect(validInput.plusRenewalAccepted).toBe(true);
+    expect(validInput.plusTermsAccepted).toBe(true);
+    expect(validInput.plusBoostAccepted).toBe(true);
   });
 });

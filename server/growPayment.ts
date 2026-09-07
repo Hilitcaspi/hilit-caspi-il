@@ -85,7 +85,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
 };
 
 export type PlusCheckoutMode = "production" | "unconfigured";
-export const PLUS_CHECKOUT_PUBLICLY_AVAILABLE = false;
+export const PLUS_CHECKOUT_PUBLICLY_AVAILABLE = true;
 
 export function getPlusCheckoutConfig(): {
   configured: boolean;
