@@ -11,6 +11,7 @@ import { isPotentialPlusCharge } from "./growWebhook";
 
 const originalEnv = {
   productionUserId: process.env.GROW_USER_ID,
+  plusUserId: process.env.GROW_PLUS_USER_ID,
   productionPageCode: process.env.GROW_PAGE_CODE_PLUS,
   databasePageCode: process.env.GROW_PAGE_CODE_DATABASE,
   sandboxUserId: process.env.GROW_SANDBOX_USER_ID,
@@ -25,6 +26,7 @@ function restoreEnv(key: string, value: string | undefined) {
 
 afterEach(() => {
   restoreEnv("GROW_USER_ID", originalEnv.productionUserId);
+  restoreEnv("GROW_PLUS_USER_ID", originalEnv.plusUserId);
   restoreEnv("GROW_PAGE_CODE_PLUS", originalEnv.productionPageCode);
   restoreEnv("GROW_PAGE_CODE_DATABASE", originalEnv.databasePageCode);
   restoreEnv("GROW_SANDBOX_USER_ID", originalEnv.sandboxUserId);
@@ -34,9 +36,9 @@ afterEach(() => {
 });
 
 describe("Database Plus hidden checkout", () => {
-  it("reports checkout as unavailable even when Sandbox secrets exist", () => {
-    process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
-    process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
+  it("keeps checkout publicly unavailable even when Production recurring secrets exist", () => {
+    process.env.GROW_PLUS_USER_ID = "synthetic-production-user";
+    process.env.GROW_PAGE_CODE_PLUS = "synthetic-recurring-page";
 
     expect(PLUS_CHECKOUT_PUBLICLY_AVAILABLE).toBe(false);
     expect(PRODUCT_CONFIGS.plus.sum).toBe(99);
@@ -48,8 +50,8 @@ describe("Database Plus hidden checkout", () => {
     });
   });
 
-  it("does not fall back to any production page code", () => {
-    process.env.GROW_USER_ID = "synthetic-production-user";
+  it("does not expose Plus while the public availability gate is closed", () => {
+    process.env.GROW_PLUS_USER_ID = "synthetic-production-user";
     process.env.GROW_PAGE_CODE_PLUS = "synthetic-production-plus-page";
     process.env.GROW_PAGE_CODE_DATABASE = "synthetic-database-page";
 
@@ -57,8 +59,8 @@ describe("Database Plus hidden checkout", () => {
   });
 
   it("rejects Plus before making any provider request", async () => {
-    process.env.GROW_SANDBOX_USER_ID = "synthetic-sandbox-user";
-    process.env.GROW_SANDBOX_RECURRING_PAGE_CODE = "synthetic-recurring-page";
+    process.env.GROW_PLUS_USER_ID = "synthetic-production-user";
+    process.env.GROW_PAGE_CODE_PLUS = "synthetic-recurring-page";
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as typeof fetch;
 
@@ -72,6 +74,19 @@ describe("Database Plus hidden checkout", () => {
     })).rejects.toThrow("Database Plus payment product is not configured");
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the hidden Plus integration on secure with recurring charge type and Production identifiers", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "server/growPayment.ts"), "utf8");
+
+    expect(source).toContain('const GROW_PLUS_API_URL = "https://secure.meshulam.co.il/api/light/server/1.0/createPaymentProcess"');
+    expect(source).toContain('const GROW_PLUS_APPROVE_URL = "https://secure.meshulam.co.il/api/light/server/1.0/approveTransaction"');
+    expect(source).toContain('process.env.GROW_PLUS_USER_ID?.trim()');
+    expect(source).toContain('process.env.GROW_PAGE_CODE_PLUS?.trim()');
+    expect(source).toContain('form.append("chargeType", "1")');
+    expect(source).toContain('form.append("sum", String(config.sum))');
+    expect(source).not.toContain('globalThis.fetch(GROW_SANDBOX_API_URL');
+    expect(source).not.toContain('usePlusSandbox');
   });
 
   it("still recognizes historical Plus webhook amounts for already-created processes", () => {

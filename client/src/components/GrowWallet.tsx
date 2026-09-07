@@ -340,7 +340,7 @@ export default function GrowWallet({
     };
 
     try {
-      // Plus Sandbox returns a hosted recurring-payment URL, so it must not
+      // Plus returns a hosted recurring-payment URL, so it must not
       // depend on the regular Grow wallet SDK. Other products still use the
       // embedded authCode flow and initialize the SDK before creating it.
       if (product !== "plus") {

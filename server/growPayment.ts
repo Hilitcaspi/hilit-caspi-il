@@ -1,7 +1,7 @@
 /**
  * Grow Payment SDK — Server-side helpers
  * ─────────────────────────────────────────────────────────────────────────────
- * Wraps the Grow createPaymentProcess API (sandbox.meshulam.co.il) so the
+ * Wraps the Grow createPaymentProcess API so the
  * frontend can open the inline wallet without ever touching the Grow API directly.
  *
  * Grow docs: https://grow-il.readme.io/reference/post_api-light-server-1-0-createpaymentprocess
@@ -17,8 +17,6 @@
 // Native fetch + browser-like headers bypasses this.
 
 // ─── Environment ──────────────────────────────────────────────────────────────
-// Use GROW_ENV=production to switch to the live Grow API.
-// Until Grow provides production pageCodes, keep this as sandbox.
 const IS_GROW_PROD = true; // Production — using secure.meshulam.co.il
 
 const GROW_API_BASE = IS_GROW_PROD
@@ -27,8 +25,8 @@ const GROW_API_BASE = IS_GROW_PROD
 
 const GROW_API_URL = `${GROW_API_BASE}/api/light/server/1.0/createPaymentProcess`;
 const GROW_APPROVE_URL = `${GROW_API_BASE}/api/light/server/1.0/approveTransaction`;
-const GROW_SANDBOX_API_URL = "https://sandbox.meshulam.co.il/api/light/server/1.0/createPaymentProcess";
-const GROW_SANDBOX_APPROVE_URL = "https://sandbox.meshulam.co.il/api/light/server/1.0/approveTransaction";
+const GROW_PLUS_API_URL = "https://secure.meshulam.co.il/api/light/server/1.0/createPaymentProcess";
+const GROW_PLUS_APPROVE_URL = "https://secure.meshulam.co.il/api/light/server/1.0/approveTransaction";
 
 // Browser-like headers to avoid Incapsula 403 blocking
 const BROWSER_HEADERS = {
@@ -58,7 +56,7 @@ const PAGE_CODES: Record<string, string> = {
   // wallet page. Product identity is preserved by its unique description and
   // by the pending Boost request created before Grow is opened.
   match_boost: process.env.GROW_PAGE_CODE_MATCH_BOOST || process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
-  // Plus uses the dedicated recurring-payment Sandbox branch below. Never
+  // Plus uses the dedicated recurring-payment Production branch below. Never
   // fall back to a regular production payment page for this product.
   plus:         process.env.GROW_PAGE_CODE_PLUS || "",
 };
@@ -86,7 +84,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   plus:         { description: "Database Plus - מנוי חודשי",                         sum: 99 },
 };
 
-export type PlusCheckoutMode = "production" | "sandbox" | "unconfigured";
+export type PlusCheckoutMode = "production" | "unconfigured";
 export const PLUS_CHECKOUT_PUBLICLY_AVAILABLE = false;
 
 export function getPlusCheckoutConfig(): {
@@ -98,12 +96,12 @@ export function getPlusCheckoutConfig(): {
   if (!PLUS_CHECKOUT_PUBLICLY_AVAILABLE) {
     return { configured: false, mode: "unconfigured", checkoutAmount: null, displayAmount: 99 };
   }
-  const sandboxConfigured = Boolean(
-    process.env.GROW_SANDBOX_USER_ID?.trim()
-    && process.env.GROW_SANDBOX_RECURRING_PAGE_CODE?.trim(),
+  const productionConfigured = Boolean(
+    process.env.GROW_PLUS_USER_ID?.trim()
+    && process.env.GROW_PAGE_CODE_PLUS?.trim(),
   );
-  if (sandboxConfigured) {
-    return { configured: true, mode: "sandbox", checkoutAmount: 1, displayAmount: 99 };
+  if (productionConfigured) {
+    return { configured: true, mode: "production", checkoutAmount: 99, displayAmount: 99 };
   }
   return { configured: false, mode: "unconfigured", checkoutAmount: null, displayAmount: 99 };
 }
@@ -122,7 +120,7 @@ export interface CreatePaymentInput {
   webhookReference?: string;
   /** Signed non-PII reference used to bind a public Plus webhook to one checkout. */
   plusWebhookReference?: string;
-  /** Browser origin used only for Plus Sandbox callbacks in the temporary preview. */
+  /** Browser origin used for the hosted Plus recurring-payment callback. */
   origin?: string;
 }
 
@@ -143,9 +141,9 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     throw new Error("The Database Plus payment product is not configured yet");
   }
 
-  if (plusCheckout?.mode === "sandbox") {
-    const pageCode = process.env.GROW_SANDBOX_RECURRING_PAGE_CODE?.trim() || "";
-    const userId = process.env.GROW_SANDBOX_USER_ID?.trim() || "";
+  if (plusCheckout?.mode === "production") {
+    const pageCode = process.env.GROW_PAGE_CODE_PLUS?.trim() || "";
+    const userId = process.env.GROW_PLUS_USER_ID?.trim() || "";
     const callbackBase = input.origin && /^https:\/\//i.test(input.origin)
       ? input.origin.replace(/\/$/, "")
       : SITE_BASE;
@@ -153,7 +151,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     form.append("userId", userId);
     form.append("pageCode", pageCode);
     form.append("chargeType", "1");
-    form.append("sum", "1");
+    form.append("sum", String(config.sum));
     form.append("description", "Database Plus Monthly");
     form.append("pageField[invoiceName]", input.fullName);
     form.append("pageField[fullName]", input.fullName);
@@ -161,11 +159,11 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     form.append("pageField[email]", input.email);
     form.append("successUrl", `${callbackBase}/thank-you/plus`);
     form.append("cancelUrl", callbackBase);
-    const sandboxNotifyUrl = new URL(`${callbackBase}/api/grow/webhook`);
-    if (input.plusWebhookReference) sandboxNotifyUrl.searchParams.set("plus_ref", input.plusWebhookReference);
-    form.append("notifyUrl", sandboxNotifyUrl.toString());
+    const notifyUrl = new URL(`${callbackBase}/api/grow/webhook`);
+    if (input.plusWebhookReference) notifyUrl.searchParams.set("plus_ref", input.plusWebhookReference);
+    form.append("notifyUrl", notifyUrl.toString());
 
-    const response = await globalThis.fetch(GROW_SANDBOX_API_URL, {
+    const response = await globalThis.fetch(GROW_PLUS_API_URL, {
       method: "POST",
       headers: { accept: "application/json", ...BROWSER_HEADERS },
       body: form,
@@ -181,17 +179,17 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
         customerEmail: input.email,
         customerPhone: input.phone,
         product: input.product,
-        amount: 1,
-        errorMessage: payload?.err || `Grow Sandbox returned HTTP ${response.status}`,
+        amount: config.sum,
+        errorMessage: payload?.err || `Grow Live returned HTTP ${response.status}`,
         stage: "createProcess",
       });
-      throw new Error(payload?.err || "Grow Sandbox did not return a hosted payment form");
+      throw new Error(payload?.err || "Grow Live did not return a hosted payment form");
     }
     return {
       authCode: "",
       processToken: payload.data.processToken,
       url: payload.data.url,
-      checkoutMode: "sandbox",
+      checkoutMode: "production",
     };
   }
 
@@ -314,19 +312,14 @@ export async function approveTransaction(
   product?: string
 ): Promise<boolean> {
   const data = webhookData ?? {};
-  const plusCheckout = product === "plus" ? getPlusCheckoutConfig() : null;
-  const usePlusSandbox = plusCheckout?.mode === "sandbox";
-  const productionUserId = product === "plus"
-    ? process.env.GROW_USER_ID?.trim() || GROW_USER_ID
+  const isPlus = product === "plus";
+  const growUserId = isPlus
+    ? process.env.GROW_PLUS_USER_ID?.trim() || ""
     : GROW_USER_ID;
-  const productionPageCode = product === "plus"
+  const pageCode = isPlus
     ? process.env.GROW_PAGE_CODE_PLUS?.trim() || ""
     : product ? (PAGE_CODES[product] ?? GROW_USER_ID) : GROW_USER_ID;
-  const growUserId = usePlusSandbox ? process.env.GROW_SANDBOX_USER_ID || "" : productionUserId;
-  const pageCode = usePlusSandbox
-    ? process.env.GROW_SANDBOX_RECURRING_PAGE_CODE || ""
-    : productionPageCode;
-  const approveUrl = usePlusSandbox ? GROW_SANDBOX_APPROVE_URL : GROW_APPROVE_URL;
+  const approveUrl = isPlus ? GROW_PLUS_APPROVE_URL : GROW_APPROVE_URL;
 
   const params = new URLSearchParams();
   // Required: pageCode and userId
