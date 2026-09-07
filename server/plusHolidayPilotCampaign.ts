@@ -4,6 +4,7 @@ import { sendEmail, isPermanentlyBlockedEmail } from "./brevo";
 import { getDb } from "./db";
 import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
 import { assessPlusEligibility } from "./plusPilotRouter";
+import { normalizeIsraeliMobile, sendSMSDetailed } from "./vibrate";
 
 export const PLUS_HOLIDAY_PILOT_COHORT = "holiday_plus_pilot_2026_09";
 export const PLUS_HOLIDAY_PILOT_JOURNEY = "plus_holiday_pilot_2026_09";
@@ -136,6 +137,16 @@ export function buildPlusHolidayPilotEmail(input: { firstName: string; email: st
   return { subject, htmlContent, textContent, checkoutUrl };
 }
 
+export function buildPlusHolidayPilotSms(input: { email: string; token: string }): {
+  message: string;
+  checkoutUrl: string;
+} {
+  const checkoutUrl = `${PLUS_PUBLIC_URL}?email=${encodeURIComponent(input.email)}&token=${encodeURIComponent(input.token)}&utm_source=sms&utm_medium=pilot_invitation&utm_campaign=${PLUS_HOLIDAY_PILOT_COHORT}`;
+  const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.email });
+  const message = `היי, כאן הילית 🤍\n\nנרשמת לרשימת ההמתנה ל־Database Plus, ואני שמחה לבשר שנבחרת להשקה הראשונה ✨\n\nמחכות לך 2 התאמות בכל חודש, בוסט אחד חינם בכל מחזור ויותר תשומת לב לפרופיל.\n\nלכבוד החגים אני שמה גז על ההיכרויות 🌿\n\nההצטרפות ב־99 ₪ לחודש:\n${checkoutUrl}\n\nלהסרה ממסרים שיווקיים:\n${unsubscribeUrl}`;
+  return { message, checkoutUrl };
+}
+
 export function buildPlusPaymentRecoveryEmail(input: { firstName: string; email: string; token: string }): {
   subject: string;
   htmlContent: string;
@@ -145,9 +156,19 @@ export function buildPlusPaymentRecoveryEmail(input: { firstName: string; email:
   const checkoutUrl = `${PLUS_PUBLIC_URL}?email=${encodeURIComponent(input.email)}&token=${encodeURIComponent(input.token)}&utm_source=email&utm_medium=payment_recovery&utm_campaign=${PLUS_PAYMENT_RECOVERY_COHORT}`;
   const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.email });
   const subject = "Database Plus נפתח היום. אפשר להשלים את ההצטרפות";
-  const textContent = `היי ${input.firstName},\n\nראיתי שניסית בעבר להצטרף ל־Database Plus. באותו זמן העמוד היה בסביבת בדיקה, ולכן חויבת ב־1 ₪ בלבד ולא הוגדר עבורך חיוב Plus של 99 ₪.\n\nההשקה הראשונה מתקיימת היום. במסלול מחכות לך שתי התאמות שאני בוחנת עבורך בכל חודש ובוסט אחד חינם בכל מחזור.\n\nאם תרצה להצטרף, אפשר להשלים כאן תשלום של 99 ₪ לחודש בחיוב מתחדש עד לביטול. השירות יופעל רק לאחר שהתשלום החדש ייקלט בהצלחה:\n${checkoutUrl}\n\nבאהבה,\nהילית\n\nלהסרה: ${unsubscribeUrl}`;
-  const htmlContent = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8" /></head><body style="margin:0;background:#f5efe7;font-family:Arial,sans-serif;color:#2b1816"><div style="max-width:620px;margin:0 auto;padding:28px 16px"><div style="background:#2b1816;border-radius:24px 24px 0 0;padding:34px 28px;text-align:center"><div style="font-size:14px;color:#d9b989">הילית כספי | מומחית לזוגיות</div><h1 style="margin:16px 0 0;color:#fff8ef;font-size:31px;line-height:1.25">Database Plus נפתח היום</h1></div><div style="background:#fffdf9;border-radius:0 0 24px 24px;padding:34px 30px;line-height:1.8;font-size:17px"><p style="margin-top:0">היי ${input.firstName},</p><p>ראיתי שניסית בעבר להצטרף ל־Database Plus. באותו זמן העמוד היה בסביבת בדיקה, ולכן חויבת ב־<strong>1 ₪ בלבד</strong> ולא הוגדר עבורך חיוב Plus של 99 ₪.</p><p>ההשקה הראשונה מתקיימת היום. במסלול מחכות לך <strong>שתי התאמות שאני בוחנת עבורך בכל חודש</strong> ו־<strong>בוסט אחד חינם בכל מחזור</strong>.</p><p>אם תרצה להצטרף, אפשר להשלים תשלום של <strong>99 ₪ לחודש</strong> בחיוב מתחדש עד לביטול. השירות יופעל רק לאחר שהתשלום החדש ייקלט בהצלחה.</p><div style="text-align:center;margin:30px 0"><a href="${checkoutUrl}" style="display:inline-block;background:#d9a7a7;color:#2b1816;text-decoration:none;font-weight:700;padding:15px 30px;border-radius:999px">להשלמת התשלום והפעלת Plus</a></div><p style="margin-bottom:0">באהבה,<br /><strong>הילית</strong></p></div><div style="text-align:center;padding:18px;font-size:12px;color:#7d6c64"><a href="${unsubscribeUrl}" style="color:#7d6c64">הסרה מרשימת הדיוור</a></div></div></body></html>`;
+  const textContent = `היי ${input.firstName},\n\nראיתי שניסית בעבר להצטרף ל־Database Plus. באותו זמן העמוד היה בסביבת בדיקה, ולכן חויבת ב־1 ₪ בלבד ולא הוגדר עבורך חיוב Plus של 99 ₪.\n\nההשקה הראשונה מתקיימת היום, ואני שמחה שבחרת להשתתף. במסלול מחכות לך שתי התאמות שאני בוחנת עבורך בכל חודש ובוסט אחד חינם בכל מחזור.\n\nלהצטרפות אפשר להשלים כאן תשלום של 99 ₪ לחודש בחיוב מתחדש עד לביטול. השירות יופעל רק לאחר שהתשלום החדש ייקלט בהצלחה:\n${checkoutUrl}\n\nבאהבה,\nהילית\n\nלהסרה: ${unsubscribeUrl}`;
+  const htmlContent = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8" /></head><body style="margin:0;background:#f5efe7;font-family:Arial,sans-serif;color:#2b1816"><div style="max-width:620px;margin:0 auto;padding:28px 16px"><div style="background:#2b1816;border-radius:24px 24px 0 0;padding:34px 28px;text-align:center"><div style="font-size:14px;color:#d9b989">הילית כספי | מומחית לזוגיות</div><h1 style="margin:16px 0 0;color:#fff8ef;font-size:31px;line-height:1.25">Database Plus נפתח היום</h1></div><div style="background:#fffdf9;border-radius:0 0 24px 24px;padding:34px 30px;line-height:1.8;font-size:17px"><p style="margin-top:0">היי ${input.firstName},</p><p>ראיתי שניסית בעבר להצטרף ל־Database Plus. באותו זמן העמוד היה בסביבת בדיקה, ולכן חויבת ב־<strong>1 ₪ בלבד</strong> ולא הוגדר עבורך חיוב Plus של 99 ₪.</p><p>ההשקה הראשונה מתקיימת היום, ואני שמחה שבחרת להשתתף. במסלול מחכות לך <strong>שתי התאמות שאני בוחנת עבורך בכל חודש</strong> ו־<strong>בוסט אחד חינם בכל מחזור</strong>.</p><p>להצטרפות אפשר להשלים תשלום של <strong>99 ₪ לחודש</strong> בחיוב מתחדש עד לביטול. השירות יופעל רק לאחר שהתשלום החדש ייקלט בהצלחה.</p><div style="text-align:center;margin:30px 0"><a href="${checkoutUrl}" style="display:inline-block;background:#d9a7a7;color:#2b1816;text-decoration:none;font-weight:700;padding:15px 30px;border-radius:999px">להשלמת התשלום והפעלת Plus</a></div><p style="margin-bottom:0">באהבה,<br /><strong>הילית</strong></p></div><div style="text-align:center;padding:18px;font-size:12px;color:#7d6c64"><a href="${unsubscribeUrl}" style="color:#7d6c64">הסרה מרשימת הדיוור</a></div></div></body></html>`;
   return { subject, htmlContent, textContent, checkoutUrl };
+}
+
+export function buildPlusPaymentRecoverySms(input: { email: string; token: string }): {
+  message: string;
+  checkoutUrl: string;
+} {
+  const checkoutUrl = `${PLUS_PUBLIC_URL}?email=${encodeURIComponent(input.email)}&token=${encodeURIComponent(input.token)}&utm_source=sms&utm_medium=payment_recovery&utm_campaign=${PLUS_PAYMENT_RECOVERY_COHORT}`;
+  const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.email });
+  const message = `היי, כאן הילית 🤍\n\nנבחרת להשקה הראשונה של Database Plus, ואני שמחה שבחרת להשתתף ✨\n\nבניסיון הקודם בוצע חיוב בדיקה של 1 ₪ בלבד. התשלום המלא לא הועבר ולכן מנוי Plus עדיין לא הופעל.\n\nאפשר להשלים כאן הצטרפות ב־99 ₪ לחודש:\n${checkoutUrl}\n\nמיד לאחר אישור התשלום ייפתחו עבורך שתי התאמות בכל חודש ובוסט אחד חינם בכל מחזור.\n\nלהסרה ממסרים שיווקיים:\n${unsubscribeUrl}`;
+  return { message, checkoutUrl };
 }
 
 function trackedEmailContent(htmlContent: string, logId: number, checkoutUrl: string): string {
@@ -275,9 +296,8 @@ export async function sendPreparedPlusHolidayPilotInvitations(): Promise<{ total
     .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
     .where(and(
       eq(plusPilotMembers.pilotCohort, PLUS_HOLIDAY_PILOT_COHORT),
-      eq(plusPilotMembers.status, "eligible"),
+      inArray(plusPilotMembers.status, ["eligible", "invited"]),
       eq(plusPilotMembers.billingStatus, "not_configured"),
-      isNull(plusPilotMembers.invitedAt),
     ));
   const expectedFemale = rows.filter(row => row.single.gender === "female").length;
   const expectedMale = rows.filter(row => row.single.gender === "male").length;
@@ -376,6 +396,90 @@ export async function sendPreparedPlusHolidayPilotInvitations(): Promise<{ total
   return { total: rows.length, accepted, failed, female: expectedFemale, male: expectedMale };
 }
 
+export async function sendPreparedPlusHolidayPilotSms(): Promise<{ total: number; accepted: number; failed: number; female: number; male: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select({ member: plusPilotMembers, single: singles })
+    .from(plusPilotMembers)
+    .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
+    .where(and(
+      eq(plusPilotMembers.pilotCohort, PLUS_HOLIDAY_PILOT_COHORT),
+      inArray(plusPilotMembers.status, ["eligible", "invited"]),
+      eq(plusPilotMembers.billingStatus, "not_configured"),
+    ));
+  const female = rows.filter(row => row.single.gender === "female").length;
+  const male = rows.filter(row => row.single.gender === "male").length;
+  if (rows.length !== 60 || female !== 30 || male !== 30 || rows.some(row => !String(row.single.questionnaireToken || "").trim())) {
+    throw new Error("Plus pilot SMS snapshot mismatch");
+  }
+
+  const rowIds = rows.map(row => row.single.id);
+  const [currentMatches, coachingEmails] = await Promise.all([
+    db.select({
+      id: matches.id,
+      singleAId: matches.singleAId,
+      singleBId: matches.singleBId,
+      proposedAt: matches.proposedAt,
+      status: matches.status,
+      matchDetailStatus: matches.matchDetailStatus,
+      returnedToPoolAt: matches.returnedToPoolAt,
+    }).from(matches).where(or(inArray(matches.singleAId, rowIds), inArray(matches.singleBId, rowIds))),
+    loadCoachingClientEmails(db),
+  ]);
+  const matchesBySingle = new Map<number, typeof currentMatches>();
+  for (const match of currentMatches) {
+    for (const singleId of [match.singleAId, match.singleBId]) {
+      if (!singleId || !rowIds.includes(singleId)) continue;
+      const memberMatches = matchesBySingle.get(singleId) || [];
+      memberMatches.push(match);
+      matchesBySingle.set(singleId, memberMatches);
+    }
+  }
+  for (const row of rows) {
+    const email = normalizeCampaignEmail(row.single.email);
+    const assessment = assessPlusEligibility(row.single, matchesBySingle.get(row.single.id) || []);
+    const suppressed = isPermanentlyBlockedEmail(email) || (await isEmailMarketingSuppressed(email)).suppressed;
+    if (!row.single.isPaid || !row.single.isActive || row.single.isSeed || !row.single.consentEmailMarketing || suppressed
+      || !normalizeIsraeliMobile(String(row.single.phone || "")) || isPlusPilotCoachingClient(row.single, coachingEmails)
+      || !assessment.eligible || assessment.activeMatch || assessment.positiveOutcome || assessment.potentialMatchesUnderReview < 2) {
+      throw new Error("Plus pilot SMS recipient is no longer eligible");
+    }
+  }
+
+  let accepted = 0;
+  let failed = 0;
+  for (const row of rows) {
+    if (row.member.smsInvitedAt) {
+      accepted += 1;
+      continue;
+    }
+    const phone = normalizeIsraeliMobile(String(row.single.phone || ""));
+    if (!phone) {
+      failed += 1;
+      continue;
+    }
+    const content = buildPlusHolidayPilotSms({
+      email: normalizeCampaignEmail(row.single.email),
+      token: String(row.single.questionnaireToken || ""),
+    });
+    const delivery = await sendSMSDetailed(phone, content.message);
+    if (!delivery.accepted) {
+      failed += 1;
+      continue;
+    }
+    const sentAt = Date.now();
+    accepted += 1;
+    await db.update(plusPilotMembers).set({
+      status: "invited",
+      invitedAt: row.member.invitedAt || sentAt,
+      smsInvitedAt: sentAt,
+      smsProviderRunId: delivery.providerRunId,
+      updatedAt: sentAt,
+    }).where(and(eq(plusPilotMembers.id, row.member.id), isNull(plusPilotMembers.smsInvitedAt)));
+  }
+  return { total: rows.length, accepted, failed, female, male };
+}
+
 export async function preparePlusPaymentRecoveryCandidates(): Promise<{ prepared: number }> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -435,9 +539,8 @@ export async function sendPreparedPlusPaymentRecoveryEmails(): Promise<{ total: 
     .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
     .where(and(
       eq(plusPilotMembers.pilotCohort, PLUS_PAYMENT_RECOVERY_COHORT),
-      eq(plusPilotMembers.status, "eligible"),
+      inArray(plusPilotMembers.status, ["eligible", "invited"]),
       eq(plusPilotMembers.billingStatus, "not_configured"),
-      isNull(plusPilotMembers.invitedAt),
     ));
   if (rows.length !== 5 || rows.some(row => row.single.gender !== "male" || !String(row.single.questionnaireToken || "").trim())) {
     throw new Error("Plus payment recovery email snapshot mismatch");
@@ -456,17 +559,27 @@ export async function sendPreparedPlusPaymentRecoveryEmails(): Promise<{ total: 
   const validFailedSandboxIntents = new Set(recoveryIntents
     .filter(intent => intent.checkoutMode === "sandbox" && intent.status === "failed" && intent.amountAgorot === 100)
     .map(intent => intent.email.trim().toLowerCase()));
+  const contactableRows: typeof rows = [];
+  let suppressedCount = 0;
   for (const row of rows) {
     const email = String(row.single.email || "").trim().toLowerCase();
     const suppressed = isPermanentlyBlockedEmail(email) || (await isEmailMarketingSuppressed(email)).suppressed;
-    if (!row.single.isPaid || !row.single.isActive || row.single.isSeed || !row.single.consentEmailMarketing || suppressed
+    if (!row.single.isPaid || !row.single.isActive || row.single.isSeed
       || recoveryTotals.get(row.member.id) !== 100 || !validFailedSandboxIntents.has(email)) {
       throw new Error("Plus payment recovery recipient snapshot changed");
     }
+    if (!row.single.consentEmailMarketing || suppressed) {
+      suppressedCount += 1;
+      continue;
+    }
+    contactableRows.push(row);
+  }
+  if (contactableRows.length !== 3 || suppressedCount !== 2) {
+    throw new Error("Plus payment recovery contactable snapshot mismatch");
   }
   let accepted = 0;
   let failed = 0;
-  for (const row of rows) {
+  for (const row of contactableRows) {
     const email = String(row.single.email || "").trim().toLowerCase();
     if (isPermanentlyBlockedEmail(email) || (await isEmailMarketingSuppressed(email)).suppressed) {
       failed += 1;
@@ -513,5 +626,90 @@ export async function sendPreparedPlusPaymentRecoveryEmails(): Promise<{ total: 
     await db.update(plusPilotMembers).set({ status: "invited", invitedAt: sentAt, updatedAt: sentAt })
       .where(and(eq(plusPilotMembers.id, row.member.id), eq(plusPilotMembers.status, "eligible"), isNull(plusPilotMembers.invitedAt)));
   }
-  return { total: rows.length, accepted, failed };
+  return { total: contactableRows.length, accepted, failed };
+}
+
+export async function sendPreparedPlusPaymentRecoverySms(): Promise<{ total: number; accepted: number; failed: number; excluded: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select({ member: plusPilotMembers, single: singles })
+    .from(plusPilotMembers)
+    .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
+    .where(and(
+      eq(plusPilotMembers.pilotCohort, PLUS_PAYMENT_RECOVERY_COHORT),
+      inArray(plusPilotMembers.status, ["eligible", "invited"]),
+      eq(plusPilotMembers.billingStatus, "not_configured"),
+    ));
+  if (rows.length !== 5 || rows.some(row => row.single.gender !== "male" || !String(row.single.questionnaireToken || "").trim())) {
+    throw new Error("Plus payment recovery SMS snapshot mismatch");
+  }
+
+  const memberIds = rows.map(row => row.member.id);
+  const emails = rows.map(row => normalizeCampaignEmail(row.single.email));
+  const [events, intents] = await Promise.all([
+    db.select().from(plusPaymentEvents).where(inArray(plusPaymentEvents.plusMemberId, memberIds)),
+    db.select().from(plusCheckoutIntents).where(inArray(plusCheckoutIntents.email, emails)),
+  ]);
+  const paidTotals = new Map<number, number>();
+  for (const event of events) {
+    if (!['subscription_started', 'payment_succeeded'].includes(event.eventType) || !event.providerTransactionId) continue;
+    paidTotals.set(event.plusMemberId, (paidTotals.get(event.plusMemberId) || 0) + event.amountAgorot);
+  }
+  const failedSandboxEmails = new Set(intents
+    .filter(intent => intent.checkoutMode === "sandbox" && intent.status === "failed" && intent.amountAgorot === 100)
+    .map(intent => normalizeCampaignEmail(intent.email)));
+  const contactableRows: typeof rows = [];
+  let excluded = 0;
+  for (const row of rows) {
+    const email = normalizeCampaignEmail(row.single.email);
+    const suppressed = isPermanentlyBlockedEmail(email) || (await isEmailMarketingSuppressed(email)).suppressed;
+    if (!row.single.isPaid || !row.single.isActive || row.single.isSeed
+      || paidTotals.get(row.member.id) !== 100 || !failedSandboxEmails.has(email)) {
+      throw new Error("Plus payment recovery SMS recipient snapshot changed");
+    }
+    if (!row.single.consentEmailMarketing || suppressed) {
+      excluded += 1;
+      continue;
+    }
+    if (!normalizeIsraeliMobile(String(row.single.phone || ""))) {
+      throw new Error("Plus payment recovery recipient has no valid mobile");
+    }
+    contactableRows.push(row);
+  }
+  if (contactableRows.length !== 3 || excluded !== 2) {
+    throw new Error("Plus payment recovery SMS contactable snapshot mismatch");
+  }
+
+  let accepted = 0;
+  let failed = 0;
+  for (const row of contactableRows) {
+    if (row.member.smsInvitedAt) {
+      accepted += 1;
+      continue;
+    }
+    const phone = normalizeIsraeliMobile(String(row.single.phone || ""));
+    if (!phone) {
+      failed += 1;
+      continue;
+    }
+    const content = buildPlusPaymentRecoverySms({
+      email: normalizeCampaignEmail(row.single.email),
+      token: String(row.single.questionnaireToken || ""),
+    });
+    const delivery = await sendSMSDetailed(phone, content.message);
+    if (!delivery.accepted) {
+      failed += 1;
+      continue;
+    }
+    const sentAt = Date.now();
+    accepted += 1;
+    await db.update(plusPilotMembers).set({
+      status: "invited",
+      invitedAt: row.member.invitedAt || sentAt,
+      smsInvitedAt: sentAt,
+      smsProviderRunId: delivery.providerRunId,
+      updatedAt: sentAt,
+    }).where(and(eq(plusPilotMembers.id, row.member.id), isNull(plusPilotMembers.smsInvitedAt)));
+  }
+  return { total: contactableRows.length, accepted, failed, excluded };
 }

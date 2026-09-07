@@ -15,7 +15,7 @@ const SENDER_NAME = "HilitCaspi";
 /**
  * Normalize Israeli phone number to 05XXXXXXXX format
  */
-function normalizePhone(phone: string): string | null {
+export function normalizeIsraeliMobile(phone: string): string | null {
   let normalized = phone.replace(/[\s\-\(\)\+]/g, "");
   // Convert international format (972...) to local (0...)
   if (normalized.startsWith("972")) {
@@ -34,16 +34,22 @@ function normalizePhone(phone: string): string | null {
  * @param message - Message text (plain text)
  * @returns true only when Vibrate accepts the request with HTTP 202; this does not confirm handset delivery
  */
-export async function sendSMS(phone: string, message: string): Promise<boolean> {
+export type SmsDeliveryResult = {
+  accepted: boolean;
+  providerRunId: string | null;
+  error: string | null;
+};
+
+export async function sendSMSDetailed(phone: string, message: string): Promise<SmsDeliveryResult> {
   if (!VIBRATE_API_KEY) {
     console.warn("[Vibrate] VIBRATE_API_KEY not set, skipping SMS send");
-    return false;
+    return { accepted: false, providerRunId: null, error: "missing_api_key" };
   }
 
-  const normalizedPhone = normalizePhone(phone);
+  const normalizedPhone = normalizeIsraeliMobile(phone);
   if (!normalizedPhone) {
     console.warn(`[Vibrate] Invalid phone number: ${phone.slice(0, 4)}****`);
-    return false;
+    return { accepted: false, providerRunId: null, error: "invalid_phone" };
   }
 
   try {
@@ -64,14 +70,22 @@ export async function sendSMS(phone: string, message: string): Promise<boolean> 
     if (res.status === 202) {
       const data = await res.json().catch(() => ({}));
       console.log(`[Vibrate] SMS accepted by provider for ${normalizedPhone.slice(0, 4)}****${normalizedPhone.slice(-2)}, runId: ${data.runId ?? "unknown"}`);
-      return true;
+      return {
+        accepted: true,
+        providerRunId: typeof data.runId === "string" && data.runId ? data.runId : null,
+        error: null,
+      };
     }
 
     const text = await res.text().catch(() => "");
     console.error(`[Vibrate] Failed to send SMS to ${normalizedPhone.slice(0, 4)}****: ${res.status} ${text}`);
-    return false;
+    return { accepted: false, providerRunId: null, error: `http_${res.status}` };
   } catch (err) {
     console.error(`[Vibrate] Error sending SMS:`, err);
-    return false;
+    return { accepted: false, providerRunId: null, error: "network_error" };
   }
+}
+
+export async function sendSMS(phone: string, message: string): Promise<boolean> {
+  return (await sendSMSDetailed(phone, message)).accepted;
 }

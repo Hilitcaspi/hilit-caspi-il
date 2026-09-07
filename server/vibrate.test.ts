@@ -13,7 +13,7 @@ describe("Vibrate SMS Service", () => {
   });
 
   it("treats HTTP 202 as provider acceptance while normalizing Israeli phone numbers", async () => {
-    const { sendSMS } = await import("./vibrate");
+    const { sendSMS, sendSMSDetailed } = await import("./vibrate");
     
     // Valid phone - should attempt to send
     mockFetch.mockResolvedValueOnce({
@@ -38,6 +38,16 @@ describe("Vibrate SMS Service", () => {
         }),
       })
     );
+
+    mockFetch.mockResolvedValueOnce({
+      status: 202,
+      json: () => Promise.resolve({ runId: "test-789" }),
+    });
+    await expect(sendSMSDetailed("0559348719", "Test message")).resolves.toEqual({
+      accepted: true,
+      providerRunId: "test-789",
+      error: null,
+    });
   });
 
   it("should convert international format to local", async () => {

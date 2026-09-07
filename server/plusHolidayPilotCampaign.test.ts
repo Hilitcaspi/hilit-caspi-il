@@ -7,7 +7,9 @@ vi.mock("./emailUnsubscribe", () => ({
 
 import {
   buildPlusHolidayPilotEmail,
+  buildPlusHolidayPilotSms,
   buildPlusPaymentRecoveryEmail,
+  buildPlusPaymentRecoverySms,
   isPlusPilotCoachingClient,
   PLUS_HOLIDAY_PILOT_NEW_COUNTS,
   rankPlusHolidayPilotCandidates,
@@ -67,6 +69,19 @@ describe("Plus holiday pilot campaign", () => {
     expect(content.checkoutUrl).toContain("utm_campaign=holiday_plus_pilot_2026_09");
   });
 
+  it("builds a festive pilot SMS with spacing, gentle emojis and a personal checkout link", () => {
+    const content = buildPlusHolidayPilotSms({ email: "noa@example.com", token: "questionnaire-token-123456" });
+    expect(content.message).toContain("היי, כאן הילית 🤍");
+    expect(content.message).toContain("נבחרת להשקה הראשונה ✨");
+    expect(content.message).toContain("\n\n");
+    expect(content.message).toContain("2 התאמות בכל חודש");
+    expect(content.message).toContain("בוסט אחד חינם");
+    expect(content.message).toContain("99 ₪ לחודש");
+    expect(content.message).toContain("להסרה ממסרים שיווקיים");
+    expect(content.checkoutUrl).toContain("token=questionnaire-token-123456");
+    expect(content.checkoutUrl).toContain("utm_source=sms");
+  });
+
   it("builds a transparent payment recovery email for the five 1-shekel sandbox attempts", () => {
     const content = buildPlusPaymentRecoveryEmail({ firstName: "אורי", email: "ori@example.com", token: "questionnaire-token-123456" });
     expect(content.subject).toContain("נפתח היום");
@@ -75,6 +90,16 @@ describe("Plus holiday pilot campaign", () => {
     expect(content.htmlContent).toContain("שתי התאמות");
     expect(content.htmlContent).toContain("בוסט אחד חינם");
     expect(content.htmlContent).toContain("השירות יופעל רק לאחר שהתשלום החדש ייקלט בהצלחה");
+    expect(content.checkoutUrl).toContain("utm_medium=payment_recovery");
+  });
+
+  it("builds a transparent recovery SMS without implying a valid Plus subscription was paid", () => {
+    const content = buildPlusPaymentRecoverySms({ email: "ori@example.com", token: "questionnaire-token-123456" });
+    expect(content.message).toContain("חיוב בדיקה של 1 ₪ בלבד");
+    expect(content.message).toContain("התשלום המלא לא הועבר");
+    expect(content.message).toContain("מנוי Plus עדיין לא הופעל");
+    expect(content.message).toContain("מיד לאחר אישור התשלום");
+    expect(content.message).toContain("בוסט אחד חינם");
     expect(content.checkoutUrl).toContain("utm_medium=payment_recovery");
   });
 });
