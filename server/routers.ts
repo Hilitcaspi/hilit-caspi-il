@@ -992,15 +992,21 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) return { valid: false, reason: "server_error", email: null };
         const normalizedToken = normalizeFreeAccessToken(input.token);
-        const [row] = await db.select().from(freeAccessTokens)
+        const [accessRow] = await db.select().from(freeAccessTokens)
           .where(sql`LOWER(TRIM(${freeAccessTokens.token})) = ${normalizedToken}`).limit(1);
-        const validation = validateFreeAccessTokenState(row ? {
-          usedAt: row.usedAt,
-          expiresAt: row.expiresAt,
-          boundEmail: row.email,
+        const [inviteRow] = accessRow ? [] : await db.select().from(inviteTokens)
+          .where(sql`LOWER(TRIM(${inviteTokens.token})) = ${normalizedToken}`).limit(1);
+        const validation = validateFreeAccessTokenState(accessRow ? {
+          usedAt: accessRow.usedAt,
+          expiresAt: accessRow.expiresAt,
+          boundEmail: accessRow.email,
+        } : inviteRow ? {
+          usedAt: inviteRow.usedAt,
+          expiresAt: inviteRow.expiresAt,
+          boundEmail: inviteRow.boundEmail,
         } : null);
         if (!validation.valid) return { valid: false, reason: validation.reason, email: null };
-        return { valid: true, email: row.email };
+        return { valid: true, email: accessRow?.email || inviteRow?.boundEmail || null };
       }),
     // Redeem a free access token (called when /join form is submitted with token)
     redeem: publicProcedure
@@ -1009,12 +1015,18 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const normalizedToken = normalizeFreeAccessToken(input.token);
-        const [row] = await db.select().from(freeAccessTokens)
+        const [accessRow] = await db.select().from(freeAccessTokens)
           .where(sql`LOWER(TRIM(${freeAccessTokens.token})) = ${normalizedToken}`).limit(1);
-        const validation = validateFreeAccessTokenState(row ? {
-          usedAt: row.usedAt,
-          expiresAt: row.expiresAt,
-          boundEmail: row.email,
+        const [inviteRow] = accessRow ? [] : await db.select().from(inviteTokens)
+          .where(sql`LOWER(TRIM(${inviteTokens.token})) = ${normalizedToken}`).limit(1);
+        const validation = validateFreeAccessTokenState(accessRow ? {
+          usedAt: accessRow.usedAt,
+          expiresAt: accessRow.expiresAt,
+          boundEmail: accessRow.email,
+        } : inviteRow ? {
+          usedAt: inviteRow.usedAt,
+          expiresAt: inviteRow.expiresAt,
+          boundEmail: inviteRow.boundEmail,
         } : null, input.email);
         if (!validation.valid) {
           const messages = {
@@ -1025,11 +1037,15 @@ export const appRouter = router({
           } as const;
           throw new TRPCError({ code: "BAD_REQUEST", message: messages[validation.reason] });
         }
-        // Mark as used
-        await db.update(freeAccessTokens).set({
-          usedAt: Date.now(),
-          usedByEmail: input.email.trim().toLowerCase(),
-        }).where(eq(freeAccessTokens.id, row.id));
+        const usedAt = Date.now();
+        const usedByEmail = input.email.trim().toLowerCase();
+        if (accessRow) {
+          await db.update(freeAccessTokens).set({ usedAt, usedByEmail })
+            .where(eq(freeAccessTokens.id, accessRow.id));
+        } else if (inviteRow) {
+          await db.update(inviteTokens).set({ usedAt, usedByEmail })
+            .where(eq(inviteTokens.id, inviteRow.id));
+        }
         return { success: true };
       }),
   }),

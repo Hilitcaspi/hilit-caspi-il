@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 const root = process.cwd();
 const register = readFileSync(resolve(root, "client/src/pages/Register.tsx"), "utf8");
 const wallet = readFileSync(resolve(root, "client/src/components/GrowWallet.tsx"), "utf8");
+const routers = readFileSync(resolve(root, "server/routers.ts"), "utf8");
 
 describe("free access token entry at database checkout", () => {
   it("shows the free-access field before the payment wallet", () => {
@@ -23,5 +24,11 @@ describe("free access token entry at database checkout", () => {
   it("does not render the payment wallet after a free token is validated", () => {
     expect(register).toContain("{!couponValid && (");
     expect(register).toContain("השלם/י רישום חינמי ←");
+  });
+
+  it("accepts CRM invite tokens through the direct free_token link", () => {
+    expect(routers).toContain("const [inviteRow] = accessRow ? [] : await db.select().from(inviteTokens)");
+    expect(routers).toContain("email: accessRow?.email || inviteRow?.boundEmail || null");
+    expect(routers).toContain("await db.update(inviteTokens).set({ usedAt, usedByEmail })");
   });
 });
