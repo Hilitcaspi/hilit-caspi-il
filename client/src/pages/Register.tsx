@@ -435,28 +435,41 @@ export default function Register() {
   const validateInviteMutation = trpc.invites.validateMutation.useMutation();
   const redeemInviteMutation = trpc.invites.redeem.useMutation();
 
+  const validateManualFreeAccessCode = async (rawCode: string, candidateEmail?: string) => {
+    const normalizedCode = rawCode.trim().toLowerCase();
+    if (!normalizedCode) return { valid: false, error: "יש להזין קוד גישה" };
+    const normalizedEmail = (candidateEmail || email).trim().toLowerCase();
+    try {
+      const data = await validateInviteMutation.mutateAsync({ token: normalizedCode, email: normalizedEmail || undefined });
+      if (data?.valid) {
+        setCouponCode(normalizedCode);
+        setCouponValid(true);
+        setCouponBoundEmail(data.boundEmail || null);
+        setCouponError("");
+        return { valid: true };
+      }
+      const msgs: Record<string, string> = {
+        not_found: "קוד לא נמצא",
+        already_used: "קוד זה כבר נוצל",
+        expired: "הקוד פג תוקף",
+        email_mismatch: "הקוד מיועד לאימייל אחר",
+      };
+      const error = msgs[(data as any)?.reason] || "קוד לא תקין";
+      setCouponError(error);
+      return { valid: false, error };
+    } catch {
+      const error = "שגיאה בבדיקת הקוד";
+      setCouponError(error);
+      return { valid: false, error };
+    }
+  };
+
   const handleCouponApply = async () => {
     if (!couponCode.trim()) return;
-    const normalizedCode = couponCode.trim().toLowerCase();
-    setCouponCode(normalizedCode);
     setCouponLoading(true);
     setCouponError("");
     try {
-      const data = await validateInviteMutation.mutateAsync({ token: normalizedCode, email: email.trim().toLowerCase() || undefined });
-      if (data?.valid) {
-        setCouponValid(true);
-        setCouponBoundEmail(data.boundEmail || null);
-      } else {
-        const msgs: Record<string, string> = {
-          not_found: "קוד לא נמצא",
-          already_used: "קוד זה כבר נוצל",
-          expired: "הקוד פג תוקף",
-          email_mismatch: "הקוד מיועד לאימייל אחר",
-        };
-        setCouponError(msgs[(data as any)?.reason] || "קוד לא תקין");
-      }
-    } catch {
-      setCouponError("שגיאה בבדיקת הקוד");
+      await validateManualFreeAccessCode(couponCode, email);
     } finally {
       setCouponLoading(false);
     }
@@ -1361,27 +1374,18 @@ export default function Register() {
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 {!growOpened ? (
                   <>
-                    <GrowWallet
-                      product="database"
-                      termsPath="/terms/database"
-                      prefillName={firstName && lastName ? `${firstName} ${lastName}` : firstName || undefined}
-                      prefillEmail={email || undefined}
-                      prefillPhone={phone || undefined}
-                      customerGender={gender === "male" ? "male" : "female"}
-                      onSuccess={handlePaymentSuccess}
-                    />
-
                     {/* Free invite code section (separate from discount coupons) */}
-                    <div className="mt-6 pt-5 border-t border-[#e9e8e8]">
+                    <div className="mb-6 rounded-2xl border-2 border-[#ffe27c] bg-[#fffaf0] p-4">
                       {!couponValid ? (
                         <>
-                          <p className="text-[#727272] text-sm text-right mb-3">יש לך קוד גישה חינמי?</p>
+                          <p className="text-[#191265] font-bold text-sm text-right mb-1">יש לך קוד כניסה חינמית?</p>
+                          <p className="text-[#727272] text-xs text-right mb-3">זה המקום לטוקן הארוך שקיבלת מהילית. קוד הנחה רגיל מוזן באזור התשלום למטה.</p>
                           <div className="flex gap-2">
                             <input
                               type="text"
                               value={couponCode}
                               onChange={e => { setCouponCode(e.target.value); setCouponError(""); }}
-                              placeholder="הכנס/י קוד גישה"
+                              placeholder="הדבק/י כאן את קוד הכניסה החינמית"
                               className="flex-1 px-4 py-2.5 rounded-xl border-2 border-[#e9e8e8] text-right text-sm focus:outline-none focus:border-[#191265] transition-colors"
                               dir="ltr"
                             />
@@ -1416,6 +1420,21 @@ export default function Register() {
                         </div>
                       )}
                     </div>
+
+                    {!couponValid && (
+                      <div className="pt-5 border-t border-[#e9e8e8]">
+                        <GrowWallet
+                          product="database"
+                          termsPath="/terms/database"
+                          prefillName={firstName && lastName ? `${firstName} ${lastName}` : firstName || undefined}
+                          prefillEmail={email || undefined}
+                          prefillPhone={phone || undefined}
+                          customerGender={gender === "male" ? "male" : "female"}
+                          onFreeAccessCode={validateManualFreeAccessCode}
+                          onSuccess={handlePaymentSuccess}
+                        />
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-center py-4">

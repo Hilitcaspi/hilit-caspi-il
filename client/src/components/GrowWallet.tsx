@@ -172,6 +172,7 @@ interface GrowWalletProps {
   personalToken?: string;
   boostMatchId?: number;
   showCoupon?: boolean;
+  onFreeAccessCode?: (code: string, email: string) => Promise<{ valid: boolean; error?: string }>;
   plusConsents?: {
     renewalAccepted: boolean;
     termsAccepted: boolean;
@@ -195,6 +196,7 @@ export default function GrowWallet({
   personalToken,
   boostMatchId,
   showCoupon = true,
+  onFreeAccessCode,
   plusConsents,
 }: GrowWalletProps) {
   const [name, setName] = useState(prefillName || "");
@@ -263,14 +265,20 @@ export default function GrowWallet({
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
+    const normalizedCode = couponCode.trim();
     setCouponError("");
     setCouponLoading(true);
     try {
-      const result = await validateCouponMutation.mutateAsync({ code: couponCode.trim(), product, email: email.trim() || undefined });
+      const result = await validateCouponMutation.mutateAsync({ code: normalizedCode, product, email: email.trim() || undefined });
       if (result.valid) {
         setCouponApplied({ code: result.code, discountPercent: result.discountPercent, discountAmount: result.discountAmount, fixedPrice: result.fixedPrice });
         const label = result.fixedPrice ? `מחיר מיוחד: ₪${result.fixedPrice}` : result.discountPercent ? `${result.discountPercent}% הנחה` : result.discountAmount ? `₪${result.discountAmount} הנחה` : "הנחה";
         toast.success(`קופון הוחל! ${label}`);
+      } else if (product === "database" && onFreeAccessCode) {
+        const freeAccess = await onFreeAccessCode(normalizedCode, email.trim());
+        if (!freeAccess.valid) {
+          setCouponError(freeAccess.error || (result as any).error || "קוד לא תקין");
+        }
       } else {
         setCouponError((result as any).error || "קוד קופון לא תקין");
       }
@@ -592,7 +600,7 @@ export default function GrowWallet({
 
       {/* Coupon field */}
       {showCoupon && <div className="mb-4">
-        <p className="text-xs font-semibold text-[#727272] mb-1.5">יש לך קוד קופון?</p>
+        <p className="text-xs font-semibold text-[#727272] mb-1.5">{product === "database" ? "יש לך קוד הנחה לרכישה?" : "יש לך קוד קופון?"}</p>
         {couponApplied ? (
           <div className="flex items-center justify-between bg-green-50 border border-green-300 rounded-xl px-4 py-2.5">
             <span className="text-green-700 text-sm font-bold">
@@ -608,7 +616,7 @@ export default function GrowWallet({
               type="text"
               value={couponCode}
               onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponError(""); }}
-              placeholder="הכנס קוד קופון"
+              placeholder={product === "database" ? "הכנס/י קוד הנחה" : "הכנס קוד קופון"}
               className="text-right text-sm"
               style={{ color: '#1a1a1a', backgroundColor: 'white' }}
               onKeyDown={e => { if (e.key === 'Enter') handleApplyCoupon(); }}
