@@ -432,7 +432,8 @@ export default function CRMMatchmaking() {
   const createAndSendMatch = (trpc.admin as any).createAndSendMatch.useMutation({
     onSuccess: () => {
       setCompatResult((prev: any) => prev ? { ...prev, matchStatus: 'proposed' } : prev);
-      toast.success("ההצעה נשלחה לשני הצדדים! 💛");
+      refetchMatches();
+      toast.success("ההצעה נשלחה לשני הצדדים ומופיעה בטאב קיבלו התאמה 💛");
     },
     onError: (err: any) => {
       const msg = err?.message || "שגיאה בשליחת ההצעה";
