@@ -24,6 +24,8 @@ describe("free access token entry at database checkout", () => {
   it("does not render the payment wallet after a free token is validated", () => {
     expect(register).toContain("{!couponValid && (");
     expect(register).toContain("השלם/י רישום חינמי ←");
+    expect(register).toContain('{ id: "payment", label: freeTokenFromUrl ? "אימות" : "תשלום" }');
+    expect(register).toContain('? "המשך להרשמה החינמית ←"');
   });
 
   it("accepts CRM invite tokens through the direct free_token link", () => {

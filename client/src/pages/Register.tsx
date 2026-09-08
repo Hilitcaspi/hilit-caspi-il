@@ -656,7 +656,7 @@ export default function Register() {
           {[
             { id: "profile", label: "פרופיל" },
             { id: "dna_select", label: "DNA" },
-            { id: "payment", label: "תשלום" },
+            { id: "payment", label: freeTokenFromUrl ? "אימות" : "תשלום" },
             { id: "done", label: "אישור" },
           ].map((s, i, arr) => {
             const isDone =
@@ -1133,7 +1133,11 @@ export default function Register() {
                 </label>
                 <button type="submit" disabled={paymentLoading}
                   className="w-full bg-[#191265] text-white font-black text-lg py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 shadow-xl disabled:opacity-60 disabled:cursor-wait">
-                  {paymentLoading ? "שומרים את הפרטים..." : "המשך לתשלום ₪299 ←"}
+                  {paymentLoading
+                    ? "שומרים את הפרטים..."
+                    : freeTokenFromUrl
+                      ? "המשך להרשמה החינמית ←"
+                      : "המשך לתשלום ₪299 ←"}
                 </button>
               </form>
             </motion.div>
