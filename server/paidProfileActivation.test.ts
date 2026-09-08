@@ -16,8 +16,9 @@ describe("paid profile activation", () => {
   });
 
   it("preserves paid state after Grow while allowing a validated free token to activate an unpaid draft", () => {
-    expect(registrationProcedure).toContain("isActive: input.freeToken ? true : (existingProfile.isPaid || existingProfile.isActive)");
-    expect(registrationProcedure).toContain("isPaid: input.freeToken ? true : existingProfile.isPaid");
+    expect(registrationProcedure).toContain("isActive: hasValidFreeToken ? true : (existingProfile.isPaid || existingProfile.isActive)");
+    expect(registrationProcedure).toContain("isPaid: hasValidFreeToken ? true : existingProfile.isPaid");
+    expect(registrationProcedure).toContain("קוד הגישה החינמי אינו תקף");
     expect(registrationProcedure).toContain("if (input.deferUntilPayment && existingProfile.isPaid)");
   });
 });

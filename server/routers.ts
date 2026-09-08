@@ -28,6 +28,7 @@ import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as
 import { sendEmail } from "./brevo";
 import { createPlusCheckoutReference } from "./plusCheckoutReference";
 import { activatePendingPlusAfterRegistration } from "./plusFulfillment";
+import { normalizeFreeAccessToken, validateFreeAccessTokenState } from "./freeAccessTokenPolicy";
 import { verifyBoostNewsletterUnsubscribeToken } from "./boostNewsletterCampaign";
 import {
   applyEmailUnsubscribe,
@@ -990,11 +991,15 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const db = await getDb();
         if (!db) return { valid: false, reason: "server_error", email: null };
+        const normalizedToken = normalizeFreeAccessToken(input.token);
         const [row] = await db.select().from(freeAccessTokens)
-          .where(eq(freeAccessTokens.token, input.token)).limit(1);
-        if (!row) return { valid: false, reason: "not_found", email: null };
-        if (row.usedAt) return { valid: false, reason: "already_used", email: null };
-        if (Date.now() > row.expiresAt) return { valid: false, reason: "expired", email: null };
+          .where(sql`LOWER(TRIM(${freeAccessTokens.token})) = ${normalizedToken}`).limit(1);
+        const validation = validateFreeAccessTokenState(row ? {
+          usedAt: row.usedAt,
+          expiresAt: row.expiresAt,
+          boundEmail: row.email,
+        } : null);
+        if (!validation.valid) return { valid: false, reason: validation.reason, email: null };
         return { valid: true, email: row.email };
       }),
     // Redeem a free access token (called when /join form is submitted with token)
@@ -1003,17 +1008,28 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const normalizedToken = normalizeFreeAccessToken(input.token);
         const [row] = await db.select().from(freeAccessTokens)
-          .where(eq(freeAccessTokens.token, input.token)).limit(1);
-        if (!row) throw new TRPCError({ code: "BAD_REQUEST", message: "קוד לא תקין" });
-        if (row.usedAt) throw new TRPCError({ code: "BAD_REQUEST", message: "קוד זה כבר נוצל" });
-        if (Date.now() > row.expiresAt) throw new TRPCError({ code: "BAD_REQUEST", message: "הקוד פג תוקף" });
-        if (row.email.toLowerCase() !== input.email.toLowerCase()) throw new TRPCError({ code: "BAD_REQUEST", message: "הקוד שייך לכתובת מייל אחרת" });
+          .where(sql`LOWER(TRIM(${freeAccessTokens.token})) = ${normalizedToken}`).limit(1);
+        const validation = validateFreeAccessTokenState(row ? {
+          usedAt: row.usedAt,
+          expiresAt: row.expiresAt,
+          boundEmail: row.email,
+        } : null, input.email);
+        if (!validation.valid) {
+          const messages = {
+            not_found: "קוד לא תקין",
+            already_used: "קוד זה כבר נוצל",
+            expired: "הקוד פג תוקף",
+            email_mismatch: "הקוד שייך לכתובת מייל אחרת",
+          } as const;
+          throw new TRPCError({ code: "BAD_REQUEST", message: messages[validation.reason] });
+        }
         // Mark as used
         await db.update(freeAccessTokens).set({
           usedAt: Date.now(),
-          usedByEmail: input.email,
-        }).where(eq(freeAccessTokens.token, input.token));
+          usedByEmail: input.email.trim().toLowerCase(),
+        }).where(eq(freeAccessTokens.id, row.id));
         return { success: true };
       }),
   }),
@@ -1895,6 +1911,39 @@ export const appRouter = router({
         // Normalize email and phone to match Grow webhook storage format
         const normalizedEmail = input.email.trim().toLowerCase();
         const normalizedPhone = input.phone.trim().replace(/[\s\-]/g, "");
+        const normalizedRegistrationFreeToken = input.freeToken
+          ? normalizeFreeAccessToken(input.freeToken)
+          : null;
+        let hasValidFreeToken = false;
+        if (normalizedRegistrationFreeToken) {
+          const [inviteRow] = await db.select().from(inviteTokens)
+            .where(sql`LOWER(TRIM(${inviteTokens.token})) = ${normalizedRegistrationFreeToken}`).limit(1);
+          if (inviteRow) {
+            const validation = validateFreeAccessTokenState({
+              usedAt: inviteRow.usedAt,
+              usedByEmail: inviteRow.usedByEmail,
+              expiresAt: inviteRow.expiresAt,
+              boundEmail: inviteRow.boundEmail,
+            }, normalizedEmail, Date.now(), true);
+            if (!validation.valid) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "קוד הגישה החינמי אינו תקף" });
+            }
+            hasValidFreeToken = true;
+          } else {
+            const [accessRow] = await db.select().from(freeAccessTokens)
+              .where(sql`LOWER(TRIM(${freeAccessTokens.token})) = ${normalizedRegistrationFreeToken}`).limit(1);
+            const validation = validateFreeAccessTokenState(accessRow ? {
+              usedAt: accessRow.usedAt,
+              usedByEmail: accessRow.usedByEmail,
+              expiresAt: accessRow.expiresAt,
+              boundEmail: accessRow.email,
+            } : null, normalizedEmail, Date.now(), true);
+            if (!validation.valid) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "קוד הגישה החינמי אינו תקף" });
+            }
+            hasValidFreeToken = true;
+          }
+        }
         let resolvedGender: "female" | "male";
         if (input.gender === "{{gender}}") {
           const [leadGender] = await db.select({ gender: crmLeads.gender })
@@ -1936,7 +1985,7 @@ export const appRouter = router({
         if (existingProfile) {
           // Check if this is a skeleton record created by Grow webhook (age=0, city empty)
           const isSkeleton = existingProfile.age === 0 && (!existingProfile.city || existingProfile.city === "");
-          const activatesWithFreeToken = Boolean(input.freeToken) && !existingProfile.isPaid;
+          const activatesWithFreeToken = hasValidFreeToken && !existingProfile.isPaid;
           const isUnpaidDraft = !existingProfile.isPaid && (input.deferUntilPayment === true || activatesWithFreeToken);
 
           if (input.deferUntilPayment && existingProfile.isPaid) {
@@ -1998,8 +2047,8 @@ export const appRouter = router({
               locationPreference: input.locationPreference,
               partnerDescription: input.partnerDescription,
               ...(photoUrl ? { photoUrl } : {}),
-              isActive: input.freeToken ? true : (existingProfile.isPaid || existingProfile.isActive),
-              isPaid: input.freeToken ? true : existingProfile.isPaid,
+              isActive: hasValidFreeToken ? true : (existingProfile.isPaid || existingProfile.isActive),
+              isPaid: hasValidFreeToken ? true : existingProfile.isPaid,
               updatedAt: now,
               // Save UTM from the registration form (sessionStorage → frontend → here)
               ...(input.utmSource ? { utmSource: input.utmSource } : {}),
@@ -2171,9 +2220,9 @@ export const appRouter = router({
           consentMatchmaking: input.consentMatchmaking ?? false,
           consentDataSharing: input.consentDataSharing ?? false,
           consentEmailMarketing: input.consentEmailMarketing ?? false,
-          isActive: input.freeToken ? true : false, // active immediately if paid (free token); otherwise wait for payment
+          isActive: hasValidFreeToken, // active immediately only after a valid free token; otherwise wait for payment
           isSeed: false,
-          isPaid: input.freeToken ? true : false, // free token = paid; DNA form = wait for Grow webhook
+          isPaid: hasValidFreeToken, // validated free token = paid; DNA form = wait for Grow webhook
           createdAt: now,
           updatedAt: now,
         });
@@ -2236,7 +2285,7 @@ export const appRouter = router({
           .catch(err => console.error("[RegisterBasic] CRM lead update failed:", err));
 
         // Notify owner only if this is a free-token registration (paid registrations are notified by Grow webhook)
-        if (input.freeToken) {
+        if (hasValidFreeToken) {
           notifyOwner({
             title: "פרופיל חדש נרשם! (גישה חינמית) 💎",
             content: `${input.firstName} ${input.lastName || ""} (${input.gender === "female" ? "אישה" : "גבר"}, ${input.age > 0 ? input.age : '?'}, ${input.city}) נרשמ${input.gender === "female" ? "ה" : ""} למאגר עם גישה חינמית. DNA: ${input.dnaType || "לא מולא"}. ממתינ${input.gender === "female" ? "ה" : ""} להשלמת שאלון מדעי.`,
@@ -2278,7 +2327,7 @@ export const appRouter = router({
         }
 
         // Fire GA4 sign_up event server-side
-        ga4SignUp(clientIdFromEmail(input.email), input.freeToken ? "free_token" : "database").catch(() => {});
+        ga4SignUp(clientIdFromEmail(input.email), hasValidFreeToken ? "free_token" : "database").catch(() => {});
         }
 
         if (!input.deferUntilPayment) {
@@ -6009,17 +6058,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       .query(async ({ input }) => {
         const db = await getDb();
         if (!db) return { valid: false, reason: "server_error" };
-
+        const normalizedToken = normalizeFreeAccessToken(input.token);
         const [row] = await db.select().from(inviteTokens)
-          .where(eq(inviteTokens.token, input.token)).limit(1);
-
-        if (!row) return { valid: false, reason: "not_found" };
-        if (row.usedAt) return { valid: false, reason: "already_used" };
-        if (Date.now() > row.expiresAt) return { valid: false, reason: "expired" };
-        if (row.boundEmail && input.email && row.boundEmail.toLowerCase() !== input.email.toLowerCase()) {
-          return { valid: false, reason: "email_mismatch" };
-        }
-
+          .where(sql`LOWER(TRIM(${inviteTokens.token})) = ${normalizedToken}`).limit(1);
+        const validation = validateFreeAccessTokenState(row ? {
+          usedAt: row.usedAt,
+          expiresAt: row.expiresAt,
+          boundEmail: row.boundEmail,
+        } : null, input.email);
+        if (!validation.valid) return validation;
         return { valid: true, boundEmail: row.boundEmail };
       }),
 
@@ -6031,17 +6078,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) return { valid: false, reason: "server_error" };
-
+        const normalizedToken = normalizeFreeAccessToken(input.token);
         const [row] = await db.select().from(inviteTokens)
-          .where(eq(inviteTokens.token, input.token)).limit(1);
-
-        if (!row) return { valid: false, reason: "not_found" };
-        if (row.usedAt) return { valid: false, reason: "already_used" };
-        if (Date.now() > row.expiresAt) return { valid: false, reason: "expired" };
-        if (row.boundEmail && input.email && row.boundEmail.toLowerCase() !== input.email.toLowerCase()) {
-          return { valid: false, reason: "email_mismatch" };
-        }
-
+          .where(sql`LOWER(TRIM(${inviteTokens.token})) = ${normalizedToken}`).limit(1);
+        const validation = validateFreeAccessTokenState(row ? {
+          usedAt: row.usedAt,
+          expiresAt: row.expiresAt,
+          boundEmail: row.boundEmail,
+        } : null, input.email);
+        if (!validation.valid) return validation;
         return { valid: true, boundEmail: row.boundEmail };
       }),
 
@@ -6057,19 +6102,29 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
+        const normalizedToken = normalizeFreeAccessToken(input.token);
         const [row] = await db.select().from(inviteTokens)
-          .where(eq(inviteTokens.token, input.token)).limit(1);
-
-        if (!row) throw new TRPCError({ code: "BAD_REQUEST", message: "קוד לא תקין" });
-        if (row.usedAt) throw new TRPCError({ code: "BAD_REQUEST", message: "קוד זה כבר נוצל" });
-        if (Date.now() > row.expiresAt) throw new TRPCError({ code: "BAD_REQUEST", message: "הקוד פג תוקף" });
+          .where(sql`LOWER(TRIM(${inviteTokens.token})) = ${normalizedToken}`).limit(1);
+        const validation = validateFreeAccessTokenState(row ? {
+          usedAt: row.usedAt,
+          expiresAt: row.expiresAt,
+          boundEmail: row.boundEmail,
+        } : null, input.email);
+        if (!validation.valid) {
+          const messages = {
+            not_found: "קוד לא תקין",
+            already_used: "קוד זה כבר נוצל",
+            expired: "הקוד פג תוקף",
+            email_mismatch: "הקוד שייך לכתובת מייל אחרת",
+          } as const;
+          throw new TRPCError({ code: "BAD_REQUEST", message: messages[validation.reason] });
+        }
 
         await db.update(inviteTokens).set({
           usedAt: Date.now(),
-          usedByEmail: input.email,
+          usedByEmail: input.email.trim().toLowerCase(),
           usedBySingleId: input.singleId,
-        }).where(eq(inviteTokens.token, input.token));
+        }).where(eq(inviteTokens.id, row.id));
 
         return { success: true };
       }),

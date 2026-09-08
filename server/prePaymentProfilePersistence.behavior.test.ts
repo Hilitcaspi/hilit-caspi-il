@@ -191,6 +191,15 @@ describe("registerBasicProfile pre-payment draft behavior", () => {
   it("activates the same draft for a validated free-token path without inserting a duplicate", async () => {
     const harness: DbHarness = createDbHarness([[
       {
+        id: 7,
+        token: "synthetic-validated-token",
+        boundEmail: "synthetic.draft@example.com",
+        usedAt: null,
+        usedByEmail: null,
+        expiresAt: Date.now() + 60_000,
+      },
+    ], [
+      {
         id: 42,
         age: 34,
         city: "תל אביב",
@@ -220,6 +229,22 @@ describe("registerBasicProfile pre-payment draft behavior", () => {
     }));
     expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
     expect(mocks.ga4SignUp).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an invalid free token before activating or mutating a profile", async () => {
+    const harness: DbHarness = createDbHarness([[], []]);
+    mocks.getDb.mockResolvedValue(harness.db);
+
+    await expect(appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
+      ...fullDraftInput,
+      deferUntilPayment: false,
+      freeToken: "NOT-A-REAL-TOKEN",
+    })).rejects.toThrow("קוד הגישה החינמי אינו תקף");
+
+    expect(harness.inserts).toHaveLength(0);
+    expect(harness.updates).toHaveLength(0);
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+    expect(mocks.notifyOwner).not.toHaveBeenCalled();
   });
 
   it("blocks a new checkout draft for an already paid profile without mutating or emailing it", async () => {

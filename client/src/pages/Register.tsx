@@ -78,7 +78,7 @@ export default function Register() {
     }
   });
   // Read DNA from URL params, fall back to localStorage (saved when visiting /database-sales from DnaQuiz)
-  const freeTokenFromUrl = params.get("free_token") || "";
+  const freeTokenFromUrl = (params.get("free_token") || "").trim().toLowerCase();
   const [dnaFromQuiz, setDnaFromQuiz] = useState<string | null>(
     params.get("dna") || localStorage.getItem("dna_type")
   );
@@ -437,10 +437,12 @@ export default function Register() {
 
   const handleCouponApply = async () => {
     if (!couponCode.trim()) return;
+    const normalizedCode = couponCode.trim().toLowerCase();
+    setCouponCode(normalizedCode);
     setCouponLoading(true);
     setCouponError("");
     try {
-      const data = await validateInviteMutation.mutateAsync({ token: couponCode.trim(), email: email || undefined });
+      const data = await validateInviteMutation.mutateAsync({ token: normalizedCode, email: email.trim().toLowerCase() || undefined });
       if (data?.valid) {
         setCouponValid(true);
         setCouponBoundEmail(data.boundEmail || null);
@@ -463,6 +465,7 @@ export default function Register() {
   const handleCouponRegister = async () => {
     setPaymentLoading(true);
     try {
+      const normalizedCode = couponCode.trim().toLowerCase();
       const emailToUse = couponBoundEmail || email;
       const data = await registerBasicMutation.mutateAsync({
         firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email: emailToUse,
@@ -478,7 +481,7 @@ export default function Register() {
         locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
         photoBase64: photoPreview || undefined, photoMime: photoFile?.type || undefined,
         origin: window.location.origin,
-        freeToken: couponCode.trim() || undefined, // invite token → marks isPaid=true
+        freeToken: normalizedCode || undefined, // invite token → marks isPaid=true
         utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
         utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
         utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
@@ -486,7 +489,7 @@ export default function Register() {
       });
       // Redeem the invite token
       if (data && (data as any).singleId) {
-        await redeemInviteMutation.mutateAsync({ token: couponCode.trim(), email: emailToUse, singleId: (data as any).singleId });
+        await redeemInviteMutation.mutateAsync({ token: normalizedCode, email: emailToUse.trim().toLowerCase(), singleId: (data as any).singleId });
       }
       trackCompleteRegistration({ content_name: "מאגר רווקים - קופון" });
       gaSignUp("database");
