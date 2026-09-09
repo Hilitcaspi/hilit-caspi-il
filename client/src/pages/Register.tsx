@@ -791,41 +791,6 @@ export default function Register() {
                 </div>
               )}
 
-              {!freeTokenFromUrl && (
-                <div className="bg-white border-2 border-[#ffe27c] rounded-2xl p-5 mb-6 shadow-sm text-right">
-                  {!couponValid ? (
-                    <>
-                      <p className="text-[#191265] font-black text-base mb-1">יש לך קוד כניסה חינמית?</p>
-                      <p className="text-[#727272] text-xs mb-3">אפשר לאמת אותו כאן, עוד לפני מילוי הפרטים והתשלום.</p>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          type="text"
-                          value={couponCode}
-                          onChange={e => { setCouponCode(e.target.value); setCouponError(""); }}
-                          placeholder="הדבק/י כאן את קוד הכניסה החינמית"
-                          className="flex-1 px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-right text-sm focus:outline-none focus:border-[#191265]"
-                          dir="ltr"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleCouponApply}
-                          disabled={couponLoading || !couponCode.trim()}
-                          className="bg-[#191265] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#1800ad] disabled:opacity-50"
-                        >
-                          {couponLoading ? "בודק..." : "אימות הקוד"}
-                        </button>
-                      </div>
-                      {couponError && <p className="text-red-600 text-xs mt-2">{couponError}</p>}
-                    </>
-                  ) : (
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                      <p className="text-green-700 font-bold text-sm">✓ קוד הכניסה החינמית אומת</p>
-                      <p className="text-green-600 text-xs mt-1">מלאו את הפרטים והשאלון וההרשמה תושלם ללא תשלום.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
               <div className="text-center mb-8">
                 <div className="text-4xl mb-3">🧬</div>
                 <h1 className="text-2xl md:text-3xl font-black text-[#191265] mb-2">

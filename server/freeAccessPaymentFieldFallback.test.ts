@@ -8,12 +8,15 @@ const wallet = readFileSync(resolve(root, "client/src/components/GrowWallet.tsx"
 const routers = readFileSync(resolve(root, "server/routers.ts"), "utf8");
 
 describe("free access token entry at database checkout", () => {
-  it("shows the free-access field before the payment wallet", () => {
-    expect(register.indexOf("יש לך קוד כניסה חינמית?")).toBeGreaterThan(-1);
-    expect(register.indexOf("יש לך קוד כניסה חינמית?")).toBeLessThan(register.indexOf("<GrowWallet"));
+  it("shows the manual free-access field only beside the payment wallet", () => {
+    const freeField = 'placeholder="הדבק/י כאן את קוד הכניסה החינמית"';
+    expect(register.match(/יש לך קוד כניסה חינמית\?/g)).toHaveLength(1);
+    expect(register.match(/הדבק\/י כאן את קוד הכניסה החינמית/g)).toHaveLength(1);
+    expect(register.indexOf(freeField)).toBeGreaterThan(register.indexOf('step === "payment"'));
+    expect(register.indexOf(freeField)).toBeLessThan(register.indexOf("<GrowWallet"));
     expect(register).toContain("זה המקום לטוקן הארוך שקיבלת מהילית");
-    expect(register).toContain("אפשר לאמת אותו כאן, עוד לפני מילוי הפרטים והתשלום");
-    expect(register).toContain("אימות הקוד");
+    expect(register).not.toContain("אפשר לאמת אותו כאן, עוד לפני מילוי הפרטים והתשלום");
+    expect(register).toContain("freeTokenFromUrl && freeTokenStatus");
   });
 
   it("falls back from the discount validator to the invite-token validator", () => {
