@@ -39,6 +39,9 @@ describe("free access token entry at database checkout", () => {
   it("retries a transient profile-draft save before showing a payment error", () => {
     expect(register).toContain("for (let retry = 1; retry <= 3; retry++)");
     expect(register).toContain("retry * 1200");
+    expect(register).toContain("const registrationFailureMutation = trpc.payment.reportFailure.useMutation()");
+    expect(register).toContain('stage: "profile_save"');
+    expect(register.match(/reportProfileSaveFailure\(err\);/g)).toHaveLength(2);
   });
 
   it("compresses large mobile photos before the pre-payment profile save", () => {

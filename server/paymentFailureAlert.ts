@@ -1,22 +1,24 @@
 /**
  * Payment Failure Alert System
  * 
- * Sends immediate notifications (email + WhatsApp) to Hilit whenever a payment fails.
+ * Sends email for payment failures and a throttled operational SMS for technical
+ * failures that can block the checkout flow before a customer reaches Grow.
  * This covers:
  * - createPaymentProcess failures (server-side API call to Meshulam fails)
  * - Client-side payment failures reported back from the Grow SDK
  */
 import { sendEmail } from "./brevo";
-
+import { sendSMS } from "./vibrate";
 
 const HILIT_EMAIL = "hilit@hilitcaspi.com";
 const HILIT_PHONE = "0544530975";
-const PARTNER_PHONE = "0529467614";
 
 // Throttle: don't send more than 1 alert per email+product+stage per 1 minute
 // (keeps alerts frequent enough to catch every real attempt while avoiding exact duplicates from retries)
 const recentAlerts = new Map<string, number>();
 const THROTTLE_MS = 60 * 1000;
+const CRITICAL_SMS_COOLDOWN_MS = 15 * 60 * 1000;
+let lastCriticalSmsAt = 0;
 
 function shouldAlert(key: string): boolean {
   const now = Date.now();
@@ -41,8 +43,23 @@ export interface PaymentFailureInfo {
   product: string;
   amount?: number;
   errorMessage?: string;
-  stage: "createProcess" | "doPayment" | "sdk_failure";
+  stage: "profile_save" | "createProcess" | "doPayment" | "sdk_failure";
   processToken?: string;
+}
+
+export function shouldSendCriticalPaymentSms(
+  stage: PaymentFailureInfo["stage"],
+  now = Date.now(),
+): boolean {
+  if (stage !== "profile_save" && stage !== "createProcess") return false;
+  if (lastCriticalSmsAt && now - lastCriticalSmsAt < CRITICAL_SMS_COOLDOWN_MS) return false;
+  lastCriticalSmsAt = now;
+  return true;
+}
+
+export function resetPaymentFailureAlertStateForTests(): void {
+  recentAlerts.clear();
+  lastCriticalSmsAt = 0;
 }
 
 const PRODUCT_LABELS: Record<string, string> = {
@@ -59,24 +76,12 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
   if (!shouldAlert(key)) return;
 
   const productLabel = PRODUCT_LABELS[info.product] || info.product;
-  const stageLabel = info.stage === "createProcess" ? "יצירת תהליך תשלום"
+  const stageLabel = info.stage === "profile_save" ? "שמירת פרופיל לפני תשלום"
+    : info.stage === "createProcess" ? "יצירת תהליך תשלום"
     : info.stage === "doPayment" ? "סליקת כרטיס"
     : "כשל ב-SDK";
 
   const now = new Date().toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" });
-
-  // WhatsApp message
-  const waMsg = [
-    `🚨 תשלום נכשל!`,
-    `שם: ${info.customerName}`,
-    `מייל: ${info.customerEmail}`,
-    info.customerPhone ? `טלפון: ${info.customerPhone}` : null,
-    `מוצר: ${productLabel}`,
-    `שלב: ${stageLabel}`,
-    info.errorMessage ? `שגיאה: ${info.errorMessage.slice(0, 100)}` : null,
-    info.processToken ? `טוקן תהליך: ${info.processToken.slice(0, 20)}` : null,
-    `זמן: ${now}`,
-  ].filter(Boolean).join("\n");
 
   // Email
   const htmlContent = `
@@ -96,15 +101,27 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
     </div>
   `;
 
-  // Send both in parallel, never throw
+  const alertTasks: Promise<unknown>[] = [
+    sendEmail({
+      to: { email: HILIT_EMAIL, name: "הילית כספי" },
+      subject: `🚨 תשלום נכשל - ${info.customerName} (${productLabel})`,
+      htmlContent,
+    }),
+  ];
+
+  if (shouldSendCriticalPaymentSms(info.stage)) {
+    alertTasks.push(sendSMS(HILIT_PHONE, [
+      "🚨 תקלה במסלול ההצטרפות למאגר",
+      `שלב: ${stageLabel}`,
+      "לא בוצע חיוב.",
+      "נדרשת בדיקה באתר.",
+      `זמן: ${now}`,
+    ].join("\n")));
+  }
+
+  // Send alerts in parallel, never throw or block the customer flow.
   try {
-    await Promise.allSettled([
-      sendEmail({
-        to: { email: HILIT_EMAIL, name: "הילית כספי" },
-        subject: `🚨 תשלום נכשל - ${info.customerName} (${productLabel})`,
-        htmlContent,
-      }),
-    ]);
+    await Promise.allSettled(alertTasks);
   } catch (err) {
     console.error("[PaymentFailureAlert] Failed to send notification:", err);
   }

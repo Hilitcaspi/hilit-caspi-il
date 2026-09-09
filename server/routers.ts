@@ -7661,12 +7661,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         product: z.string(),
         amount: z.number().optional(),
         errorMessage: z.string().optional(),
-        stage: z.enum(["createProcess", "doPayment", "sdk_failure"]),
+        stage: z.enum(["profile_save", "createProcess", "doPayment", "sdk_failure"]),
         processToken: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        // Log full payment failure details for debugging (visible in server logs)
-        const failLog = `[PaymentFailure] ${input.stage} | ${input.product} | ${input.customerName} | ${input.customerEmail} | processToken: ${input.processToken || 'N/A'} | error: ${input.errorMessage || 'N/A'}`;
+        const emailDomain = input.customerEmail.includes("@")
+          ? input.customerEmail.split("@").pop()
+          : "unknown";
+        const sanitizedError = (input.errorMessage || "N/A")
+          .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+          .replace(/\b(?:\+?972|0)5\d[\d\s()-]{7,}\b/g, "[phone]")
+          .slice(0, 160);
+        const failLog = `[PaymentFailure] stage=${input.stage} product=${input.product} emailDomain=${emailDomain} hasPhone=${Boolean(input.customerPhone)} hasProcessToken=${Boolean(input.processToken)} error=${sanitizedError}`;
         console.log(failLog);
         addToPaymentLogBuffer(failLog);
         const { notifyPaymentFailure } = await import("./paymentFailureAlert");

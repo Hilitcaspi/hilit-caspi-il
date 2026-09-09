@@ -311,6 +311,7 @@ export default function Register() {
         setStep("payment");
       } catch (err) {
         console.error("[PrePayment] Failed to save profile draft:", err);
+        reportProfileSaveFailure(err);
         setRegisterError("לא הצלחנו לשמור את הפרופיל לפני התשלום. לא בוצע חיוב. אנא נסו שוב.");
         setStep("uploading_error");
       } finally {
@@ -577,8 +578,23 @@ export default function Register() {
     },
   });
   const profileDraftMutation = trpc.singles.registerBasicProfile.useMutation();
+  const registrationFailureMutation = trpc.payment.reportFailure.useMutation();
   const [draftSavedBeforePayment, setDraftSavedBeforePayment] = useState(false);
   const draftSaveInFlightRef = useRef<Promise<unknown> | null>(null);
+
+  const reportProfileSaveFailure = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "unknown_profile_save_error";
+    if (message === "PROFILE_ALREADY_REGISTERED") return;
+    registrationFailureMutation.mutate({
+      customerName: `${firstName} ${lastName}`.trim() || "לא ידוע",
+      customerEmail: email.trim(),
+      customerPhone: phone.trim() || undefined,
+      product: "database",
+      amount: 299,
+      errorMessage: message.slice(0, 160),
+      stage: "profile_save",
+    });
+  };
 
   const buildRegisterPayload = () => ({
     firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email,
@@ -1412,6 +1428,7 @@ export default function Register() {
                     setStep("payment");
                   } catch (err) {
                     console.error("[PrePayment] Failed to save profile draft after DNA:", err);
+                    reportProfileSaveFailure(err);
                     setRegisterError("לא הצלחנו לשמור את הפרופיל לפני התשלום. לא בוצע חיוב. אנא נסו שוב.");
                     setStep("uploading_error");
                   } finally {
