@@ -12,6 +12,8 @@ describe("free access token entry at database checkout", () => {
     expect(register.indexOf("יש לך קוד כניסה חינמית?")).toBeGreaterThan(-1);
     expect(register.indexOf("יש לך קוד כניסה חינמית?")).toBeLessThan(register.indexOf("<GrowWallet"));
     expect(register).toContain("זה המקום לטוקן הארוך שקיבלת מהילית");
+    expect(register).toContain("אפשר לאמת אותו כאן, עוד לפני מילוי הפרטים והתשלום");
+    expect(register).toContain("אימות הקוד");
   });
 
   it("falls back from the discount validator to the invite-token validator", () => {
@@ -32,5 +34,17 @@ describe("free access token entry at database checkout", () => {
     expect(routers).toContain("const [inviteRow] = accessRow ? [] : await db.select().from(inviteTokens)");
     expect(routers).toContain("email: accessRow?.email || inviteRow?.boundEmail || null");
     expect(routers).toContain("await db.update(inviteTokens).set({ usedAt, usedByEmail })");
+  });
+
+  it("retries a transient profile-draft save before showing a payment error", () => {
+    expect(register).toContain("for (let retry = 1; retry <= 3; retry++)");
+    expect(register).toContain("retry * 1200");
+  });
+
+  it("compresses large mobile photos before the pre-payment profile save", () => {
+    expect(register).toContain("const maxDimension = 1600");
+    expect(register).toContain('canvas.toDataURL("image/jpeg", quality)');
+    expect(register).toContain("compressed.length > 2_800_000");
+    expect(register).toContain("התמונה תותאם אוטומטית");
   });
 });

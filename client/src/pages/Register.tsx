@@ -200,6 +200,7 @@ export default function Register() {
   const [locationPref, setLocationPref] = useState("");
   const [interests, setInterests] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState("");
 
   // Mini DNA quiz toggle (shown inside dna_select step)
   const [showMiniQuiz, setShowMiniQuiz] = useState(false);
@@ -231,13 +232,51 @@ export default function Register() {
     },
   });
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    setPhotoError("");
+    try {
+      const sourceUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("PHOTO_READ_FAILED"));
+        reader.readAsDataURL(file);
+      });
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("PHOTO_DECODE_FAILED"));
+        img.src = sourceUrl;
+      });
+      const maxDimension = 1600;
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("PHOTO_CANVAS_FAILED");
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      let quality = 0.84;
+      let compressed = canvas.toDataURL("image/jpeg", quality);
+      while (compressed.length > 2_800_000 && quality > 0.5) {
+        quality -= 0.08;
+        compressed = canvas.toDataURL("image/jpeg", quality);
+      }
+      if (compressed.length > 6_000_000) throw new Error("PHOTO_TOO_LARGE");
+
+      const response = await fetch(compressed);
+      const blob = await response.blob();
+      const safeName = file.name.replace(/\.[^.]+$/, "") || "profile";
+      setPhotoFile(new File([blob], `${safeName}.jpg`, { type: "image/jpeg" }));
+      setPhotoPreview(compressed);
+    } catch (error) {
+      console.error("[ProfilePhoto] Failed to prepare image:", error);
+      setPhotoFile(null);
+      setPhotoPreview("");
+      setPhotoError("לא הצלחנו להכין את התמונה. נסו לבחור תמונת JPG או PNG אחרת.");
+    }
   };
 
   const toggleReligiosityPref = (val: string) => {
@@ -445,6 +484,7 @@ export default function Register() {
         setCouponCode(normalizedCode);
         setCouponValid(true);
         setCouponBoundEmail(data.boundEmail || null);
+        if (data.boundEmail) setEmail(data.boundEmail);
         setCouponError("");
         return { valid: true };
       }
@@ -573,14 +613,24 @@ export default function Register() {
         deferUntilPayment: true,
       };
       try { localStorage.setItem("pending_profile_payload", JSON.stringify(payload)); } catch {}
-      const data = await profileDraftMutation.mutateAsync(payload);
-      if (data?.alreadyExists) {
-        try { localStorage.removeItem("pending_profile_payload"); } catch {}
-        throw new Error("PROFILE_ALREADY_REGISTERED");
+      let lastError: unknown;
+      for (let retry = 1; retry <= 3; retry++) {
+        try {
+          const data = await profileDraftMutation.mutateAsync(payload);
+          if (data?.alreadyExists) {
+            try { localStorage.removeItem("pending_profile_payload"); } catch {}
+            throw new Error("PROFILE_ALREADY_REGISTERED");
+          }
+          if (data?.questionnaireToken) setQuestionnaireToken(data.questionnaireToken);
+          setDraftSavedBeforePayment(true);
+          return data;
+        } catch (error) {
+          lastError = error;
+          if (error instanceof Error && error.message === "PROFILE_ALREADY_REGISTERED") throw error;
+          if (retry < 3) await new Promise(resolve => setTimeout(resolve, retry * 1200));
+        }
       }
-      if (data?.questionnaireToken) setQuestionnaireToken(data.questionnaireToken);
-      setDraftSavedBeforePayment(true);
-      return data;
+      throw lastError;
     })();
     draftSaveInFlightRef.current = attempt;
     try {
@@ -718,6 +768,41 @@ export default function Register() {
                 </div>
               )}
 
+              {!freeTokenFromUrl && (
+                <div className="bg-white border-2 border-[#ffe27c] rounded-2xl p-5 mb-6 shadow-sm text-right">
+                  {!couponValid ? (
+                    <>
+                      <p className="text-[#191265] font-black text-base mb-1">יש לך קוד כניסה חינמית?</p>
+                      <p className="text-[#727272] text-xs mb-3">אפשר לאמת אותו כאן, עוד לפני מילוי הפרטים והתשלום.</p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={couponCode}
+                          onChange={e => { setCouponCode(e.target.value); setCouponError(""); }}
+                          placeholder="הדבק/י כאן את קוד הכניסה החינמית"
+                          className="flex-1 px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-right text-sm focus:outline-none focus:border-[#191265]"
+                          dir="ltr"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCouponApply}
+                          disabled={couponLoading || !couponCode.trim()}
+                          className="bg-[#191265] text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-[#1800ad] disabled:opacity-50"
+                        >
+                          {couponLoading ? "בודק..." : "אימות הקוד"}
+                        </button>
+                      </div>
+                      {couponError && <p className="text-red-600 text-xs mt-2">{couponError}</p>}
+                    </>
+                  ) : (
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <p className="text-green-700 font-bold text-sm">✓ קוד הכניסה החינמית אומת</p>
+                      <p className="text-green-600 text-xs mt-1">מלאו את הפרטים והשאלון וההרשמה תושלם ללא תשלום.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="text-center mb-8">
                 <div className="text-4xl mb-3">🧬</div>
                 <h1 className="text-2xl md:text-3xl font-black text-[#191265] mb-2">
@@ -762,7 +847,8 @@ export default function Register() {
                         className="bg-[#f0eadc] text-[#191265] font-medium px-5 py-2.5 rounded-xl hover:bg-[#e9e8e8] transition-colors text-sm">
                         {isFemale ? "בחרי תמונה" : "בחר תמונה"}
                       </button>
-                      <p className="text-[#727272] text-xs mt-2">JPG, PNG עד 5MB</p>
+                      <p className="text-[#727272] text-xs mt-2">JPG, PNG — התמונה תותאם אוטומטית</p>
+                      {photoError && <p className="text-red-600 text-xs mt-2">{photoError}</p>}
                     </div>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
                   </div>
