@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { normalizeIsraeliPhone } from "@shared/profileValidation";
 
 // ─── Grow payment links ───────────────────────────────────────────────────────
 const GROW_LINKS: Record<string, string> = {
@@ -97,7 +98,7 @@ export default function GrowPayButton({
     // Validate required fields
     const fullName = name.trim();
     const userEmail = email.trim();
-    const userPhone = phone.trim();
+    const userPhone = normalizeIsraeliPhone(phone);
 
     if (!fullName || fullName.split(" ").filter(Boolean).length < 2) {
       toast.error("יש להזין שם פרטי ושם משפחה.");
@@ -107,10 +108,11 @@ export default function GrowPayButton({
       toast.error("יש להזין כתובת מייל תקינה.");
       return;
     }
-    if (!userPhone || userPhone.replace(/\D/g, "").length < 9) {
-      toast.error("יש להזין מספר טלפון תקין.");
+    if (!userPhone) {
+      toast.error("מספר הטלפון אינו תקין. יש להזין מספר ישראלי מלא, לדוגמה 050-0000000.");
       return;
     }
+    if (phone !== userPhone) setPhone(userPhone);
     if (!ageConfirmed) {
       toast.error("יש לאשר שאתה/את בן/בת 18 ומעלה.");
       return;

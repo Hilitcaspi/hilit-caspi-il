@@ -15,6 +15,16 @@
 // NOTE: We use globalThis.fetch (native Node 18+) instead of node-fetch.
 // node-fetch sends a "node-fetch" User-Agent which gets blocked by Incapsula (403).
 // Native fetch + browser-like headers bypasses this.
+import { normalizeIsraeliPhone } from "../shared/profileValidation";
+
+export const PAYMENT_PHONE_INVALID = "PAYMENT_PHONE_INVALID";
+
+export function isGrowPhoneValidationFailure(payload: unknown): boolean {
+  const candidate = payload as { err?: { id?: number; message?: string } | string } | null;
+  const id = typeof candidate?.err === "object" ? candidate.err?.id : undefined;
+  const message = typeof candidate?.err === "object" ? candidate.err?.message : candidate?.err;
+  return id === 946 || /phone.*(?:לא תקין|invalid)|שדה חובה phone/i.test(message || "");
+}
 
 // ─── Environment ──────────────────────────────────────────────────────────────
 const IS_GROW_PROD = true; // Production — using secure.meshulam.co.il
@@ -160,6 +170,8 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   const { notifyPaymentFailure } = await import("./paymentFailureAlert");
   const config = PRODUCT_CONFIGS[input.product];
   if (!config) throw new Error(`Unknown product: ${input.product}`);
+  const normalizedPhone = input.phone ? normalizeIsraeliPhone(input.phone) : null;
+  if (input.phone && !normalizedPhone) throw new Error(PAYMENT_PHONE_INVALID);
 
   const plusCheckout = input.product === "plus" ? getPlusCheckoutConfig() : null;
   if (plusCheckout && !plusCheckout.configured) {
@@ -180,7 +192,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     form.append("description", "Database Plus Monthly");
     form.append("pageField[invoiceName]", input.fullName);
     form.append("pageField[fullName]", input.fullName);
-    form.append("pageField[phone]", input.phone || "");
+    form.append("pageField[phone]", normalizedPhone || "");
     form.append("pageField[email]", input.email);
     form.append("successUrl", `${callbackBase}/thank-you/plus`);
     form.append("cancelUrl", callbackBase);
@@ -202,7 +214,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
       void notifyPaymentFailure({
         customerName: input.fullName,
         customerEmail: input.email,
-        customerPhone: input.phone,
+        customerPhone: normalizedPhone || undefined,
         product: input.product,
         amount: config.sum,
         errorMessage: payload?.err || `Grow Live returned HTTP ${response.status}`,
@@ -256,7 +268,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   params.append("notifyUrl", notifyUrl.toString());
   params.append("pageField[fullName]", input.fullName);
   params.append("pageField[email]", input.email);
-  if (input.phone) params.append("pageField[phone]", input.phone);
+  if (normalizedPhone) params.append("pageField[phone]", normalizedPhone);
 
   if (config.paymentNum) {
     params.append("paymentNum", String(config.paymentNum));
@@ -311,15 +323,19 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   });
 
   if (!json.status || !json.data?.authCode) {
-    void notifyPaymentFailure({
-      customerName: input.fullName,
-      customerEmail: input.email,
-      customerPhone: input.phone,
-      product: input.product,
-      amount: sum,
-      errorMessage: `Grow returned: ${JSON.stringify(json).slice(0, 150)}`,
-      stage: "createProcess",
-    });
+    const phoneValidationFailure = isGrowPhoneValidationFailure(json);
+    if (!phoneValidationFailure) {
+      void notifyPaymentFailure({
+        customerName: input.fullName,
+        customerEmail: input.email,
+        customerPhone: normalizedPhone || undefined,
+        product: input.product,
+        amount: sum,
+        errorMessage: `Grow returned: ${JSON.stringify(json).slice(0, 150)}`,
+        stage: "createProcess",
+      });
+    }
+    if (phoneValidationFailure) throw new Error(PAYMENT_PHONE_INVALID);
     throw new Error(`Grow API returned failure: ${JSON.stringify(json)}`);
   }
 

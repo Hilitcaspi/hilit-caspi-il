@@ -1,4 +1,22 @@
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const ISRAELI_LOCAL_PHONE_PATTERN = /^0(?:5\d{8}|[2-489]\d{7})$/;
+const ALLOWED_PHONE_CHARACTERS = /^[\d\s()+-]+$/;
+
+/**
+ * Normalize common Israeli phone formats for providers such as Grow.
+ * Unknown characters and missing digits are rejected rather than guessed.
+ */
+export function normalizeIsraeliPhone(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || !ALLOWED_PHONE_CHARACTERS.test(trimmed)) return null;
+
+  let digits = trimmed.replace(/\D/g, "");
+  if (digits.startsWith("00972")) digits = digits.slice(5);
+  else if (digits.startsWith("972")) digits = digits.slice(3);
+  if (!digits.startsWith("0")) digits = `0${digits}`;
+
+  return ISRAELI_LOCAL_PHONE_PATTERN.test(digits) ? digits : null;
+}
 
 export function calculateAgeFromBirthDate(value: string, today = new Date()): number | null {
   const match = ISO_DATE_PATTERN.exec(value.trim());

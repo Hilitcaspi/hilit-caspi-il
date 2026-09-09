@@ -1,7 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { createPaymentProcess, approveTransaction, PRODUCT_CONFIGS, shouldUseGrowCreateFallback } from "./growPayment";
+import { createPaymentProcess, approveTransaction, isGrowPhoneValidationFailure, PAYMENT_PHONE_INVALID, PRODUCT_CONFIGS, shouldUseGrowCreateFallback } from "./growPayment";
 
 describe("growPayment module", () => {
+  it("classifies Grow error 946 as user phone validation rather than a platform outage", () => {
+    expect(isGrowPhoneValidationFailure({
+      status: "0",
+      err: { id: 946, message: "שדה חובה phone לא תקין" },
+    })).toBe(true);
+    expect(isGrowPhoneValidationFailure({
+      status: "0",
+      err: { id: 500, message: "temporary provider error" },
+    })).toBe(false);
+    expect(PAYMENT_PHONE_INVALID).toBe("PAYMENT_PHONE_INVALID");
+  });
+
   it("uses the fallback only for Incapsula-style createProcess responses", () => {
     expect(shouldUseGrowCreateFallback(403, "text/html", "Request unsuccessful - Incapsula")).toBe(true);
     expect(shouldUseGrowCreateFallback(200, "application/json", '{"status":1}')).toBe(false);

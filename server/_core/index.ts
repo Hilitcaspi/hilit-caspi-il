@@ -241,7 +241,12 @@ async function startServer() {
     res.status(200).json({ ok: true }); // Respond immediately so Grow doesn't retry
     try {
       // Accept ALL webhooks — no key validation at all
-      console.log("[GrowWebhook] Received (Content-Type:", req.headers['content-type'], "):", JSON.stringify(req.body).slice(0, 500));
+      const webhookFieldNames = req.body && typeof req.body === "object"
+        ? Object.keys(req.body).slice(0, 30)
+        : [];
+      console.log(
+        `[GrowWebhook] Received contentType=${String(req.headers["content-type"] || "unknown")} fieldNames=${webhookFieldNames.join(",") || "none"}`,
+      );
       const boostCheckoutReference = typeof req.query.boost_ref === "string" ? req.query.boost_ref : undefined;
       const plusCheckoutReference = typeof req.query.plus_ref === "string" ? req.query.plus_ref : undefined;
       await handleGrowWebhook(req.body, { boostCheckoutReference, plusCheckoutReference });

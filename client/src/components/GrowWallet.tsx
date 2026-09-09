@@ -22,6 +22,7 @@ import { gaBeginCheckout } from "@/lib/ga";
 import { trackInitiateCheckout } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import { isGrowPaymentRendererReady, isGrowWalletVisible } from "@/lib/growSdkReadiness";
+import { normalizeIsraeliPhone } from "@shared/profileValidation";
 
 // ─── Grow config from VITE env vars ──────────────────────────────────────────
 const GROW_ENV = "PRODUCTION" as string; // "DEV" for sandbox, "PRODUCTION" for live
@@ -345,7 +346,7 @@ export default function GrowWallet({
   const handlePay = useCallback(async () => {
     const fullName = name.trim();
     const userEmail = email.trim();
-    const userPhone = phone.trim();
+    const userPhone = normalizeIsraeliPhone(phone);
 
     if (!fullName || fullName.split(" ").filter(Boolean).length < 2) {
       toast.error("שם מלא נדרש — יש להזין שם פרטי ושם משפחה.");
@@ -355,10 +356,11 @@ export default function GrowWallet({
       toast.error("אימייל לא תקין — יש להזין כתובת אימייל תקינה.");
       return;
     }
-    if (!userPhone || userPhone.replace(/\D/g, "").length < 9) {
-      toast.error("יש להזין מספר טלפון תקין.");
+    if (!userPhone) {
+      toast.error("מספר הטלפון אינו תקין. יש להזין מספר ישראלי מלא, לדוגמה 050-0000000.");
       return;
     }
+    if (phone !== userPhone) setPhone(userPhone);
     if (!ageConfirmed) {
       toast.error("יש לאשר שאתה/את בן/בת 18 ומעלה.");
       return;
@@ -417,7 +419,7 @@ export default function GrowWallet({
             reportFailureMutation.mutate({
               customerName: name.trim(),
               customerEmail: email.trim(),
-              customerPhone: phone.trim() || undefined,
+              customerPhone: userPhone,
               product,
               errorMessage: `${errMsg} | RAW: ${fullRaw}`,
               stage: "sdk_failure",
@@ -443,7 +445,7 @@ export default function GrowWallet({
             reportFailureMutation.mutate({
               customerName: name.trim(),
               customerEmail: email.trim(),
-              customerPhone: phone.trim() || undefined,
+              customerPhone: userPhone,
               product,
               errorMessage: `${errMsg} | RAW: ${fullRaw}`,
               stage: "sdk_failure",
@@ -570,6 +572,10 @@ export default function GrowWallet({
       logStep("ERROR", errDetail);
       setWalletLoading(false);
       const isConnectivityFailure = /Grow API error|fetch failed|Failed to fetch|HTTP\s*\d+/i.test(technicalMessage);
+      if (/PAYMENT_PHONE_INVALID/.test(technicalMessage)) {
+        toast.error("מספר הטלפון אינו תקין. יש לבדוק את הספרות ולנסות שוב.");
+        return;
+      }
       toast.error(
         isConnectivityFailure
           ? "לא ניתן להתחבר כרגע למערכת התשלום. אפשר לנסות שוב בעוד כמה רגעים."
@@ -578,7 +584,7 @@ export default function GrowWallet({
       reportFailureMutation.mutate({
         customerName: name.trim(),
         customerEmail: email.trim(),
-        customerPhone: phone.trim() || undefined,
+        customerPhone: userPhone,
         product,
         errorMessage: errDetail.slice(0, 300),
         stage: "createProcess",

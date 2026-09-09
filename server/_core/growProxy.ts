@@ -110,6 +110,35 @@ function resolveUpstream(pathAfterBase: string): string {
  * Rebuild the upstream request body + content-type from express's already-parsed
  * `req.body`. Returns `undefined` body for GET/HEAD or empty payloads.
  */
+export function encodeGrowUrlEncodedBody(raw: unknown): string {
+  const params = new URLSearchParams();
+
+  const appendValue = (key: string, value: unknown) => {
+    if (value === undefined || value === null) return;
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        const nestedKey = item && typeof item === "object" ? `${key}[${index}]` : `${key}[]`;
+        appendValue(nestedKey, item);
+      });
+      return;
+    }
+    if (typeof value === "object") {
+      for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+        appendValue(`${key}[${childKey}]`, childValue);
+      }
+      return;
+    }
+    params.append(key, String(value));
+  };
+
+  if (raw && typeof raw === "object") {
+    for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+      appendValue(key, value);
+    }
+  }
+  return params.toString();
+}
+
 function buildBody(req: Request): { body?: string; contentType?: string } {
   const method = req.method.toUpperCase();
   if (method === "GET" || method === "HEAD") return {};
@@ -128,13 +157,8 @@ function buildBody(req: Request): { body?: string; contentType?: string } {
 
   // urlencoded body (the Grow SDK uses this for createPaymentProcess etc.)
   if (ct.includes("application/x-www-form-urlencoded") || typeof raw === "object") {
-    const params = new URLSearchParams();
-    for (const [k, v] of Object.entries(raw)) {
-      if (Array.isArray(v)) v.forEach((item) => params.append(k, String(item)));
-      else params.append(k, String(v));
-    }
     return {
-      body: params.toString(),
+      body: encodeGrowUrlEncodedBody(raw),
       contentType: "application/x-www-form-urlencoded",
     };
   }
@@ -166,9 +190,10 @@ export function registerGrowProxy(app: Express): void {
       const afterBase = fullPath.slice(PROXY_BASE.length) || "/";
       const upstreamUrl = resolveUpstream(afterBase);
 
-      // Log all proxy requests for debugging (especially Apple Pay)
-      const bodySnippet = req.body ? JSON.stringify(req.body).slice(0, 300) : "(empty)";
-      const reqLog = `[GrowProxy] ${req.method} ${afterBase} → ${upstreamUrl} | body: ${bodySnippet}`;
+      // Never log payment tokens or personal fields. Route and body shape are
+      // sufficient for operational diagnostics.
+      const bodyKeys = req.body && typeof req.body === "object" ? Object.keys(req.body).slice(0, 20) : [];
+      const reqLog = `[GrowProxy] ${req.method} ${afterBase} → ${upstreamUrl} | bodyKeys=${bodyKeys.join(",") || "none"}`;
       console.log(reqLog);
       addToPaymentLogBuffer(reqLog);
 
@@ -201,9 +226,9 @@ export function registerGrowProxy(app: Express): void {
         buf = Buffer.from(await upstream.arrayBuffer());
         status = upstream.status;
         contentTypeOut = upstream.headers.get("content-type");
-        // Log response details
-        const respSnippet = buf.subarray(0, 500).toString("utf8");
-        const respLog = `[GrowProxy] Direct response: HTTP ${status} | size: ${buf.length}B | content-type: ${contentTypeOut} | body: ${respSnippet}`;
+        const responsePayload = JSON.parse(buf.toString("utf8")) as { status?: unknown; err?: { id?: unknown; message?: unknown } | string };
+        const errId = typeof responsePayload.err === "object" ? responsePayload.err?.id : undefined;
+        const respLog = `[GrowProxy] Direct response: HTTP ${status} | size=${buf.length}B | contentType=${contentTypeOut} | providerStatus=${String(responsePayload.status ?? "unknown")} | errId=${String(errId ?? "none")}`;
         console.log(respLog);
         addToPaymentLogBuffer(respLog);
       } catch (e: any) {
@@ -226,8 +251,14 @@ export function registerGrowProxy(app: Express): void {
           console.log(`[GrowProxy] Fallback URL: ${fbUrl}`);
           const fb = await fetchWithTimeout(fbUrl, init, FALLBACK_TIMEOUT_MS);
           const fbBuf = Buffer.from(await fb.arrayBuffer());
-          const fbSnippet = fbBuf.subarray(0, 500).toString("utf8");
-          const fbRespLog = `[GrowProxy] Fallback response: HTTP ${fb.status} | size: ${fbBuf.length}B | body: ${fbSnippet}`;
+          let fallbackStatus: unknown = "unknown";
+          let fallbackErrId: unknown = "none";
+          try {
+            const fallbackPayload = JSON.parse(fbBuf.toString("utf8")) as { status?: unknown; err?: { id?: unknown } | string };
+            fallbackStatus = fallbackPayload.status ?? "unknown";
+            fallbackErrId = typeof fallbackPayload.err === "object" ? fallbackPayload.err?.id ?? "none" : "none";
+          } catch { /* non-JSON block responses are classified below */ }
+          const fbRespLog = `[GrowProxy] Fallback response: HTTP ${fb.status} | size=${fbBuf.length}B | providerStatus=${String(fallbackStatus)} | errId=${String(fallbackErrId)}`;
           console.log(fbRespLog);
           addToPaymentLogBuffer(fbRespLog);
           if (!looksBlocked(fb.status, fbBuf)) {

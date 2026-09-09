@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateAgeFromBirthDate, parseOptionalIntegerInRange } from "../shared/profileValidation";
+import { calculateAgeFromBirthDate, normalizeIsraeliPhone, parseOptionalIntegerInRange } from "../shared/profileValidation";
 
 describe("profile birth-date validation", () => {
   const today = new Date(2026, 7, 24);
@@ -21,5 +21,17 @@ describe("profile birth-date validation", () => {
     expect(parseOptionalIntegerInRange("", 18, 120)).toBeUndefined();
     expect(parseOptionalIntegerInRange("abc", 18, 120)).toBeUndefined();
     expect(parseOptionalIntegerInRange("12", 18, 120)).toBeUndefined();
+  });
+
+  it("normalizes valid Israeli mobile and landline formats for Grow", () => {
+    expect(normalizeIsraeliPhone("050-123 4567")).toBe("0501234567");
+    expect(normalizeIsraeliPhone("+972 50 123 4567")).toBe("0501234567");
+    expect(normalizeIsraeliPhone("00972-2-1234567")).toBe("021234567");
+  });
+
+  it("rejects missing digits and unknown characters instead of guessing", () => {
+    expect(normalizeIsraeliPhone("x501234567")).toBeNull();
+    expect(normalizeIsraeliPhone("050123456")).toBeNull();
+    expect(normalizeIsraeliPhone("05012345678")).toBeNull();
   });
 });

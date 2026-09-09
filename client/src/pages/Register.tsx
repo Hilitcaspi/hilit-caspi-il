@@ -14,6 +14,7 @@ import { useLocation, useSearch } from "wouter";
 import { MATCH_QUESTIONS, IMPORTANCE_LABELS, CHAPTER2_QUESTION_IDS, PARENTS_ONLY_QUESTION_IDS, type MatchAnswer } from "@/lib/matchmakingQuestions";
 import EmbeddedDnaQuiz from "@/components/EmbeddedDnaQuiz";
 import GrowWallet from "@/components/GrowWallet";
+import { normalizeIsraeliPhone } from "@shared/profileValidation";
 
 type Step = "profile" | "dna_select" | "compatibility_quiz" | "free_token_verify" | "payment" | "uploading" | "uploading_error" | "already_registered" | "done";
 
@@ -299,6 +300,16 @@ export default function Register() {
       form.reportValidity();
       return;
     }
+    const normalizedPhone = normalizeIsraeliPhone(phone);
+    if (!normalizedPhone) {
+      const phoneInput = form.querySelector('input[type="tel"]') as HTMLInputElement | null;
+      phoneInput?.setCustomValidity("יש להזין מספר טלפון ישראלי מלא, לדוגמה 050-0000000");
+      phoneInput?.scrollIntoView({ behavior: "smooth", block: "center" });
+      phoneInput?.focus();
+      phoneInput?.reportValidity();
+      return;
+    }
+    if (phone !== normalizedPhone) setPhone(normalizedPhone);
     // If DNA already known (came from quiz), skip DNA step entirely
     if (dnaFromQuiz) {
       if (freeTokenFromUrl) {
@@ -595,7 +606,7 @@ export default function Register() {
     registrationFailureMutation.mutate({
       customerName: `${firstName} ${lastName}`.trim() || "לא ידוע",
       customerEmail: email.trim(),
-      customerPhone: phone.trim() || undefined,
+      customerPhone: normalizeIsraeliPhone(phone) || undefined,
       product: "database",
       amount: 299,
       errorMessage: message.slice(0, 160),
@@ -604,7 +615,7 @@ export default function Register() {
   };
 
   const buildRegisterPayload = () => ({
-    firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email,
+    firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone: normalizeIsraeliPhone(phone) || phone.trim(), email,
     city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
     religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
     maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
@@ -848,7 +859,7 @@ export default function Register() {
                   {fromDna && (
                     <div className="bg-[#191265]/8 border border-[#191265]/20 rounded-2xl px-4 py-3 mb-4 text-right">
                       <p className="text-[#191265] text-sm font-bold">✓ פרטים מהשאלון שלך</p>
-                      <p className="text-[#191265]/60 text-xs mt-0.5">השם, המייל והטלפון מולאו אוטומטית מהשאלון. לא ניתן לשנות אותם כדי לשמור על אותו פרופיל.</p>
+                      <p className="text-[#191265]/60 text-xs mt-0.5">השם והמייל מולאו מהשאלון. אפשר לתקן את מספר הטלפון לפני ההמשך.</p>
                     </div>
                   )}
                   <div className="space-y-4">
@@ -922,10 +933,10 @@ export default function Register() {
 
                     <div>
                       <label className="block text-sm font-medium text-[#191265] mb-1">טלפון *</label>
-                      <input type="tel" value={phone} onChange={e => !fromDna && setPhone(e.target.value)} required
+                      <input type="tel" value={phone} onChange={e => { e.currentTarget.setCustomValidity(""); setPhone(e.target.value); }} required
                         placeholder="050-0000000"
-                        readOnly={fromDna}
-                        className={`w-full px-4 py-3 rounded-xl border-2 text-right ${fromDna ? "border-[#191265]/30 bg-[#191265]/5 text-[#191265] cursor-not-allowed" : "border-[#e9e8e8] focus:outline-none focus:border-[#191265]"}`} />
+                        inputMode="tel"
+                        className="w-full px-4 py-3 rounded-xl border-2 text-right border-[#e9e8e8] focus:outline-none focus:border-[#191265]" />
                     </div>
 
                     <div>

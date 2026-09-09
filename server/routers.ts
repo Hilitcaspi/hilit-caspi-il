@@ -39,7 +39,7 @@ import { sendSMS } from "./vibrate";
 import { sendInitialMatchSmsOnce } from "./matchSms";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
 import { calculateOutcomeSegments } from "./matchmakingSegments";
-import { calculateAgeFromBirthDate } from "../shared/profileValidation";
+import { calculateAgeFromBirthDate, normalizeIsraeliPhone } from "../shared/profileValidation";
 import { getReleaseLifecycleUpdate } from "../shared/matchLifecycle";
 import { buildFeedbackRequestKey, ensurePositiveFeedbackRequest, markFeedbackRequestSent } from "./feedbackAutomation";
 import {
@@ -1631,7 +1631,14 @@ export const appRouter = router({
           age: z.number().min(18).max(80),
           birthDate: z.string().optional(),
           city: z.string().min(1),
-          phone: z.string().min(9),
+          phone: z.string().transform((value, ctx) => {
+            const normalized = normalizeIsraeliPhone(value);
+            if (!normalized) {
+              ctx.addIssue({ code: z.ZodIssueCode.custom, message: "יש להזין מספר טלפון ישראלי תקין" });
+              return z.NEVER;
+            }
+            return normalized;
+          }),
           email: z.string().email(),
           height: z.number().min(100).max(250).optional(),
           education: z.enum(["high_school", "vocational", "technician", "student", "bachelor", "master", "phd", "other"]).optional(),
@@ -1875,7 +1882,14 @@ export const appRouter = router({
           age: z.number().min(18).max(80),
           birthDate: z.string().optional(),
           city: z.string().min(1),
-          phone: z.string().min(9),
+          phone: z.string().transform((value, ctx) => {
+            const normalized = normalizeIsraeliPhone(value);
+            if (!normalized) {
+              ctx.addIssue({ code: z.ZodIssueCode.custom, message: "יש להזין מספר טלפון ישראלי תקין" });
+              return z.NEVER;
+            }
+            return normalized;
+          }),
           email: z.string().email(),
           height: z.number().min(100).max(250).nullish(),
           education: z.enum(["high_school", "vocational", "technician", "student", "bachelor", "master", "phd", "other"]).nullish(),
@@ -7373,7 +7387,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       .input(z.object({
         name: z.string().min(2),
         email: z.string().email(),
-        phone: z.string().min(9),
+        phone: z.string().transform((value, ctx) => {
+          const normalized = normalizeIsraeliPhone(value);
+          if (!normalized) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "יש להזין מספר טלפון ישראלי תקין" });
+            return z.NEVER;
+          }
+          return normalized;
+        }),
         product: z.string(),
       }))
       .mutation(async ({ input }) => {
@@ -7405,7 +7426,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "bundle_new_year", "match_boost", "plus"]),
         fullName: z.string().min(2),
         email: z.string().email(),
-        phone: z.string().optional(),
+        phone: z.string().optional().transform((value, ctx) => {
+          if (!value) return undefined;
+          const normalized = normalizeIsraeliPhone(value);
+          if (!normalized) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "יש להזין מספר טלפון ישראלי תקין" });
+            return z.NEVER;
+          }
+          return normalized;
+        }),
         // Client passes coupon code; server validates and computes final price
         couponCode: z.string().max(50).optional(),
         // UTM tracking
