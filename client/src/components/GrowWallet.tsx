@@ -21,6 +21,7 @@ import { trpc } from "@/lib/trpc";
 import { gaBeginCheckout } from "@/lib/ga";
 import { trackInitiateCheckout } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
+import { isGrowPaymentRendererReady } from "@/lib/growSdkReadiness";
 
 // ─── Grow config from VITE env vars ──────────────────────────────────────────
 const GROW_ENV = "PRODUCTION" as string; // "DEV" for sandbox, "PRODUCTION" for live
@@ -112,32 +113,21 @@ function preloadGrowSDKScript(): Promise<void> {
   return scriptLoadPromise;
 }
 
-// Wait for growRuntime AND all payment services to be loaded
+// Wait for the exact public renderer used by checkout. Grow can expose
+// growRuntime before renderPaymentOptions is attached to growPayment.
 function waitForGrowRuntime(timeoutMs = 12000): Promise<void> {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
     const poll = setInterval(() => {
-      const runtime = (window as any).growRuntime;
-      const servicesLoaded = (window as any).__growServicesLoaded;
-      if (runtime) {
-        if (servicesLoaded && typeof servicesLoaded === 'function') {
-          if (servicesLoaded()) {
-            clearInterval(poll);
-            console.log('[GrowWallet] All payment services loaded ✓');
-            resolve();
-            return;
-          }
-        } else {
-          // __growServicesLoaded not available — assume runtime is enough
-          clearInterval(poll);
-          console.log('[GrowWallet] growRuntime ready (no services check) ✓');
-          resolve();
-          return;
-        }
+      if (isGrowPaymentRendererReady(window)) {
+        clearInterval(poll);
+        console.log('[GrowWallet] Payment renderer ready ✓');
+        resolve();
+        return;
       }
       if (Date.now() > deadline) {
         clearInterval(poll);
-        reject(new Error("Grow runtime timeout after " + timeoutMs + "ms"));
+        reject(new Error("Grow payment renderer timeout after " + timeoutMs + "ms"));
       }
     }, 100);
   });
@@ -518,6 +508,9 @@ export default function GrowWallet({
 
       // Step 5: Render wallet (opens the payment overlay)
       logStep("5_renderPaymentOptions_start");
+      // Re-check after the network round-trip as the SDK mutates its global
+      // object asynchronously during initialization on some first loads.
+      await waitForGrowRuntime(12000);
       const growPaymentSdk = window.growPayment;
       if (!growPaymentSdk || typeof growPaymentSdk.renderPaymentOptions !== "function") {
         throw new Error("מערכת התשלום לא נטענה במלואה. אפשר לרענן את העמוד ולנסות שוב.");
