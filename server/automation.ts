@@ -849,11 +849,14 @@ export async function retryUnsentMatchEmails(): Promise<number> {
         sendEmail({ to: { email: singleA.email, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
         sendEmail({ to: { email: singleB.email, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
       ]);
-      // Mark as retried regardless of send success to avoid infinite loops
-      await db.update(matches).set({ emailRetriedAt: Date.now() }).where(eq(matches.id, match.id));
-      if (resA.success || resB.success) {
+      // Do not close the retry path after a partial provider failure. The match
+      // remains eligible for a later retry until Brevo accepts both emails.
+      if (resA.success && resB.success) {
+        await db.update(matches).set({ emailRetriedAt: Date.now() }).where(eq(matches.id, match.id));
         retried++;
         console.log(`[MatchRetry] Resent match proposal for match ${match.id} (${singleA.firstName} & ${singleB.firstName})`);
+      } else {
+        console.error(`[MatchRetry] Provider did not accept both emails for match ${match.id}; retry remains open`);
       }
     } catch (err) {
       console.error(`[MatchRetry] Error retrying match ${match.id}:`, err);
