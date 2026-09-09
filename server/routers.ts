@@ -36,7 +36,7 @@ import {
   verifySignedUnsubscribeToken,
 } from "./emailUnsubscribe";
 import { sendSMS } from "./vibrate";
-import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
+import { sendInitialMatchSmsOnce } from "./matchSms";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
 import { calculateOutcomeSegments } from "./matchmakingSegments";
 import { calculateAgeFromBirthDate } from "../shared/profileValidation";
@@ -3048,11 +3048,11 @@ export const appRouter = router({
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
 
-        await sendInitialMatchWhatsAppsOnce(db, {
+        await sendInitialMatchSmsOnce(db, {
           matchId,
           score,
-          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName },
-          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName },
+          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
+          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
         });
 
         return { success: true, matchId, score };
@@ -4305,11 +4305,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
 
-        await sendInitialMatchWhatsAppsOnce(db, {
+        await sendInitialMatchSmsOnce(db, {
           matchId: input.matchId,
           score,
-          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName },
-          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName },
+          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
+          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
         });
 
         await syncBoostRequestAfterMatchDecision(db, { matchId: input.matchId, decision: "approved" });
@@ -4399,11 +4399,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
         await notifyOwner({ title: "✅ התאמה נשלחה!", content: `ההצעה ל-${singleA.firstName} ו-${singleB.firstName} נשלחה בהצלחה.` });
-        await sendInitialMatchWhatsAppsOnce(db, {
+        await sendInitialMatchSmsOnce(db, {
           matchId: match.id,
           score,
-          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName },
-          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName },
+          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
+          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
         });
         return { success: true, action: "approved", sentTo: [singleA.email, singleB.email] };
       }),

@@ -249,7 +249,7 @@ export const matches = mysqlTable("matches", {
   followUpSentAt: bigint("followUpSentAt", { mode: "number" }),
   // Retry tracking: if initial proposal emails were not opened after 30 min, resend once
   emailRetriedAt: bigint("emailRetriedAt", { mode: "number" }),
-  // WhatsApp notification tracking: when the initial match proposal WA was sent (prevents duplicates)
+  // Legacy channel field: now tracks the initial mobile match notification SMS claim (prevents duplicates)
   waSentAt: bigint("waSentAt", { mode: "number" }),
   // Post-match lifecycle: after both approve, track follow-up emails and return-to-pool
   matchWeekFollowupSentAt: bigint("matchWeekFollowupSentAt", { mode: "number" }),

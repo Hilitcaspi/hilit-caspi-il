@@ -20,7 +20,7 @@ import { sendEmail } from "./brevo";
 import { buildMatchProposalEmail } from "./emailTemplates";
 import { normalizeEmail, normalizedEmailEquals } from "./emailNormalization";
 import { getMissingProfileFields } from "./matchmakingMetrics";
-import { sendInitialMatchWhatsAppsOnce } from "./matchWhatsApp";
+import { sendInitialMatchSmsOnce } from "./matchSms";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const BOOST_PRICE_AGOROT = 1990;
@@ -806,16 +806,16 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     sendEmail({ to: { email: partyA.email, name: partyA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
     sendEmail({ to: { email: partyB.email, name: partyB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
   ]);
-  const whatsAppResult = await sendInitialMatchWhatsAppsOnce(db, {
+  const smsResult = await sendInitialMatchSmsOnce(db, {
     matchId: match.id,
     score,
     proposalSource: "boost",
     boostSenderSide: senderIsA ? "A" : "B",
-    recipientA: { phone: partyA.phone, firstName: partyA.firstName, matchFirstName: partyB.firstName },
-    recipientB: { phone: partyB.phone, firstName: partyB.firstName, matchFirstName: partyA.firstName },
+    recipientA: { phone: partyA.phone, firstName: partyA.firstName, matchFirstName: partyB.firstName, isActive: partyA.isActive, isSeed: partyA.isSeed },
+    recipientB: { phone: partyB.phone, firstName: partyB.firstName, matchFirstName: partyA.firstName, isActive: partyB.isActive, isSeed: partyB.isSeed },
   });
-  const bothSidesReceivedAtLeastOneChannel = Boolean(emailAResult.success || whatsAppResult.sentA)
-    && Boolean(emailBResult.success || whatsAppResult.sentB);
+  const bothSidesReceivedAtLeastOneChannel = Boolean(emailAResult.success || smsResult.sentA)
+    && Boolean(emailBResult.success || smsResult.sentB);
   if (!bothSidesReceivedAtLeastOneChannel) {
     await db.transaction(async (tx: any) => {
       await tx.update(matches).set({

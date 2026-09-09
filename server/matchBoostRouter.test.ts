@@ -270,7 +270,7 @@ describe("match boost privacy and payment gate", () => {
   const uiSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/UserDashboard.tsx"), "utf8");
   const operationsSource = fs.readFileSync(path.join(process.cwd(), "client/src/components/OperationsSection.tsx"), "utf8");
   const emailSource = fs.readFileSync(path.join(process.cwd(), "server/emailTemplates.ts"), "utf8");
-  const whatsappSource = fs.readFileSync(path.join(process.cwd(), "server/matchWhatsApp.ts"), "utf8");
+  const smsSource = fs.readFileSync(path.join(process.cwd(), "server/matchSms.ts"), "utf8");
   const paymentSource = fs.readFileSync(path.join(process.cwd(), "server/growPayment.ts"), "utf8");
   const paymentRouterSource = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
   const webhookSource = fs.readFileSync(path.join(process.cwd(), "server/growWebhook.ts"), "utf8");
@@ -452,10 +452,10 @@ describe("match boost privacy and payment gate", () => {
     expect(emailSource).toContain("${matchPhotoUrl ?");
     expect(source).toContain("matchPhotoUrl: partyB.photoUrl ?? undefined");
     expect(source).toContain("matchPhotoUrl: partyA.photoUrl ?? undefined");
-    expect(whatsappSource).toContain('proposalSource === "boost"');
-    expect(whatsappSource).toContain("בקשת ה־Boost שלך");
-    expect(whatsappSource).toContain("נשלחה אליך התאמת Boost מיוחדת");
-    expect(whatsappSource).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
+    expect(smsSource).toContain('proposalSource === "boost"');
+    expect(smsSource).toContain("בקשת ה־Boost שלך");
+    expect(smsSource).toContain("נשלחה אליך התאמת Boost");
+    expect(smsSource).toContain("לא נבחרה אישית על ידי הילית");
     expect(automationSource).toContain('proposalSource: isBoost ? "boost" : "regular"');
     expect(emailSource).toContain('proposalSource?: "regular" | "boost"');
     expect(emailSource).toContain("התאמת ה־Boost עדיין ממתינה לאישור שלך");

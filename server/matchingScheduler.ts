@@ -14,7 +14,8 @@
 import { getDb } from "./db";
 import { singles, matches, matchmakingAnswers } from "../drizzle/schema";
 import { eq, and, isNotNull, lt } from "drizzle-orm";
-import { sendWhatsAppViaMake } from "./whatsappWebhook";
+import { sendSMS } from "./vibrate";
+import { buildMatchExpiredSmsMessage } from "./matchSms";
 import {
   computeFullScore,
   scoreOpenText,
@@ -372,27 +373,15 @@ export async function expireStaleMatches(): Promise<number> {
       db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1).then(r => r[0]),
     ]);
 
-    // Send WhatsApp notification to parties who did not respond
-    const expiredMessage = (firstName: string) =>
-      `היי ${firstName}, ההתאמה האחרונה פגה לאחר שלא התקבלה תשובה בתוך 48 שעות. בהתאמה הבאה חשוב להשיב בתוך 48 שעות כדי לשמור אותה פעילה. אם יש שאלות, אני כאן. הילית`;
-    if (!match.approvedByA && singleA?.phone) {
-      sendWhatsAppViaMake({
-        event: "match_expired",
-        idempotencyKey: `match-expired-${match.id}-A`,
-        phone: singleA.phone,
-        message: expiredMessage(singleA.firstName),
-        metadata: { matchId: match.id, recipientSide: "A" },
-      }).catch(() => {});
-    }
-    if (!match.approvedByB && singleB?.phone) {
-      sendWhatsAppViaMake({
-        event: "match_expired",
-        idempotencyKey: `match-expired-${match.id}-B`,
-        phone: singleB.phone,
-        message: expiredMessage(singleB.firstName),
-        metadata: { matchId: match.id, recipientSide: "B" },
-      }).catch(() => {});
-    }
+    // Send Vibrate SMS notification to parties who did not respond.
+    await Promise.all([
+      !match.approvedByA && singleA?.phone && singleA.isActive && !singleA.isSeed
+        ? sendSMS(singleA.phone, buildMatchExpiredSmsMessage(singleA.firstName))
+        : Promise.resolve(false),
+      !match.approvedByB && singleB?.phone && singleB.isActive && !singleB.isSeed
+        ? sendSMS(singleB.phone, buildMatchExpiredSmsMessage(singleB.firstName))
+        : Promise.resolve(false),
+    ]);
 
     // If one party said yes but the other didn't respond, send consolation to the one who said yes
     const aRespondedYes = match.approvedByA && !match.approvedByB;

@@ -2,8 +2,8 @@
  * SMS Integration via Vibrate API
  * https://www.vibrate.co.il
  *
- * Sends operational SMS messages that still use the Vibrate channel.
- * Initial match proposals are sent through the Make WhatsApp webhook instead.
+ * Sends operational SMS messages through the Vibrate channel, including
+ * automatic match proposals, reminders and expiry notices.
  * Fire-and-forget pattern — never throws, never blocks the main flow.
  * HTTP 202 confirms provider acceptance only; it is not handset delivery proof.
  */
