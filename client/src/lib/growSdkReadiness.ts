@@ -17,3 +17,17 @@ export function isGrowPaymentRendererReady(host: GrowSdkHost): boolean {
       && typeof host.growPayment.renderPaymentOptions === "function",
   );
 }
+
+export type GrowWalletComputedStyle = {
+  display?: string;
+  visibility?: string;
+  opacity?: string;
+};
+
+/** Grow may create the wallet DOM shell while keeping it fully hidden. */
+export function isGrowWalletVisible(style: GrowWalletComputedStyle | null): boolean {
+  if (!style) return false;
+  return style.display !== "none"
+    && style.visibility !== "hidden"
+    && style.opacity !== "0";
+}

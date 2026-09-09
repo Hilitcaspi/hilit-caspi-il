@@ -21,7 +21,7 @@ import { trpc } from "@/lib/trpc";
 import { gaBeginCheckout } from "@/lib/ga";
 import { trackInitiateCheckout } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
-import { isGrowPaymentRendererReady } from "@/lib/growSdkReadiness";
+import { isGrowPaymentRendererReady, isGrowWalletVisible } from "@/lib/growSdkReadiness";
 
 // ─── Grow config from VITE env vars ──────────────────────────────────────────
 const GROW_ENV = "PRODUCTION" as string; // "DEV" for sandbox, "PRODUCTION" for live
@@ -131,6 +131,50 @@ function waitForGrowRuntime(timeoutMs = 12000): Promise<void> {
       }
     }, 100);
   });
+}
+
+function waitForGrowWalletOpen(timeoutMs = 2500): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+    const poll = setInterval(() => {
+      const root = document.getElementById("Gr0W8-wallet-root");
+      if (root && isGrowWalletVisible(window.getComputedStyle(root))) {
+        clearInterval(poll);
+        resolve();
+        return;
+      }
+      if (Date.now() > deadline) {
+        clearInterval(poll);
+        reject(new Error("Grow wallet did not become visible"));
+      }
+    }, 100);
+  });
+}
+
+async function renderGrowPaymentOptionsWithRetry(
+  authCode: string,
+  logStep: (step: string, detail?: string) => void,
+): Promise<void> {
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    await waitForGrowRuntime(12000);
+    const growPaymentSdk = window.growPayment;
+    if (!growPaymentSdk || typeof growPaymentSdk.renderPaymentOptions !== "function") {
+      throw new Error("מערכת התשלום לא נטענה במלואה. אפשר לרענן את העמוד ולנסות שוב.");
+    }
+
+    growPaymentSdk.renderPaymentOptions(authCode);
+    logStep("5_renderPaymentOptions_attempt", `attempt=${attempt}`);
+    try {
+      await waitForGrowWalletOpen(2500);
+      return;
+    } catch {
+      if (attempt < 4) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 350));
+      }
+    }
+  }
+
+  throw new Error("מערכת התשלום לא נפתחה. אפשר לנסות שוב בעוד כמה רגעים.");
 }
 
 // ─── Declare global types ─────────────────────────────────────────────────────
@@ -510,12 +554,7 @@ export default function GrowWallet({
       logStep("5_renderPaymentOptions_start");
       // Re-check after the network round-trip as the SDK mutates its global
       // object asynchronously during initialization on some first loads.
-      await waitForGrowRuntime(12000);
-      const growPaymentSdk = window.growPayment;
-      if (!growPaymentSdk || typeof growPaymentSdk.renderPaymentOptions !== "function") {
-        throw new Error("מערכת התשלום לא נטענה במלואה. אפשר לרענן את העמוד ולנסות שוב.");
-      }
-      growPaymentSdk.renderPaymentOptions(result.authCode);
+      await renderGrowPaymentOptionsWithRetry(result.authCode, logStep);
       logStep("5_renderPaymentOptions_done");
 
     } catch (err: any) {
