@@ -24,6 +24,7 @@ const GROW_API_BASE = IS_GROW_PROD
   : "https://sandbox.meshulam.co.il";
 
 const GROW_API_URL = `${GROW_API_BASE}/api/light/server/1.0/createPaymentProcess`;
+const GROW_CREATE_FALLBACK_URL = "https://grow-proxy.hilitcaspi.workers.dev/api/light/server/1.0/createPaymentProcess";
 const GROW_APPROVE_URL = `${GROW_API_BASE}/api/light/server/1.0/approveTransaction`;
 const GROW_PLUS_API_URL = "https://secure.meshulam.co.il/api/light/server/1.0/createPaymentProcess";
 const GROW_PLUS_APPROVE_URL = "https://secure.meshulam.co.il/api/light/server/1.0/approveTransaction";
@@ -62,6 +63,30 @@ const PAGE_CODES: Record<string, string> = {
 };
 
 const SITE_BASE = "https://hilitcaspi.com";
+
+export function shouldUseGrowCreateFallback(status: number, contentType: string | null, body: string): boolean {
+  return status === 403
+    || Boolean(contentType?.toLowerCase().includes("text/html"))
+    || /Incapsula|_Incapsula_Resource|Request unsuccessful/i.test(body);
+}
+
+async function postGrowCreatePayment(url: string, body: string, timeoutMs = 12000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await globalThis.fetch(url, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        ...BROWSER_HEADERS,
+      },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // ─── Product definitions ──────────────────────────────────────────────────────
 export interface ProductConfig {
@@ -239,41 +264,43 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     params.append("maxPaymentNum", String(config.maxPaymentNum));
   }
 
-  let res: Response;
+  let res: Response | null = null;
+  let directFailure = "";
   try {
-    res = await globalThis.fetch(GROW_API_URL, {
-      method: "POST",
-      body: params.toString(),
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        ...BROWSER_HEADERS,
-      },
-    });
+    res = await postGrowCreatePayment(GROW_API_URL, params.toString());
   } catch (fetchErr: any) {
-    void notifyPaymentFailure({
-      customerName: input.fullName,
-      customerEmail: input.email,
-      customerPhone: input.phone,
-      product: input.product,
-      amount: sum,
-      errorMessage: `Network error: ${fetchErr?.message || "fetch failed"}`,
-      stage: "createProcess",
-    });
-    throw fetchErr;
+    directFailure = `Network error: ${fetchErr?.message || "fetch failed"}`;
   }
 
-  if (!res.ok) {
-    const text = await res.text();
+  if (res) {
+    const probe = await res.clone().text();
+    if (shouldUseGrowCreateFallback(res.status, res.headers.get("content-type"), probe)) {
+      directFailure = `Direct Grow blocked with HTTP ${res.status}`;
+      res = null;
+    }
+  }
+
+  if (!res) {
+    console.warn(`[GrowPayment] ${directFailure || "Direct Grow unavailable"}; trying established fallback`);
+    try {
+      res = await postGrowCreatePayment(GROW_CREATE_FALLBACK_URL, params.toString());
+    } catch (fallbackErr: any) {
+      directFailure = `Fallback network error: ${fallbackErr?.message || "fetch failed"}`;
+    }
+  }
+
+  if (!res || !res.ok) {
+    const text = res ? await res.text() : directFailure;
     void notifyPaymentFailure({
       customerName: input.fullName,
       customerEmail: input.email,
       customerPhone: input.phone,
       product: input.product,
       amount: sum,
-      errorMessage: `HTTP ${res.status}: ${text.slice(0, 150)}`,
+      errorMessage: `${res ? `HTTP ${res.status}` : "No response"}: ${text.slice(0, 150)}`,
       stage: "createProcess",
     });
-    throw new Error(`Grow API error ${res.status}: ${text.slice(0, 300)}`);
+    throw new Error(`Grow API error ${res?.status || "network"}: ${text.slice(0, 300)}`);
   }
 
   const json = (await res.json()) as any;

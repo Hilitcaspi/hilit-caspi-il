@@ -41,7 +41,15 @@ describe("Grow wallet SDK readiness", () => {
 
     expect(createProcessIndex).toBeGreaterThan(-1);
     expect(guardedRenderIndex).toBeGreaterThan(createProcessIndex);
-    expect(source).toContain("for (let attempt = 1; attempt <= 4; attempt++)");
-    expect(source).toContain("await waitForGrowWalletOpen(2500)");
+    expect(source).toContain("for (let attempt = 1; attempt <= 2; attempt++)");
+    expect(source).toContain("await waitForGrowWalletOpen(9000)");
+    expect(source).toContain("setWalletLoading(false)");
+  });
+
+  it("uses the local proxied SDK instead of the Incapsula-prone CDN runtime", () => {
+    const source = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
+
+    expect(source).toContain('const GROW_SDK_URL = "/grow-sdk/gs.min.js"');
+    expect(source).not.toContain('const GROW_SDK_URL = "https://cdn.meshulam.co.il/sdk/gs.min.js"');
   });
 });

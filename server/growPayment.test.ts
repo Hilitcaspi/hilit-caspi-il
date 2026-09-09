@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { createPaymentProcess, approveTransaction, PRODUCT_CONFIGS } from "./growPayment";
+import { createPaymentProcess, approveTransaction, PRODUCT_CONFIGS, shouldUseGrowCreateFallback } from "./growPayment";
 
 describe("growPayment module", () => {
+  it("uses the fallback only for Incapsula-style createProcess responses", () => {
+    expect(shouldUseGrowCreateFallback(403, "text/html", "Request unsuccessful - Incapsula")).toBe(true);
+    expect(shouldUseGrowCreateFallback(200, "application/json", '{"status":1}')).toBe(false);
+    expect(shouldUseGrowCreateFallback(400, "application/json", '{"status":0}')).toBe(false);
+  });
+
   it("exports createPaymentProcess function", () => {
     expect(typeof createPaymentProcess).toBe("function");
   });

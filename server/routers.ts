@@ -56,6 +56,7 @@ import { buildOutcomeFeedbackRequestEmail, shouldOfferTestimonialRequest, TESTIM
 import { buildApprovedTestimonialCreativeVariants } from "./testimonialCreative";
 import { testimonialRouter } from "./testimonialRouter";
 import { dailyReportRouter } from "./dailyReportRouter";
+import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivacy";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -7697,7 +7698,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         email: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        const msg = `[PaymentStep] ${input.product} | ${input.step} | ${input.email || 'N/A'} | ${input.detail || ''}`;
+        const msg = `[PaymentStep] ${input.product} | ${input.step} | emailDomain=${getSafeEmailDomain(input.email)} | ${sanitizePaymentLogDetail(input.detail)}`;
         console.log(msg);
         addToPaymentLogBuffer(msg);
         return { ok: true };

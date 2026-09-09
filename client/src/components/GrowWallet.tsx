@@ -63,7 +63,10 @@ const SITE_BASE = window.location.origin;
 // This avoids CORS issues and keeps credentials secure on the server.
 
 // Official Meshulam CDN SDK
-const GROW_SDK_URL = "https://cdn.meshulam.co.il/sdk/gs.min.js";
+// Keep the wallet on the local 1.3.5 loader. It rewrites Grow's browser-side
+// API calls through our same-origin /api/grow-proxy route, whose Cloudflare
+// fallback protects checkout from intermittent Incapsula blocks.
+const GROW_SDK_URL = "/grow-sdk/gs.min.js";
 
 // ─── SDK Script Preloader ─────────────────────────────────────────────────────
 // Just loads the script tag — does NOT call init()
@@ -155,7 +158,7 @@ async function renderGrowPaymentOptionsWithRetry(
   authCode: string,
   logStep: (step: string, detail?: string) => void,
 ): Promise<void> {
-  for (let attempt = 1; attempt <= 4; attempt++) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
     await waitForGrowRuntime(12000);
     const growPaymentSdk = window.growPayment;
     if (!growPaymentSdk || typeof growPaymentSdk.renderPaymentOptions !== "function") {
@@ -165,10 +168,13 @@ async function renderGrowPaymentOptionsWithRetry(
     growPaymentSdk.renderPaymentOptions(authCode);
     logStep("5_renderPaymentOptions_attempt", `attempt=${attempt}`);
     try {
-      await waitForGrowWalletOpen(2500);
+      // The same-origin proxy may first receive a fast Incapsula block and then
+      // complete through its Worker fallback. Give that single request enough
+      // time before issuing another draw for the same authCode.
+      await waitForGrowWalletOpen(9000);
       return;
     } catch {
-      if (attempt < 4) {
+      if (attempt < 2) {
         await new Promise(resolve => setTimeout(resolve, attempt * 350));
       }
     }
@@ -555,6 +561,7 @@ export default function GrowWallet({
       // Re-check after the network round-trip as the SDK mutates its global
       // object asynchronously during initialization on some first loads.
       await renderGrowPaymentOptionsWithRetry(result.authCode, logStep);
+      setWalletLoading(false);
       logStep("5_renderPaymentOptions_done");
 
     } catch (err: any) {

@@ -15,7 +15,7 @@ import { MATCH_QUESTIONS, IMPORTANCE_LABELS, CHAPTER2_QUESTION_IDS, PARENTS_ONLY
 import EmbeddedDnaQuiz from "@/components/EmbeddedDnaQuiz";
 import GrowWallet from "@/components/GrowWallet";
 
-type Step = "profile" | "dna_select" | "compatibility_quiz" | "free_token_verify" | "payment" | "uploading" | "uploading_error" | "done";
+type Step = "profile" | "dna_select" | "compatibility_quiz" | "free_token_verify" | "payment" | "uploading" | "uploading_error" | "already_registered" | "done";
 
 const DNA_LABELS: Record<string, string> = {
   leader:      "המנהיגה הממגנטת / המנהיג הממגנט",
@@ -145,6 +145,7 @@ export default function Register() {
     }
   }, [validateFreeToken.isLoading, validateFreeToken.data, freeTokenFromUrl]);
   const [singleId, setSingleId] = useState<number | null>(null);
+  const [existingProfileToken, setExistingProfileToken] = useState("");
 
   // Pre-filled from DNA quiz URL params (name, email, phone)
   const nameFromDna = params.get("name") || "";
@@ -307,7 +308,12 @@ export default function Register() {
       setPaymentLoading(true);
       setRegisterError("");
       try {
-        await saveProfileDraftBeforePayment();
+        const draft = await saveProfileDraftBeforePayment();
+        if (draft?.alreadyExists) {
+          setExistingProfileToken(draft.questionnaireToken || "");
+          setStep("already_registered");
+          return;
+        }
         setStep("payment");
       } catch (err) {
         console.error("[PrePayment] Failed to save profile draft:", err);
@@ -579,8 +585,9 @@ export default function Register() {
   });
   const profileDraftMutation = trpc.singles.registerBasicProfile.useMutation();
   const registrationFailureMutation = trpc.payment.reportFailure.useMutation();
+  type ProfileDraftResult = Awaited<ReturnType<typeof profileDraftMutation.mutateAsync>>;
   const [draftSavedBeforePayment, setDraftSavedBeforePayment] = useState(false);
-  const draftSaveInFlightRef = useRef<Promise<unknown> | null>(null);
+  const draftSaveInFlightRef = useRef<Promise<ProfileDraftResult> | null>(null);
 
   const reportProfileSaveFailure = (error: unknown) => {
     const message = error instanceof Error ? error.message : "unknown_profile_save_error";
@@ -620,7 +627,7 @@ export default function Register() {
     gender?: "female" | "male";
     dnaType?: "leader" | "romantic" | "free_spirit" | "anchor";
     dnaSessionId?: string;
-  }) {
+  }): Promise<ProfileDraftResult> {
     if (draftSaveInFlightRef.current) return draftSaveInFlightRef.current;
     const attempt = (async () => {
       const payload = {
@@ -635,14 +642,14 @@ export default function Register() {
           const data = await profileDraftMutation.mutateAsync(payload);
           if (data?.alreadyExists) {
             try { localStorage.removeItem("pending_profile_payload"); } catch {}
-            throw new Error("PROFILE_ALREADY_REGISTERED");
+            if (data.questionnaireToken) setQuestionnaireToken(data.questionnaireToken);
+            return data;
           }
           if (data?.questionnaireToken) setQuestionnaireToken(data.questionnaireToken);
           setDraftSavedBeforePayment(true);
           return data;
         } catch (error) {
           lastError = error;
-          if (error instanceof Error && error.message === "PROFILE_ALREADY_REGISTERED") throw error;
           if (retry < 3) await new Promise(resolve => setTimeout(resolve, retry * 1200));
         }
       }
@@ -1420,11 +1427,16 @@ export default function Register() {
                   setPaymentLoading(true);
                   setRegisterError("");
                   try {
-                    await saveProfileDraftBeforePayment({
+                    const draft = await saveProfileDraftBeforePayment({
                       gender: quizGender as "female" | "male",
                       dnaType,
                       ...(quizSessionId ? { dnaSessionId: quizSessionId } : {}),
                     });
+                    if (draft?.alreadyExists) {
+                      setExistingProfileToken(draft.questionnaireToken || "");
+                      setStep("already_registered");
+                      return;
+                    }
                     setStep("payment");
                   } catch (err) {
                     console.error("[PrePayment] Failed to save profile draft after DNA:", err);
@@ -1660,6 +1672,37 @@ export default function Register() {
                   className="border-2 border-[#191265] text-[#191265] font-bold py-3 rounded-2xl text-center hover:bg-[#191265] hover:text-white transition-all">
                   צור קשר עם הילית בוואטסאפ
                 </a>
+              </div>
+            </motion.div>
+          )}
+          {/* ── ALREADY REGISTERED ── */}
+          {step === "already_registered" && (
+            <motion.div key="already_registered" {...slideIn} className="text-center py-16">
+              <div className="text-6xl mb-6">✓</div>
+              <h2 className="text-3xl font-black text-[#191265] mb-4">
+                הפרופיל שלך כבר קיים במאגר
+              </h2>
+              <p className="text-[#727272] text-lg leading-relaxed mb-8 max-w-md mx-auto">
+                זיהינו שכבר נרשמת ושילמת בעבר, ולכן עצרנו כאן כדי שלא יתבצע חיוב נוסף.
+                <br /><br />
+                אפשר להמשיך ישירות לאזור האישי ולראות את מצב הפרופיל וההתאמות.
+              </p>
+              <div className="flex flex-col gap-3 max-w-xs mx-auto">
+                <a
+                  href={existingProfileToken
+                    ? `/my-profile?email=${encodeURIComponent(email.trim())}&token=${encodeURIComponent(existingProfileToken)}`
+                    : "/my-profile"}
+                  className="bg-[#191265] text-white font-black py-4 rounded-2xl text-center hover:bg-[#1800ad] transition-all"
+                >
+                  כניסה לאזור האישי
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setStep("profile")}
+                  className="border-2 border-[#191265] text-[#191265] font-bold py-3 rounded-2xl text-center hover:bg-[#191265] hover:text-white transition-all"
+                >
+                  חזרה לפרטים
+                </button>
               </div>
             </motion.div>
           )}

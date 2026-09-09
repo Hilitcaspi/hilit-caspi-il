@@ -44,6 +44,14 @@ describe("free access token entry at database checkout", () => {
     expect(register.match(/reportProfileSaveFailure\(err\);/g)).toHaveLength(2);
   });
 
+  it("does not turn an existing paid profile into a save error or a second payment", () => {
+    expect(register).not.toContain('throw new Error("PROFILE_ALREADY_REGISTERED")');
+    expect(register.match(/if \(draft\?\.alreadyExists\)/g)).toHaveLength(2);
+    expect(register).toContain('setStep("already_registered")');
+    expect(register).toContain("עצרנו כאן כדי שלא יתבצע חיוב נוסף");
+    expect(register).toContain("כניסה לאזור האישי");
+  });
+
   it("compresses large mobile photos before the pre-payment profile save", () => {
     expect(register).toContain("const maxDimension = 1600");
     expect(register).toContain('canvas.toDataURL("image/jpeg", quality)');
