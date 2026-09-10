@@ -2830,3 +2830,9 @@
 - [x] להכין קישור שחזור אישי אם נדרש: לא נדרש למשתמש האחרון משום שהשלים תשלום; לא נוצר קישור חלופי או חיוב נוסף
 - [x] לתקן את שורש התקלה ולהוסיף רגרסיה: readiness של Grow ממתין כעת עד 35 שניות במקום להיכשל אחרי 12 שניות, וכשל טעינת SDK מסווג `sdk_failure` ולא `createProcess` קריטי; 11 בדיקות ממוקדות ו־TypeScript עברו
 - [ ] לאמת את הפתרון ללא כרטיס או חיוב, לנקות QA ולדווח למשתמשת בזהות מסוננת ובפעולה מומלצת
+
+## Date-to-task category mapping — September 2026
+
+- [x] Extract dates only from the user-supplied support file without processing usage figures
+- [x] Map each extracted date to task categories found in the conversation and website-project checkpoint history
+- [x] Deliver a concise date-by-date table without credit or token attribution
