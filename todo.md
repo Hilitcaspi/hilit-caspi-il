@@ -2836,3 +2836,10 @@
 - [x] Extract dates only from the user-supplied support file without processing usage figures
 - [x] Map each extracted date to task categories found in the conversation and website-project checkpoint history
 - [x] Deliver a concise date-by-date table without credit or token attribution
+
+## 50-line application description — September 2026
+
+- [x] Write an exactly 50-line business and product description
+- [x] Include the customer application, technical architecture, payments, automations, security, and data model
+- [x] Include the CRM/admin interface, operational controls, analytics, and audit capabilities
+- [x] Verify the final deliverable contains exactly 50 non-empty lines
