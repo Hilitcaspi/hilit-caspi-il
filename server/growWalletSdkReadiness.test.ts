@@ -42,8 +42,25 @@ describe("Grow wallet SDK readiness", () => {
     expect(createProcessIndex).toBeGreaterThan(-1);
     expect(guardedRenderIndex).toBeGreaterThan(createProcessIndex);
     expect(source).toContain("for (let attempt = 1; attempt <= 2; attempt++)");
+    expect(source).toContain("const GROW_RUNTIME_TIMEOUT_MS = 35_000");
+    expect(source).toContain("await waitForGrowRuntime(GROW_RUNTIME_TIMEOUT_MS)");
     expect(source).toContain("await waitForGrowWalletOpen(9000)");
     expect(source).toContain("setWalletLoading(false)");
+  });
+
+  it("classifies slow SDK readiness separately from createProcess failures", () => {
+    const source = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
+    const initIndex = source.indexOf('let failureStage: "createProcess" | "sdk_failure"');
+    const createProcessStageIndex = source.indexOf('failureStage = "createProcess"', initIndex + 1);
+    const createProcessIndex = source.indexOf("const result = await createProcessMutation.mutateAsync", createProcessStageIndex);
+    const sdkStageIndex = source.indexOf('failureStage = "sdk_failure"', createProcessIndex);
+    const reportIndex = source.indexOf("stage: failureStage", sdkStageIndex);
+
+    expect(initIndex).toBeGreaterThan(-1);
+    expect(createProcessStageIndex).toBeGreaterThan(initIndex);
+    expect(createProcessIndex).toBeGreaterThan(createProcessStageIndex);
+    expect(sdkStageIndex).toBeGreaterThan(createProcessIndex);
+    expect(reportIndex).toBeGreaterThan(sdkStageIndex);
   });
 
   it("uses the local proxied SDK instead of the Incapsula-prone CDN runtime", () => {

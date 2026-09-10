@@ -119,7 +119,9 @@ function preloadGrowSDKScript(): Promise<void> {
 
 // Wait for the exact public renderer used by checkout. Grow can expose
 // growRuntime before renderPaymentOptions is attached to growPayment.
-function waitForGrowRuntime(timeoutMs = 12000): Promise<void> {
+const GROW_RUNTIME_TIMEOUT_MS = 35_000;
+
+function waitForGrowRuntime(timeoutMs = GROW_RUNTIME_TIMEOUT_MS): Promise<void> {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
     const poll = setInterval(() => {
@@ -160,7 +162,7 @@ async function renderGrowPaymentOptionsWithRetry(
   logStep: (step: string, detail?: string) => void,
 ): Promise<void> {
   for (let attempt = 1; attempt <= 2; attempt++) {
-    await waitForGrowRuntime(12000);
+    await waitForGrowRuntime(GROW_RUNTIME_TIMEOUT_MS);
     const growPaymentSdk = window.growPayment;
     if (!growPaymentSdk || typeof growPaymentSdk.renderPaymentOptions !== "function") {
       throw new Error("מערכת התשלום לא נטענה במלואה. אפשר לרענן את העמוד ולנסות שוב.");
@@ -389,6 +391,11 @@ export default function GrowWallet({
       try { logStepMutation.mutate({ product, step, detail: detail || "", email: email.trim() }); } catch {}
     };
 
+    // Only failures from the server-side process creation step are critical
+    // createProcess incidents. SDK boot/render failures are recoverable client
+    // failures and must not trigger the operational createProcess SMS alert.
+    let failureStage: "createProcess" | "sdk_failure" = product === "plus" ? "createProcess" : "sdk_failure";
+
     try {
       // Plus returns a hosted recurring-payment URL, so it must not
       // depend on the regular Grow wallet SDK. Other products still use the
@@ -457,7 +464,7 @@ export default function GrowWallet({
 
         logStep("2_init_done");
         logStep("3_wait_runtime_start");
-        await waitForGrowRuntime(12000);
+        await waitForGrowRuntime(GROW_RUNTIME_TIMEOUT_MS);
         logStep("3_wait_runtime_done");
       }
 
@@ -524,6 +531,7 @@ export default function GrowWallet({
       } catch { /* non-blocking */ }
 
       logStep("4_createProcess_start");
+      failureStage = "createProcess";
       const result = await createProcessMutation.mutateAsync({
         product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "match_boost" | "plus",
         fullName,
@@ -559,6 +567,7 @@ export default function GrowWallet({
       logStep("4_createProcess_done", `authCode=${result.authCode ? "present" : "missing"} processToken=${result.processToken ? "present" : "missing"}`);
 
       // Step 5: Render wallet (opens the payment overlay)
+      failureStage = "sdk_failure";
       logStep("5_renderPaymentOptions_start");
       // Re-check after the network round-trip as the SDK mutates its global
       // object asynchronously during initialization on some first loads.
@@ -587,7 +596,7 @@ export default function GrowWallet({
         customerPhone: userPhone,
         product,
         errorMessage: errDetail.slice(0, 300),
-        stage: "createProcess",
+        stage: failureStage,
       });
     }
   }, [name, email, phone, product, termsPath, termsAccepted, ageConfirmed, personalToken, boostMatchId, couponApplied, plusConsents]);
