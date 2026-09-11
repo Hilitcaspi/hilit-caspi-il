@@ -909,9 +909,12 @@ export async function processMatchedPairFollowUps(): Promise<number> {
       if (!singleA || !singleB) continue;
 
       const isWeekFollowup = !match.matchWeekFollowupSentAt;
-      const returnUrl = `${SITE_BASE}/match/return-to-pool?matchId=${match.id}`;
+      const buildReturnUrl = (single: { email: string | null; questionnaireToken: string | null }) => {
+        if (!single.email || !single.questionnaireToken) return `${SITE_BASE}/my-profile`;
+        return `${SITE_BASE}/match/return-to-pool?matchId=${match.id}&email=${encodeURIComponent(single.email)}&token=${encodeURIComponent(single.questionnaireToken)}`;
+      };
 
-      const buildEmail = (firstName: string, matchFirstName: string, recipientEmail: string, feedbackToken: string | null) => {
+      const buildEmail = (firstName: string, matchFirstName: string, recipientEmail: string, feedbackToken: string | null, returnUrl: string) => {
         const outcomeUrl = feedbackToken ? `${SITE_BASE}/match/outcome?token=${encodeURIComponent(feedbackToken)}` : null;
         const feedbackButton = outcomeUrl ? `
           <p style="text-align:center;margin:24px 0;">
@@ -964,7 +967,7 @@ export async function processMatchedPairFollowUps(): Promise<number> {
       let emailsSent = 0;
 
       if (singleA.email) {
-        const tpl = buildEmail(singleA.firstName, singleB.firstName, singleA.email, match.approvalTokenA);
+        const tpl = buildEmail(singleA.firstName, singleB.firstName, singleA.email, match.approvalTokenA, buildReturnUrl(singleA));
         const res = await sendEmail({
           to: { email: singleA.email, name: singleA.firstName },
           subject: tpl.subject,
@@ -974,7 +977,7 @@ export async function processMatchedPairFollowUps(): Promise<number> {
       }
 
       if (singleB.email) {
-        const tpl = buildEmail(singleB.firstName, singleA.firstName, singleB.email, match.approvalTokenB);
+        const tpl = buildEmail(singleB.firstName, singleA.firstName, singleB.email, match.approvalTokenB, buildReturnUrl(singleB));
         const res = await sendEmail({
           to: { email: singleB.email, name: singleB.firstName },
           subject: tpl.subject,

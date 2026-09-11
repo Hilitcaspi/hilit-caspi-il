@@ -676,12 +676,12 @@ export default function CRMMatchmaking() {
     return { aBlocked: !!aBlocked, bBlocked: !!bBlocked, blockedPersons, maxHoursLeft: Math.max(...blockedPersons.map(p => p.hoursLeft)) };
   };
   // Map: singleId -> match history (all statuses, for showing who was already sent)
-  const matchHistoryBySingleId = new Map<number, Array<{ matchId: number; opponentName: string; status: string; score?: number | null; proposedAt?: number | null; opponentPhotoUrl?: string | null }>>();
+  const matchHistoryBySingleId = new Map<number, Array<{ matchId: number; opponentName: string; status: string; score?: number | null; proposedAt?: number | null; opponentPhotoUrl?: string | null; returnedToPoolAt?: number | null }>>();
   // Only include matches that were actually SENT (proposed/matched/rejected/expired) — not pending
   typedMatches.filter(m => m.status !== "pending").forEach(m => {
     const addToHistory = (singleId: number, opponentName: string, opponentPhotoUrl: string | null | undefined) => {
       const existing = matchHistoryBySingleId.get(singleId) || [];
-      existing.push({ matchId: m.id, opponentName, status: m.status, score: m.score, proposedAt: m.proposedAt as number | null, opponentPhotoUrl });
+      existing.push({ matchId: m.id, opponentName, status: m.status, score: m.score, proposedAt: m.proposedAt as number | null, opponentPhotoUrl, returnedToPoolAt: m.returnedToPoolAt });
       matchHistoryBySingleId.set(singleId, existing);
     };
     addToHistory(m.singleAId, m.singleBName || "?", m.singleBPhotoUrl);
@@ -1309,13 +1309,15 @@ export default function CRMMatchmaking() {
                                       </div>
                                       {(m.status === "proposed" || m.status === "matched" || m.status === "rejected" || m.status === "expired") && (
                                         <div className={`mt-1 text-[10px] px-1.5 py-0.5 rounded-full inline-block font-bold ${
+                                          m.returnedToPoolAt ? "bg-purple-100 text-purple-700" :
                                           m.status === "matched" ? "bg-green-100 text-green-700" :
                                           m.status === "proposed" ? "bg-blue-100 text-blue-700" :
                                           (m.status === "rejected" && m.approvedByA === true && m.approvedByB === true) ? "bg-purple-100 text-purple-700" :
                                           (m.status === "rejected" || m.status === "expired") ? "bg-orange-100 text-orange-600" :
                                           "bg-red-100 text-red-600"
                                         }`}>
-                                          {m.status === "proposed" ? "📨 כבר נשלחה" :
+                                          {m.returnedToPoolAt ? "🔓 שוחררו" :
+                                           m.status === "proposed" ? "📨 כבר נשלחה" :
                                            m.status === "matched" ? "💛 התאמה!" :
                                            (m.status === "rejected" && m.approvedByA === true && m.approvedByB === true) ? "🔓 שוחרר" :
                                            m.status === "expired" ? "⌛ פג תוקף" :
@@ -1385,12 +1387,13 @@ export default function CRMMatchmaking() {
                               </div>
                               {/* Status badge */}
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 ${
+                                h.returnedToPoolAt ? "bg-purple-100 text-purple-700" :
                                 h.status === "proposed" ? "bg-blue-100 text-blue-700" :
                                 h.status === "matched" ? "bg-green-100 text-green-700" :
                                 h.status === "rejected" ? "bg-red-100 text-red-700" :
                                 "bg-gray-100 text-gray-600"
                               }`}>
-                                {h.status === "proposed" ? "📨 נשלחה" : h.status === "matched" ? "💚 זוג" : h.status === "rejected" ? "❌ לא התאמה" : h.status === "expired" ? "⏰ פג תוקף" : h.status}
+                                {h.returnedToPoolAt ? "🔓 שוחררו" : h.status === "proposed" ? "📨 נשלחה" : h.status === "matched" ? "💚 זוג" : h.status === "rejected" ? "❌ לא התאמה" : h.status === "expired" ? "⏰ פג תוקף" : h.status}
                               </span>
                             </div>
                           ))}
@@ -1979,7 +1982,7 @@ export default function CRMMatchmaking() {
                       )}
 
                       {/* Match detail status + release for matched */}
-                      {match.status === "matched" && (
+                      {match.status === "matched" && !match.returnedToPoolAt && (
                         <div className="space-y-3 mb-3">
                           {/* Detail status dropdown */}
                           <div className="flex items-center gap-2 flex-wrap">
@@ -2114,7 +2117,7 @@ export default function CRMMatchmaking() {
                       )}
 
                       {/* Follow-up actions for matched 14+ days */}
-                      {match.status === "matched" && match.matchedAt && match.matchedAt < now14daysAgo && (
+                      {match.status === "matched" && !match.returnedToPoolAt && match.matchedAt && match.matchedAt < now14daysAgo && (
                         <div className="bg-purple-50 rounded-xl p-3 space-y-3">
                           <p className="text-xs font-bold text-purple-800">🔔 מעקב אחרי ההתאמה</p>
                           <p className="text-xs text-purple-700">ההתאמה הצליחה לפני {Math.floor((Date.now() - (match.matchedAt || 0)) / (1000 * 60 * 60 * 24))} ימים. כדאי לשאול איך הייתה הפגישה!</p>

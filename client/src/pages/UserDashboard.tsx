@@ -11,6 +11,7 @@ import GrowWallet from "@/components/GrowWallet";
 import AnonymousBoostSilhouette from "@/components/AnonymousBoostSilhouette";
 import { trpc } from "@/lib/trpc";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
 function PlusPilotCard({ email, token }: { email: string; token: string }) {
   const utils = trpc.useUtils();
@@ -236,6 +237,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; 
   pending: { label: "ממתין לאישור הילית", color: "#727272", bg: "#f5f5f5", icon: "⏳" },
   proposed: { label: "הצעה נשלחה אליך", color: "#1565c0", bg: "#e3f2fd", icon: "💌" },
   matched: { label: "התאמה מוצלחת!", color: "#2e7d32", bg: "#e8f5e9", icon: "💚" },
+  released: { label: "ההתאמה שוחררה", color: "#6b5b45", bg: "#f0eadc", icon: "🔓" },
   rejected: { label: "לא התאים הפעם", color: "#727272", bg: "#f5f5f5", icon: "✕" },
   expired: { label: "פג תוקף", color: "#727272", bg: "#f5f5f5", icon: "⌛" },
 };
@@ -672,15 +674,18 @@ function MatchBoostCard({
 }
 
 // ─── Match Card ───────────────────────────────────────────────────────────────
-function MatchCard({ match }: { match: any }) {
-  const statusInfo = STATUS_LABELS[match.status] || STATUS_LABELS.pending;
+function MatchCard({ match, email, token }: { match: any; email: string; token: string }) {
+  const isReleased = Boolean(match.returnedToPoolAt);
+  const statusInfo = isReleased ? STATUS_LABELS.released : (STATUS_LABELS[match.status] || STATUS_LABELS.pending);
   const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
   const utils = trpc.useUtils();
   const releaseMutation = trpc.matchmaking.returnToPool.useMutation({
-    onSuccess: () => {
-      utils.singles.getDashboard.invalidate();
+    onSuccess: async () => {
+      await utils.singles.getDashboard.invalidate({ email, token });
       setShowReleaseConfirm(false);
+      toast.success("ההתאמה שוחררה בהצלחה. שניכם חזרתם למאגר ותוכלו לקבל התאמות חדשות.");
     },
+    onError: () => toast.error("לא הצלחנו להשלים את השחרור. הפרטים לא שונו ואפשר לנסות שוב."),
   });
   const expiresIn = match.approvalExpiresAt
     ? Math.max(0, Math.ceil((match.approvalExpiresAt - Date.now()) / (1000 * 60 * 60)))
@@ -700,7 +705,15 @@ function MatchCard({ match }: { match: any }) {
         )}
       </div>
 
-      {match.status === 'proposed' && match.other && (
+      {isReleased && (
+        <div className="p-5 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#f0eadc] text-2xl">🔓</div>
+          <p className="font-black text-[#191265]">ההתאמה שוחררה</p>
+          <p className="mt-1 text-sm text-[#666]">שניכם חזרתם למאגר ותוכלו לקבל התאמות חדשות. היסטוריית ההתאמה נשמרה כאן.</p>
+        </div>
+      )}
+
+      {!isReleased && match.status === 'proposed' && match.other && (
         <div className="p-5">
           <div className="flex gap-4 items-start">
             {match.other.photoUrl ? (
@@ -739,7 +752,7 @@ function MatchCard({ match }: { match: any }) {
         </div>
       )}
 
-      {match.status === 'matched' && match.other && (
+      {!isReleased && match.status === 'matched' && match.other && (
         <div className="p-5">
           <div className="bg-[#e8f5e9] rounded-xl p-4 mb-4 text-center">
             <p className="text-2xl mb-1">🎉</p>
@@ -797,7 +810,7 @@ function MatchCard({ match }: { match: any }) {
                 <p className="text-xs text-[#555] mb-3">לאחר השחרור, שניכם תחזרו למאגר ותוכלו לקבל התאמות חדשות.</p>
                 <div className="flex gap-2 justify-center">
                   <button
-                    onClick={() => releaseMutation.mutate({ matchId: match.matchId })}
+                    onClick={() => releaseMutation.mutate({ matchId: match.matchId, email, token })}
                     disabled={releaseMutation.isPending}
                     className="bg-[#e53935] text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-[#c62828] transition-colors disabled:opacity-50"
                   >
@@ -816,7 +829,7 @@ function MatchCard({ match }: { match: any }) {
         </div>
       )}
 
-      {(match.status === 'rejected' || match.status === 'expired') && (
+      {!isReleased && (match.status === 'rejected' || match.status === 'expired') && (
         <div className="p-5 text-center text-[#aaa] text-sm">
           <p>ההצעה לא התאימה הפעם. הילית תמשיך לחפש עבורך.</p>
         </div>
@@ -1151,7 +1164,7 @@ export default function UserDashboard() {
         <div className="grid grid-cols-3 gap-3">
           {[
             { label: "התאמות פעילות", value: activeMatches.length, icon: "💌" },
-            { label: "התאמות מוצלחות", value: myMatches.filter((m: any) => m.status === "matched").length, icon: "💚" },
+            { label: "חיבורים הדדיים", value: myMatches.filter((m: any) => m.status === "matched").length, icon: "💚" },
             { label: "ימים במאגר", value: profile.createdAt ? Math.floor((Date.now() - profile.createdAt) / (1000 * 60 * 60 * 24)) : 0, icon: "📅" },
           ].map(({ label, value, icon }) => (
             <div key={label} className="bg-white rounded-xl p-3 text-center shadow-sm border border-[#e9e8e8]">
@@ -1263,7 +1276,7 @@ export default function UserDashboard() {
                     <div>
                       <h3 className="text-sm font-bold text-[#191265] mb-3 px-1">התאמות שנשלחו</h3>
                       <div className="space-y-3">
-                        {activeMatches.map((m: any) => <MatchCard key={m.matchId} match={m} />)}
+                        {activeMatches.map((m: any) => <MatchCard key={m.matchId} match={m} email={email} token={token} />)}
                       </div>
                     </div>
                   )}
@@ -1271,7 +1284,7 @@ export default function UserDashboard() {
                     <div>
                       <h3 className="text-sm font-bold text-[#191265] mb-3 px-1">התאמות שהילית בוחנת</h3>
                       <div className="space-y-3">
-                        {pendingMatches.map((m: any) => <MatchCard key={m.matchId} match={m} />)}
+                        {pendingMatches.map((m: any) => <MatchCard key={m.matchId} match={m} email={email} token={token} />)}
                       </div>
                     </div>
                   )}
@@ -1279,7 +1292,7 @@ export default function UserDashboard() {
                     <div>
                       <h3 className="text-sm font-bold text-[#727272] mb-3 px-1">היסטוריה</h3>
                       <div className="space-y-3">
-                        {historyMatches.map((m: any) => <MatchCard key={m.matchId} match={m} />)}
+                        {historyMatches.map((m: any) => <MatchCard key={m.matchId} match={m} email={email} token={token} />)}
                       </div>
                     </div>
                   )}

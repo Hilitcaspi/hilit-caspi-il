@@ -5314,16 +5314,42 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * Called from the /match/return-to-pool page (linked in follow-up emails).
      */
     returnToPool: publicProcedure
-      .input(z.object({ matchId: z.number() }))
+      .input(z.object({
+        matchId: z.number(),
+        email: z.string().email(),
+        token: z.string().min(1),
+      }))
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [profile] = await db.select({
+          id: singles.id,
+          questionnaireToken: singles.questionnaireToken,
+        }).from(singles)
+          .where(sql`LOWER(${singles.email}) = ${input.email.trim().toLowerCase()}`)
+          .limit(1);
+        if (!profile || profile.questionnaireToken !== input.token) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "הקישור אינו תקין או שפג תוקפו" });
+        }
         const [match] = await db.select().from(matches).where(eq(matches.id, input.matchId)).limit(1);
         if (!match) throw new TRPCError({ code: "NOT_FOUND", message: "התאמה לא נמצאה" });
+        if (match.singleAId !== profile.id && match.singleBId !== profile.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "אין הרשאה לשחרר התאמה זו" });
+        }
+        if (match.returnedToPoolAt) return { success: true, alreadyReleased: true };
         if (match.status !== "matched") throw new TRPCError({ code: "BAD_REQUEST", message: "ההתאמה אינה פעילה" });
         const now = Date.now();
-        await db.update(matches).set({ returnedToPoolAt: now, updatedAt: now }).where(eq(matches.id, input.matchId));
-        return { success: true };
+        const releaseUpdate = getReleaseLifecycleUpdate(match);
+        await db.update(matches).set({
+          ...releaseUpdate,
+          returnedToPoolAt: now,
+          updatedAt: now,
+          notes: setLegacyMatchNote(match.notes, "שוחרר מהאזור האישי"),
+        }).where(and(
+          eq(matches.id, input.matchId),
+          or(eq(matches.singleAId, profile.id), eq(matches.singleBId, profile.id)),
+        ));
+        return { success: true, alreadyReleased: false };
       }),
 
     /**
