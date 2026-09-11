@@ -2843,3 +2843,10 @@
 - [x] Include the customer application, technical architecture, payments, automations, security, and data model
 - [x] Include the CRM/admin interface, operational controls, analytics, and audit capabilities
 - [x] Verify the final deliverable contains exactly 50 non-empty lines
+
+## ברכת שנה טובה ללקוחות — 11.09.2026
+
+- [x] לגבש מסר קצר, אישי וחם הקשור לאהבה ומתאים לכל המגדרים ללא ניסוח עם לוכסן
+- [x] ליצור תמונת ברכה מרובעת לוואטסאפ בשפת המותג: קרם, חום שוקולד, ורוד עדין ופרחים לבנים
+- [x] לוודא שהטקסט בעברית ברור, מדויק וקריא ושהתמונה מתאימה לשליחה ללקוחות; שתי הגרסאות נבדקו ב־2048×2048 וגרסה 1 נבחרה כראשית
+- [x] לנסח הודעת וואטסאפ קצרה ואישית לצירוף לתמונה
