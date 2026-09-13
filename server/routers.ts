@@ -58,6 +58,7 @@ import { testimonialRouter } from "./testimonialRouter";
 import { dailyReportRouter } from "./dailyReportRouter";
 import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivacy";
 import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYMENT_ATTRIBUTION_TTL_MS } from "./paymentAttribution";
+import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -2929,8 +2930,8 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-        const [singleA] = await db.select().from(singles).where(eq(singles.id, input.idA)).limit(1);
-        const [singleB] = await db.select().from(singles).where(eq(singles.id, input.idB)).limit(1);
+        let [singleA] = await db.select().from(singles).where(eq(singles.id, input.idA)).limit(1);
+        let [singleB] = await db.select().from(singles).where(eq(singles.id, input.idB)).limit(1);
         if (!singleA || !singleB) throw new TRPCError({ code: "NOT_FOUND", message: "אחד מהאנשים לא נמצא" });
 
         // Check if either single already has an active proposed match
@@ -2963,6 +2964,12 @@ export const appRouter = router({
             and(eq(matches.singleAId, input.idB), eq(matches.singleBId, input.idA))
           )
         ).limit(1);
+
+        if (existingMatch.length > 0) {
+          const oriented = orientParticipantsToStoredMatch(singleA, singleB, existingMatch[0]);
+          singleA = oriented.singleA;
+          singleB = oriented.singleB;
+        }
 
         // Compute score
         const answersA = await db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleA.id)).limit(1);
