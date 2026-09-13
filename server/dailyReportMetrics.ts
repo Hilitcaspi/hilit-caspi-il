@@ -552,6 +552,19 @@ function pacingExplanation(label?: string): string {
     : "יעדי החודש + התאמה לסופי שבוע וחגים";
 }
 
+export function buildPurchaseSignalLine(metrics: DailyReportMetrics): string {
+  const metaPurchases = metrics.databaseCampaignPurchasesToday;
+  if (metaPurchases === null || metaPurchases === undefined) {
+    return "אות Purchase מאגר: נתוני Meta לא זמינים";
+  }
+  if (metrics.databasePurchasesToday === 0) {
+    return `אות Purchase מאגר: Grow 0 | Meta ${metaPurchases} | אין בסיס להשוואה היום`;
+  }
+  const matchRate = Math.round((metaPurchases / metrics.databasePurchasesToday) * 100);
+  const status = matchRate >= 80 ? "תקין" : matchRate >= 60 ? "במעקב" : "דורש בדיקה";
+  return `אות Purchase מאגר, ייחוס כיווני: Grow ${metrics.databasePurchasesToday} | Meta ${metaPurchases} | ${matchRate}% | ${status}`;
+}
+
 export function buildDailyReportMessages(
   metrics: DailyReportMetrics,
   targets: DailyReportTargets,
@@ -589,6 +602,7 @@ export function buildDailyReportMessages(
     budgetLine("DNA/פגישות/רזרבה", metrics.otherCampaignSpendTodayAgorot, metrics.otherCampaignSpendMonthAgorot, derived.otherDailyBudgetTargetAgorot, derived.otherBudgetToDateAgorot, otherMonthlyPlanAgorot),
     `יעילות מאגר+באנדל: ${metric(metrics.salesCampaignClicksToday)} קליקים | ${metric(derived.salesCtr, "%")} הקליקו | ליד עלה ${ils(derived.salesCplAgorot)} | רכישה עלתה ${ils(derived.salesCpaAgorot)} | כל ₪1 החזיר ${derived.salesRoas === null ? "לא זמין" : `₪${derived.salesRoas.toFixed(2)}`}`,
     `יעילות Boost: ${metric(derived.boostCtr, "%")} הקליקו | ליד עלה ${ils(derived.boostCplAgorot)} | רכישה עלתה ${ils(derived.boostCpaAgorot)} | כל ₪1 החזיר ${derived.boostRoas === null ? "לא זמין" : `₪${derived.boostRoas.toFixed(2)}`}`,
+    buildPurchaseSignalLine(metrics),
     `תקציב חודשי כולל: ${ils(derived.mediaPlan.totalMonthlyBudgetAgorot)} | ${derived.mediaPlan.basisLabel}`,
     `לתשומת לב: ${derived.alerts.length ? derived.alerts.join("; ") : "אין חריגה מהקצב"}`,
   ];

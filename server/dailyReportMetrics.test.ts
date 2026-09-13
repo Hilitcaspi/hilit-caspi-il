@@ -3,6 +3,7 @@ import {
   buildHistoricalWeekdayWeights,
   buildDailyReportMessage,
   buildDailyReportMessages,
+  buildPurchaseSignalLine,
   DAILY_REPORT_MAX_MESSAGE_LENGTH,
   deriveDailyReportMetrics,
   getDailyBusinessWeight,
@@ -132,6 +133,7 @@ describe("daily report metrics and message", () => {
     expect(parts[1].message).toContain("עד היום ₪350 מתוך");
     expect(parts[1].message).toContain("רכישה עלתה");
     expect(parts[1].message).toContain("כל ₪1 החזיר");
+    expect(parts[1].message).toContain("אות Purchase מאגר, ייחוס כיווני: Grow 2 | Meta 2 | 100% | תקין");
     expect(parts[1].message).toContain("תוכנית ספטמבר שאושרה");
     expect(parts[1].message).toContain("% פחות מהתכנון");
     expect(parts[2].message).toContain("התאמות: 5 נשלחו | 2 זוגות אמרו כן");
@@ -139,6 +141,13 @@ describe("daily report metrics and message", () => {
     expect(parts[2].message).toContain("מקור לא זמין: Meta");
     expect(parts.every(part => part.message.length <= DAILY_REPORT_MAX_MESSAGE_LENGTH)).toBe(true);
     expect(buildDailyReportMessage(metrics, targets, {})).toContain("דוח 3/3");
+  });
+
+  it("marks the directional Purchase signal as healthy, under review or unavailable", () => {
+    expect(buildPurchaseSignalLine({ ...metrics, databaseCampaignPurchasesToday: 2 })).toContain("100% | תקין");
+    expect(buildPurchaseSignalLine({ ...metrics, databaseCampaignPurchasesToday: 1 })).toContain("50% | דורש בדיקה");
+    expect(buildPurchaseSignalLine({ ...metrics, databaseCampaignPurchasesToday: null })).toBe("אות Purchase מאגר: נתוני Meta לא זמינים");
+    expect(buildPurchaseSignalLine({ ...metrics, databasePurchasesToday: 0, databaseCampaignPurchasesToday: 0 })).toContain("אין בסיס להשוואה היום");
   });
 
   it("explains when the daily pace also uses the recent 60-day history", () => {
