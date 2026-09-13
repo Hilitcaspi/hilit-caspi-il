@@ -1,26 +1,10 @@
 import { motion } from "framer-motion";
-import { useEffect } from "react";
 import { BookOpenCheck, CheckCircle2, Mail, Network } from "lucide-react";
-import { gaPurchase } from "@/lib/ga";
-import { trackPurchase } from "@/lib/metaPixel";
-import { track } from "@/lib/track";
 import ProductFeedbackThankYouCard from "@/components/ProductFeedbackThankYouCard";
 
 const SUPPORT_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, רכשתי את חבילת השנה החדשה ואשמח לעזרה");
 
 export default function ThankYouNewYearBundle() {
-  useEffect(() => {
-    const dedupeKey = "purchase_fired_bundle_new_year";
-    if (sessionStorage.getItem(dedupeKey)) return;
-    sessionStorage.setItem(dedupeKey, "1");
-    const params = new URLSearchParams(window.location.search);
-    const txId = params.get("transactionId") || params.get("trxId") || `client-bundle-new-year-${Date.now()}`;
-    const eventID = `grow-${txId}`;
-    trackPurchase({ value: 399, currency: "ILS", content_name: "חבילת שנה חדשה: מאגר + מדריך + קורס", eventID });
-    gaPurchase("bundle_new_year", txId);
-    track({ eventType: "purchase", page: "/thank-you/new-year-love", metadata: { product: "bundle_new_year", value: 399 } });
-  }, []);
-
   return (
     <div dir="rtl" className="min-h-screen bg-[#fbf7ef] px-5 py-14 font-['Rubik',sans-serif] text-[#191265]">
       <div className="mx-auto max-w-2xl">

@@ -57,6 +57,7 @@ import { buildApprovedTestimonialCreativeVariants } from "./testimonialCreative"
 import { testimonialRouter } from "./testimonialRouter";
 import { dailyReportRouter } from "./dailyReportRouter";
 import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivacy";
+import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYMENT_ATTRIBUTION_TTL_MS } from "./paymentAttribution";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -7476,6 +7477,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         ga4ClientId: z.string().max(100).optional(),
         // GA4 session_id from _ga_ZH1CYQCTMN cookie — required for campaign_details UTM attribution
         ga4SessionId: z.string().max(50).optional(),
+        // Meta browser identifiers captured at checkout and used only after a verified Grow webhook.
+        fbp: z.string().max(255).optional(),
+        fbc: z.string().max(255).optional(),
         personalToken: z.string().min(16).max(200).optional(),
         boostTermsAccepted: z.literal(true).optional(),
         boostMatchId: z.number().int().positive().optional(),
@@ -7484,9 +7488,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         plusBoostAccepted: z.literal(true).optional(),
         origin: z.string().url().max(500).optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { createPaymentProcess, getPlusCheckoutConfig, PRODUCT_CONFIGS } = await import("./growPayment");
         const db = await getDb();
+        const normalizedCheckoutEmail = input.email.trim().toLowerCase();
+        const paymentTracking = createPurchaseTrackingIdentity();
+        let paymentTrackingSaved = false;
 
         let preparedBoostRequestId: number | null = null;
         let preparedBoostCheckoutReference: string | null = null;
@@ -7678,6 +7685,52 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           }
         }
 
+        // Save short-lived browser attribution before opening Grow. The row is
+        // reset on every new attempt and can become a Purchase only after the
+        // verified webhook marks it confirmed.
+        if (db) {
+          try {
+            const now = Date.now();
+            await db.insert(paymentLeads).values({
+              name: input.fullName.trim(),
+              email: normalizedCheckoutEmail,
+              phone: input.phone || "",
+              product: input.product,
+              trackingToken: paymentTracking.trackingToken,
+              purchaseEventId: paymentTracking.purchaseEventId,
+              fbp: normalizeMetaCookie(input.fbp),
+              fbc: normalizeMetaCookie(input.fbc),
+              clientIp: getClientIp(ctx.req),
+              clientUserAgent: String(ctx.req.headers["user-agent"] || "").slice(0, 500) || undefined,
+              attributionExpiresAt: now + PAYMENT_ATTRIBUTION_TTL_MS,
+              confirmedTransactionId: null,
+              confirmedAmountAgorot: null,
+              confirmedAt: null,
+              browserTrackedAt: null,
+              createdAt: now,
+            }).onDuplicateKeyUpdate({ set: {
+              name: input.fullName.trim(),
+              phone: input.phone || "",
+              trackingToken: paymentTracking.trackingToken,
+              providerProcessToken: null,
+              purchaseEventId: paymentTracking.purchaseEventId,
+              fbp: normalizeMetaCookie(input.fbp),
+              fbc: normalizeMetaCookie(input.fbc),
+              clientIp: getClientIp(ctx.req),
+              clientUserAgent: String(ctx.req.headers["user-agent"] || "").slice(0, 500) || null,
+              attributionExpiresAt: now + PAYMENT_ATTRIBUTION_TTL_MS,
+              confirmedTransactionId: null,
+              confirmedAmountAgorot: null,
+              confirmedAt: null,
+              browserTrackedAt: null,
+              createdAt: now,
+            }});
+            paymentTrackingSaved = true;
+          } catch (error) {
+            console.error("[PurchaseTracking] Failed to save checkout attribution:", error);
+          }
+        }
+
         try {
           const result = await createPaymentProcess({
             ...input,
@@ -7691,7 +7744,20 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               .set({ processToken: result.processToken || null, updatedAt: Date.now() })
               .where(eq(plusCheckoutIntents.email, input.email.trim().toLowerCase()));
           }
-          return { ...result, boostRequestId: preparedBoostRequestId }; // { authCode, processToken?, boostRequestId? }
+          if (db && paymentTrackingSaved) {
+            await db.update(paymentLeads)
+              .set({ providerProcessToken: result.processToken || null })
+              .where(and(
+                eq(paymentLeads.email, normalizedCheckoutEmail),
+                eq(paymentLeads.product, input.product),
+                eq(paymentLeads.trackingToken, paymentTracking.trackingToken),
+              ));
+          }
+          return {
+            ...result,
+            boostRequestId: preparedBoostRequestId,
+            purchaseTrackingToken: paymentTrackingSaved ? paymentTracking.trackingToken : undefined,
+          };
         } catch (error: any) {
           if (preparedBoostRequestId) {
             await cancelPaidBoostCheckout(preparedBoostRequestId, error?.message || "grow_create_process_failed");
@@ -7706,6 +7772,52 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           }
           throw error;
         }
+      }),
+
+    confirmPurchaseTracking: publicProcedure
+      .input(z.object({ trackingToken: z.string().regex(/^[a-f0-9]{64}$/) }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        const [row] = await db.select({
+          id: paymentLeads.id,
+          product: paymentLeads.product,
+          purchaseEventId: paymentLeads.purchaseEventId,
+          confirmedTransactionId: paymentLeads.confirmedTransactionId,
+          confirmedAmountAgorot: paymentLeads.confirmedAmountAgorot,
+          confirmedAt: paymentLeads.confirmedAt,
+          browserTrackedAt: paymentLeads.browserTrackedAt,
+          attributionExpiresAt: paymentLeads.attributionExpiresAt,
+        }).from(paymentLeads)
+          .where(eq(paymentLeads.trackingToken, input.trackingToken))
+          .limit(1);
+
+        if (!row || !row.attributionExpiresAt || row.attributionExpiresAt < Date.now()) {
+          return { status: "invalid" as const };
+        }
+        if (!row.confirmedAt || !row.confirmedTransactionId || !row.confirmedAmountAgorot || !row.purchaseEventId) {
+          return { status: "pending" as const };
+        }
+        if (row.browserTrackedAt) {
+          return { status: "already_tracked" as const };
+        }
+
+        const [claimResult] = await db.update(paymentLeads)
+          .set({ browserTrackedAt: Date.now() })
+          .where(and(eq(paymentLeads.id, row.id), isNull(paymentLeads.browserTrackedAt)));
+        if (claimResult.affectedRows !== 1) {
+          return { status: "already_tracked" as const };
+        }
+
+        return {
+          status: "confirmed" as const,
+          eventId: row.purchaseEventId,
+          transactionId: row.confirmedTransactionId,
+          product: row.product,
+          value: row.confirmedAmountAgorot / 100,
+          currency: "ILS" as const,
+        };
       }),
 
     // Client reports SDK-level payment failure (onFailure callback from Grow SDK)

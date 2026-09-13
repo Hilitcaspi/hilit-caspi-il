@@ -31,9 +31,9 @@
  */
 
 import crypto from "crypto";
-import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, desc as orderDesc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, freeAccessTokens, plusPilotMembers, plusCheckoutIntents } from "../drizzle/schema";
+import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, freeAccessTokens, plusPilotMembers, plusCheckoutIntents, paymentLeads } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
 import { queueProductFeedbackAfterPurchase } from "./feedbackAutomation";
@@ -163,7 +163,7 @@ async function handleCourse(
 
   const existing = await db.select().from(productAccessTokens)
     .where(and(eq(productAccessTokens.email, email), eq(productAccessTokens.product, "course_249")))
-    .orderBy(desc(productAccessTokens.createdAt))
+    .orderBy(orderDesc(productAccessTokens.createdAt))
     .limit(1);
   const isNewYearBundle = opts.emailMode === "new_year_bundle";
   if (existing.length > 0 && !isNewYearBundle) {
@@ -174,7 +174,7 @@ async function handleCourse(
   const now = Date.now();
   const existingGuide = await db.select().from(productAccessTokens)
     .where(and(eq(productAccessTokens.email, email), eq(productAccessTokens.product, "guide_149")))
-    .orderBy(desc(productAccessTokens.createdAt))
+    .orderBy(orderDesc(productAccessTokens.createdAt))
     .limit(1);
   const courseToken = existing[0]?.token || crypto.randomBytes(32).toString("hex");
   const guideToken = existingGuide[0]?.token || crypto.randomBytes(32).toString("hex");
@@ -318,7 +318,7 @@ export async function handleDatabase(email: string, name: string, phone: string,
     quizSessionId: crmLeads.quizSessionId,
   }).from(crmLeads)
     .where(sql`LOWER(TRIM(${crmLeads.email})) = ${normalizedEmail}`)
-    .orderBy(desc(crmLeads.createdAt))
+    .orderBy(orderDesc(crmLeads.createdAt))
     .limit(1)
     .then(r => r[0] ?? null);
   let verifiedGender = existingCrmProfile?.gender === "female" || existingCrmProfile?.gender === "male"
@@ -735,6 +735,44 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     product = "match_boost";
   }
 
+  let purchaseTracking: {
+    id: number;
+    purchaseEventId: string | null;
+    fbp: string | null;
+    fbc: string | null;
+    clientIp: string | null;
+    clientUserAgent: string | null;
+    attributionExpiresAt: number | null;
+  } | null = null;
+  if (product && email) {
+    try {
+      const db = await getDb();
+      if (db) {
+        const trackingWhere = processToken
+          ? or(
+              eq(paymentLeads.providerProcessToken, processToken),
+              and(eq(paymentLeads.email, email), eq(paymentLeads.product, product)),
+            )
+          : and(eq(paymentLeads.email, email), eq(paymentLeads.product, product));
+        const [row] = await db.select({
+          id: paymentLeads.id,
+          purchaseEventId: paymentLeads.purchaseEventId,
+          fbp: paymentLeads.fbp,
+          fbc: paymentLeads.fbc,
+          clientIp: paymentLeads.clientIp,
+          clientUserAgent: paymentLeads.clientUserAgent,
+          attributionExpiresAt: paymentLeads.attributionExpiresAt,
+        }).from(paymentLeads)
+          .where(trackingWhere)
+          .orderBy(orderDesc(paymentLeads.createdAt))
+          .limit(1);
+        if (row) purchaseTracking = row;
+      }
+    } catch (error) {
+      console.warn("[PurchaseTracking] Checkout attribution lookup failed", error);
+    }
+  }
+
   console.log(`[GrowWebhook] Payment: ${name} (${email}) | product: ${product} | sum: ${sum} | tx: ${transactionId}`);
 
   if (!product) {
@@ -864,6 +902,21 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       }
     }
 
+    if (purchaseTracking && transactionId && sum > 0) {
+      try {
+        const db = await getDb();
+        if (db) {
+          await db.update(paymentLeads).set({
+            confirmedTransactionId: transactionId,
+            confirmedAmountAgorot: Math.round(sum * 100),
+            confirmedAt: Date.now(),
+          }).where(eq(paymentLeads.id, purchaseTracking.id));
+        }
+      } catch (error) {
+        console.error("[PurchaseTracking] Failed to mark checkout confirmed", error);
+      }
+    }
+
     // Save UTM attribution to crmLeads if we have any UTM data
     if (utm.utmSource || utm.utmMedium || utm.utmCampaign) {
       try {
@@ -887,7 +940,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     }
 
     // Fire GA4 purchase event server-side via Measurement Protocol
-    const GA4_KEYS = ["guide", "course", "coaching", "session", "database", "bundle_new_year", "match_boost"] as const;
+    const GA4_KEYS = ["guide", "course", "coaching", "coaching_mas", "session", "database", "bundle_tubav", "bundle_new_year", "match_boost", "plus"] as const;
     type GA4Key = typeof GA4_KEYS[number];
     if (GA4_KEYS.includes(product as GA4Key)) {
       // Prefer the real browser client_id (from _ga cookie) for accurate DebugView stitching
@@ -903,6 +956,11 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       product,
       sum,
       transactionId: transactionId || undefined,
+      eventId: purchaseTracking?.purchaseEventId || undefined,
+      fbp: purchaseTracking?.attributionExpiresAt && purchaseTracking.attributionExpiresAt >= Date.now() ? purchaseTracking.fbp || undefined : undefined,
+      fbc: purchaseTracking?.attributionExpiresAt && purchaseTracking.attributionExpiresAt >= Date.now() ? purchaseTracking.fbc || undefined : undefined,
+      ip: purchaseTracking?.attributionExpiresAt && purchaseTracking.attributionExpiresAt >= Date.now() ? purchaseTracking.clientIp || undefined : undefined,
+      userAgent: purchaseTracking?.attributionExpiresAt && purchaseTracking.attributionExpiresAt >= Date.now() ? purchaseTracking.clientUserAgent || undefined : undefined,
       utmSource: utm.utmSource,
     }).catch(err => console.error("[MetaCAPI] capiPurchase failed:", err));
 

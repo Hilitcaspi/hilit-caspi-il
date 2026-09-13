@@ -683,9 +683,23 @@ export const paymentLeads = mysqlTable("payment_leads", {
   email:     varchar("email", { length: 200 }).notNull(),
   phone:     varchar("phone", { length: 30 }).notNull(),
   product:   varchar("product", { length: 50 }).notNull(),
+  trackingToken: varchar("tracking_token", { length: 64 }),
+  providerProcessToken: varchar("provider_process_token", { length: 255 }),
+  purchaseEventId: varchar("purchase_event_id", { length: 120 }),
+  fbp: varchar("fbp", { length: 255 }),
+  fbc: varchar("fbc", { length: 255 }),
+  clientIp: varchar("client_ip", { length: 64 }),
+  clientUserAgent: varchar("client_user_agent", { length: 500 }),
+  attributionExpiresAt: bigint("attribution_expires_at", { mode: "number" }),
+  confirmedTransactionId: varchar("confirmed_transaction_id", { length: 200 }),
+  confirmedAmountAgorot: int("confirmed_amount_agorot"),
+  confirmedAt: bigint("confirmed_at", { mode: "number" }),
+  browserTrackedAt: bigint("browser_tracked_at", { mode: "number" }),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 }, (t) => ({
   emailProductIdx: uniqueIndex("email_product_idx").on(t.email, t.product),
+  trackingTokenIdx: uniqueIndex("payment_leads_tracking_token_idx").on(t.trackingToken),
+  providerProcessTokenIdx: index("payment_leads_process_token_idx").on(t.providerProcessToken),
 }));
 export type PaymentLead = typeof paymentLeads.$inferSelect;
 export type InsertPaymentLead = typeof paymentLeads.$inferInsert;

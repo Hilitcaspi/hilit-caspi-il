@@ -23,6 +23,7 @@ import { trackInitiateCheckout } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import { isGrowPaymentRendererReady, isGrowWalletVisible } from "@/lib/growSdkReadiness";
 import { normalizeIsraeliPhone } from "@shared/profileValidation";
+import { getMetaBrowserIdentifiers, rememberPurchaseTrackingToken } from "@/lib/purchaseTracking";
 
 // ─── Grow config from VITE env vars ──────────────────────────────────────────
 const GROW_ENV = "PRODUCTION" as string; // "DEV" for sandbox, "PRODUCTION" for live
@@ -524,6 +525,7 @@ export default function GrowWallet({
       } catch {
         // Ignore cookie read errors
       }
+      const { fbp, fbc } = getMetaBrowserIdentifiers();
 
       // Save lead for cart abandonment tracking (non-blocking)
       try {
@@ -548,6 +550,8 @@ export default function GrowWallet({
         metaAdId,
         ga4ClientId,
         ga4SessionId,
+        fbp,
+        fbc,
         personalToken,
         boostTermsAccepted: product === "match_boost" ? true : undefined,
         boostMatchId: product === "match_boost" ? boostMatchId : undefined,
@@ -556,6 +560,8 @@ export default function GrowWallet({
         plusBoostAccepted: product === "plus" && plusConsents?.boostAccepted ? true : undefined,
         origin: product === "plus" ? window.location.origin : undefined,
       });
+
+      rememberPurchaseTrackingToken(result.purchaseTrackingToken);
 
       if (result.url) {
         window.location.assign(result.url);

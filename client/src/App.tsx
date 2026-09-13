@@ -8,6 +8,7 @@ import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import ContextualUpsell from "@/components/ContextualUpsell";
+import VerifiedPurchaseTracker from "@/components/VerifiedPurchaseTracker";
 
 // Eagerly loaded (critical path)
 import Home from "@/pages/Home";
@@ -199,6 +200,7 @@ function UsRouter() {
     <>
       <ReferrerDetector />
       <ScrollToTop />
+      <VerifiedPurchaseTracker />
       <Suspense fallback={<div className="min-h-screen bg-[#191265] flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#ffe27c] border-t-transparent rounded-full animate-spin"></div></div>}>
         <Switch>
           <Route path={"/"} component={EnHome} />
@@ -249,6 +251,7 @@ function HeRouter() {
     <>
       <ReferrerDetector />
       <ScrollToTop />
+      <VerifiedPurchaseTracker />
       <Suspense fallback={<div className="min-h-screen bg-[#191265] flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#ffe27c] border-t-transparent rounded-full animate-spin"></div></div>}>
         <Switch>
           <Route path={"/"} component={Home} />

@@ -5,27 +5,11 @@
  */
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { useEffect } from "react";
-import { trackPurchase } from "@/lib/metaPixel";
-import { track } from "@/lib/track";
-import { gaPurchase } from "@/lib/ga";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית! רכשתי חבילת ליווי אישי 8 פגישות באתר ואשמח לעזרה 🙏");
 const INSTAGRAM_URL = "https://www.instagram.com/hilitcaspi_relationship";
 
 export default function ThankYouCoaching() {
-  useEffect(() => {
-    const dedupKey = "purchase_fired_coaching";
-    if (sessionStorage.getItem(dedupKey)) return;
-    sessionStorage.setItem(dedupKey, "1");
-    const urlParams = new URLSearchParams(window.location.search);
-    const txId = urlParams.get("transactionId") || urlParams.get("trxId") || `client-coaching-${Date.now()}`;
-    const eventID = `grow-${txId}`;
-    trackPurchase({ value: 2900, currency: "ILS", content_name: "ליווי אישי 8 פגישות", eventID });
-    track({ eventType: "purchase", page: "/thank-you/coaching", metadata: { product: "coaching", value: 2900 } });
-    gaPurchase("coaching", txId);
-  }, []);
-
   return (
     <div className="min-h-screen bg-[#f0eadc] font-rubik flex flex-col items-center justify-center px-6 py-16" dir="rtl">
       {/* Background texture */}

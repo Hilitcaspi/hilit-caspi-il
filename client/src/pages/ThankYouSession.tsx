@@ -4,10 +4,6 @@
  */
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { useEffect } from "react";
-import { gaPurchase } from "@/lib/ga";
-import { trackPurchase } from "@/lib/metaPixel";
-import { track } from "@/lib/track";
 
 const HILIT_IMG    = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-thankyou_a6c21266.jpeg";
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית! רכשתי פגישה אישית באתר ואשמח לעזרה בתיאום המועד.");
@@ -16,12 +12,6 @@ const DNA_QUIZ_URL = "/dna-quiz";
 const GUIDE_URL    = "/guide";
 
 export default function ThankYouSession() {
-  useEffect(() => {
-    gaPurchase("session");
-    trackPurchase({ value: 500, currency: "ILS", content_name: "פגישת היכרות אישית" });
-    track({ eventType: "purchase", page: "/thank-you/session", metadata: { product: "session", value: 500 } });
-  }, []);
-
   return (
     <div className="min-h-screen bg-[#f0eadc] font-rubik flex flex-col items-center justify-center px-6 py-16" dir="rtl">
 

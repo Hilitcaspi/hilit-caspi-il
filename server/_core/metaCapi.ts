@@ -28,6 +28,7 @@ const CAPI_PRODUCTS: Record<string, { name: string; price: number; currency: str
   bundle_tubav: { name: "חבילת טו באב - מאגר + מדריך", price: 349, currency: "ILS" },
   bundle_new_year: { name: "חבילת שנה חדשה - מאגר + מדריך + קורס", price: 399, currency: "ILS" },
   match_boost: { name: "Boost - שליחת הצעת התאמה", price: 19.9, currency: "ILS" },
+  plus: { name: "Database Plus", price: 99, currency: "ILS" },
 };
 
 // ─── Hashing helper (Meta requires SHA-256 of PII) ────────────────────────────
@@ -54,6 +55,8 @@ export async function capiPurchase(params: {
   /** Actual amount paid (ILS) — overrides catalog price if provided */
   sum?: number;
   transactionId?: string;
+  /** Stable identifier shared with the browser Pixel for deduplication. */
+  eventId?: string;
   /** fbp cookie value (from _fbp cookie on the browser) */
   fbp?: string;
   /** fbc cookie value (from _fbc cookie or fbclid query param) */
@@ -80,9 +83,7 @@ export async function capiPurchase(params: {
   }
 
   const value = params.sum ?? product.price;
-  const eventId = params.transactionId
-    ? `grow-${params.transactionId}`
-    : `grow-${params.product}-${Date.now()}`;
+  const eventId = resolvePurchaseEventId(params);
 
   // Build user_data with hashed PII
   const userData: Record<string, string | string[]> = {};
@@ -140,8 +141,18 @@ export async function capiPurchase(params: {
 
     const eventsReceived = json?.events_received ?? "?";
     const quality = json?.messages?.[0] ?? "";
-    console.log(`[MetaCAPI] ✓ Purchase sent for ${params.email} | product=${params.product} | value=${value} ILS | events_received=${eventsReceived} ${quality}`);
+    console.log(`[MetaCAPI] ✓ Purchase sent | product=${params.product} | value=${value} ILS | events_received=${eventsReceived} ${quality}`);
   } catch (err) {
     console.error("[MetaCAPI] Fetch failed:", err);
   }
+}
+
+export function resolvePurchaseEventId(params: {
+  eventId?: string;
+  transactionId?: string;
+  product: string;
+}, now = Date.now()): string {
+  return params.eventId || (params.transactionId
+    ? `grow-${params.transactionId}`
+    : `grow-${params.product}-${now}`);
 }

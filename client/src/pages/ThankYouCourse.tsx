@@ -5,12 +5,8 @@
  * הדף הזה מציג אישור ומסביר שהגישה נשלחה למייל שהוזן בתשלום.
  */
 
-import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { trackPurchase } from "@/lib/metaPixel";
-import { track } from "@/lib/track";
-import { gaPurchase } from "@/lib/ga";
 import ProductFeedbackThankYouCard from "@/components/ProductFeedbackThankYouCard";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent('היי הילית! רכשתי את הקורס "המסע" באתר ואשמח לעזרה');
@@ -25,18 +21,6 @@ const stagger = {
 };
 
 export default function ThankYouCourse() {
-  useEffect(() => {
-    const dedupKey = "purchase_fired_course";
-    if (sessionStorage.getItem(dedupKey)) return;
-    sessionStorage.setItem(dedupKey, "1");
-    const urlParams = new URLSearchParams(window.location.search);
-    const txId = urlParams.get("transactionId") || urlParams.get("trxId") || `client-course-${Date.now()}`;
-    const eventID = `grow-${txId}`;
-    trackPurchase({ value: 249, currency: "ILS", content_name: "קורס המסע", eventID });
-    track({ eventType: "purchase", page: "/thank-you/course", metadata: { product: "course", value: 249 } });
-    gaPurchase("course", txId);
-  }, []);
-
   return (
     <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">
       {/* Hero */}
