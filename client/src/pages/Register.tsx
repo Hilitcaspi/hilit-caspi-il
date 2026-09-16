@@ -80,6 +80,7 @@ export default function Register() {
   });
   // Read DNA from URL params, fall back to localStorage (saved when visiting /database-sales from DnaQuiz)
   const freeTokenFromUrl = (params.get("free_token") || "").trim().toLowerCase();
+  const resumeTokenFromUrl = (params.get("resume") || "").trim().toLowerCase();
   const [dnaFromQuiz, setDnaFromQuiz] = useState<string | null>(
     params.get("dna") || localStorage.getItem("dna_type")
   );
@@ -599,6 +600,76 @@ export default function Register() {
   type ProfileDraftResult = Awaited<ReturnType<typeof profileDraftMutation.mutateAsync>>;
   const [draftSavedBeforePayment, setDraftSavedBeforePayment] = useState(false);
   const draftSaveInFlightRef = useRef<Promise<ProfileDraftResult> | null>(null);
+  const resumeAppliedRef = useRef(false);
+  const resumeDraftQuery = trpc.singles.getRegistrationDraftByToken.useQuery(
+    { token: resumeTokenFromUrl },
+    {
+      enabled: /^[a-f0-9]{64}$/i.test(resumeTokenFromUrl),
+      retry: false,
+      staleTime: Infinity,
+    },
+  );
+
+  useEffect(() => {
+    const result = resumeDraftQuery.data;
+    if (!resumeTokenFromUrl || !result || resumeAppliedRef.current) return;
+    resumeAppliedRef.current = true;
+    if (result.status === "already_registered") {
+      setSingleId(result.singleId);
+      setExistingProfileToken(result.questionnaireToken);
+      setStep("already_registered");
+      return;
+    }
+
+    const draft = result.draft;
+    setSingleId(draft.id);
+    setFirstName(draft.firstName || "");
+    setLastName(draft.lastName || "");
+    setGender(draft.gender);
+    setSeekingGender(draft.seekingGender || (draft.gender === "female" ? "male" : "female"));
+    setBirthDate(draft.birthDate || "");
+    setPhone(draft.phone || "");
+    setEmail(draft.email || "");
+    setCity(draft.city || "");
+    setHeight(draft.height ? String(draft.height) : "");
+    setEducation(draft.education || "");
+    setReligiosity(draft.religiosity || "");
+    setReligiosityOrigin(draft.religiosityOrigin || "");
+    setShomerShabbat(draft.shomerShabbat ?? null);
+    setOccupation(draft.occupation || "");
+    setMaritalStatus(draft.maritalStatus || "");
+    setHasKids(Boolean(draft.hasKids));
+    setNumKids(String(draft.numKids || 0));
+    setWantsKids(draft.wantsKids || "");
+    setAbout(draft.about || "");
+    setPartnerDescription(draft.partnerDescription || "");
+    setMinAge(draft.minAgePreference ? String(draft.minAgePreference) : "");
+    setMaxAge(draft.maxAgePreference ? String(draft.maxAgePreference) : "");
+    setMinHeight(draft.minHeightPreference ? String(draft.minHeightPreference) : "");
+    setMaxHeight(draft.maxHeightPreference ? String(draft.maxHeightPreference) : "");
+    setReligiosityPref((draft.religiosityPreference || "").split(",").map(value => value.trim()).filter(Boolean));
+    setAcceptsKids(draft.acceptsKids === true ? "yes" : draft.acceptsKids === false ? "no" : "");
+    setOpenToPartnerWithKids(draft.openToPartnerWithKids || "");
+    setLocationPref(draft.locationPreference || "");
+    setInterests(draft.interests || "");
+    setDnaFromQuiz(draft.dnaType || null);
+    setPhotoPreview(draft.photoUrl || null);
+    setQuestionnaireToken(draft.questionnaireToken || "");
+    setDraftSavedBeforePayment(true);
+    setRegisterError("");
+    const preservedUtm = {
+      utm_source: draft.utmSource,
+      utm_medium: draft.utmMedium,
+      utm_campaign: draft.utmCampaign,
+      utm_content: draft.utmContent,
+    };
+    Object.entries(preservedUtm).forEach(([key, value]) => {
+      if (!value) return;
+      sessionStorage.setItem(key, value);
+      localStorage.setItem(key, value);
+    });
+    setStep("payment");
+  }, [resumeDraftQuery.data, resumeTokenFromUrl]);
 
   const reportProfileSaveFailure = (error: unknown) => {
     const message = error instanceof Error ? error.message : "unknown_profile_save_error";
@@ -722,6 +793,28 @@ export default function Register() {
     if (q.conditionalAge && profileAgeNum < q.conditionalAge) return false;
     return true;
   });
+
+  if (resumeTokenFromUrl && resumeDraftQuery.isLoading) {
+    return (
+      <div dir="rtl" className="min-h-screen bg-[#f0eadc] flex items-center justify-center px-6">
+        <div className="bg-white rounded-2xl p-8 text-center shadow-sm max-w-md w-full">
+          <p className="text-[#191265] font-bold text-lg">טוענים את ההרשמה ששמרת...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (resumeTokenFromUrl && (resumeDraftQuery.isError || (resumeDraftQuery.isFetched && !resumeDraftQuery.data))) {
+    return (
+      <div dir="rtl" className="min-h-screen bg-[#f0eadc] flex items-center justify-center px-6">
+        <div className="bg-white rounded-2xl p-8 text-center shadow-sm max-w-md w-full">
+          <h1 className="text-[#191265] font-black text-2xl mb-3">לא הצלחנו לפתוח את ההרשמה</h1>
+          <p className="text-[#727272] mb-6">הקישור אינו תקין. אפשר להתחיל מהעמוד הראשי או לפנות להילית לקבלת קישור חדש.</p>
+          <a href="/join" className="inline-block bg-[#191265] text-white font-bold px-6 py-3 rounded-xl">לעמוד ההרשמה</a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">

@@ -2376,6 +2376,70 @@ export const appRouter = router({
       }),
 
     /**
+     * Resume an unpaid registration draft by its unguessable questionnaire token.
+     * Paid profiles keep using the personal-area/questionnaire flows.
+     */
+    getRegistrationDraftByToken: publicProcedure
+      .input(z.object({ token: z.string().regex(/^[a-f0-9]{64}$/i) }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return null;
+        const [profile] = await db.select({
+          id: singles.id,
+          firstName: singles.firstName,
+          lastName: singles.lastName,
+          gender: singles.gender,
+          seekingGender: singles.seekingGender,
+          age: singles.age,
+          birthDate: singles.birthDate,
+          city: singles.city,
+          phone: singles.phone,
+          email: singles.email,
+          height: singles.height,
+          education: singles.education,
+          religiosity: singles.religiosity,
+          religiosityOrigin: singles.religiosityOrigin,
+          shomerShabbat: singles.shomerShabbat,
+          occupation: singles.occupation,
+          about: singles.about,
+          interests: singles.interests,
+          maritalStatus: singles.maritalStatus,
+          hasKids: singles.hasKids,
+          numKids: singles.numKids,
+          wantsKids: singles.wantsKids,
+          dnaType: singles.dnaType,
+          minAgePreference: singles.minAgePreference,
+          maxAgePreference: singles.maxAgePreference,
+          minHeightPreference: singles.minHeightPreference,
+          maxHeightPreference: singles.maxHeightPreference,
+          religiosityPreference: singles.religiosityPreference,
+          acceptsKids: singles.acceptsKids,
+          openToPartnerWithKids: singles.openToPartnerWithKids,
+          locationPreference: singles.locationPreference,
+          partnerDescription: singles.partnerDescription,
+          photoUrl: singles.photoUrl,
+          questionnaireToken: singles.questionnaireToken,
+          utmSource: singles.utmSource,
+          utmMedium: singles.utmMedium,
+          utmCampaign: singles.utmCampaign,
+          utmContent: singles.utmContent,
+          isPaid: singles.isPaid,
+        }).from(singles)
+          .where(eq(singles.questionnaireToken, input.token))
+          .limit(1);
+        if (!profile) return null;
+        if (profile.isPaid) {
+          return {
+            status: "already_registered" as const,
+            singleId: profile.id,
+            questionnaireToken: profile.questionnaireToken || "",
+          };
+        }
+        const { isPaid: _isPaid, ...draft } = profile;
+        return { status: "ready" as const, draft };
+      }),
+
+    /**
      * Get a single profile by questionnaire token (for the questionnaire page).
      */
     getByQuestionnaireToken: publicProcedure
