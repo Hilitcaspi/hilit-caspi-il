@@ -20,7 +20,7 @@ function timezoneOffsetMs(timestamp: number) {
   return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - Math.floor(timestamp / 1000) * 1000;
 }
 
-function israelMidnightUtc(year: number, month: number, day: number) {
+export function israelMidnightUtc(year: number, month: number, day: number) {
   const base = Date.UTC(year, month - 1, day, 0, 0, 0);
   let result = base;
   for (let index = 0; index < 3; index += 1) result = base - timezoneOffsetMs(result);
@@ -30,4 +30,14 @@ function israelMidnightUtc(year: number, month: number, day: number) {
 export function getCurrentIsraelMonthStart(now = Date.now()) {
   const parts = zonedParts(now);
   return israelMidnightUtc(parts.year, parts.month, 1);
+}
+
+export function formatIsraelCalendarDate(timestamp: number) {
+  const parts = zonedParts(timestamp);
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+export function parseIsraelCalendarDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return israelMidnightUtc(year, month, day);
 }

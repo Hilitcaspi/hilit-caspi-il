@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfitAndLossSection } from "@/components/ProfitAndLossSection";
-import { getCurrentIsraelMonthStart } from "@/lib/dashboardDateRange";
+import {
+  formatIsraelCalendarDate,
+  getCurrentIsraelMonthStart,
+  parseIsraelCalendarDate,
+} from "@/lib/dashboardDateRange";
 import {
   TrendingUp, Users, DollarSign, Mail, MousePointerClick,
   ChevronDown, ChevronUp, ArrowLeft, BarChart3,
@@ -22,8 +26,8 @@ const PRESETS = [
   { label: "הכל", days: 365 * 3 },
 ] as const;
 
-function toDateStr(ts: number) { return new Date(ts).toISOString().split("T")[0]; }
-function fromDateStr(s: string) { return new Date(s + "T00:00:00").getTime(); }
+function toDateStr(ts: number) { return formatIsraelCalendarDate(ts); }
+function fromDateStr(s: string) { return parseIsraelCalendarDate(s); }
 function fmt(n: number) { return `₪${Math.round(n).toLocaleString("he-IL")}`; }
 function fmtPct(n: number) { return `${n.toFixed(1)}%`; }
 function fmtDate(ts: number) { return new Date(ts).toLocaleDateString("he-IL", { day: "numeric", month: "short" }); }
@@ -195,13 +199,18 @@ export default function Dashboard() {
               <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-red-500">
                 <div className="flex items-center gap-2 mb-1">
                   <Megaphone size={14} className="text-red-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">הוצאות</span>
+                  <span className="text-[11px] text-gray-500 font-medium">הוצאות Meta, שני חשבונות</span>
                 </div>
                 <div className="text-2xl font-black text-gray-900">
-                  {metaAds.data ? fmt([...(metaAds.data.campaigns || []), ...(metaAds.data.boosts || [])].reduce((s: number, x: any) => s + (x.spend || 0), 0)) : '—'}
+                  {metaAds.data ? fmt(metaAds.data.accountTotals.totalSpend) : '—'}
                 </div>
+                {metaAds.data && (
+                  <div className="text-[9px] leading-4 text-gray-500 mt-0.5">
+                    קמפיינים: {fmt(metaAds.data.accountTotals.mainSpend)} · קידומי פוסטים: {fmt(metaAds.data.accountTotals.boostsSpend)}
+                  </div>
+                )}
                 {metaAds.data && c.current.revenue > 0 && (
-                  <div className="text-[10px] text-gray-500">ROAS: <span className="font-bold text-green-600">{(c.current.revenue / Math.max([...(metaAds.data.campaigns || []), ...(metaAds.data.boosts || [])].reduce((s: number, x: any) => s + (x.spend || 0), 0), 1)).toFixed(1)}x</span></div>
+                  <div className="text-[10px] text-gray-500">ROAS: <span className="font-bold text-green-600">{(c.current.revenue / Math.max(metaAds.data.accountTotals.totalSpend, 1)).toFixed(1)}x</span></div>
                 )}
               </div>
               {/* Database members */}

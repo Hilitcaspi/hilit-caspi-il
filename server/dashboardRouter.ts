@@ -8,6 +8,7 @@ import { sendEmail } from "./brevo";
 import { calculatePnlSummary, prorateMonthlyAmountAgorot } from "./businessFinance";
 import { aggregateVerifiedGrowPayments, summarizeVerifiedGrowPayments } from "./dashboardRevenue";
 import { getPaymentAbandonmentAudit } from "./paymentAbandonmentAudit";
+import { formatMetaCalendarDate, summarizeMetaSpend } from "./dashboardMetaSpend";
 
 import { sendSMS } from "./vibrate";
 import crypto from "crypto";
@@ -291,11 +292,10 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
     estimatedPurchases: Number(row.estimatedPurchases || 0),
   }));
   const estimatedTransactionCount = products.reduce((sum, product) => sum + product.estimatedPurchases, 0);
-  const since = new Date(startDate).toISOString().slice(0, 10);
-  const until = new Date(endDate).toISOString().slice(0, 10);
+  const since = formatMetaCalendarDate(startDate);
+  const until = formatMetaCalendarDate(endDate);
   const meta = await fetchMetaAdsInsights(since, until);
-  const metaSpend = [...(meta.campaigns || []), ...(meta.boosts || [])]
-    .reduce((sum, campaign) => sum + Number(campaign.spend || 0), 0);
+  const metaSpend = summarizeMetaSpend(meta.campaigns, meta.boosts).totalSpend;
 
   const expenseRows = await db.select().from(businessExpenses).where(and(
     gte(businessExpenses.expenseDate, startDate),
@@ -1024,18 +1024,18 @@ export const dashboardRouter = router({
       }
 
       // Fetch Meta Ads spend for this period and previous period
-      const sinceStr = new Date(startDate).toISOString().split('T')[0];
-      const untilStr = new Date(endDate).toISOString().split('T')[0];
-      const prevSinceStr = new Date(sameLastMonthStart).toISOString().split('T')[0];
-      const prevUntilStr = new Date(sameLastMonthEnd).toISOString().split('T')[0];
+      const sinceStr = formatMetaCalendarDate(startDate);
+      const untilStr = formatMetaCalendarDate(endDate);
+      const prevSinceStr = formatMetaCalendarDate(sameLastMonthStart);
+      const prevUntilStr = formatMetaCalendarDate(sameLastMonthEnd);
       
       let metaSpend = 0;
       let prevMetaSpend = 0;
       try {
         const metaData = await fetchMetaAdsInsights(sinceStr, untilStr);
-        metaSpend = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.spend, 0);
+        metaSpend = summarizeMetaSpend(metaData.campaigns, metaData.boosts).totalSpend;
         const prevMetaData = await fetchMetaAdsInsights(prevSinceStr, prevUntilStr);
-        prevMetaSpend = [...prevMetaData.campaigns, ...prevMetaData.boosts].reduce((s, c) => s + c.spend, 0);
+        prevMetaSpend = summarizeMetaSpend(prevMetaData.campaigns, prevMetaData.boosts).totalSpend;
       } catch (e) { /* ignore meta errors */ }
 
       return Object.entries(channelData)
@@ -1329,10 +1329,11 @@ export const dashboardRouter = router({
     .input(z.object({ startDate: z.number(), endDate: z.number() }))
     .query(async ({ ctx, input }) => {
       guardAdmin(ctx);
-      const since = new Date(input.startDate).toISOString().split("T")[0];
-      const until = new Date(input.endDate).toISOString().split("T")[0];
+      const since = formatMetaCalendarDate(input.startDate);
+      const until = formatMetaCalendarDate(input.endDate);
       const metaData = await fetchMetaAdsInsights(since, until);
-      const totalSpend = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.spend, 0);
+      const accountTotals = summarizeMetaSpend(metaData.campaigns, metaData.boosts);
+      const totalSpend = accountTotals.totalSpend;
       const totalPurchases = metaData.campaigns.reduce((s, c) => s + c.purchases, 0);
       const totalLeads = metaData.campaigns.reduce((s, c) => s + c.leads, 0);
       const totalImpressions = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.impressions, 0);
@@ -1340,6 +1341,7 @@ export const dashboardRouter = router({
       return {
         campaigns: metaData.campaigns.sort((a, b) => b.spend - a.spend),
         boosts: metaData.boosts.sort((a, b) => b.spend - a.spend),
+        accountTotals,
         totals: { spend: totalSpend, purchases: totalPurchases, leads: totalLeads, impressions: totalImpressions, reach: totalReach, avgCPA: totalPurchases > 0 ? Math.round(totalSpend / totalPurchases) : 0, avgCPL: totalLeads > 0 ? Math.round(totalSpend / totalLeads * 10) / 10 : 0, roas: totalSpend > 0 ? Math.round(totalPurchases * 299 / totalSpend * 10) / 10 : 0, revenue: totalPurchases * 299 },
         boostsTotals: { spend: metaData.boosts.reduce((s, c) => s + c.spend, 0), impressions: metaData.boosts.reduce((s, c) => s + c.impressions, 0), reach: metaData.boosts.reduce((s, c) => s + c.reach, 0), clicks: metaData.boosts.reduce((s, c) => s + c.clicks, 0), engagement: metaData.boosts.reduce((s, c) => s + c.postEngagement, 0), likes: metaData.boosts.reduce((s, c) => s + c.likes, 0), comments: metaData.boosts.reduce((s, c) => s + c.comments, 0), shares: metaData.boosts.reduce((s, c) => s + c.shares, 0), saves: metaData.boosts.reduce((s, c) => s + c.saves, 0), videoViews: metaData.boosts.reduce((s, c) => s + c.videoViews, 0) },
       };
@@ -1455,8 +1457,8 @@ export const dashboardRouter = router({
     const prevPurchases = Number(prevPurchaseRow?.cnt ?? 0);
     
     // Meta Ads data
-    const since = new Date(weekAgo).toISOString().split("T")[0];
-    const until = new Date(now).toISOString().split("T")[0];
+    const since = formatMetaCalendarDate(weekAgo);
+    const until = formatMetaCalendarDate(now);
     const metaData = await fetchMetaAdsInsights(since, until);
     const totalSpend = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.spend, 0);
     
