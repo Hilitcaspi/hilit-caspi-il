@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
-import { crmTeamTasks, matchBoostMemberships, matchBoostRequests, matches, plusPaymentEvents, plusPilotMembers, singles } from "../drizzle/schema";
+import { crmTeamTasks, emailLog, matchBoostMemberships, matchBoostRequests, matches, plusCheckoutIntents, plusPaymentEvents, plusPilotMembers, singles } from "../drizzle/schema";
 import { getDb } from "./db";
 import { sendEmail } from "./brevo";
 import { zonedMidnightUtc } from "./dailyReportMetrics";
@@ -9,6 +9,7 @@ import { getMissingProfileFields } from "./matchmakingMetrics";
 import { calculatePlusCycleProgress } from "./plusSubscription";
 import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
 import { PLUS_CHECKOUT_PUBLICLY_AVAILABLE } from "./growPayment";
+import { PLUS_RELAUNCH_BONUS_WINDOW_MS, PLUS_RELAUNCH_COHORT, PLUS_RELAUNCH_EMAIL_JOURNEY, PLUS_RELAUNCH_GUIDE_VALUE_ILS, PLUS_RELAUNCH_SMS_JOURNEY, qualifiesForPlusRelaunchGuideBonus } from "./plusLaunchOffer";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 
 const PLUS_STATUSES = ["waitlist", "eligible", "invited", "active", "declined", "churned"] as const;
@@ -39,14 +40,24 @@ export function hasConfirmedProductionPlusPayment(events: Array<{ eventType: str
 
 export function calculatePlusBoostBenefit(member: any, requests: any[]) {
   const cycleStart = Number(member.billingCycleStartedAt || 0);
-  const request = requests.find(row => row.source === "plus_included"
-    && Number(row.plusBillingCycleStartedAt || 0) === cycleStart);
+  const request = requests
+    .filter(row => row.source === "plus_included"
+      && Number(row.plusBillingCycleStartedAt || 0) === cycleStart)
+    .sort((a, b) => Number(b.requestedAt || 0) - Number(a.requestedAt || 0))[0];
   const active = member.status === "active" && member.billingStatus === "active";
+  const deliveredAt = Number(request?.fulfilledAt || request?.matchProposedAt || 0) || null;
+  const terminalWithoutDelivery = Boolean(
+    request
+    && !deliveredAt
+    && ["rejected", "refunded", "cancelled"].includes(String(request.status || "")),
+  );
   return {
-    available: active && cycleStart > 0 && !request,
-    used: Boolean(request),
+    available: active && cycleStart > 0 && (!request || terminalWithoutDelivery),
+    inProgress: active && Boolean(request) && !deliveredAt && !terminalWithoutDelivery,
+    used: Boolean(deliveredAt),
     requestStatus: request?.status || null,
-    usedAt: request?.requestedAt || null,
+    requestedAt: request?.requestedAt || null,
+    usedAt: deliveredAt,
   };
 }
 
@@ -145,6 +156,13 @@ export const plusPilotRouter = router({
         },
         eligibility,
         cycleProgress: pilot[0] ? calculatePlusCycleProgress(pilot[0], memberMatches) : null,
+        launchOffer: pilot[0] && qualifiesForPlusRelaunchGuideBonus(pilot[0].pilotCohort, pilot[0].invitedAt)
+          ? {
+              guideIncluded: true,
+              guideValueIls: PLUS_RELAUNCH_GUIDE_VALUE_ILS,
+              expiresAt: Number(pilot[0].invitedAt || 0) + PLUS_RELAUNCH_BONUS_WINDOW_MS,
+            }
+          : null,
         paymentConfigured: PLUS_CHECKOUT_PUBLICLY_AVAILABLE,
         benefits: [
           "לפחות שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב",
@@ -286,7 +304,7 @@ export const plusPilotRouter = router({
       .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
       .orderBy(desc(plusPilotMembers.updatedAt));
 
-    const [allMatches, boostRows, boostMembershipRows, paymentRows, matchSingles] = await Promise.all([
+    const [allMatches, boostRows, boostMembershipRows, paymentRows, matchSingles, pendingPaidProfiles, relaunchLogs] = await Promise.all([
       db.select({
         id: matches.id,
         singleAId: matches.singleAId,
@@ -295,6 +313,7 @@ export const plusPilotRouter = router({
         status: matches.status,
         matchDetailStatus: matches.matchDetailStatus,
         score: matches.score,
+        returnedToPoolAt: matches.returnedToPoolAt,
       }).from(matches),
       db.select({
         matchId: matchBoostRequests.matchId,
@@ -303,6 +322,9 @@ export const plusPilotRouter = router({
         status: matchBoostRequests.status,
         plusBillingCycleStartedAt: matchBoostRequests.plusBillingCycleStartedAt,
         requestedAt: matchBoostRequests.requestedAt,
+        fulfilledAt: matchBoostRequests.fulfilledAt,
+        decidedAt: matchBoostRequests.decidedAt,
+        decisionReason: matchBoostRequests.decisionReason,
       }).from(matchBoostRequests),
       db.select({
         singleId: matchBoostMemberships.singleId,
@@ -317,8 +339,28 @@ export const plusPilotRouter = router({
         providerTransactionId: plusPaymentEvents.providerTransactionId,
       }).from(plusPaymentEvents),
       db.select({ id: singles.id, firstName: singles.firstName, lastName: singles.lastName }).from(singles),
+      db.select({
+        id: plusCheckoutIntents.id,
+        fullName: plusCheckoutIntents.fullName,
+        email: plusCheckoutIntents.email,
+        phone: plusCheckoutIntents.phone,
+        amountAgorot: plusCheckoutIntents.amountAgorot,
+        paidAt: plusCheckoutIntents.paidAt,
+        singleId: plusCheckoutIntents.singleId,
+      }).from(plusCheckoutIntents).where(eq(plusCheckoutIntents.status, "paid_pending_profile")),
+      db.select({
+        recipientEmail: emailLog.recipientEmail,
+        journeyKey: emailLog.journeyKey,
+        status: emailLog.status,
+        openedAt: emailLog.openedAt,
+        clickedAt: emailLog.clickedAt,
+      }).from(emailLog).where(inArray(emailLog.journeyKey, [PLUS_RELAUNCH_EMAIL_JOURNEY, PLUS_RELAUNCH_SMS_JOURNEY])),
     ]);
-    const boostMatchIds = new Set(boostRows.map(row => Number(row.matchId || 0)).filter(Boolean));
+    const matchById = new Map(allMatches.map(match => [match.id, match]));
+    const boostMatchIds = new Set(boostRows
+      .filter(row => Boolean(row.fulfilledAt || matchById.get(Number(row.matchId || 0))?.proposedAt))
+      .map(row => Number(row.matchId || 0))
+      .filter(Boolean));
     const countableMatches = allMatches.map(match => ({
       ...match,
       proposalSource: boostMatchIds.has(match.id) ? "boost" : "manual",
@@ -328,6 +370,24 @@ export const plusPilotRouter = router({
     const membershipBySingleId = new Map(boostMembershipRows.map(membership => [membership.singleId, membership]));
     const enrichedRows = rows.map(row => {
       const memberMatches = countableMatches.filter(match => match.singleAId === row.single.id || match.singleBId === row.single.id);
+      const cycleProgress = calculatePlusCycleProgress(row.pilot, memberMatches);
+      const cycleMatches = memberMatches
+        .filter(match => Number(match.proposedAt || 0) >= cycleProgress.cycleStart && Number(match.proposedAt || 0) < cycleProgress.cycleEnd)
+        .sort((a, b) => Number(b.proposedAt || 0) - Number(a.proposedAt || 0))
+        .map(match => {
+          const otherId = match.singleAId === row.single.id ? match.singleBId : match.singleAId;
+          const other = singleById.get(otherId);
+          return {
+            id: match.id,
+            proposedAt: match.proposedAt,
+            status: match.status,
+            matchDetailStatus: match.matchDetailStatus,
+            returnedToPoolAt: match.returnedToPoolAt,
+            score: match.score,
+            source: match.proposalSource,
+            other: other ? { id: other.id, firstName: other.firstName, lastName: other.lastName } : null,
+          };
+        });
       const monthMatches = memberMatches
         .filter(match => Number(match.proposedAt || 0) >= monthRange.start && Number(match.proposedAt || 0) < monthRange.end && match.status !== "pending")
         .sort((a, b) => Number(b.proposedAt || 0) - Number(a.proposedAt || 0))
@@ -345,16 +405,22 @@ export const plusPilotRouter = router({
           };
         });
       const memberBoostRequests = boostRows.filter(request => request.singleId === row.single.id);
+      const memberBoostRequestsWithDelivery = memberBoostRequests.map(request => ({
+        ...request,
+        matchProposedAt: matchById.get(Number(request.matchId || 0))?.proposedAt || null,
+      }));
       const paymentEvents = paymentRows.filter(event => event.plusMemberId === row.pilot.id);
       return {
         ...row,
         confirmedPayment: hasConfirmedProductionPlusPayment(paymentEvents),
-        cycleProgress: calculatePlusCycleProgress(row.pilot, memberMatches),
+        cycleProgress,
+        cycleMatches,
+        cycleMatchCount: cycleMatches.filter(match => match.source !== "boost").length,
         monthMatches,
         monthMatchCount: monthMatches.filter(match => match.source !== "boost").length,
         monthLabel: monthRange.label,
         boostMembership: membershipBySingleId.get(row.single.id) || null,
-        boostBenefit: calculatePlusBoostBenefit(row.pilot, memberBoostRequests),
+        boostBenefit: calculatePlusBoostBenefit(row.pilot, memberBoostRequestsWithDelivery),
       };
     });
     const counts = Object.fromEntries(PLUS_STATUSES.map(status => [status, rows.filter(row => row.pilot.status === status).length]));
@@ -369,14 +435,37 @@ export const plusPilotRouter = router({
       status: row.pilot.status,
       gender: row.single.gender,
     })));
+    const capacityBreakdown = {
+      female: {
+        active: rows.filter(row => row.single.gender === "female" && row.pilot.status === "active").length,
+        invited: rows.filter(row => row.single.gender === "female" && row.pilot.status === "invited").length,
+      },
+      male: {
+        active: rows.filter(row => row.single.gender === "male" && row.pilot.status === "active").length,
+        invited: rows.filter(row => row.single.gender === "male" && row.pilot.status === "invited").length,
+      },
+    };
+    const relaunchMembers = rows.filter(row => row.pilot.pilotCohort === PLUS_RELAUNCH_COHORT);
+    const relaunchStats = {
+      cohort: relaunchMembers.length,
+      invited: relaunchMembers.filter(row => row.pilot.status === "invited").length,
+      active: relaunchMembers.filter(row => row.pilot.status === "active").length,
+      emailSent: relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_EMAIL_JOURNEY && row.status === "sent").length,
+      smsSent: relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_SMS_JOURNEY && row.status === "sent").length,
+      uniqueOpened: new Set(relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_EMAIL_JOURNEY && row.openedAt).map(row => row.recipientEmail.toLowerCase())).size,
+      uniqueClicked: new Set(relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_EMAIL_JOURNEY && row.clickedAt).map(row => row.recipientEmail.toLowerCase())).size,
+    };
     return {
       counts,
       commitment,
       capacity,
+      capacityBreakdown,
+      relaunchStats,
       waitlistToInviteRate: rows.length > 0 ? Math.round(invitedBase / rows.length * 100) : 0,
       inviteToActiveRate: invitedBase > 0 ? Math.round((counts.active + counts.churned) / invitedBase * 100) : 0,
       retentionRate: activatedBase > 0 ? Math.round(counts.active / activatedBase * 100) : 0,
       monthLabel: monthRange.label,
+      pendingPaidProfiles,
       rows: enrichedRows,
     };
   }),

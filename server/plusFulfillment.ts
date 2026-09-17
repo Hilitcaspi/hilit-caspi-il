@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   matchBoostConsentEvents,
   matchBoostMemberships,
@@ -14,6 +14,7 @@ import { notifyOwner } from "./_core/notification";
 import { addOneBillingMonth } from "./plusSubscription";
 import { BOOST_CONSENT_VERSION } from "./matchBoostRouter";
 import { getMissingProfileFields } from "./matchmakingMetrics";
+import { ensurePlusRelaunchGuideBonus } from "./plusLaunchOffer";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -162,15 +163,24 @@ export async function activatePlusForSingle(input: PlusActivationInput) {
     plusMemberId: member.id,
     activatedAt: now,
     updatedAt: now,
-  }).where(eq(plusCheckoutIntents.email, input.email.trim().toLowerCase()));
+  }).where(sql`LOWER(TRIM(${plusCheckoutIntents.email})) = ${input.email.trim().toLowerCase()}`);
+
+  const launchBonus = await ensurePlusRelaunchGuideBonus(db, {
+    email: input.email,
+    name: input.name,
+    paymentRef: input.transactionId,
+    pilotCohort: member.pilotCohort,
+    invitedAt: member.invitedAt,
+    now,
+  });
 
   const personalUrl = input.single.questionnaireToken
     ? `${SITE_BASE}/my-profile?email=${encodeURIComponent(input.email)}&token=${encodeURIComponent(input.single.questionnaireToken)}`
     : `${SITE_BASE}/database-plus`;
   await sendEmail({
     to: { email: input.email, name: input.name },
-    subject: "Database Plus שלך פעיל",
-    htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">ברוכים הבאים ל־Database Plus</h2><p style="line-height:1.8">המנוי שלך פעיל. בכל מחזור חיוב מגיעות לך לפחות <strong>שתי הצעות התאמה חדשות שנבדקו ונשלחו</strong>, ובנוסף <strong>בוסט אחד ללא תשלום נוסף</strong> שאפשר להפעיל מהאזור האישי.</p><p style="line-height:1.8">באזור האישי ניתן לראות את ההתקדמות ולפנות לערוץ השירות בעדיפות.</p><p style="line-height:1.8;font-size:13px;color:#666">ההבטחה היא להצעות שנבדקו ונשלחו. אישור הדדי, דייט או זוגיות תלויים גם בצד השני ואינם מובטחים.</p><p style="text-align:center;margin:28px 0"><a href="${personalUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">כניסה לאזור האישי</a></p></div>`,
+    subject: launchBonus ? "Database Plus שלך פעיל — והמתנה שלך בפנים" : "Database Plus שלך פעיל",
+    htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">ברוכים הבאים ל־Database Plus</h2><p style="line-height:1.8">המנוי שלך פעיל. בכל מחזור חיוב מגיעות לך לפחות <strong>שתי הצעות התאמה חדשות שנבדקו ונשלחו</strong>, ובנוסף <strong>בוסט אחד ללא תשלום נוסף</strong> שאפשר להפעיל מהאזור האישי.</p><p style="line-height:1.8">באזור האישי ניתן לראות את ההתקדמות ולפנות לערוץ השירות בעדיפות.</p>${launchBonus ? `<div style="margin:22px 0;padding:20px;border-radius:16px;background:#fff2f5;border:1px solid #ffc9d8"><strong style="color:#ff4466">מתנת ההשקה שלך: המדריך „לבחור נכון”</strong><p style="line-height:1.7;margin:8px 0 16px">המדריך המלא, בשווי 149 ₪, מחכה לך ללא תשלום נוסף.</p><a href="${launchBonus.url}" style="display:inline-block;background:#ff4466;color:white;text-decoration:none;padding:11px 20px;border-radius:999px;font-weight:bold">לפתיחת המדריך</a></div>` : ""}<p style="line-height:1.8;font-size:13px;color:#666">ההבטחה היא להצעות שנבדקו ונשלחו. אישור הדדי, דייט או זוגיות תלויים גם בצד השני ואינם מובטחים.</p><p style="text-align:center;margin:28px 0"><a href="${personalUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">כניסה לאזור האישי</a></p></div>`,
   });
   await notifyOwner({ title: "מנוי Database Plus חדש", content: `${input.name} (${input.email}) הפעיל/ה Plus.` });
   return { memberId: member.id };

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
@@ -91,5 +92,12 @@ describe("Database Plus public payment fulfillment", () => {
       providerSubscriptionId: "synthetic-subscription-id",
     }));
     expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("matches existing profiles and checkout intents by normalized email", () => {
+    const source = readFileSync(new URL("./growWebhook.ts", import.meta.url), "utf8");
+    const handler = source.slice(source.indexOf("export async function handlePlus"), source.indexOf("async function handleMatchBoost"));
+    expect(handler).toContain("LOWER(TRIM(${singles.email}))");
+    expect(handler).toContain("LOWER(TRIM(${plusCheckoutIntents.email}))");
   });
 });

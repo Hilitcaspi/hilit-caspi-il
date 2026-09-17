@@ -33,7 +33,7 @@ export function isPlusPilotCoachingClient(
   return Boolean(single.isCoachingClient) || coachingEmails.has(normalizeCampaignEmail(single.email));
 }
 
-async function loadCoachingClientEmails(db: NonNullable<Awaited<ReturnType<typeof getDb>>>): Promise<Set<string>> {
+export async function loadCoachingClientEmails(db: NonNullable<Awaited<ReturnType<typeof getDb>>>): Promise<Set<string>> {
   const [singleRows, crmRows, leadRows, paymentRows] = await Promise.all([
     db.select({ email: singles.email }).from(singles).where(eq(singles.isCoachingClient, true)),
     db.select({ email: crmLeads.email, status: crmLeads.status, product: crmLeads.product }).from(crmLeads),

@@ -3036,3 +3036,16 @@
 - [x] Improve match-feedback prompts without fabricating or rewriting customer statements
 - [x] Dry-run the last three Israel calendar days and identify six safe recipients
 - [x] Deploy, sync to GitHub, send six emails and six SMS messages, and verify zero provider failures
+
+## Database Plus tracking and relaunch (September 17)
+
+- [x] Reconcile verified Grow Plus purchases with active members and pending-profile purchasers
+- [x] Show Plus proposals by each member's billing cycle rather than calendar month
+- [x] Show Boost as available, in progress or actually sent instead of treating every request as used
+- [x] Normalize email matching during Plus payment fulfillment
+- [x] Separate active service capacity from unconverted marketing invitations
+- [x] Audit the previous launch funnel and identify the 45 safe unsent recipients
+- [x] Create a measured 72-hour relaunch offer with the Choose Right guide bonus
+- [x] Add campaign funnel metrics to the Plus CRM tab
+- [ ] Publish the corrected Plus experience and sync GitHub
+- [ ] Prepare, send and verify the relaunch email and SMS cohort

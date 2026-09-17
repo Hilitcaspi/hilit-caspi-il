@@ -76,8 +76,12 @@ describe("Plus admin visibility helpers", () => {
 
   it("marks the included boost as used only when a request exists for the current cycle", () => {
     const member = { status: "active", billingStatus: "active", billingCycleStartedAt: 1234 };
-    expect(calculatePlusBoostBenefit(member, [])).toEqual({ available: true, used: false, requestStatus: null, usedAt: null });
+    expect(calculatePlusBoostBenefit(member, [])).toEqual({ available: true, inProgress: false, used: false, requestStatus: null, requestedAt: null, usedAt: null });
     expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "queued", requestedAt: 1500 }]))
-      .toEqual({ available: false, used: true, requestStatus: "queued", usedAt: 1500 });
+      .toEqual({ available: false, inProgress: true, used: false, requestStatus: "queued", requestedAt: 1500, usedAt: null });
+    expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "approved", requestedAt: 1500, fulfilledAt: 1800 }]))
+      .toEqual({ available: false, inProgress: false, used: true, requestStatus: "approved", requestedAt: 1500, usedAt: 1800 });
+    expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "cancelled", requestedAt: 1500 }]))
+      .toEqual({ available: true, inProgress: false, used: false, requestStatus: "cancelled", requestedAt: 1500, usedAt: null });
   });
 });

@@ -491,7 +491,10 @@ async function handleBundleNewYear(email: string, name: string, phone: string, t
 export async function handlePlus(email: string, name: string, transactionId: string, sum: number, data: any) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [single] = await db.select().from(singles).where(eq(singles.email, email)).limit(1);
+  const normalizedEmail = email.trim().toLowerCase();
+  const [single] = await db.select().from(singles)
+    .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`)
+    .limit(1);
   const now = Date.now();
   const providerSubscriptionId = String(
     data.subscriptionId || data.recurringPaymentId || data.paymentLinkProcessToken || "",
@@ -505,7 +508,7 @@ export async function handlePlus(email: string, name: string, transactionId: str
     singleId: single?.id || null,
     paidAt: now,
     updatedAt: now,
-  }).where(eq(plusCheckoutIntents.email, email));
+  }).where(sql`LOWER(TRIM(${plusCheckoutIntents.email})) = ${normalizedEmail}`);
 
   if (single?.isActive && single?.isPaid) {
     await activatePlusForSingle({

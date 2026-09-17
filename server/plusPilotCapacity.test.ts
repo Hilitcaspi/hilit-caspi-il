@@ -6,9 +6,9 @@ import {
   isPlusPilotSlotReserved,
 } from "./plusPilotCapacity";
 
-describe("Plus pilot 30/30 capacity", () => {
-  it("reserves slots only for invited and active members", () => {
-    expect(isPlusPilotSlotReserved("invited")).toBe(true);
+describe("Plus active-service 30/30 capacity", () => {
+  it("reserves slots only for paid active members", () => {
+    expect(isPlusPilotSlotReserved("invited")).toBe(false);
     expect(isPlusPilotSlotReserved("active")).toBe(true);
     expect(isPlusPilotSlotReserved("eligible")).toBe(false);
     expect(isPlusPilotSlotReserved("declined")).toBe(false);
@@ -17,6 +17,7 @@ describe("Plus pilot 30/30 capacity", () => {
   it("enforces separate limits for 30 women and 30 men", () => {
     const rows = [
       ...Array.from({ length: 30 }, () => ({ status: "invited", gender: "female" })),
+      ...Array.from({ length: 30 }, () => ({ status: "active", gender: "female" })),
       ...Array.from({ length: 7 }, () => ({ status: "active", gender: "male" })),
       { status: "waitlist", gender: "female" },
     ];

@@ -420,7 +420,9 @@ export function evaluateBoostEligibility(input: {
   const plusActive = input.plusMember?.status === "active" && input.plusMember?.billingStatus === "active";
   const cycleStart = Number(input.plusMember?.billingCycleStartedAt || 0);
   const plusBenefitUsed = plusActive && cycleStart > 0 && (input.boostRequests || []).some(request =>
-    request.source === "plus_included" && Number(request.plusBillingCycleStartedAt || 0) === cycleStart,
+    request.source === "plus_included"
+    && Number(request.plusBillingCycleStartedAt || 0) === cycleStart
+    && Boolean(request.fulfilledAt),
   );
 
   const blockers: string[] = [];
@@ -1207,6 +1209,22 @@ export const matchBoostRouter = router({
       const now = Date.now();
       const cycleStart = Number(context.plusMember.billingCycleStartedAt);
       const idempotencyKey = `plus:${single.id}:${cycleStart}`;
+      const dispatchWithFailureRelease = async (requestId: number) => {
+        try {
+          return await dispatchAlgorithmicBoostProposal(db, requestId);
+        } catch (error: any) {
+          if (String(error?.message || "") === "boost_recipient_delivery_failed") {
+            const failedAt = Date.now();
+            await db.update(matchBoostRequests).set({
+              status: "cancelled",
+              decidedAt: failedAt,
+              decisionReason: "plus_boost_delivery_failed_retry_available",
+              updatedAt: failedAt,
+            }).where(eq(matchBoostRequests.id, requestId));
+          }
+          throw error;
+        }
+      };
       try {
         const requestId = await db.transaction(async (tx: any) => {
           const [insertResult] = await tx.insert(matchBoostRequests).values({
@@ -1225,13 +1243,25 @@ export const matchBoostRouter = router({
           const insertedId = Number((insertResult as any).insertId || 0);
           return insertedId;
         });
-        return await dispatchAlgorithmicBoostProposal(db, requestId);
+        return await dispatchWithFailureRelease(requestId);
       } catch (error: any) {
         if (error?.code === "ER_DUP_ENTRY") {
           const [existing] = await db.select().from(matchBoostRequests)
             .where(eq(matchBoostRequests.idempotencyKey, idempotencyKey)).limit(1);
           if (!existing) throw error;
-          return await dispatchAlgorithmicBoostProposal(db, existing.id);
+          if (existing.status === "cancelled" && !existing.fulfilledAt) {
+            await db.update(matchBoostRequests).set({
+              matchId: selectedCandidate.id,
+              status: "queued",
+              requestedAt: now,
+              reviewStartedAt: null,
+              decidedAt: null,
+              decisionReason: "plus_boost_retry_after_delivery_failure",
+              expiresAt: now + 7 * DAY_MS,
+              updatedAt: now,
+            }).where(eq(matchBoostRequests.id, existing.id));
+          }
+          return await dispatchWithFailureRelease(existing.id);
         }
         throw error;
       }

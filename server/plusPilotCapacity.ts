@@ -7,7 +7,9 @@ export type PlusPilotCapacityRow = {
   gender: string | null | undefined;
 };
 
-const RESERVED_STATUSES = new Set(["invited", "active"]);
+// An invitation is marketing outreach, not a service commitment. Only a paid,
+// active member consumes the operational Plus capacity.
+const RESERVED_STATUSES = new Set(["active"]);
 
 export function isPlusPilotSlotReserved(status: string | null | undefined): boolean {
   return Boolean(status && RESERVED_STATUSES.has(status));

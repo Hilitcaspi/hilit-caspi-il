@@ -238,10 +238,29 @@ describe("match boost eligibility", () => {
         source: "plus_included",
         requestedAt: NOW - 4 * 24 * 60 * 60 * 1000,
         plusBillingCycleStartedAt: plusMember.billingCycleStartedAt,
+        fulfilledAt: NOW - 4 * 24 * 60 * 60 * 1000,
       }],
       now: NOW,
     });
     expect(used.plusBenefitAvailable).toBe(false);
+
+    const retryAfterDeliveryFailure = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [pendingMatch()],
+      plusMember,
+      membership: activeMembership(),
+      boostRequests: [{
+        id: 4,
+        status: "cancelled",
+        source: "plus_included",
+        requestedAt: NOW - 1000,
+        plusBillingCycleStartedAt: plusMember.billingCycleStartedAt,
+        fulfilledAt: null,
+      }],
+      now: NOW,
+    });
+    expect(retryAfterDeliveryFailure.plusBenefitAvailable).toBe(true);
+    expect(retryAfterDeliveryFailure.eligible).toBe(true);
   });
 
   it("blocks members without current explicit Boost consent", () => {
