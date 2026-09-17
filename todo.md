@@ -3026,3 +3026,13 @@
 - [x] Remove false follower decline and show social snapshots, comparable engagement and post detail
 - [x] Align dashboard targets with the daily midnight report settings and approved September media plan
 - [x] Run live aggregate smoke test, full tests, TypeScript, build and diff validation
+
+## Feedback automation and recent mutual matches (September 17)
+
+- [x] Audit the testimonial pipeline, existing responses and scheduled automation
+- [x] Fix mutual-match requests so they enter the delivery queue instead of being marked sent inside the contact-details email
+- [x] Add idempotent Brevo email and Vibrate SMS delivery with consent, suppression and duplicate checks
+- [x] Separate received testimonials, review queue, internal satisfaction feedback and outreach tracking in CRM
+- [x] Improve match-feedback prompts without fabricating or rewriting customer statements
+- [x] Dry-run the last three Israel calendar days and identify six safe recipients
+- [x] Deploy, sync to GitHub, send six emails and six SMS messages, and verify zero provider failures
