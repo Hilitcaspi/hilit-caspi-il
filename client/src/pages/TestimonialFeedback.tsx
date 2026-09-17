@@ -63,12 +63,12 @@ export default function TestimonialFeedback() {
   const [rewardPath, setRewardPath] = useState<string | null>(null);
   const previewData = useMemo(() => ({
     displayName: undefined,
-    proofType: "product",
-    sourceType: "course",
+    proofType: "success",
+    sourceType: "match",
     surveyKind: "positive_experience",
-    touchpoint: "course_complete",
-    campaignVariant: null,
-    productLabel: "המסע לזוגיות",
+    touchpoint: "match_mutual",
+    campaignVariant: "match_testimonial_request",
+    productLabel: "המאגר",
     status: "draft",
     canSubmit: true,
     hasActiveConsent: false,
@@ -77,12 +77,12 @@ export default function TestimonialFeedback() {
     rewardGranted: false,
     rewardPath: null,
     questions: {
-      heading: "אשמח לשמוע על החוויה שלך",
-      intro: "כמה מילים ממך יעזרו לנו לספר על הדרך כפי שהיא באמת. בסיום מחכה לך מתנה אישית מהילית.",
-      primaryQuestion: "איזה חלק בקורס היה משמעותי עבורך, ומה הצלחת להבין או ליישם בזכותו?",
-      secondaryQuestion: "מה בדרך, בשיטה או בליווי של הילית הרגיש לך מדויק ובעל ערך?",
-      testimonialPrompt: "אם אדם שמחפש אהבה היה מתלבט אם להצטרף למסע לזוגיות, מה היית רוצה לומר לו?",
-      outcomeQuestion: "איזה שינוי, תובנה או צעד ימשיכו איתך גם אחרי סיום הקורס?",
+      heading: "אשמח לשמוע על החוויה שלך מהמאגר",
+      intro: "כמה מילים כנות ממך יעזרו לי להבין מה היה משמעותי בחוויה, וגם יוכלו לעזור לעוד אנשים שמחפשים אהבה להכיר את המאגר. ככל שיותר אנשים מתאימים יצטרפו, ייווצרו יותר הזדמנויות להתאמות עבור כולם. בסיום מחכה לך מתנה אישית ממני.",
+      primaryQuestion: "מה בדרך שבה נבחרה והוצגה ההתאמה הרגיש לך אישי, מדויק או שונה מאפליקציות והיכרויות אחרות?",
+      secondaryQuestion: "איזה פרט בתהליך, בשירות או בליווי גרם לך להרגיש שרואים ומבינים אותך?",
+      testimonialPrompt: "אם חבר או חברה שמתלבטים אם להצטרף למאגר היו שואלים אותך על החוויה, מה היית אומר או אומרת להם בכנות?",
+      outcomeQuestion: "אם מתאים לשתף, מה היה טוב בחיבור או בהיכרות שנוצרו? אפשר לציין רגע, תחושה או פרט קטן.",
       showRatings: false,
       showImprovement: false,
       rewardLabel: "מפת הדייט הבא",
@@ -242,6 +242,7 @@ export default function TestimonialFeedback() {
   }
 
   const data = formData!;
+  const isMatchFeedback = data.campaignVariant === "match_testimonial_request" || data.campaignVariant === "match_testimonial_reminder";
   return (
     <main dir="rtl" className="min-h-screen bg-[#fff6f8] text-[#4c2634]">
       <header className="relative overflow-hidden bg-gradient-to-br from-[#6f3f52] via-[#a75f78] to-[#d89bb0] px-5 py-12 text-white">
@@ -273,16 +274,17 @@ export default function TestimonialFeedback() {
               <h2 className="mt-3 text-2xl font-semibold">כמה שאלות קצרות שיעזרו לי להבין מה היה משמעותי עבורך</h2>
               <div className="mt-6">
                 <Label htmlFor="feedback" className="text-base font-semibold leading-7">{data.questions.primaryQuestion}</Label>
-                <Textarea id="feedback" value={feedbackText} onChange={event => setFeedbackText(event.target.value)} className="mt-3 min-h-32 rounded-2xl border-[#e7c4d1] bg-[#fffafd] text-base" placeholder="אפשר לכתוב בכנות ובמילים שלך" />
+                {isMatchFeedback && <p className="mt-2 text-sm leading-6 text-[#795e69]">אפשר להתייחס לבחירת ההתאמה, לאופן שבו היא הוצגה, לתחושת הביטחון או להבדל לעומת אפליקציות.</p>}
+                <Textarea id="feedback" value={feedbackText} onChange={event => setFeedbackText(event.target.value)} className="mt-3 min-h-32 rounded-2xl border-[#e7c4d1] bg-[#fffafd] text-base" placeholder={isMatchFeedback ? "למשל: הרגשתי שההתאמה נבחרה מתוך היכרות אמיתית איתי, כי..." : "אפשר לכתוב בכנות ובמילים שלך"} />
               </div>
               <div className="mt-6">
                 <Label htmlFor="secondary" className="text-base font-semibold leading-7">{data.questions.secondaryQuestion}</Label>
-                <Textarea id="secondary" value={secondaryText} onChange={event => setSecondaryText(event.target.value)} className="mt-3 min-h-28 rounded-2xl border-[#e7c4d1] bg-[#fffafd] text-base" placeholder="אפשר לשתף גם במשפט אחד" />
+                <Textarea id="secondary" value={secondaryText} onChange={event => setSecondaryText(event.target.value)} className="mt-3 min-h-28 rounded-2xl border-[#e7c4d1] bg-[#fffafd] text-base" placeholder={isMatchFeedback ? "אפשר לספר על רגע, שיחה, הסבר או תחושה שקיבלת לאורך הדרך" : "אפשר לשתף גם במשפט אחד"} />
               </div>
               {data.surveyKind === "positive_experience" && <div className="mt-6 rounded-2xl border border-[#efcad7] bg-[#fff4f8] p-5">
                 <Label htmlFor="testimonial" className="text-base font-semibold leading-7">{data.questions.testimonialPrompt}</Label>
                 <p className="mt-2 text-sm leading-6 text-[#795e69]">כאן אפשר לכתוב את המשפט שהיית רוצה שיגיע לעוד אנשים שמחפשים אהבה ויעזור להם להכיר את הדרך.</p>
-                <Textarea id="testimonial" value={testimonialText} onChange={event => setTestimonialText(event.target.value)} className="mt-3 min-h-32 rounded-2xl border-[#dfb7c6] bg-white text-base" placeholder="אפשר לכתוב את ההמלצה בדיוק במילים שלך" />
+                <Textarea id="testimonial" value={testimonialText} onChange={event => setTestimonialText(event.target.value)} className="mt-3 min-h-32 rounded-2xl border-[#dfb7c6] bg-white text-base" placeholder={isMatchFeedback ? "אפשר להתחיל כך: למי שמתלבט או מתלבטת, הייתי אומר/ת..." : "אפשר לכתוב את ההמלצה בדיוק במילים שלך"} />
               </div>}
               {data.questions.outcomeQuestion && <div className="mt-6">
                 <Label htmlFor="outcome" className="text-base font-semibold leading-7">{data.questions.outcomeQuestion}</Label>

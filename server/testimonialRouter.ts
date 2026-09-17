@@ -9,6 +9,7 @@ import {
   testimonialRecords,
   testimonialUsage,
   feedbackAutomationSettings,
+  emailLog,
   matches,
   singles,
   webhookIdempotency,
@@ -26,7 +27,16 @@ import {
   prepareSatisfactionSurveyDrafts,
   previewFeedbackCampaignAudiences,
 } from "./feedbackCampaignDrafts";
-import { buildFeedbackRequestKey, buildFeedbackUrl, sendFeedbackRequestBatch, sendFeedbackRequestNow } from "./feedbackAutomation";
+import {
+  buildFeedbackRequestKey,
+  buildFeedbackUrl,
+  FEEDBACK_EMAIL_JOURNEY,
+  FEEDBACK_SMS_JOURNEY,
+  prepareRecentMutualFeedbackRequests,
+  sendFeedbackOutreachNow,
+  sendFeedbackRequestBatch,
+  sendFeedbackRequestNow,
+} from "./feedbackAutomation";
 import {
   buildTestimonialDraft,
   consentAllowsChannel,
@@ -159,6 +169,7 @@ export const testimonialRouter = router({
         rewardType: testimonialRecords.rewardType,
         requestSentAt: testimonialRecords.requestSentAt,
         rewardGrantedAt: testimonialRecords.rewardGrantedAt,
+        lastResponseAt: testimonialRecords.lastResponseAt,
         consentText: testimonialRecords.consentText,
         consentPhoto: testimonialRecords.consentPhoto,
         consentVideo: testimonialRecords.consentVideo,
@@ -187,6 +198,10 @@ export const testimonialRouter = router({
         withTextConsent: rows.filter(row => row.consentText).length,
         withPhotoConsent: rows.filter(row => row.consentPhoto).length,
         withVideoConsent: rows.filter(row => row.consentVideo).length,
+        positiveResponses: rows.filter(row => row.surveyKind === "positive_experience" && Boolean(row.lastResponseAt)).length,
+        satisfactionResponses: rows.filter(row => row.surveyKind === "satisfaction_survey" && Boolean(row.lastResponseAt)).length,
+        awaitingPositiveReview: rows.filter(row => row.surveyKind === "positive_experience" && ["submitted", "awaiting_consent", "awaiting_verification"].includes(row.status)).length,
+        activePublishingConsents: rows.filter(row => row.surveyKind === "positive_experience" && Boolean(row.lastResponseAt) && (row.consentText || row.consentPhoto || row.consentVideo)).length,
       };
     }),
 
@@ -196,6 +211,7 @@ export const testimonialRouter = router({
       sourceType: sourceTypeSchema.optional(),
       surveyKind: surveyKindSchema.optional(),
       touchpoint: touchpointSchema.optional(),
+      hasResponse: z.boolean().optional(),
       search: z.string().trim().max(150).optional(),
       limit: z.number().int().min(1).max(250).default(100),
     }).optional()).query(async ({ input }) => {
@@ -206,6 +222,8 @@ export const testimonialRouter = router({
       if (input?.sourceType) conditions.push(eq(testimonialRecords.sourceType, input.sourceType));
       if (input?.surveyKind) conditions.push(eq(testimonialRecords.surveyKind, input.surveyKind));
       if (input?.touchpoint) conditions.push(eq(testimonialRecords.touchpoint, input.touchpoint));
+      if (input?.hasResponse === true) conditions.push(isNotNull(testimonialRecords.lastResponseAt));
+      if (input?.hasResponse === false) conditions.push(isNull(testimonialRecords.lastResponseAt));
       if (input?.search) {
         const search = `%${input.search}%`;
         conditions.push(or(
@@ -246,12 +264,62 @@ export const testimonialRouter = router({
         deliveryChannel: testimonialRecords.deliveryChannel,
         touchpoint: testimonialRecords.touchpoint,
       }).from(testimonialRecords);
+      const deliveryRows = await db.select({
+        journeyKey: emailLog.journeyKey,
+        status: emailLog.status,
+      }).from(emailLog).where(inArray(emailLog.journeyKey, ["testimonial_request", FEEDBACK_EMAIL_JOURNEY, FEEDBACK_SMS_JOURNEY]));
+      const recentMutual = await prepareRecentMutualFeedbackRequests({ execute: false, days: 3 });
       return {
         settings: settings ?? null,
         queued: rows.filter(row => row.deliveryChannel === "email" && row.status === "approved_to_contact" && !row.requestSentAt).length,
+        dueNow: rows.filter(row => row.deliveryChannel === "email" && row.status === "approved_to_contact" && !row.requestSentAt && Boolean(row.scheduledAt) && Number(row.scheduledAt) <= Date.now()).length,
+        missingSchedule: rows.filter(row => row.deliveryChannel === "email" && row.status === "approved_to_contact" && !row.requestSentAt && !row.scheduledAt).length,
         scheduled: rows.filter(row => Boolean(row.scheduledAt) && !row.requestSentAt).length,
         sent: rows.filter(row => Boolean(row.requestSentAt)).length,
+        emailAccepted: deliveryRows.filter(row => ["testimonial_request", FEEDBACK_EMAIL_JOURNEY].includes(row.journeyKey) && row.status === "sent").length,
+        emailFailed: deliveryRows.filter(row => ["testimonial_request", FEEDBACK_EMAIL_JOURNEY].includes(row.journeyKey) && row.status === "failed").length,
+        smsAccepted: deliveryRows.filter(row => row.journeyKey === FEEDBACK_SMS_JOURNEY && row.status === "sent").length,
+        smsFailed: deliveryRows.filter(row => row.journeyKey === FEEDBACK_SMS_JOURNEY && row.status === "failed").length,
+        recentMutual: {
+          startAt: recentMutual.startAt,
+          endAt: recentMutual.endAt,
+          pairs: recentMutual.pairs,
+          recipients: recentMutual.recipients,
+          eligible: recentMutual.eligible,
+          skippedExisting: recentMutual.skippedExisting,
+          skippedConsentOrStatus: recentMutual.skippedConsentOrStatus,
+        },
         byTouchpoint: Object.fromEntries(TESTIMONIAL_TOUCHPOINTS.map(touchpoint => [touchpoint, rows.filter(row => row.touchpoint === touchpoint).length])),
+      };
+    }),
+
+    sendRecentMutualFeedback: teamProcedure.input(z.object({
+      confirmedSend: z.literal(true),
+      days: z.number().int().min(1).max(7).default(3),
+    })).mutation(async ({ input }) => {
+      const prepared = await prepareRecentMutualFeedbackRequests({ execute: true, days: input.days });
+      const results: Array<{ email: string; sms: string }> = [];
+      let cursor = 0;
+      const workers = Array.from({ length: Math.min(3, prepared.recordIds.length) }, async () => {
+        while (cursor < prepared.recordIds.length) {
+          const recordId = prepared.recordIds[cursor++];
+          results.push(await sendFeedbackOutreachNow({ recordId, sentBy: "testimonial-crm-recent-mutual", includeSms: true }));
+        }
+      });
+      await Promise.all(workers);
+      return {
+        pairs: prepared.pairs,
+        recipients: prepared.recipients,
+        created: prepared.created,
+        skippedExisting: prepared.skippedExisting,
+        skippedConsentOrStatus: prepared.skippedConsentOrStatus,
+        emailAccepted: results.filter(result => result.email === "accepted").length,
+        emailAlreadySent: results.filter(result => result.email === "already_sent").length,
+        emailFailed: results.filter(result => result.email === "failed").length,
+        smsAccepted: results.filter(result => result.sms === "accepted").length,
+        smsAlreadySent: results.filter(result => result.sms === "already_sent").length,
+        smsSuppressed: results.filter(result => ["suppressed", "invalid_phone"].includes(result.sms)).length,
+        smsFailed: results.filter(result => result.sms === "failed").length,
       };
     }),
 

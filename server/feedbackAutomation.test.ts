@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildFeedbackRequestEmail,
   buildFeedbackRequestKey,
+  buildFeedbackSmsMessage,
   feedbackProductPlan,
   isFeedbackDraftSendable,
   isFeedbackTouchpointEnabled,
+  recentIsraelCalendarWindow,
   shouldApplyFeedbackCooldown,
 } from "./feedbackAutomation";
 import { buildTestimonialDraft } from "./testimonialService";
@@ -47,6 +49,25 @@ describe("feedback automation", () => {
     expect(email.htmlContent).toContain("לעוד אנשים שמחפשים אהבה");
     expect(email.htmlContent).toContain("/unsubscribe?token=");
     expect(email.htmlContent).not.toContain("/unsubscribe?email=");
+  });
+
+  it("builds a concise SMS with the personal feedback link and a signed unsubscribe link", () => {
+    const sms = buildFeedbackSmsMessage({
+      firstName: "דנה",
+      contactEmail: "dana@example.com",
+      feedbackUrl: "https://example.com/feedback",
+    });
+    expect(sms).toContain("ששניכם אמרתם כן");
+    expect(sms).toContain("לעוד אנשים");
+    expect(sms).toContain("https://example.com/feedback");
+    expect(sms).toContain("להסרה:");
+    expect(sms).toContain("/unsubscribe?token=");
+  });
+
+  it("uses the last three Israel calendar days including today", () => {
+    const range = recentIsraelCalendarWindow(new Date("2026-09-17T09:00:00.000Z").getTime(), 3);
+    expect(range.startAt).toBe(new Date("2026-09-14T21:00:00.000Z").getTime());
+    expect(range.endAt).toBe(new Date("2026-09-17T21:00:00.000Z").getTime());
   });
 
   it("builds distinct recommendation requests for mutual matches and DNA completers", () => {

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { and, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   crmLeads,
   emailLog,
@@ -14,6 +14,7 @@ import {
 import { getDb } from "./db";
 import { isPermanentlyBlockedEmail, sendEmail } from "./brevo";
 import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
+import { normalizeIsraeliMobile, sendSMSDetailed } from "./vibrate";
 import {
   buildTestimonialDraft,
   normalizeTestimonialEmail,
@@ -27,6 +28,10 @@ import {
 
 const SITE_BASE = "https://hilitcaspi.com";
 const MATCH_WEEK_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
+const DELIVERY_LEASE_MS = 10 * 60 * 1000;
+
+export const FEEDBACK_EMAIL_JOURNEY = "testimonial_feedback_email_v1";
+export const FEEDBACK_SMS_JOURNEY = "testimonial_feedback_sms_v1";
 
 export type FeedbackDeliveryChannel = "email" | "onsite" | "manual";
 
@@ -69,6 +74,12 @@ export function shouldApplyFeedbackCooldown(touchpoint: TestimonialTouchpoint): 
 
 export function buildFeedbackUrl(token: string): string {
   return `${SITE_BASE}/testimonial/feedback?token=${encodeURIComponent(token)}`;
+}
+
+export function buildFeedbackSmsMessage(input: { firstName: string; contactEmail: string; feedbackUrl: string }): string {
+  const firstName = input.firstName.trim().split(/\s+/)[0] || "שלום";
+  const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.contactEmail });
+  return `היי ${firstName}, שמחתי ששניכם אמרתם כן להתאמה 💗 אשמח לשמוע בכמה מילים על החוויה מהמאגר ומהדרך שבה נבחרה ההתאמה. הפידבק שלך יכול לעזור לעוד אנשים להכיר את המאגר ולהצטרף, וכך ליצור יותר הזדמנויות לכולם. למילוי קצר ולקבלת מתנה אישית: ${input.feedbackUrl} הילית\nלהסרה: ${unsubscribeUrl}`;
 }
 
 const PRODUCT_FEEDBACK_CONFIG: Partial<Record<string, { sourceType: TestimonialSourceType; delayDays: number }>> = {
@@ -184,6 +195,33 @@ async function canEmailContact(email: string): Promise<boolean> {
   return !suppression.suppressed;
 }
 
+async function canCreateFeedbackRequest(input: {
+  contactEmail: string;
+  singleId?: number | null;
+  crmLeadId?: number | null;
+}): Promise<boolean> {
+  const db = await getDb();
+  if (!db || !(await canEmailContact(input.contactEmail))) return false;
+  const normalizedEmail = normalizeTestimonialEmail(input.contactEmail);
+  if (input.singleId) {
+    const [single] = await db.select({
+      email: singles.email,
+      isActive: singles.isActive,
+      isSeed: singles.isSeed,
+      consentEmailMarketing: singles.consentEmailMarketing,
+    }).from(singles).where(eq(singles.id, input.singleId)).limit(1);
+    if (!single?.isActive || single.isSeed || !single.consentEmailMarketing || normalizeTestimonialEmail(single.email || "") !== normalizedEmail) {
+      return false;
+    }
+  }
+  if (input.crmLeadId) {
+    const [lead] = await db.select({ emailUnsubscribed: crmLeads.emailUnsubscribed })
+      .from(crmLeads).where(eq(crmLeads.id, input.crmLeadId)).limit(1);
+    if (lead?.emailUnsubscribed) return false;
+  }
+  return true;
+}
+
 export function isFeedbackDraftSendable(record: Pick<TestimonialRecord, "status" | "requestSentAt" | "contactEmail">) {
   const normalizedEmail = normalizeTestimonialEmail(record.contactEmail);
   return Boolean(normalizedEmail
@@ -285,7 +323,7 @@ export async function sendFeedbackRequestNow(input: { recordId: number; approved
   });
 
   const [existingLog] = await db.select().from(emailLog).where(and(
-    eq(emailLog.journeyKey, "testimonial_request"),
+    inArray(emailLog.journeyKey, ["testimonial_request", FEEDBACK_EMAIL_JOURNEY]),
     eq(emailLog.emailIndex, record.id),
   )).limit(1);
   if (existingLog?.status === "sent" && existingLog.sentAt) {
@@ -300,7 +338,7 @@ export async function sendFeedbackRequestNow(input: { recordId: number; approved
       leadId: record.crmLeadId,
       recipientEmail: record.contactEmail,
       recipientName: record.contactName,
-      journeyKey: "testimonial_request",
+      journeyKey: FEEDBACK_EMAIL_JOURNEY,
       emailIndex: record.id,
       subject: email.subject,
       htmlBody: email.htmlContent,
@@ -344,6 +382,94 @@ export async function sendFeedbackRequestNow(input: { recordId: number; approved
   return { status: "accepted" };
 }
 
+export type FeedbackSmsStatus = "accepted" | "already_sent" | "suppressed" | "invalid_phone" | "failed";
+
+export async function sendFeedbackSmsNow(input: { recordId: number; sentBy: string }): Promise<{ status: FeedbackSmsStatus }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [record] = await db.select().from(testimonialRecords).where(eq(testimonialRecords.id, input.recordId)).limit(1);
+  if (!record) throw new Error("Feedback record was not found");
+
+  const [existingLog] = await db.select().from(emailLog).where(and(
+    eq(emailLog.journeyKey, FEEDBACK_SMS_JOURNEY),
+    eq(emailLog.emailIndex, record.id),
+  )).limit(1);
+  if (existingLog?.status === "sent" && existingLog.sentAt) return { status: "already_sent" };
+  if (existingLog?.status === "processing" && existingLog.scheduledAt > Date.now() - DELIVERY_LEASE_MS) {
+    return { status: "already_sent" };
+  }
+
+  if (!(await canSendFeedbackRecord(db, record))) return { status: "suppressed" };
+  const phone = normalizeIsraeliMobile(record.contactPhone || "");
+  if (!phone) return { status: "invalid_phone" };
+
+  const now = Date.now();
+  const feedbackUrl = buildFeedbackUrl(record.publicToken);
+  const message = buildFeedbackSmsMessage({
+    firstName: record.contactName,
+    contactEmail: record.contactEmail,
+    feedbackUrl,
+  });
+  let smsLogId = existingLog?.id || 0;
+  if (!smsLogId) {
+    const inserted = await db.insert(emailLog).values({
+      leadId: record.crmLeadId,
+      recipientEmail: record.contactEmail,
+      recipientName: record.contactName,
+      journeyKey: FEEDBACK_SMS_JOURNEY,
+      emailIndex: record.id,
+      subject: "[SMS] בקשת פידבק לאחר התאמה",
+      htmlBody: "SMS delivery record",
+      textBody: message,
+      scheduledAt: now,
+      status: "processing",
+      createdAt: now,
+    });
+    smsLogId = Number((inserted as unknown as [{ insertId?: number }])[0]?.insertId || 0);
+  } else {
+    await db.update(emailLog).set({ status: "processing", scheduledAt: now, errorMessage: null })
+      .where(eq(emailLog.id, smsLogId));
+  }
+
+  const delivery = await sendSMSDetailed(phone, message);
+  const finishedAt = Date.now();
+  if (!delivery.accepted) {
+    if (smsLogId) {
+      await db.update(emailLog).set({
+        status: "failed",
+        sentAt: finishedAt,
+        errorMessage: delivery.error || "provider_rejected",
+      }).where(eq(emailLog.id, smsLogId));
+    }
+    return { status: "failed" };
+  }
+
+  if (smsLogId) {
+    await db.update(emailLog).set({
+      status: "sent",
+      sentAt: finishedAt,
+      errorMessage: delivery.providerRunId,
+    }).where(eq(emailLog.id, smsLogId));
+  }
+  await db.insert(testimonialEvents).values({
+    recordId: record.id,
+    eventType: "request_marked_sent",
+    actorType: "system",
+    actorRef: input.sentBy,
+    metadata: JSON.stringify({ channel: "sms", smsLogId, providerRunId: delivery.providerRunId }),
+    createdAt: finishedAt,
+  });
+  return { status: "accepted" };
+}
+
+export async function sendFeedbackOutreachNow(input: { recordId: number; sentBy: string; includeSms: boolean }) {
+  const email = await sendFeedbackRequestNow({ recordId: input.recordId, approvedBy: input.sentBy });
+  const sms = input.includeSms
+    ? await sendFeedbackSmsNow({ recordId: input.recordId, sentBy: input.sentBy })
+    : { status: "suppressed" as const };
+  return { email: email.status, sms: sms.status };
+}
+
 export async function sendFeedbackRequestBatch(input: { recordIds: number[]; approvedBy: string; concurrency?: number }) {
   const uniqueIds = Array.from(new Set(input.recordIds));
   if (uniqueIds.length === 0 || uniqueIds.length > 150) throw new Error("Choose between 1 and 150 feedback drafts");
@@ -362,6 +488,138 @@ export async function sendFeedbackRequestBatch(input: { recordIds: number[]; app
     alreadySent: results.filter(result => result.status === "already_sent").length,
     archived: results.filter(result => result.status === "archived").length,
     failed: results.filter(result => result.status === "failed").length,
+  };
+}
+
+function israelCalendarDateParts(now: number) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jerusalem",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(now));
+  const value = (type: string) => Number(parts.find(part => part.type === type)?.value || 0);
+  return { year: value("year"), month: value("month"), day: value("day") };
+}
+
+function israelMidnightUtc(year: number, month: number, day: number) {
+  const target = Date.UTC(year, month - 1, day);
+  let candidate = target;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jerusalem",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(candidate));
+    const value = (type: string) => Number(parts.find(part => part.type === type)?.value || 0);
+    const represented = Date.UTC(value("year"), value("month") - 1, value("day"), value("hour"), value("minute"), value("second"));
+    candidate -= represented - target;
+  }
+  return candidate;
+}
+
+export function recentIsraelCalendarWindow(now = Date.now(), days = 3) {
+  const today = israelCalendarDateParts(now);
+  const startCalendar = new Date(Date.UTC(today.year, today.month - 1, today.day - Math.max(1, days) + 1));
+  const endCalendar = new Date(Date.UTC(today.year, today.month - 1, today.day + 1));
+  return {
+    startAt: israelMidnightUtc(startCalendar.getUTCFullYear(), startCalendar.getUTCMonth() + 1, startCalendar.getUTCDate()),
+    endAt: israelMidnightUtc(endCalendar.getUTCFullYear(), endCalendar.getUTCMonth() + 1, endCalendar.getUTCDate()),
+  };
+}
+
+export async function prepareRecentMutualFeedbackRequests(input: {
+  now?: number;
+  days?: number;
+  execute: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const now = input.now ?? Date.now();
+  const { startAt, endAt } = recentIsraelCalendarWindow(now, input.days ?? 3);
+  const recentMatches = await db.select().from(matches).where(and(
+    gte(matches.proposedAt, startAt),
+    lt(matches.proposedAt, endAt),
+    eq(matches.approvedByA, true),
+    eq(matches.approvedByB, true),
+  ));
+  const singleIds = Array.from(new Set(recentMatches.flatMap(match => [match.singleAId, match.singleBId]).filter(Boolean)));
+  const people = singleIds.length ? await db.select().from(singles).where(inArray(singles.id, singleIds)) : [];
+  const personById = new Map(people.map(person => [person.id, person]));
+  const existing = recentMatches.length ? await db.select({
+    matchId: testimonialRecords.matchId,
+    singleId: testimonialRecords.singleId,
+    contactEmail: testimonialRecords.contactEmail,
+  }).from(testimonialRecords).where(
+    inArray(testimonialRecords.status, ["draft", "candidate", "approved_to_contact", "sent", "submitted", "awaiting_consent", "awaiting_verification", "approved", "published"]),
+  ) : [];
+  const existingKeys = new Set(existing.map(row => `${row.matchId}:${row.singleId}`));
+  const existingSingleIds = new Set(existing.map(row => row.singleId).filter(Boolean));
+  const existingEmails = new Set(existing.map(row => normalizeTestimonialEmail(row.contactEmail || "")).filter(Boolean));
+
+  let eligible = 0;
+  let created = 0;
+  let skippedExisting = 0;
+  let skippedConsentOrStatus = 0;
+  const recordIds: number[] = [];
+  for (const match of recentMatches) {
+    for (const singleId of [match.singleAId, match.singleBId]) {
+      const person = personById.get(singleId);
+      const key = `${match.id}:${singleId}`;
+      const normalizedEmail = normalizeTestimonialEmail(person?.email || "");
+      if (existingKeys.has(key) || existingSingleIds.has(singleId) || (normalizedEmail && existingEmails.has(normalizedEmail))) {
+        skippedExisting += 1;
+        continue;
+      }
+      if (!person?.email || !(await canCreateFeedbackRequest({ contactEmail: person.email, singleId: person.id }))) {
+        skippedConsentOrStatus += 1;
+        continue;
+      }
+      eligible += 1;
+      if (!input.execute) continue;
+      const request = await ensurePositiveFeedbackRequest({
+        requestKey: buildFeedbackRequestKey({ touchpoint: "match_mutual", subjectId: match.id, contactId: person.id }),
+        touchpoint: "match_mutual",
+        deliveryChannel: "email",
+        proofType: "success",
+        sourceType: "match",
+        contactName: person.firstName,
+        contactEmail: person.email,
+        contactPhone: person.phone,
+        singleId: person.id,
+        matchId: match.id,
+        sourceSnapshot: {
+          matchedAt: match.matchedAt,
+          proposedAt: match.proposedAt,
+          campaignVariant: "match_testimonial_request",
+          cohort: "recent_mutual_three_israel_days",
+        },
+        scheduledAt: now,
+      });
+      if (request?.created) {
+        created += 1;
+        recordIds.push(request.record.id);
+        existingKeys.add(key);
+        existingSingleIds.add(person.id);
+        existingEmails.add(normalizedEmail);
+      }
+    }
+  }
+  return {
+    startAt,
+    endAt,
+    pairs: recentMatches.length,
+    recipients: recentMatches.length * 2,
+    eligible,
+    created,
+    skippedExisting,
+    skippedConsentOrStatus,
+    recordIds,
   };
 }
 
@@ -385,12 +643,19 @@ export async function ensurePositiveFeedbackRequest(input: {
   if (!db || !settings?.enabled || !isFeedbackTouchpointEnabled(settings, input.touchpoint)) return null;
 
   const normalizedEmail = normalizeTestimonialEmail(input.contactEmail);
-  if (!normalizedEmail || !(await canEmailContact(normalizedEmail))) return null;
+  if (!normalizedEmail || !(await canCreateFeedbackRequest({
+    contactEmail: normalizedEmail,
+    singleId: input.singleId,
+    crmLeadId: input.crmLeadId,
+  }))) return null;
 
   const [existing] = await db.select().from(testimonialRecords)
     .where(eq(testimonialRecords.requestKey, input.requestKey))
     .limit(1);
-  if (existing) return { record: existing, feedbackUrl: buildFeedbackUrl(existing.publicToken), created: false };
+  if (existing) {
+    if (["archived", "revoked"].includes(existing.status)) return null;
+    return { record: existing, feedbackUrl: buildFeedbackUrl(existing.publicToken), created: false };
+  }
 
   if (input.touchpoint === "guide_complete" || input.touchpoint === "course_complete") {
     const [pendingProductFollowup] = await db.select().from(testimonialRecords)
@@ -418,6 +683,7 @@ export async function ensurePositiveFeedbackRequest(input: {
       .where(and(
         sql`LOWER(${testimonialRecords.contactEmail}) = ${normalizedEmail}`,
         eq(testimonialRecords.surveyKind, "positive_experience"),
+        inArray(testimonialRecords.status, ["draft", "candidate", "approved_to_contact", "sent", "submitted", "awaiting_consent", "awaiting_verification", "approved", "published"]),
         gt(testimonialRecords.createdAt, cooldownBoundary),
       ))
       .limit(1);
@@ -478,22 +744,6 @@ export async function ensurePositiveFeedbackRequest(input: {
   }
 }
 
-export async function markFeedbackRequestSent(recordId: number, providerMessageId?: string): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-  const now = Date.now();
-  await db.update(testimonialRecords).set({ status: "sent", requestSentAt: now, updatedAt: now })
-    .where(eq(testimonialRecords.id, recordId));
-  await db.insert(testimonialEvents).values({
-    recordId,
-    eventType: "request_marked_sent",
-    actorType: "system",
-    actorRef: "feedback-automation",
-    metadata: providerMessageId ? JSON.stringify({ providerMessageId }) : null,
-    createdAt: now,
-  });
-}
-
 async function queueWeekMatchRequests(now: number): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
@@ -524,7 +774,7 @@ async function queueWeekMatchRequests(now: number): Promise<number> {
         contactPhone: person.phone,
         singleId: person.id,
         matchId: match.id,
-        sourceSnapshot: { matchedAt: match.matchedAt, matchStillActive: true },
+        sourceSnapshot: { matchedAt: match.matchedAt, matchStillActive: true, campaignVariant: "match_testimonial_reminder" },
         scheduledAt: now,
       });
       if (request?.created) created += 1;
@@ -538,10 +788,12 @@ export async function processFeedbackAutomation(now = Date.now()): Promise<{
   queued: number;
   sent: number;
   failed: number;
+  smsAccepted: number;
+  smsFailed: number;
 }> {
   const db = await getDb();
   const settings = await getSettings();
-  if (!db || !settings?.enabled) return { enabled: false, queued: 0, sent: 0, failed: 0 };
+  if (!db || !settings?.enabled) return { enabled: false, queued: 0, sent: 0, failed: 0, smsAccepted: 0, smsFailed: 0 };
   const queued = settings.matchWeekReminderEnabled ? await queueWeekMatchRequests(now) : 0;
   const due = await db.select().from(testimonialRecords)
     .where(and(
@@ -553,58 +805,20 @@ export async function processFeedbackAutomation(now = Date.now()): Promise<{
     .limit(settings.maxEmailsPerRun);
   let sent = 0;
   let failed = 0;
+  let smsAccepted = 0;
+  let smsFailed = 0;
   for (const record of due) {
-    if (!(await canEmailContact(record.contactEmail))) {
-      await db.update(testimonialRecords)
-        .set({ status: "archived", archivedAt: now, updatedAt: now })
-        .where(and(
-          eq(testimonialRecords.id, record.id),
-          eq(testimonialRecords.status, "approved_to_contact"),
-          isNull(testimonialRecords.requestSentAt),
-        ));
-      continue;
-    }
-    const claim = await db.update(testimonialRecords)
-      .set({ status: "sent", requestSentAt: now, updatedAt: now })
-      .where(and(
-        eq(testimonialRecords.id, record.id),
-        eq(testimonialRecords.status, "approved_to_contact"),
-        isNull(testimonialRecords.requestSentAt),
-      ));
-    const affectedRows = Number((claim as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0);
-    if (affectedRows !== 1) continue;
-    const email = buildFeedbackRequestEmail({
-      firstName: record.contactName.trim().split(/\s+/)[0] || "שלום",
-      contactEmail: record.contactEmail,
-      sourceType: record.sourceType,
-      surveyKind: record.surveyKind,
-      feedbackUrl: buildFeedbackUrl(record.publicToken),
-      reminder: record.touchpoint === "match_week",
+    const result = await sendFeedbackOutreachNow({
+      recordId: record.id,
+      sentBy: "feedback-automation",
+      includeSms: record.touchpoint === "match_mutual",
     });
-    const delivery = await sendEmail({
-      to: { email: record.contactEmail, name: record.contactName },
-      subject: email.subject,
-      htmlContent: email.htmlContent,
-      textContent: email.textContent,
-    });
-    if (delivery.success) {
-      sent += 1;
-      await db.insert(testimonialEvents).values({
-        recordId: record.id,
-        eventType: "request_marked_sent",
-        actorType: "system",
-        actorRef: "feedback-automation",
-        metadata: delivery.messageId ? JSON.stringify({ providerMessageId: delivery.messageId }) : null,
-        createdAt: now,
-      });
-    } else {
-      failed += 1;
-      await db.update(testimonialRecords)
-        .set({ status: "approved_to_contact", requestSentAt: null, updatedAt: Date.now() })
-        .where(eq(testimonialRecords.id, record.id));
-    }
+    if (result.email === "accepted") sent += 1;
+    else if (result.email === "failed") failed += 1;
+    if (result.sms === "accepted") smsAccepted += 1;
+    else if (result.sms === "failed") smsFailed += 1;
   }
-  return { enabled: true, queued, sent, failed };
+  return { enabled: true, queued, sent, failed, smsAccepted, smsFailed };
 }
 
 export async function runScheduledFeedbackAutomation(taskUid: string, now = Date.now()): Promise<{
@@ -612,6 +826,8 @@ export async function runScheduledFeedbackAutomation(taskUid: string, now = Date
   queued: number;
   sent: number;
   failed: number;
+  smsAccepted: number;
+  smsFailed: number;
   skipped?: "orphan" | "disabled";
 }> {
   const db = await getDb();
@@ -619,7 +835,7 @@ export async function runScheduledFeedbackAutomation(taskUid: string, now = Date
   const [settings] = await db.select().from(feedbackAutomationSettings)
     .where(eq(feedbackAutomationSettings.scheduleCronTaskUid, taskUid))
     .limit(1);
-  if (!settings) return { enabled: false, queued: 0, sent: 0, failed: 0, skipped: "orphan" };
-  if (!settings.enabled) return { enabled: false, queued: 0, sent: 0, failed: 0, skipped: "disabled" };
+  if (!settings) return { enabled: false, queued: 0, sent: 0, failed: 0, smsAccepted: 0, smsFailed: 0, skipped: "orphan" };
+  if (!settings.enabled) return { enabled: false, queued: 0, sent: 0, failed: 0, smsAccepted: 0, smsFailed: 0, skipped: "disabled" };
   return processFeedbackAutomation(now);
 }

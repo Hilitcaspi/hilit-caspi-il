@@ -41,7 +41,7 @@ import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
 import { calculateOutcomeSegments } from "./matchmakingSegments";
 import { calculateAgeFromBirthDate, normalizeIsraeliPhone } from "../shared/profileValidation";
 import { getReleaseLifecycleUpdate } from "../shared/matchLifecycle";
-import { buildFeedbackRequestKey, ensurePositiveFeedbackRequest, markFeedbackRequestSent } from "./feedbackAutomation";
+import { buildFeedbackRequestKey, ensurePositiveFeedbackRequest } from "./feedbackAutomation";
 import {
   parseMatchOutcomeNotes,
   setAdminOutcome,
@@ -4671,7 +4671,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
           if (singleA && singleB) {
             const score = match.score ?? 0;
-            const [feedbackA, feedbackB] = await Promise.all([
+            await Promise.all([
               singleA.email ? ensurePositiveFeedbackRequest({
                 requestKey: buildFeedbackRequestKey({ touchpoint: "match_mutual", subjectId: match.id, contactId: singleA.id }),
                 touchpoint: "match_mutual",
@@ -4683,8 +4683,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
                 contactPhone: singleA.phone,
                 singleId: singleA.id,
                 matchId: match.id,
-                sourceSnapshot: { matchedAt: now, proposalSource: isBoost ? "boost" : "regular", score },
-                scheduledAt: null,
+                sourceSnapshot: { matchedAt: now, proposalSource: isBoost ? "boost" : "regular", score, campaignVariant: "match_testimonial_request" },
+                scheduledAt: now,
               }) : Promise.resolve(null),
               singleB.email ? ensurePositiveFeedbackRequest({
                 requestKey: buildFeedbackRequestKey({ touchpoint: "match_mutual", subjectId: match.id, contactId: singleB.id }),
@@ -4697,8 +4697,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
                 contactPhone: singleB.phone,
                 singleId: singleB.id,
                 matchId: match.id,
-                sourceSnapshot: { matchedAt: now, proposalSource: isBoost ? "boost" : "regular", score },
-                scheduledAt: null,
+                sourceSnapshot: { matchedAt: now, proposalSource: isBoost ? "boost" : "regular", score, campaignVariant: "match_testimonial_request" },
+                scheduledAt: now,
               }) : Promise.resolve(null),
             ]);
             const dashboardUrlA = singleA.questionnaireToken
@@ -4727,7 +4727,6 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               singleId: singleA.id,
               dashboardUrl: dashboardUrlA,
               proposalSource: isBoost ? "boost" : "regular",
-              feedbackUrl: feedbackA?.feedbackUrl,
             });
 
             const emailRevealB = buildContactRevealEmailTemplate({
@@ -4747,11 +4746,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               singleId: singleB.id,
               dashboardUrl: dashboardUrlB,
               proposalSource: isBoost ? "boost" : "regular",
-              feedbackUrl: feedbackB?.feedbackUrl,
             });
 
             // Send contact reveal emails to both
-            const [deliveryA, deliveryB] = await Promise.all([
+            await Promise.all([
               sendEmail({
                 to: { email: singleA.email!, name: singleA.firstName },
                 subject: emailRevealA.subject,
@@ -4763,11 +4761,6 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
                 htmlContent: emailRevealB.htmlBody,
               }),
             ]);
-            await Promise.all([
-              deliveryA.success && feedbackA ? markFeedbackRequestSent(feedbackA.record.id, deliveryA.messageId) : Promise.resolve(),
-              deliveryB.success && feedbackB ? markFeedbackRequestSent(feedbackB.record.id, deliveryB.messageId) : Promise.resolve(),
-            ]);
-
             await notifyOwner({
               title: "💛 התאמה הצליחה!",
               content: `${singleA.firstName} ו-${singleB.firstName} שניהם אמרו כן! הפרטים נשלחו.`,

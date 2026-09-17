@@ -96,14 +96,16 @@ type Touchpoint = "manual" | "match_mutual" | "match_week" | "dna_result" | "dat
 export default function TestimonialManagementSection({ preview = false }: { preview?: boolean }) {
   const utils = trpc.useUtils();
   const [view, setView] = useState<"pipeline" | "library">("pipeline");
+  const [quickView, setQuickView] = useState<"all" | "positive" | "review" | "satisfaction" | "outreach">("positive");
   const [status, setStatus] = useState<RecordStatus | "all">("all");
   const [sourceType, setSourceType] = useState<SourceType | "all">("all");
   const [proofType, setProofType] = useState<ProofType | "all">("all");
-  const [surveyKind, setSurveyKind] = useState<SurveyKind | "all">("all");
+  const [surveyKind, setSurveyKind] = useState<SurveyKind | "all">("positive_experience");
   const [touchpoint, setTouchpoint] = useState<Touchpoint | "all">("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [showAdvancedTools, setShowAdvancedTools] = useState(false);
 
   const listInput = useMemo(() => ({
     status: status === "all" ? undefined : status,
@@ -111,21 +113,36 @@ export default function TestimonialManagementSection({ preview = false }: { prev
     proofType: proofType === "all" ? undefined : proofType,
     surveyKind: surveyKind === "all" ? undefined : surveyKind,
     touchpoint: touchpoint === "all" ? undefined : touchpoint,
+    hasResponse: ["positive", "review", "satisfaction"].includes(quickView) ? true : quickView === "outreach" ? false : undefined,
     search: search.trim() || undefined,
     limit: 150,
-  }), [status, sourceType, proofType, surveyKind, touchpoint, search]);
+  }), [status, sourceType, proofType, surveyKind, touchpoint, quickView, search]);
 
   const statsQuery = trpc.testimonial.team.stats.useQuery(undefined, { enabled: !preview });
   const listQuery = trpc.testimonial.team.list.useQuery(listInput, { enabled: !preview });
   const detailQuery = trpc.testimonial.team.getById.useQuery({ id: selectedId || 0 }, { enabled: !preview && Boolean(selectedId) });
   const automationQuery = trpc.testimonial.team.automationOverview.useQuery(undefined, { enabled: !preview });
-  const sampleQuery = trpc.testimonial.team.satisfactionSamplePreview.useQuery({ sampleSize: 60 }, { enabled: !preview });
-  const campaignAudienceQuery = trpc.testimonial.team.feedbackCampaignAudiencePreview.useQuery(undefined, { enabled: !preview });
+  const sampleQuery = trpc.testimonial.team.satisfactionSamplePreview.useQuery({ sampleSize: 60 }, { enabled: !preview && showAdvancedTools });
+  const campaignAudienceQuery = trpc.testimonial.team.feedbackCampaignAudiencePreview.useQuery(undefined, { enabled: !preview && showAdvancedTools });
   const syncCandidates = trpc.testimonial.team.syncMatchCandidates.useMutation();
   const prepareHistorical = trpc.testimonial.team.prepareHistoricalDrafts.useMutation();
   const prepareSatisfaction = trpc.testimonial.team.prepareSatisfactionDrafts.useMutation();
   const prepareCampaignAudience = trpc.testimonial.team.prepareFeedbackCampaignAudienceDrafts.useMutation();
   const sendDraftEmails = trpc.testimonial.team.sendDraftEmails.useMutation();
+  const sendRecentMutualFeedback = trpc.testimonial.team.sendRecentMutualFeedback.useMutation();
+
+  function chooseQuickView(next: typeof quickView) {
+    setView("pipeline");
+    setQuickView(next);
+    setSourceType("all");
+    setProofType("all");
+    setTouchpoint("all");
+    if (next === "positive") { setSurveyKind("positive_experience"); setStatus("all"); }
+    else if (next === "review") { setSurveyKind("positive_experience"); setStatus("awaiting_verification"); }
+    else if (next === "satisfaction") { setSurveyKind("satisfaction_survey"); setStatus("all"); }
+    else if (next === "outreach") { setSurveyKind("all"); setStatus("sent"); }
+    else { setSurveyKind("all"); setStatus("all"); }
+  }
 
   async function refreshAll() {
     await Promise.all([
@@ -166,9 +183,19 @@ export default function TestimonialManagementSection({ preview = false }: { prev
         </div>
       </div>
 
+      {view === "pipeline" && <div className="mt-5 flex flex-wrap gap-2 rounded-2xl border border-[#eadfd7] bg-white p-3 shadow-sm">
+        {[
+          ["positive", `המלצות שהתקבלו (${stats?.positiveResponses || 0})`],
+          ["review", `מחכות לאימות (${stats?.awaitingPositiveReview || 0})`],
+          ["satisfaction", `משובים לשיפור (${stats?.satisfactionResponses || 0})`],
+          ["outreach", "ממתינים לתגובה"],
+          ["all", "כל הרשומות"],
+        ].map(([key, label]) => <Button key={key} size="sm" variant={quickView === key ? "default" : "outline"} onClick={() => chooseQuickView(key as typeof quickView)} className="rounded-full">{label}</Button>)}
+      </div>}
+
       {view === "library" ? <div className="mt-6"><TestimonialCreativeLibrarySection /></div> : <>
         <div className={`mt-6 rounded-2xl border p-4 ${automation?.settings?.enabled ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="font-bold text-[#2a1712]">מצב האוטומציה: {automation?.settings?.enabled ? "פעילה" : "כבויה"}</p><p className="mt-1 text-sm text-[#6f5d55]">נקודות המגע מוכנות, אך לא יישלח מייל ולא ייווצר תזמון לפני אישור מפורש.</p></div><div className="flex flex-wrap gap-2 text-xs"><Badge variant="outline">ממתינות: {automation?.queued || 0}</Badge><Badge variant="outline">נשלחו: {automation?.sent || 0}</Badge><Badge variant="outline">צינון: {automation?.settings?.cooldownDays || 21} ימים</Badge></div></div>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="font-bold text-[#2a1712]">מצב האוטומציה: {automation?.settings?.enabled ? "פעילה" : "כבויה"}</p><p className="mt-1 text-sm text-[#6f5d55]">{automation?.settings?.enabled ? "התור נבדק כל חצי שעה. אחרי כן הדדי נשלחת בקשת משוב ייעודית במייל וב־SMS; תזכורת שבועית נשלחת במייל בלבד." : "האוטומציה כבויה ולא נשלחות פניות חדשות."}</p></div><div className="flex flex-wrap gap-2 text-xs"><Badge variant="outline">ממתינות: {automation?.queued || 0}</Badge><Badge variant="outline">מוכנות עכשיו: {automation?.dueNow || 0}</Badge><Badge variant="outline">מיילים התקבלו בספק: {automation?.emailAccepted || 0}</Badge><Badge variant="outline">SMS התקבלו בספק: {automation?.smsAccepted || 0}</Badge><Badge variant="outline">צינון: {automation?.settings?.cooldownDays || 45} ימים</Badge></div></div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             {[
               ["כן הדדי", automation?.settings?.matchImmediateEnabled],
@@ -180,10 +207,24 @@ export default function TestimonialManagementSection({ preview = false }: { prev
               ["מעקב מוצרי חג", automation?.settings?.productFollowupEnabled],
             ].map(([label, enabled]) => <Badge key={String(label)} variant="outline" className={enabled ? "border-emerald-300 bg-white text-emerald-800" : "border-slate-200 bg-white/70 text-slate-500"}>{label}: {enabled ? "פעיל" : "כבוי"}</Badge>)}
           </div>
-          {!preview && <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" disabled={prepareHistorical.isPending} onClick={async () => { try { const result = await prepareHistorical.mutateAsync(); toast.success(`נוצרו ${result.created} טיוטות היסטוריות. לא נשלח דבר.`); await refreshAll(); } catch (error) { toast.error(error instanceof Error ? error.message : "הכנת הטיוטות נכשלה"); } }}>הכנת טיוטות לזוגות שאמרו כן</Button><Button variant="outline" disabled={prepareSatisfaction.isPending} onClick={async () => { try { const result = await prepareSatisfaction.mutateAsync({ sampleSize: 60 }); toast.success(`נוצרו ${result.created} טיוטות סקר. לא נשלח דבר.`); await refreshAll(); } catch (error) { toast.error(error instanceof Error ? error.message : "הכנת המדגם נכשלה"); } }}>הכנת מדגם סקר של 60</Button></div>}
+          <div className="mt-4 rounded-xl border border-[#d8c4cc] bg-white/80 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div><p className="font-semibold text-[#432432]">התאמות שנשלחו בשלושת ימי ישראל האחרונים ושני הצדדים אישרו</p><p className="mt-1 text-sm text-[#6f5d55]">{automation?.recentMutual?.pairs || 0} זוגות · {automation?.recentMutual?.recipients || 0} אנשים · {automation?.recentMutual?.eligible || 0} זכאים חדשים לאחר הסכמה, הסרות וכפילויות</p></div>
+              {!preview && <Button disabled={sendRecentMutualFeedback.isPending || !(automation?.recentMutual?.eligible)} onClick={async () => {
+                const eligible = automation?.recentMutual?.eligible || 0;
+                if (!window.confirm(`לשלוח עכשיו ל־${eligible} זכאים חדשים מייל ו־SMS עם קישור אישי למשוב? מי שכבר קיבל פנייה או הגיב לא יקבל הודעה נוספת.`)) return;
+                try {
+                  const result = await sendRecentMutualFeedback.mutateAsync({ confirmedSend: true, days: 3 });
+                  toast.success(`מיילים התקבלו בספק: ${result.emailAccepted}; SMS התקבלו בספק: ${result.smsAccepted}; כפילויות הוחרגו: ${result.skippedExisting}.`);
+                  await refreshAll();
+                } catch (error) { toast.error(error instanceof Error ? error.message : "שליחת בקשות המשוב נכשלה"); }
+              }} className="bg-[#6f3f52] text-white hover:bg-[#5c3344]">{sendRecentMutualFeedback.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `שליחת ${automation?.recentMutual?.eligible || 0} בקשות`}</Button>}
+            </div>
+          </div>
+          {!preview && <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setShowAdvancedTools(current => !current)}>{showAdvancedTools ? "הסתרת כלים מתקדמים" : "כלים מתקדמים וקמפיינים"}</Button>{showAdvancedTools && <><Button variant="outline" disabled={prepareHistorical.isPending} onClick={async () => { try { const result = await prepareHistorical.mutateAsync(); toast.success(`נוצרו ${result.created} טיוטות היסטוריות. לא נשלח דבר.`); await refreshAll(); } catch (error) { toast.error(error instanceof Error ? error.message : "הכנת הטיוטות נכשלה"); } }}>הכנת טיוטות לזוגות שאמרו כן</Button><Button variant="outline" disabled={prepareSatisfaction.isPending} onClick={async () => { try { const result = await prepareSatisfaction.mutateAsync({ sampleSize: 60 }); toast.success(`נוצרו ${result.created} טיוטות סקר. לא נשלח דבר.`); await refreshAll(); } catch (error) { toast.error(error instanceof Error ? error.message : "הכנת המדגם נכשלה"); } }}>הכנת מדגם סקר של 60</Button></>}</div>}
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[#dac8bc] bg-white p-4 shadow-sm md:p-5">
+        {showAdvancedTools && <div className="mt-4 rounded-2xl border border-[#dac8bc] bg-white p-4 shadow-sm md:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-semibold tracking-[.12em] text-[#9b6d55]">קמפיין המלצות מוכן לאישור</p>
@@ -252,28 +293,28 @@ export default function TestimonialManagementSection({ preview = false }: { prev
             ))}
           </div>
           <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><strong>בקרת שליחה:</strong> הכנת הטיוטות אינה שולחת דבר. לאחר ההכנה הן מופיעות במשפך, ושם אפשר לשלוח טיוטה אחת או את כל הטיוטות המוצגות. לפני כל שליחה המערכת מבקשת אישור ובודקת מחדש הסרה, הסכמה, פרופיל פעיל וכפילות.</p>
-        </div>
+        </div>}
 
         <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-8">
           <Metric label="סה״כ" value={stats?.total || 0} />
-          <Metric label="חוויות" value={stats?.bySurveyKind.positive_experience || 0} />
-          <Metric label="סקרי שביעות רצון" value={stats?.bySurveyKind.satisfaction_survey || 0} />
-          <Metric label="טיוטות ומועמדים" value={(stats?.byStatus.draft || 0) + (stats?.byStatus.candidate || 0)} />
-          <Metric label="התקבלו" value={(stats?.byStatus.submitted || 0) + (stats?.byStatus.awaiting_consent || 0) + (stats?.byStatus.awaiting_verification || 0)} />
+          <Metric label="המלצות שהתקבלו" value={stats?.positiveResponses || 0} />
+          <Metric label="משובים לשיפור" value={stats?.satisfactionResponses || 0} />
+          <Metric label="מחכות לאימות" value={stats?.awaitingPositiveReview || 0} />
+          <Metric label="אישורי שימוש פעילים" value={stats?.activePublishingConsents || 0} />
           <Metric label="מאושרות" value={(stats?.byStatus.approved || 0) + (stats?.byStatus.published || 0)} />
           <Metric label="פניות שנשלחו" value={stats?.requestsSent || 0} />
           <Metric label="מתנות נמסרו" value={stats?.rewardsGranted || 0} />
         </div>
 
-        <div className="mt-4 rounded-2xl bg-[#2b1712] p-4 text-white shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="font-bold">מדגם שביעות רצון נפרד</p><p className="mt-1 text-sm text-white/70">תצוגה מצרפית בלבד. לא נוצרה רשומה ולא נשלחה פנייה.</p></div><div className="flex flex-wrap gap-2 text-xs"><Badge className="bg-white/10 text-white">זכאים: {sample?.eligible || 0}</Badge>{sample?.breakdown.map(bucket => <Badge key={bucket.key} className="bg-white/10 text-white">{bucket.label}: {bucket.suggested}/{bucket.available}</Badge>)}</div></div></div>
+        {showAdvancedTools && <div className="mt-4 rounded-2xl bg-[#2b1712] p-4 text-white shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="font-bold">מדגם שביעות רצון נפרד</p><p className="mt-1 text-sm text-white/70">תצוגה מצרפית בלבד. לא נוצרה רשומה ולא נשלחה פנייה.</p></div><div className="flex flex-wrap gap-2 text-xs"><Badge className="bg-white/10 text-white">זכאים: {sample?.eligible || 0}</Badge>{sample?.breakdown.map(bucket => <Badge key={bucket.key} className="bg-white/10 text-white">{bucket.label}: {bucket.suggested}/{bucket.available}</Badge>)}</div></div></div>}
 
         <div className="mt-5 grid gap-3 rounded-2xl bg-white p-4 shadow-sm md:grid-cols-3 xl:grid-cols-[1.4fr_repeat(5,1fr)_auto]">
           <label className="relative block"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e7b72]" /><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="חיפוש לפי שם, מייל או טקסט" className="pr-9" /></label>
-          <FilterSelect value={status} onChange={value => setStatus(value as RecordStatus | "all")} options={statusLabels} placeholder="כל הסטטוסים" />
-          <FilterSelect value={surveyKind} onChange={value => setSurveyKind(value as SurveyKind | "all")} options={surveyKindLabels} placeholder="כל המסלולים" />
-          <FilterSelect value={touchpoint} onChange={value => setTouchpoint(value as Touchpoint | "all")} options={touchpointLabels} placeholder="כל נקודות המגע" />
-          <FilterSelect value={sourceType} onChange={value => setSourceType(value as SourceType | "all")} options={sourceLabels} placeholder="כל המקורות" />
-          <FilterSelect value={proofType} onChange={value => setProofType(value as ProofType | "all")} options={proofLabels} placeholder="כל סוגי ההוכחה" />
+          <FilterSelect value={status} onChange={value => { setQuickView("all"); setStatus(value as RecordStatus | "all"); }} options={statusLabels} placeholder="כל הסטטוסים" />
+          <FilterSelect value={surveyKind} onChange={value => { setQuickView("all"); setSurveyKind(value as SurveyKind | "all"); }} options={surveyKindLabels} placeholder="כל המסלולים" />
+          <FilterSelect value={touchpoint} onChange={value => { setQuickView("all"); setTouchpoint(value as Touchpoint | "all"); }} options={touchpointLabels} placeholder="כל נקודות המגע" />
+          <FilterSelect value={sourceType} onChange={value => { setQuickView("all"); setSourceType(value as SourceType | "all"); }} options={sourceLabels} placeholder="כל המקורות" />
+          <FilterSelect value={proofType} onChange={value => { setQuickView("all"); setProofType(value as ProofType | "all"); }} options={proofLabels} placeholder="כל סוגי ההוכחה" />
           <Button variant="outline" onClick={() => void refreshAll()} className="gap-2"><RefreshCw className="h-4 w-4" />רענון</Button>
           {!preview && sendableRecords.length > 0 && <Button disabled={sendDraftEmails.isPending} className="gap-2 bg-[#6f3f52] text-white hover:bg-[#5c3344]" onClick={async () => {
             const approved = window.confirm(`לשלוח עכשיו ${sendableRecords.length.toLocaleString("he-IL")} מיילי בקשת משוב מהטיוטות המוצגות? לפני כל שליחה תתבצע בדיקה חוזרת של הסרה, הסכמה, פרופיל פעיל וכפילות.`);
@@ -369,7 +410,7 @@ function RecordDetails({ data, onRefresh }: { data: any; onRefresh: () => Promis
   return <div className="space-y-6">
     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-2xl font-bold text-[#2a1712]">{record.contactName}</h3><Badge className={statusTone[record.status] || "bg-[#eee5df] text-[#62473a]"}>{statusLabels[record.status]}</Badge></div><p className="mt-1 text-sm text-[#76645c]">{record.contactEmail} · {surveyKindLabels[record.surveyKind]} · {touchpointLabels[record.touchpoint]}</p></div><Button variant="outline" size="sm" onClick={() => { void navigator.clipboard.writeText(formUrl); toast.success("הקישור הועתק"); }} className="gap-2"><Clipboard className="h-4 w-4" />העתקת טופס</Button></div>
 
-    <div className="rounded-xl bg-[#f6f1ed] p-4 text-sm leading-6 text-[#674f44]"><strong>מצב בטיחות:</strong> יצירת טיוטה או אישור לפנייה אינם שולחים דבר. שליחה מתבצעת רק בלחיצה על „שליחת מייל עכשיו” ולאחר אישור נוסף.</div>
+    <div className="rounded-xl bg-[#f6f1ed] p-4 text-sm leading-6 text-[#674f44]"><strong>מצב מסירה:</strong> פניות שנוצרו אוטומטית אחרי נקודת מגע פעילה נשלחות דרך התור המתוזמן. טיוטות ידניות אינן נשלחות בלי לחיצה מפורשת, ובכל מסלול נבדקים שוב הסרה, הסכמה וכפילות לפני המסירה.</div>
 
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><InfoChip label="מקור" value={sourceLabels[record.sourceType]} /><InfoChip label="ערוץ" value={record.deliveryChannel === "email" ? "מייל" : record.deliveryChannel === "onsite" ? "באתר" : "ידני"} /><InfoChip label="מתנה" value={rewardLabels[record.rewardType]} /><InfoChip label="מסירה" value={record.requestSentAt ? new Date(record.requestSentAt).toLocaleDateString("he-IL") : "טרם נשלחה"} /></div>
 
