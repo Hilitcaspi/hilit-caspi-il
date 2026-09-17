@@ -3050,3 +3050,14 @@
 - [x] Publish the corrected Plus experience and sync GitHub
 - [x] Prepare, send and verify the relaunch cohort: 45 emails and 29 SMS accepted
 - [ ] Retry only the 15 failed SMS after Vibrate credit is replenished
+
+## Match history integrity and duplicate-send prevention (September 17)
+- [x] Audit the affected profile's full match history and provider events without exposing personal data
+- [x] Confirm that six opposite-gender rows were internal candidates that were never sent
+- [x] Restore the original lifecycle of the one match record that was reopened and sent again
+- [x] Preserve the six internal rows for audit while removing false proposal timestamps and sent-history visibility
+- [x] Display only matches with real delivery or response evidence under sent match history
+- [x] Stop setting proposedAt while generating pending candidates
+- [x] Block specific-match reuse and repeated owner-approval clicks for proposals already sent
+- [x] Disable automatic proposal resend based on missing open pixels
+- [x] Verify one visible historical proposal, zero wrong-gender entries, zero active matches and zero duplicate pair rows

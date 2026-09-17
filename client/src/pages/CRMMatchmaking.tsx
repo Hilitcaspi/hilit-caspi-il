@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles, MessageSquareText } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getMatchTrackingSummary, hasMutualYes, isUnsuccessfulMatch, isWaitingForMatchResponses } from "@shared/matchLifecycle";
+import { wasMatchProposalSent } from "@shared/matchDelivery";
 
 const RELIGIOSITY_LABELS: Record<string, string> = {
   secular:     "חילוני/ת",
@@ -675,10 +676,9 @@ export default function CRMMatchmaking() {
     }
     return { aBlocked: !!aBlocked, bBlocked: !!bBlocked, blockedPersons, maxHoursLeft: Math.max(...blockedPersons.map(p => p.hoursLeft)) };
   };
-  // Map: singleId -> match history (all statuses, for showing who was already sent)
+  // Map: singleId -> proposals that were actually delivered or exposed to a participant.
   const matchHistoryBySingleId = new Map<number, Array<{ matchId: number; opponentName: string; status: string; score?: number | null; proposedAt?: number | null; opponentPhotoUrl?: string | null; returnedToPoolAt?: number | null }>>();
-  // Only include matches that were actually SENT (proposed/matched/rejected/expired) — not pending
-  typedMatches.filter(m => m.status !== "pending").forEach(m => {
+  typedMatches.filter(wasMatchProposalSent).forEach(m => {
     const addToHistory = (singleId: number, opponentName: string, opponentPhotoUrl: string | null | undefined) => {
       const existing = matchHistoryBySingleId.get(singleId) || [];
       existing.push({ matchId: m.id, opponentName, status: m.status, score: m.score, proposedAt: m.proposedAt as number | null, opponentPhotoUrl, returnedToPoolAt: m.returnedToPoolAt });

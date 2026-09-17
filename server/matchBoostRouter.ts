@@ -208,7 +208,6 @@ async function ensureBoostCandidatesForSingle(db: any, single: any, now = Date.n
       score: option.score,
       scoreBreakdown: JSON.stringify({ ...option.breakdown, algorithm: "v8.0", source: "boost_on_demand" }),
       notes: `${BOOST_CANDIDATE_NOTE_MARKER} נוצרה כאפשרות אנונימית לפי דרישה; לא נשלחה הודעה ולא בוצע חיוב`,
-      proposedAt: now,
       status: "pending",
       updatedAt: now,
     } as any);

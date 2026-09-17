@@ -11,7 +11,7 @@
  */
 
 import { getDb, resetDb } from "./db";
-import { emailLog, crmLeads, productAccessTokens, matches, singles, matchBoostRequests } from "../drizzle/schema";
+import { emailLog, crmLeads, productAccessTokens, matches, singles } from "../drizzle/schema";
 import { and, eq, lt, gt, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { sendEmail, addContactToList } from "./brevo";
 import { sendSMS } from "./vibrate";
@@ -744,117 +744,15 @@ export async function processMatchFollowUps(): Promise<number> {
 }
 
 /**
- * Retry unsent match proposal emails.
- * If a match was proposed 30+ minutes ago and neither party has opened their email,
- * resend the proposal once. This handles cases where the server restarted mid-send.
+ * Legacy heartbeat hook retained for compatibility. Automatic proposal retries are
+ * disabled because an unopened tracking pixel is not proof that delivery failed.
  */
 export async function retryUnsentMatchEmails(): Promise<number> {
-  const db = await getDb();
-  if (!db) return 0;
-  const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
-  // Find proposed matches where:
-  // - proposed 30+ min ago
-  // - neither email was opened (indicates possible non-delivery)
-  // - no retry has been attempted yet
-  const unsentMatches = await db
-    .select()
-    .from(matches)
-    .where(
-      and(
-        eq(matches.status, "proposed"),
-        isNull(matches.emailAOpenedAt),
-        isNull(matches.emailBOpenedAt),
-        isNull(matches.emailRetriedAt),
-        isNotNull(matches.proposedAt),
-        sql`${matches.proposedAt} <= ${thirtyMinutesAgo}`
-      )
-    )
-    .limit(20);
-  if (unsentMatches.length === 0) return 0;
-  let retried = 0;
-  for (const match of unsentMatches) {
-    try {
-      const [singleA, singleB] = await Promise.all([
-        db.select().from(singles).where(eq(singles.id, match.singleAId)).then(r => r[0]),
-        db.select().from(singles).where(eq(singles.id, match.singleBId)).then(r => r[0]),
-      ]);
-      if (!singleA || !singleB) continue;
-      if (!singleA.email || !singleB.email) continue;
-      if (!match.approvalTokenA || !match.approvalTokenB) continue;
-      // Import buildMatchProposalEmail from emailTemplates
-      const { buildMatchProposalEmail: buildEmail } = await import("./emailTemplates");
-      const score = match.score ?? 0;
-      const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]");
-      const boostExplanation = String(match.autoExplanation || "").replace(/^\[BOOST\]\s*/, "");
-      const [boostRequest] = isBoost
-        ? await db.select({ singleId: matchBoostRequests.singleId }).from(matchBoostRequests)
-            .where(eq(matchBoostRequests.matchId, match.id)).limit(1)
-        : [];
-      const emailA = buildEmail({
-        firstName: singleA.firstName,
-        matchFirstName: singleB.firstName,
-        matchAge: singleB.age ?? 0,
-        matchCity: singleB.city ?? "",
-        matchOccupation: singleB.occupation ?? undefined,
-        matchDnaType: singleB.dnaType ?? undefined,
-        matchPhotoUrl: singleB.photoUrl ?? undefined,
-        matchEducation: singleB.education ?? undefined,
-        matchHasKids: singleB.hasKids ?? undefined,
-        matchNumKids: singleB.numKids ?? undefined,
-        matchWantsKids: singleB.wantsKids ?? undefined,
-        compatibilityScore: score,
-        hilitsNote: isBoost ? boostExplanation : (match.autoExplanation ?? ""),
-        yesUrl: `${SITE_BASE}/match/respond?token=${match.approvalTokenA}&response=yes`,
-        noUrl: `${SITE_BASE}/match/respond?token=${match.approvalTokenA}&response=no`,
-        recipientEmail: singleA.email,
-        singleId: singleA.id,
-        trackingPixelUrl: `${SITE_BASE}/api/match-open?token=${match.approvalTokenA}&side=a`,
-        proposalSource: isBoost ? "boost" : "manual",
-        boostRole: isBoost ? (boostRequest?.singleId === singleA.id ? "sender" : "recipient") : undefined,
-      });
-      const emailB = buildEmail({
-        firstName: singleB.firstName,
-        matchFirstName: singleA.firstName,
-        matchAge: singleA.age ?? 0,
-        matchCity: singleA.city ?? "",
-        matchOccupation: singleA.occupation ?? undefined,
-        matchDnaType: singleA.dnaType ?? undefined,
-        matchPhotoUrl: singleA.photoUrl ?? undefined,
-        matchEducation: singleA.education ?? undefined,
-        matchHasKids: singleA.hasKids ?? undefined,
-        matchNumKids: singleA.numKids ?? undefined,
-        matchWantsKids: singleA.wantsKids ?? undefined,
-        compatibilityScore: score,
-        hilitsNote: isBoost ? boostExplanation : (match.autoExplanation ?? ""),
-        yesUrl: `${SITE_BASE}/match/respond?token=${match.approvalTokenB}&response=yes`,
-        noUrl: `${SITE_BASE}/match/respond?token=${match.approvalTokenB}&response=no`,
-        recipientEmail: singleB.email,
-        singleId: singleB.id,
-        trackingPixelUrl: `${SITE_BASE}/api/match-open?token=${match.approvalTokenB}&side=b`,
-        proposalSource: isBoost ? "boost" : "manual",
-        boostRole: isBoost ? (boostRequest?.singleId === singleB.id ? "sender" : "recipient") : undefined,
-      });
-      const [resA, resB] = await Promise.all([
-        sendEmail({ to: { email: singleA.email, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
-        sendEmail({ to: { email: singleB.email, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
-      ]);
-      // Do not close the retry path after a partial provider failure. The match
-      // remains eligible for a later retry until Brevo accepts both emails.
-      if (resA.success && resB.success) {
-        await db.update(matches).set({ emailRetriedAt: Date.now() }).where(eq(matches.id, match.id));
-        retried++;
-        console.log(`[MatchRetry] Resent match proposal for match ${match.id} (${singleA.firstName} & ${singleB.firstName})`);
-      } else {
-        console.error(`[MatchRetry] Provider did not accept both emails for match ${match.id}; retry remains open`);
-      }
-    } catch (err) {
-      console.error(`[MatchRetry] Error retrying match ${match.id}:`, err);
-    }
-  }
-  if (retried > 0) {
-    console.log(`[MatchRetry] Retried ${retried} unsent match proposals`);
-  }
-  return retried;
+  // Opening pixels are not delivery receipts: privacy protection, image blocking,
+  // or a delayed open can make a delivered email look unopened. Automatically
+  // resending on that signal caused real customers to receive the same match
+  // twice. Retries must now be explicit and recipient-specific from the CRM.
+  return 0;
 }
 
 /**

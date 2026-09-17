@@ -59,6 +59,7 @@ import { dailyReportRouter } from "./dailyReportRouter";
 import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivacy";
 import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYMENT_ATTRIBUTION_TTL_MS } from "./paymentAttribution";
 import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
+import { wasMatchProposalSent } from "../shared/matchDelivery";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -601,7 +602,6 @@ export async function generateMatchesForSingle(singleId: number, gender: "female
     ).limit(1);
     if (existingMatch) continue;
 
-    const now = Date.now();
     const explanation = await buildMatchExplanation(mySingle, candidate, breakdown, myAnswers, candidateAnswers);
     await db.insert(matches).values({
       singleId: singleId,
@@ -611,9 +611,8 @@ export async function generateMatchesForSingle(singleId: number, gender: "female
       score: breakdown.total,
       scoreBreakdown: JSON.stringify(breakdown),
       autoExplanation: explanation,
-      proposedAt: now,
       status: "pending",
-      updatedAt: now,
+      updatedAt: Date.now(),
     });
   }
 }
@@ -3033,6 +3032,12 @@ export const appRouter = router({
           const oriented = orientParticipantsToStoredMatch(singleA, singleB, existingMatch[0]);
           singleA = oriented.singleA;
           singleB = oriented.singleB;
+          if (wasMatchProposalSent(existingMatch[0])) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "ההתאמה הזו כבר נשלחה בעבר. כדי למנוע שליחה כפולה, לא נשלחה הודעה חדשה.",
+            });
+          }
         }
 
         // Compute score
@@ -4152,16 +4157,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               // Never re-propose a rejected pair — if it exists in any status (including rejected), skip it
               if (existing) continue;
 
-              const now = Date.now();
               await bgDb.insert(matches).values({
                 singleAId: m.singleAId,
                 singleBId: m.singleBId,
                 score: m.score,
                 scoreBreakdown: m.scoreBreakdown,
                 autoExplanation: m.autoExplanation,
-                proposedAt: now,
                 status: "pending",
-                updatedAt: now,
+                updatedAt: Date.now(),
               });
               inserted++;
             }
@@ -4419,6 +4422,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (input.action === "reject") {
           await db.update(matches).set({ status: "rejected", updatedAt: Date.now() }).where(eq(matches.id, match.id));
           return { success: true, action: "rejected" };
+        }
+        if (wasMatchProposalSent(match)) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "ההתאמה הזו כבר נשלחה בעבר ולא תישלח פעם נוספת.",
+          });
         }
         // action === "approve" → generate tokens and send to both singles
         const [singleA] = await db.select().from(singles).where(eq(singles.id, match.singleAId)).limit(1);
@@ -5473,12 +5482,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) return [];
-        const allMatches = await db.select().from(matches).where(
+        const allMatchRows = await db.select().from(matches).where(
           or(
             eq(matches.singleAId, input.singleId),
             eq(matches.singleBId, input.singleId)
           )
         ).orderBy(desc(matches.createdAt));
+        const allMatches = allMatchRows.filter(wasMatchProposalSent);
 
         // Get all opponent IDs
         const opponentIds = allMatches.map(m => m.singleAId === input.singleId ? m.singleBId : m.singleAId);

@@ -274,7 +274,6 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
   matchesToInsert.sort((a, b) => b.score - a.score);
 
   // Insert into DB as "pending" (waiting for Hilit's approval)
-  const now = Date.now();
   for (const m of matchesToInsert) {
     await db.insert(matches).values({
       singleAId: m.singleAId,
@@ -283,8 +282,7 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
       scoreBreakdown: m.scoreBreakdown,
       autoExplanation: m.autoExplanation,
       status: "pending",
-      proposedAt: now,
-      updatedAt: now,
+      updatedAt: Date.now(),
     });
     existingPairs.add(`${Math.min(m.singleAId, m.singleBId)}-${Math.max(m.singleAId, m.singleBId)}`);
   }
