@@ -3061,3 +3061,14 @@
 - [x] Block specific-match reuse and repeated owner-approval clicks for proposals already sent
 - [x] Disable automatic proposal resend based on missing open pixels
 - [x] Verify one visible historical proposal, zero wrong-gender entries, zero active matches and zero duplicate pair rows
+
+## Feedback sentiment and service recovery analysis (September 17)
+
+- [x] Analyze all 106 submitted feedback records without exposing customer identities
+- [x] Separate unsuccessful match outcomes from preventable service failures
+- [x] Reconcile the 24 service-failure cases with match and Boost history at the time of each response
+- [x] Identify five safe service-recovery cases for a free Boost after a preference review
+- [x] Identify personal follow-up, technical, profile-review and commercial-review cohorts
+- [x] Fix the reversed RTL NPS scale and mark historical NPS values as unreliable
+- [x] Document the findings and proposed recovery process
+- [~] Deferred pending explicit approval: grant benefits or contact the recovery cohorts

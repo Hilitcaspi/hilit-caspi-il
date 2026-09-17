@@ -301,8 +301,8 @@ export default function TestimonialFeedback() {
                 </div>
               </div>}
               {data.questions.showRatings && <div className="mt-6">
-                <Label className="text-base">עד כמה הייתם ממליצים לאחרים? <span className="text-[#9d8b82]">לא חובה</span></Label>
-                <div className="mt-3 grid grid-cols-11 gap-1" dir="ltr">{Array.from({ length: 11 }, (_, value) => <button type="button" key={value} onClick={() => setNpsScore(value)} className={`aspect-square rounded-lg border text-xs font-semibold md:text-sm ${npsScore === value ? "border-[#7a4937] bg-[#7a4937] text-white" : "border-[#d8c8bc] bg-white"}`}>{value}</button>)}</div>
+                <Label className="text-base">עד כמה הייתם ממליצים לאחרים? <span className="text-[#9d8b82]">0 = לא סביר, 10 = סביר מאוד · לא חובה</span></Label>
+                <div className="mt-3 grid grid-cols-11 gap-1" dir="rtl">{Array.from({ length: 11 }, (_, value) => <button type="button" key={value} onClick={() => setNpsScore(value)} className={`aspect-square rounded-lg border text-xs font-semibold md:text-sm ${npsScore === value ? "border-[#7a4937] bg-[#7a4937] text-white" : "border-[#d8c8bc] bg-white"}`}>{value}</button>)}</div>
                 <div className="mt-2 flex justify-between text-xs text-[#8a766d]"><span>לא סביר</span><span>סביר מאוד</span></div>
               </div>}
               {data.questions.rewardLabel && <div className="mt-7 rounded-2xl border border-[#efcad7] bg-[#fff1f5] p-5">
