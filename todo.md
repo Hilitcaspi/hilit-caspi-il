@@ -3088,4 +3088,4 @@
 - [x] Enforce existing questionnaire red lines for children, marriage, existing children and animal allergy
 - [x] Block new proposals when either person is already in an active proposal or unreleased mutual match
 - [x] Audit the full production queue: 718 eligible members, 692 with valid suggestions and 26 without a current suggestion
-- [ ] Run final full tests, publish, sync GitHub and verify the live bundles
+- [x] Run final full tests, publish, sync GitHub and verify the live bundles
