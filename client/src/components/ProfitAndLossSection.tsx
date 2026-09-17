@@ -119,12 +119,18 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
   if (pnl.isLoading) {
     return <section className="rounded-2xl bg-white p-6 shadow-sm"><div className="h-48 animate-pulse rounded-xl bg-gray-100" /></section>;
   }
+  if (pnl.error) {
+    return <section className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-800">מעקב הרווחיות אינו זמין כרגע, כדי לא להציג רווח בלי נתוני הוצאות Meta מלאים.</section>;
+  }
   if (!pnl.data) return null;
 
   const current = pnl.data.current;
   const previous = pnl.data.previous;
-  const revenueChange = change(current.netRevenue, previous.netRevenue);
-  const profitChange = change(current.operatingProfit, previous.operatingProfit);
+  const comparisonLabel = pnl.data.comparisonBasis === "same_dates_previous_month"
+    ? "אותם תאריכים בחודש הקודם"
+    : "התקופה הקודמת באותו אורך";
+  const revenueChange = pnl.data.salesComparisonAvailable ? change(current.netRevenue, previous.netRevenue) : null;
+  const profitChange = pnl.data.salesComparisonAvailable ? change(current.operatingProfit, previous.operatingProfit) : null;
 
   const submitExpense = (event: React.FormEvent) => {
     event.preventDefault();
@@ -169,8 +175,8 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
         <div className="flex items-center gap-3">
           <span className="rounded-xl bg-[#ffe27c] p-2 text-[#191265]"><Calculator size={20} /></span>
           <div>
-            <h2 className="font-black">רווח והפסד אמיתי</h2>
-            <p className="text-[11px] text-white/65">הכנסה מסכומי העסקאות · Meta בזמן אמת · הוצאות שהוזנו</p>
+            <h2 className="font-black">מעקב רווחיות תפעולי</h2>
+            <p className="text-[11px] text-white/65">חיובי Grow מאומתים · כל הוצאות Meta · הוצאות שהוזנו ידנית</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -250,12 +256,12 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
           {[
-            { label: "הכנסה כוללת", value: current.netRevenue, sub: revenueChange == null ? "אתר + פעילות חיצונית" : `${revenueChange >= 0 ? "+" : ""}${revenueChange}% מול הקודמת`, color: "text-emerald-700" },
-            { label: "הוצאות Meta", value: current.metaSpend, sub: "שני חשבונות הפרסום", color: "text-red-600" },
+            { label: "הכנסה לאחר זיכויים", value: current.netRevenue, sub: !pnl.data.salesComparisonAvailable ? "אין בסיס Grow מלא בתקופה הקודמת" : revenueChange == null ? "Grow מאומת + פעילות חיצונית שהוזנה" : `${revenueChange >= 0 ? "+" : ""}${revenueChange}% מול ${comparisonLabel}`, color: "text-emerald-700" },
+            { label: "הוצאות Meta", value: current.metaSpend, sub: `מכירה ${money(current.metaSpendBreakdown.mainSpend)} · קידומים ${money(current.metaSpendBreakdown.boostsSpend)}`, color: "text-red-600" },
             { label: "הוצאות חודשיות", value: current.recurringExpenses, sub: `${current.recurringItems.length} סעיפים פעילים`, color: "text-orange-600" },
             { label: "הוצאות חד־פעמיות", value: current.manualExpenses, sub: `${current.expenses.length} רשומות`, color: "text-orange-600" },
-            { label: "רווח תפעולי", value: current.operatingProfit, sub: profitChange == null ? "לפני הוצאות חסרות" : `${profitChange >= 0 ? "+" : ""}${profitChange}% מול הקודמת`, color: current.operatingProfit >= 0 ? "text-[#191265]" : "text-red-700" },
-            { label: "שיעור רווח", value: current.margin, percent: true, sub: "על הכנסה נטו", color: current.margin >= 0 ? "text-[#191265]" : "text-red-700" },
+            { label: "רווח תפעולי חלקי", value: current.operatingProfit, sub: !pnl.data.salesComparisonAvailable ? "אין בסיס Grow מלא בתקופה הקודמת" : profitChange == null ? "לפי ההוצאות שהוזנו" : `${profitChange >= 0 ? "+" : ""}${profitChange}% מול ${comparisonLabel}`, color: current.operatingProfit >= 0 ? "text-[#191265]" : "text-red-700" },
+            { label: "שיעור רווח חלקי", value: current.margin, percent: true, sub: "לפי ההוצאות שהוזנו", color: current.margin >= 0 ? "text-[#191265]" : "text-red-700" },
           ].map(item => (
             <div key={item.label} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
               <p className="text-[10px] font-bold text-gray-500">{item.label}</p>
@@ -270,9 +276,10 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
             <h3 className="flex items-center gap-2 text-sm font-black text-[#191265]"><WalletCards size={16} /> יחידת כלכלה</h3>
             <dl className="mt-3 space-y-2 text-xs">
               <div className="flex justify-between"><dt className="text-gray-500">הכנסה ממוצעת לרכישה</dt><dd className="font-black">{money(current.unitEconomics.averageRevenuePerPurchase)}</dd></div>
-              <div className="flex justify-between"><dt className="text-gray-500">CAC שיווקי</dt><dd className="font-black">{money(current.unitEconomics.marketingCac)}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">הוצאות מדיה לכל רכישה</dt><dd className="font-black">{money(current.unitEconomics.marketingCac)}</dd></div>
               <div className="flex justify-between"><dt className="text-gray-500">תרומה לרכישה</dt><dd className="font-black">{money(current.unitEconomics.contributionPerPurchase)}</dd></div>
-              <div className="flex justify-between"><dt className="text-gray-500">ROAS הכנסה בפועל</dt><dd className="font-black">{current.unitEconomics.returnOnAdSpend.toFixed(2)}x</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">יחס הכנסות מוצר / מדיה</dt><dd className="font-black">{current.unitEconomics.returnOnAdSpend.toFixed(2)}x</dd></div>
+              <p className="pt-1 text-[9px] text-gray-400">שני היחסים כוללים את כל הוצאות Meta ואינם ייחוס קמפיין.</p>
             </dl>
           </div>
 
@@ -289,7 +296,9 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
           <div className="rounded-xl border border-gray-100 p-4">
             <h3 className="text-sm font-black text-[#191265]">הוצאות לפי קטגוריה</h3>
             <div className="mt-3 space-y-2 text-xs">
-              <div className="flex justify-between"><span className="text-gray-600">פרסום Meta</span><strong>{money(current.metaSpend)}</strong></div>
+              <div className="flex justify-between"><span className="text-gray-600">Meta · מכירה ולידים</span><strong>{money(current.metaSpendBreakdown.mainSpend)}</strong></div>
+              <div className="flex justify-between"><span className="text-gray-600">Meta · קידומי פרופיל/פוסטים</span><strong>{money(current.metaSpendBreakdown.boostsSpend)}</strong></div>
+              <div className="flex justify-between border-t border-gray-100 pt-2"><span className="font-bold text-gray-700">Meta · סה״כ</span><strong>{money(current.metaSpend)}</strong></div>
               {current.recurringItems.filter((item: any) => item.itemType === "expense" && item.recognizedAmountAgorot > 0).map((item: any) => (
                 <div key={`recurring-${item.id}`} className="flex justify-between"><span className="text-gray-600">{RECURRING_CATEGORY_LABELS[item.category] || item.description}</span><strong>{money(item.recognizedAmountAgorot / 100)}</strong></div>
               ))}

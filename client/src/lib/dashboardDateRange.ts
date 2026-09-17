@@ -37,7 +37,28 @@ export function formatIsraelCalendarDate(timestamp: number) {
   return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
+export function addCalendarDays(date: string, days: number) {
+  const [year, month, day] = date.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
+}
+
 export function parseIsraelCalendarDate(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   return israelMidnightUtc(year, month, day);
+}
+
+export function endOfIsraelCalendarDate(date: string) {
+  return parseIsraelCalendarDate(addCalendarDays(date, 1)) - 1;
+}
+
+export function getIsraelCalendarDaysStart(days: number, now = Date.now()) {
+  const safeDays = Math.max(1, Math.floor(days));
+  return parseIsraelCalendarDate(addCalendarDays(formatIsraelCalendarDate(now), -(safeDays - 1)));
+}
+
+export function formatIsraelDateRange(startDate: number, endDate: number) {
+  const start = new Date(startDate).toLocaleDateString("he-IL", { timeZone: ISRAEL_TIMEZONE, day: "numeric", month: "numeric", year: "numeric" });
+  const end = new Date(endDate).toLocaleDateString("he-IL", { timeZone: ISRAEL_TIMEZONE, day: "numeric", month: "numeric", year: "numeric" });
+  return start === end ? start : `${start}–${end}`;
 }

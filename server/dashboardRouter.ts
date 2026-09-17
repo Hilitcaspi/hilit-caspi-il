@@ -2,13 +2,15 @@ import { z } from "zod";
 import { router, teamProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
-import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
-import { businessExpenses, businessRecurringItems, completedPayments } from "../drizzle/schema";
+import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { businessExpenses, businessRecurringItems, completedPayments, crmLeads, dailyReportSettings } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { calculatePnlSummary, prorateMonthlyAmountAgorot } from "./businessFinance";
-import { aggregateVerifiedGrowPayments, summarizeVerifiedGrowPayments } from "./dashboardRevenue";
+import { aggregateVerifiedGrowPayments, israelDateKey, summarizeVerifiedGrowPayments } from "./dashboardRevenue";
 import { getPaymentAbandonmentAudit } from "./paymentAbandonmentAudit";
-import { formatMetaCalendarDate, summarizeMetaSpend } from "./dashboardMetaSpend";
+import { formatMetaCalendarDate, normalizeMetaCampaign, summarizeMetaSpend } from "./dashboardMetaSpend";
+import { hasVerifiedGrowCoverage, previousComparisonPeriod } from "./dashboardPeriods";
+import { getDailyReportMediaPlan } from "./dailyReportMetrics";
 
 import { sendSMS } from "./vibrate";
 import crypto from "crypto";
@@ -155,54 +157,61 @@ export async function fetchSocialInsights(since: number, until: number) {
   const IG_ID = "17841476794270830";
   
   try {
-    const fetchWithTimeout = (url: string) => fetch(url, { signal: AbortSignal.timeout(6_000) });
+    const fetchJson = async (url: string) => {
+      const response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      const payload = await response.json();
+      if (!response.ok || payload.error) throw new Error(payload.error?.message || `Meta HTTP ${response.status}`);
+      return payload;
+    };
     // Get page token for insights
-    const pagesRes = await fetchWithTimeout(`https://graph.facebook.com/v25.0/me/accounts?fields=id,access_token&access_token=${token}`);
-    const pagesData = await pagesRes.json();
+    const pagesData = await fetchJson(`https://graph.facebook.com/v25.0/me/accounts?fields=id,access_token&access_token=${token}`);
     const page = pagesData.data?.find((p: any) => p.id === PAGE_ID);
     const pageToken = page?.access_token || token;
     
     const sinceUnix = Math.floor(since / 1000);
     const untilUnix = Math.floor(until / 1000);
+    const previous = previousComparisonPeriod(since, until);
+    const previousSinceUnix = Math.floor(previous.startDate / 1000);
+    const previousUntilUnix = Math.floor(previous.endDate / 1000);
     
-    // IG time_series: reach, follower_count
-    const [igTimeRes, igTotalRes, igProfileRes, fbPageRes] = await Promise.all([
-      fetchWithTimeout(`https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=reach,follower_count&metric_type=time_series&period=day&since=${sinceUnix}&until=${untilUnix}&access_token=${pageToken}`),
-      fetchWithTimeout(`https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=accounts_engaged,total_interactions,likes,comments,shares,saves&metric_type=total_value&period=day&since=${sinceUnix}&until=${untilUnix}&access_token=${pageToken}`),
-      fetchWithTimeout(`https://graph.facebook.com/v25.0/${IG_ID}?fields=followers_count,media_count,username&access_token=${pageToken}`),
-      fetchWithTimeout(`https://graph.facebook.com/v25.0/${PAGE_ID}?fields=fan_count,followers_count,name&access_token=${pageToken}`),
-    ]);
-    const [igTimeData, igTotalData, igProfile, fbPage] = await Promise.all([
-      igTimeRes.json(),
-      igTotalRes.json(),
-      igProfileRes.json(),
-      fbPageRes.json(),
+    const totalsUrl = (from: number, to: number) => `https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=accounts_engaged,total_interactions,likes,comments,shares,saves&metric_type=total_value&period=day&since=${from}&until=${to}&access_token=${pageToken}`;
+    const [igTimeData, igTotalData, previousTotalData, igProfile, fbPage, mediaData] = await Promise.all([
+      fetchJson(`https://graph.facebook.com/v25.0/${IG_ID}/insights?metric=reach&metric_type=time_series&period=day&since=${sinceUnix}&until=${untilUnix}&access_token=${pageToken}`),
+      fetchJson(totalsUrl(sinceUnix, untilUnix)),
+      fetchJson(totalsUrl(previousSinceUnix, previousUntilUnix)).catch(() => ({ data: [] })),
+      fetchJson(`https://graph.facebook.com/v25.0/${IG_ID}?fields=followers_count,media_count,username&access_token=${pageToken}`),
+      fetchJson(`https://graph.facebook.com/v25.0/${PAGE_ID}?fields=fan_count,followers_count,name&access_token=${pageToken}`),
+      fetchJson(`https://graph.facebook.com/v25.0/${IG_ID}/media?fields=id,caption,media_type,timestamp,permalink,like_count,comments_count&since=${sinceUnix}&until=${untilUnix}&limit=12&access_token=${pageToken}`).catch(() => ({ data: [] })),
     ]);
     
-    // Parse IG time series
     const reachData = igTimeData.data?.find((m: any) => m.name === 'reach')?.values || [];
-    const followerData = igTimeData.data?.find((m: any) => m.name === 'follower_count')?.values || [];
-    
-    // Parse IG totals
-    const totals: Record<string, number> = {};
-    for (const metric of (igTotalData.data || [])) {
-      totals[metric.name] = metric.total_value?.value || 0;
-    }
-    
-    // Calculate follower growth
-    const followerGrowth = followerData.length >= 2 
-      ? followerData[followerData.length - 1].value - followerData[0].value 
-      : 0;
+    const parseTotals = (payload: any) => Object.fromEntries((payload.data || []).map((metric: any) => [metric.name, Number(metric.total_value?.value || 0)]));
+    const totals = parseTotals(igTotalData);
+    const previousTotals = parseTotals(previousTotalData);
     
     const totalReach = reachData.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
     const avgDailyReach = reachData.length > 0 ? Math.round(totalReach / reachData.length) : 0;
+
+    const posts = (mediaData.data || []).map((item: any) => ({
+      id: item.id,
+      caption: String(item.caption || "").replace(/\s+/g, " ").trim().slice(0, 120),
+      mediaType: item.media_type || "UNKNOWN",
+      timestamp: item.timestamp || null,
+      permalink: item.permalink || null,
+      likes: Number(item.like_count || 0),
+      comments: Number(item.comments_count || 0),
+      interactions: Number(item.like_count || 0) + Number(item.comments_count || 0),
+    })).sort((a: any, b: any) => b.interactions - a.interactions);
     
     return {
+      status: "available" as const,
+      fetchedAt: Date.now(),
+      note: "נתוני הסושיאל עשויים להתעדכן באיחור של עד 48 שעות. מספר העוקבים הוא צילום מצב נוכחי.",
       instagram: {
         username: igProfile.username || 'hilitcaspi_relationship',
         followers: igProfile.followers_count || 0,
         posts: igProfile.media_count || 0,
-        followerGrowth,
+        followerGrowth: null,
         totalReach,
         avgDailyReach,
         accountsEngaged: totals.accounts_engaged || 0,
@@ -211,18 +220,17 @@ export async function fetchSocialInsights(since: number, until: number) {
         comments: totals.comments || 0,
         shares: totals.shares || 0,
         saves: totals.saves || 0,
-        engagementRate: igProfile.followers_count > 0 
-          ? Math.round((totals.total_interactions || 0) / igProfile.followers_count * 1000) / 10 
-          : 0,
+        previousAccountsEngaged: previousTotals.accounts_engaged || 0,
+        previousTotalInteractions: previousTotals.total_interactions || 0,
         dailyReach: reachData.map((d: any) => ({ date: d.end_time?.split('T')[0], value: d.value || 0 })),
-        dailyFollowers: followerData.map((d: any) => ({ date: d.end_time?.split('T')[0], value: d.value || 0 })),
+        topPosts: posts,
       },
       facebook: {
         pageName: fbPage.name || 'Hilit Caspi Relationship',
         fans: fbPage.fan_count || 0,
         followers: fbPage.followers_count || 0,
       },
-      whatsappGroupSize: 1000,
+      whatsappGroupSize: null,
     };
   } catch (err) {
     console.error("[SocialInsights] Error:", err);
@@ -234,25 +242,38 @@ export async function fetchMetaAdsInsights(since: string, until: string) {
   const token = process.env.META_ADS_TOKEN;
   const mainAccountId = "act_254697595735216";
   const boostsAccountId = "act_3841144459522772";
-  const fields = "campaign_name,objective,spend,impressions,clicks,reach,actions";
-  async function fetchAccount(accountId: string) {
+  const fields = "campaign_name,objective,spend,impressions,clicks,reach,actions,action_values";
+  type AccountFetchResult = {
+    rows: ReturnType<typeof normalizeMetaCampaign>[];
+    status: "available" | "unavailable";
+  };
+  async function fetchAccount(accountId: string, accountRole: "sales_acquisition" | "profile_boosts"): Promise<AccountFetchResult> {
+    if (!token) return { rows: [] as ReturnType<typeof normalizeMetaCampaign>[], status: "unavailable" as const };
     try {
-      const url = `https://graph.facebook.com/v19.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&level=campaign&limit=50&access_token=${token}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(6_000) });
-      const data = await res.json();
-      if (data.error) { console.error("Meta API error:", data.error.message); return []; }
-      return data.data || [];
-    } catch (e) { console.error("Meta fetch error:", e); return []; }
+      const rows: any[] = [];
+      let next: string | null = `https://graph.facebook.com/v25.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&level=campaign&limit=100&access_token=${token}`;
+      while (next) {
+        const res = await fetch(next, { signal: AbortSignal.timeout(8_000) });
+        const data: any = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error?.message || `Meta HTTP ${res.status}`);
+        rows.push(...(data.data || []));
+        next = data.paging?.next || null;
+      }
+      return { rows: rows.map(row => normalizeMetaCampaign(row, accountRole)), status: "available" as const };
+    } catch (e) {
+      console.error("Meta fetch error:", e);
+      return { rows: [], status: "unavailable" };
+    }
   }
-  const [campaignData, boostData] = await Promise.all([fetchAccount(mainAccountId), fetchAccount(boostsAccountId)]);
-  function parseInsights(rows: any[]) {
-    return rows.map((r: any) => {
-      const actions = r.actions || [];
-      const gv = (t: string) => Number(actions.find((a: any) => a.action_type === t)?.value || 0);
-      return { name: r.campaign_name, objective: String(r.objective || ""), spend: Number(r.spend || 0), impressions: Number(r.impressions || 0), reach: Number(r.reach || 0), clicks: Number(r.clicks || 0), purchases: gv("purchase"), leads: gv("lead"), registrations: gv("complete_registration"), videoViews: gv("video_view"), postEngagement: gv("post_engagement"), likes: gv("like"), comments: gv("comment"), shares: gv("post"), saves: gv("onsite_conversion.post_save"), cpl: gv("lead") > 0 ? Math.round(Number(r.spend) / gv("lead") * 10) / 10 : 0, cpa: gv("purchase") > 0 ? Math.round(Number(r.spend) / gv("purchase") * 10) / 10 : 0, roas: gv("purchase") > 0 ? Math.round(gv("purchase") * 299 / Number(r.spend) * 10) / 10 : 0 };
-    });
-  }
-  return { campaigns: parseInsights(campaignData), boosts: parseInsights(boostData) };
+  const [main, boosts] = await Promise.all([
+    fetchAccount(mainAccountId, "sales_acquisition"),
+    fetchAccount(boostsAccountId, "profile_boosts"),
+  ]);
+  const statuses = [main.status, boosts.status];
+  const status = statuses.every(value => value === "available")
+    ? "available" as const
+    : statuses.some(value => value === "available") ? "partial" as const : "unavailable" as const;
+  return { campaigns: main.rows || [], boosts: boosts.rows || [], status, fetchedAt: Date.now() };
 }
 
 const BUSINESS_EXPENSE_CATEGORIES = [
@@ -276,10 +297,12 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
     SELECT product,
            COUNT(*) AS purchases,
            SUM(amount_agorot) / 100 AS revenue,
-           SUM(CASE WHEN amount_source = 'grow' THEN 1 ELSE 0 END) AS actualPurchases,
-           SUM(CASE WHEN amount_source = 'estimated' THEN 1 ELSE 0 END) AS estimatedPurchases
+           COUNT(*) AS actualPurchases,
+           0 AS estimatedPurchases
     FROM completed_payments
     WHERE paid_at >= ${startDate} AND paid_at <= ${endDate}
+      AND amount_source = 'grow'
+      AND amount_agorot > 100
     GROUP BY product
     ORDER BY revenue DESC
   `) as any;
@@ -291,11 +314,21 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
     actualPurchases: Number(row.actualPurchases || 0),
     estimatedPurchases: Number(row.estimatedPurchases || 0),
   }));
-  const estimatedTransactionCount = products.reduce((sum, product) => sum + product.estimatedPurchases, 0);
+  const [[estimatedRow]] = await db.execute(sql`
+    SELECT COUNT(*) AS cnt
+    FROM completed_payments
+    WHERE paid_at >= ${startDate} AND paid_at <= ${endDate}
+      AND amount_source = 'estimated'
+  `) as any;
+  const estimatedTransactionCount = Number(estimatedRow?.cnt || 0);
   const since = formatMetaCalendarDate(startDate);
   const until = formatMetaCalendarDate(endDate);
   const meta = await fetchMetaAdsInsights(since, until);
-  const metaSpend = summarizeMetaSpend(meta.campaigns, meta.boosts).totalSpend;
+  if (meta.status !== "available") {
+    throw new TRPCError({ code: "BAD_GATEWAY", message: "Meta Ads spend is unavailable or partial" });
+  }
+  const metaSpendBreakdown = summarizeMetaSpend(meta.campaigns, meta.boosts);
+  const metaSpend = metaSpendBreakdown.totalSpend;
 
   const expenseRows = await db.select().from(businessExpenses).where(and(
     gte(businessExpenses.expenseDate, startDate),
@@ -330,6 +363,7 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
     endDate,
     products,
     ...summary,
+    metaSpendBreakdown,
     expenses: expenseRows.sort((a, b) => b.expenseDate - a.expenseDate),
     recurringItems: recurringRows.map(item => ({
       ...item,
@@ -342,16 +376,16 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
       ),
     })),
     dataQuality: {
-      revenueBasis: "completed_payments: סכום Grow בפועל, עם אומדן מסומן לעסקאות היסטוריות",
+      revenueBasis: "completed_payments: עסקאות Grow מאומתות וסכום החיוב בפועל בלבד",
       metaBasis: process.env.META_ADS_TOKEN ? "Meta Ads API" : "unavailable",
       manualExpenseCount: expenseRows.length,
       recurringItemCount: recurringRows.length,
       estimatedTransactionCount,
-      isComplete: (expenseRows.length > 0 || recurringRows.length > 0) && estimatedTransactionCount === 0,
+      isComplete: false,
       warning: estimatedTransactionCount > 0
-        ? `${estimatedTransactionCount} עסקאות היסטוריות מחושבות לפי מחירון ולא לפי סכום Grow. עסקאות חדשות נשמרות מעתה בסכום ששולם בפועל.`
+        ? `${estimatedTransactionCount} עסקאות היסטוריות משוערות הוחרגו מההכנסה. ההכנסה המוצגת כוללת רק חיובי Grow מאומתים; הרווח חלקי עד להזנת כל ההוצאות.`
         : (expenseRows.length > 0 || recurringRows.length > 0)
-          ? "הדוח כולל הכנסה בפועל, Meta, סעיפים חודשיים והוצאות חד־פעמיות שהוזנו."
+          ? "ההכנסה מבוססת על חיובי Grow מאומתים. ההוצאות כוללות Meta ואת הסעיפים שהוזנו, אך אינן בהכרח הנהלת חשבונות מלאה."
           : "טרם הוזנו הוצאות שכר, ספקים, סליקה, תוכנות ומסים; הרווח המוצג חלקי ואינו רווח חשבונאי סופי.",
     },
   };
@@ -362,14 +396,17 @@ export const dashboardRouter = router({
     .input(z.object({ startDate: z.number(), endDate: z.number() }))
     .query(async ({ ctx, input }) => {
       guardAdmin(ctx);
-      const periodLength = Math.max(1, input.endDate - input.startDate);
-      const previousEnd = input.startDate - 1;
-      const previousStart = previousEnd - periodLength;
+      const previousPeriod = previousComparisonPeriod(input.startDate, input.endDate);
       const [current, previous] = await Promise.all([
         calculateProfitAndLossPeriod(input.startDate, input.endDate),
-        calculateProfitAndLossPeriod(previousStart, previousEnd),
+        calculateProfitAndLossPeriod(previousPeriod.startDate, previousPeriod.endDate),
       ]);
-      return { current, previous };
+      return {
+        current,
+        previous,
+        comparisonBasis: previousPeriod.basis,
+        salesComparisonAvailable: hasVerifiedGrowCoverage(previousPeriod),
+      };
     }),
 
   addBusinessExpense: teamProcedure
@@ -460,19 +497,23 @@ export const dashboardRouter = router({
   // ── Monthly Targets ───────────────────────────────────────────────────────
   monthlyTargets: teamProcedure.query(async ({ ctx }) => {
     guardAdmin(ctx);
-    // Realistic high targets based on actual performance:
-    // Last 30 days: 2069 leads, 373 purchases (279 database + 81 bundle + 8 session + 3 guide + 1 course + 1 coaching)
-    // Revenue: ~279*299 + 81*349 + 8*500 + 3*149 + 1*499 + 1*2900 = ~118K
-    // Target: 20% growth over current performance
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [settings] = await db.select().from(dailyReportSettings).orderBy(desc(dailyReportSettings.id)).limit(1);
+    const databaseSales = settings?.databaseMonthlyMinTarget ?? 350;
+    const bundleSales = settings?.bundleMonthlyTarget ?? 70;
+    const boostSales = settings?.boostMonthlyTarget ?? 90;
+    const reportDate = formatMetaCalendarDate(Date.now());
+    const mediaPlan = getDailyReportMediaPlan(reportDate, settings?.databaseMonthlyBudgetAgorot ?? 1_000_000);
     return {
-      budget: 8000,        // Monthly ad spend target (currently ~5K, push to 8K for growth)
-      leads: 2500,         // Monthly leads target (currently 2069, target +20%)
-      purchases: 450,      // Monthly purchases target (currently 373, target +20%)
-      revenue: 140000,     // Monthly revenue target (currently ~118K, target +20%)
-      databaseSales: 350,  // Database product (currently 279, target +25%)
-      guideSales: 20,      // Guide sales (currently 3, push with funnels)
-      courseSales: 10,     // Course sales (currently 1, push with funnels)
-      coachingSales: 5,    // Coaching clients (currently 1, high value target)
+      budget: mediaPlan.totalMonthlyBudgetAgorot === null ? null : mediaPlan.totalMonthlyBudgetAgorot / 100,
+      leads: settings?.leadMonthlyTarget ?? 2000,
+      purchases: databaseSales + bundleSales + boostSales,
+      revenue: (settings?.revenueMonthlyTargetAgorot ?? 14_000_000) / 100,
+      databaseSales,
+      bundleSales,
+      boostSales,
+      sourceLabel: mediaPlan.basisLabel,
     };
   }),
 
@@ -500,37 +541,40 @@ export const dashboardRouter = router({
       // Per-journey performance
       const [journeyStats] = await db.execute(sql`
         SELECT 
-          journey,
+          journeyKey as journey,
           COUNT(*) as sent,
           SUM(CASE WHEN openCount > 0 THEN 1 ELSE 0 END) as opened,
           SUM(CASE WHEN clickCount > 0 THEN 1 ELSE 0 END) as clicked
         FROM email_log 
         WHERE sentAt >= ${startDate} AND sentAt <= ${endDate} AND sentAt > 0
-        GROUP BY journey ORDER BY sent DESC LIMIT 15
+        GROUP BY journeyKey ORDER BY sent DESC LIMIT 15
       `) as any;
       
       // Per-email-index performance (which email in journey converts best)
       const [indexStats] = await db.execute(sql`
         SELECT 
-          journey, emailIndex,
+          journeyKey as journey, emailIndex,
           COUNT(*) as sent,
           SUM(CASE WHEN openCount > 0 THEN 1 ELSE 0 END) as opened,
           SUM(CASE WHEN clickCount > 0 THEN 1 ELSE 0 END) as clicked
         FROM email_log 
         WHERE sentAt >= ${startDate} AND sentAt <= ${endDate} AND sentAt > 0
-        GROUP BY journey, emailIndex ORDER BY journey, emailIndex LIMIT 50
+        GROUP BY journeyKey, emailIndex ORDER BY journeyKey, emailIndex LIMIT 50
       `) as any;
       
-      // Daily email performance
-      const [dailyEmails] = await db.execute(sql`
-        SELECT 
-          DATE(FROM_UNIXTIME(sentAt/1000)) as day,
-          COUNT(*) as sent,
-          SUM(CASE WHEN openCount > 0 THEN 1 ELSE 0 END) as opened
-        FROM email_log 
+      const [dailyEmailRows] = await db.execute(sql`
+        SELECT sentAt, openCount
+        FROM email_log
         WHERE sentAt >= ${startDate} AND sentAt <= ${endDate} AND sentAt > 0
-        GROUP BY day ORDER BY day
       `) as any;
+      const dailyEmailMap = new Map<string, { sent: number; opened: number }>();
+      for (const row of dailyEmailRows as any[]) {
+        const day = israelDateKey(Number(row.sentAt));
+        const current = dailyEmailMap.get(day) || { sent: 0, opened: 0 };
+        current.sent += 1;
+        current.opened += Number(row.openCount || 0) > 0 ? 1 : 0;
+        dailyEmailMap.set(day, current);
+      }
       
       const totalSent = Number(emailTotals?.totalSent ?? 0);
       const totalOpened = Number(emailTotals?.totalOpened ?? 0);
@@ -560,11 +604,7 @@ export const dashboardRouter = router({
           opened: Number(s.opened),
           clicked: Number(s.clicked),
         })),
-        daily: (dailyEmails as any[]).map((d: any) => ({
-          day: String(d.day),
-          sent: Number(d.sent),
-          opened: Number(d.opened),
-        })),
+        daily: Array.from(dailyEmailMap, ([day, values]) => ({ day, ...values })).sort((a, b) => a.day.localeCompare(b.day)),
       };
     }),
 
@@ -623,14 +663,14 @@ export const dashboardRouter = router({
         GROUP BY eventType ORDER BY cnt DESC
       `) as any;
       
-      // Funnel: page_view → dna_quiz_start → dna_quiz_complete → form_submit (purchase)
+      // Parallel activity counts; these are not an identity-linked funnel.
       const [[funnelData]] = await db.execute(sql`
         SELECT 
           (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'page_view' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as pageViews,
           (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'dna_quiz_start' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as dnaStarts,
           (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'dna_quiz_complete' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as dnaCompletes,
           (SELECT COUNT(*) FROM analytics_events WHERE eventType = 'database_cta' AND createdAt >= ${startDate} AND createdAt <= ${endDate}) as databaseClicks,
-          (SELECT COUNT(*) FROM payment_leads WHERE created_at >= ${startDate} AND created_at <= ${endDate}) as purchases
+          (SELECT COUNT(*) FROM payment_leads WHERE created_at >= ${startDate} AND created_at <= ${endDate}) as paymentStarts
       `) as any;
       
       // Scroll depth distribution
@@ -656,7 +696,7 @@ export const dashboardRouter = router({
           dnaStarts: Number(funnelData?.dnaStarts ?? 0),
           dnaCompletes: Number(funnelData?.dnaCompletes ?? 0),
           databaseClicks: Number(funnelData?.databaseClicks ?? 0),
-          purchases: Number(funnelData?.purchases ?? 0),
+          paymentStarts: Number(funnelData?.paymentStarts ?? 0),
         },
         scrollDepth: (scrollData as any[]).map((s: any) => ({ depth: s.depth, count: Number(s.cnt) })),
       };
@@ -752,9 +792,10 @@ export const dashboardRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { startDate, endDate } = input;
-      const periodLength = endDate - startDate;
-      const prevStart = startDate - periodLength;
-      const prevEnd = startDate - 1;
+      const previousPeriod = previousComparisonPeriod(startDate, endDate);
+      const salesComparisonAvailable = hasVerifiedGrowCoverage(previousPeriod);
+      const prevStart = previousPeriod.startDate;
+      const prevEnd = previousPeriod.endDate;
       
       // Current period
       const [[curr]] = await db.execute(sql`
@@ -797,6 +838,9 @@ export const dashboardRouter = router({
       const revenueCurr = currentPayments.revenue;
       const revenuePrev = previousPayments.revenue;
       const productSales = currentPayments.productSales;
+      const trackedTargetPurchases = (productSales.database || 0)
+        + (productSales.bundle_new_year || 0)
+        + (productSales.match_boost || 0);
       
       // Lead journey attribution: leads from campaigns that converted
       const [journeyAttribution] = await db.execute(sql`
@@ -831,26 +875,18 @@ export const dashboardRouter = router({
       }
       
       return {
-        current: { leads, purchases, revenue: revenueCurr, dna, conversionRate: leads > 0 ? Math.round(purchases / leads * 1000) / 10 : 0 },
+        current: { leads, purchases, trackedTargetPurchases, revenue: revenueCurr, dna },
         previous: { leads: prevLeads, purchases: prevPurchases, revenue: revenuePrev, dna: prevDna },
-        change: { 
+        change: {
           leads: pctChange(leads, prevLeads), 
-          purchases: pctChange(purchases, prevPurchases), 
-          revenue: pctChange(revenueCurr, revenuePrev),
+          purchases: salesComparisonAvailable ? pctChange(purchases, prevPurchases) : null,
+          revenue: salesComparisonAvailable ? pctChange(revenueCurr, revenuePrev) : null,
           dna: pctChange(dna, prevDna),
         },
         productSales,
+        comparisonBasis: previousPeriod.basis,
+        salesComparisonAvailable,
         journeyAttribution: aggregateJourneyAttribution(journeyAttribution as any[]),
-        // Industry benchmarks
-        benchmarks: {
-          emailOpenRate: 21.5,    // Email marketing industry avg
-          emailClickRate: 2.3,    // Industry avg
-          metaCPL: 15,            // Meta Ads avg CPL in Israel (services)
-          metaCPA: 80,            // Meta Ads avg CPA in Israel
-          metaROAS: 3.0,          // Healthy ROAS benchmark
-          conversionRate: 3.5,    // Lead-to-purchase avg for info products
-          igEngagement: 3.5,      // IG engagement rate benchmark
-        },
       };
     }),
 
@@ -867,13 +903,15 @@ export const dashboardRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { startDate, endDate } = input;
 
-      // Daily leads
-      const [leadRows] = await db.execute(sql`
-        SELECT FROM_UNIXTIME(createdAt/1000, '%Y-%m-%d') as day, COUNT(*) as cnt
-        FROM crm_leads
-        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}
-        GROUP BY day ORDER BY day ASC
-      `) as any;
+      const leadRows = await db.select({ createdAt: crmLeads.createdAt }).from(crmLeads).where(and(
+        gte(crmLeads.createdAt, startDate),
+        lte(crmLeads.createdAt, endDate),
+      ));
+      const leadDays = new Map<string, number>();
+      for (const row of leadRows) {
+        const day = israelDateKey(Number(row.createdAt));
+        leadDays.set(day, (leadDays.get(day) || 0) + 1);
+      }
 
       const verifiedPayments = await db.select({
         product: completedPayments.product,
@@ -888,7 +926,7 @@ export const dashboardRouter = router({
       const dailyPayments = aggregateVerifiedGrowPayments(verifiedPayments);
 
       return {
-        leads: (leadRows as any[]).map((r: any) => ({ day: r.day, count: Number(r.cnt) })),
+        leads: Array.from(leadDays, ([day, count]) => ({ day, count })).sort((a, b) => a.day.localeCompare(b.day)),
         revenue: dailyPayments.map(day => ({ day: day.date, amount: day.revenue })),
         purchases: dailyPayments.map(day => ({ day: day.date, count: day.purchases })),
       };
@@ -906,10 +944,11 @@ export const dashboardRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { startDate, endDate } = input;
 
-      // Same period last month for comparison
-      const periodLength = endDate - startDate;
-      const sameLastMonthStart = startDate - 30 * 24 * 60 * 60 * 1000;
-      const sameLastMonthEnd = sameLastMonthStart + periodLength;
+      // Month-to-date uses the same dates in the previous month; other ranges use the immediately preceding equal period.
+      const previousPeriod = previousComparisonPeriod(startDate, endDate);
+      const salesComparisonAvailable = hasVerifiedGrowCoverage(previousPeriod);
+      const sameLastMonthStart = previousPeriod.startDate;
+      const sameLastMonthEnd = previousPeriod.endDate;
 
       // Leads by source/campaign
       const [leadRows] = await db.execute(sql`
@@ -924,32 +963,33 @@ export const dashboardRouter = router({
         ORDER BY leads DESC
       `) as any;
 
-      // Verified Grow purchases by source/campaign (join latest CRM lead to get UTM)
+      // Verified Grow purchases by source/campaign, using the latest lead that existed before payment.
       const [purchaseRows] = await db.execute(sql`
         SELECT 
-          COALESCE(cl.utmSource, cl.source, 'direct') as channel,
-          cl.utmMedium as medium,
-          cl.utmCampaign as campaign,
-          cp.product,
+          COALESCE(attributed.utmSource, attributed.source, 'direct') as channel,
+          attributed.utmMedium as medium,
+          attributed.utmCampaign as campaign,
+          attributed.product,
           COUNT(*) as purchases,
-          SUM(cp.amount_agorot) / 100 as revenue
-        FROM completed_payments cp
-        LEFT JOIN (
-          SELECT currentLead.*
-          FROM crm_leads currentLead
-          INNER JOIN (
-            SELECT LOWER(TRIM(email)) AS normalizedEmail, MAX(id) AS latestId
-            FROM crm_leads
-            GROUP BY LOWER(TRIM(email))
-          ) latestLead ON currentLead.id = latestLead.latestId
-        ) cl ON LOWER(TRIM(cl.email)) = LOWER(TRIM(cp.email))
-        WHERE cp.paid_at >= ${startDate} AND cp.paid_at <= ${endDate}
-          AND cp.amount_source = 'grow'
-        GROUP BY channel, medium, campaign, cp.product
+          SUM(attributed.amount_agorot) / 100 as revenue
+        FROM (
+          SELECT cp.id, cp.product, cp.amount_agorot,
+                 cl.utmSource, cl.source, cl.utmMedium, cl.utmCampaign,
+                 ROW_NUMBER() OVER (PARTITION BY cp.id ORDER BY cl.createdAt DESC, cl.id DESC) AS leadRank
+          FROM completed_payments cp
+          LEFT JOIN crm_leads cl
+            ON LOWER(TRIM(cl.email)) = LOWER(TRIM(cp.email))
+            AND cl.createdAt <= cp.paid_at
+          WHERE cp.paid_at >= ${startDate} AND cp.paid_at <= ${endDate}
+            AND cp.amount_source = 'grow'
+            AND cp.amount_agorot > 100
+        ) attributed
+        WHERE attributed.leadRank = 1
+        GROUP BY channel, medium, campaign, attributed.product
         ORDER BY purchases DESC
       `) as any;
 
-      // Previous period leads by channel (same period last month)
+      // Previous equal period leads by channel.
       const [prevLeadRows] = await db.execute(sql`
         SELECT 
           COALESCE(utmSource, source, 'direct') as channel,
@@ -963,24 +1003,25 @@ export const dashboardRouter = router({
       // Previous period verified Grow purchases by channel
       const [prevPurchaseRows] = await db.execute(sql`
         SELECT 
-          COALESCE(cl.utmSource, cl.source, 'direct') as channel,
-          cl.utmMedium as medium,
-          cp.product,
+          COALESCE(attributed.utmSource, attributed.source, 'direct') as channel,
+          attributed.utmMedium as medium,
+          attributed.product,
           COUNT(*) as purchases,
-          SUM(cp.amount_agorot) / 100 as revenue
-        FROM completed_payments cp
-        LEFT JOIN (
-          SELECT previousLead.*
-          FROM crm_leads previousLead
-          INNER JOIN (
-            SELECT LOWER(TRIM(email)) AS normalizedEmail, MAX(id) AS latestId
-            FROM crm_leads
-            GROUP BY LOWER(TRIM(email))
-          ) latestLead ON previousLead.id = latestLead.latestId
-        ) cl ON LOWER(TRIM(cl.email)) = LOWER(TRIM(cp.email))
-        WHERE cp.paid_at >= ${sameLastMonthStart} AND cp.paid_at <= ${sameLastMonthEnd}
-          AND cp.amount_source = 'grow'
-        GROUP BY channel, medium, cp.product
+          SUM(attributed.amount_agorot) / 100 as revenue
+        FROM (
+          SELECT cp.id, cp.product, cp.amount_agorot,
+                 cl.utmSource, cl.source, cl.utmMedium,
+                 ROW_NUMBER() OVER (PARTITION BY cp.id ORDER BY cl.createdAt DESC, cl.id DESC) AS leadRank
+          FROM completed_payments cp
+          LEFT JOIN crm_leads cl
+            ON LOWER(TRIM(cl.email)) = LOWER(TRIM(cp.email))
+            AND cl.createdAt <= cp.paid_at
+          WHERE cp.paid_at >= ${sameLastMonthStart} AND cp.paid_at <= ${sameLastMonthEnd}
+            AND cp.amount_source = 'grow'
+            AND cp.amount_agorot > 100
+        ) attributed
+        WHERE attributed.leadRank = 1
+        GROUP BY channel, medium, attributed.product
       `) as any;
 
       // Build previous period channel totals
@@ -1031,19 +1072,23 @@ export const dashboardRouter = router({
       
       let metaSpend = 0;
       let prevMetaSpend = 0;
+      let metaSpendAvailable = false;
       try {
         const metaData = await fetchMetaAdsInsights(sinceStr, untilStr);
-        metaSpend = summarizeMetaSpend(metaData.campaigns, metaData.boosts).totalSpend;
+        metaSpend = summarizeMetaSpend(metaData.campaigns, metaData.boosts).mainSpend;
         const prevMetaData = await fetchMetaAdsInsights(prevSinceStr, prevUntilStr);
-        prevMetaSpend = summarizeMetaSpend(prevMetaData.campaigns, prevMetaData.boosts).totalSpend;
+        prevMetaSpend = summarizeMetaSpend(prevMetaData.campaigns, prevMetaData.boosts).mainSpend;
+        metaSpendAvailable = metaData.status === "available" && prevMetaData.status === "available";
       } catch (e) { /* ignore meta errors */ }
 
       return Object.entries(channelData)
         .map(([channel, data]) => ({
           channel,
           ...data,
-          spend: channel === "Meta Ads (ממומן)" ? Math.round(metaSpend) : 0,
-          prevSpend: channel === "Meta Ads (ממומן)" ? Math.round(prevMetaSpend) : 0,
+          spend: channel === "Meta Ads (ממומן)" && metaSpendAvailable ? Math.round(metaSpend) : null,
+          prevSpend: channel === "Meta Ads (ממומן)" && metaSpendAvailable ? Math.round(prevMetaSpend) : null,
+          metaSpendAvailable,
+          salesComparisonAvailable,
           prevLeads: prevChannelData[channel]?.leads ?? 0,
           prevPurchases: prevChannelData[channel]?.purchases ?? 0,
           prevRevenue: prevChannelData[channel]?.revenue ?? 0,
@@ -1336,13 +1381,31 @@ export const dashboardRouter = router({
       const totalSpend = accountTotals.totalSpend;
       const totalPurchases = metaData.campaigns.reduce((s, c) => s + c.purchases, 0);
       const totalLeads = metaData.campaigns.reduce((s, c) => s + c.leads, 0);
+      const purchaseValues = metaData.campaigns.map(c => c.purchaseValue).filter((value): value is number => value !== null);
+      const totalPurchaseValue = purchaseValues.length > 0 ? purchaseValues.reduce((sum, value) => sum + value, 0) : null;
       const totalImpressions = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.impressions, 0);
       const totalReach = [...metaData.campaigns, ...metaData.boosts].reduce((s, c) => s + c.reach, 0);
       return {
+        status: metaData.status,
+        fetchedAt: metaData.fetchedAt,
         campaigns: metaData.campaigns.sort((a, b) => b.spend - a.spend),
         boosts: metaData.boosts.sort((a, b) => b.spend - a.spend),
         accountTotals,
-        totals: { spend: totalSpend, purchases: totalPurchases, leads: totalLeads, impressions: totalImpressions, reach: totalReach, avgCPA: totalPurchases > 0 ? Math.round(totalSpend / totalPurchases) : 0, avgCPL: totalLeads > 0 ? Math.round(totalSpend / totalLeads * 10) / 10 : 0, roas: totalSpend > 0 ? Math.round(totalPurchases * 299 / totalSpend * 10) / 10 : 0, revenue: totalPurchases * 299 },
+        totals: {
+          totalPaidMediaSpend: totalSpend,
+          acquisitionSpend: accountTotals.mainSpend,
+          profileBoostSpend: accountTotals.boostsSpend,
+          metaReportedPurchases: totalPurchases,
+          metaReportedLeads: totalLeads,
+          metaReportedPurchaseValue: totalPurchaseValue,
+          impressions: totalImpressions,
+          reach: totalReach,
+          metaReportedPurchaseCpa: totalPurchases > 0 ? Math.round(accountTotals.mainSpend / totalPurchases * 100) / 100 : null,
+          metaReportedCpl: totalLeads > 0 ? Math.round(accountTotals.mainSpend / totalLeads * 100) / 100 : null,
+          metaReportedPurchaseValueRoas: totalPurchaseValue !== null && accountTotals.mainSpend > 0
+            ? Math.round(totalPurchaseValue / accountTotals.mainSpend * 100) / 100
+            : null,
+        },
         boostsTotals: { spend: metaData.boosts.reduce((s, c) => s + c.spend, 0), impressions: metaData.boosts.reduce((s, c) => s + c.impressions, 0), reach: metaData.boosts.reduce((s, c) => s + c.reach, 0), clicks: metaData.boosts.reduce((s, c) => s + c.clicks, 0), engagement: metaData.boosts.reduce((s, c) => s + c.postEngagement, 0), likes: metaData.boosts.reduce((s, c) => s + c.likes, 0), comments: metaData.boosts.reduce((s, c) => s + c.comments, 0), shares: metaData.boosts.reduce((s, c) => s + c.shares, 0), saves: metaData.boosts.reduce((s, c) => s + c.saves, 0), videoViews: metaData.boosts.reduce((s, c) => s + c.videoViews, 0) },
       };
     }),
@@ -1435,26 +1498,43 @@ export const dashboardRouter = router({
     
     // This week's KPIs
     const [[leadRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM crm_leads WHERE createdAt >= ${weekAgo}`) as any;
-    const [[purchaseRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${weekAgo}`) as any;
-    const [revenueRows] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${weekAgo} GROUP BY product`) as any;
+    const currentPaymentRows = await db.select({
+      product: completedPayments.product,
+      amountAgorot: completedPayments.amountAgorot,
+      amountSource: completedPayments.amountSource,
+      paidAt: completedPayments.paidAt,
+    }).from(completedPayments).where(and(
+      gte(completedPayments.paidAt, weekAgo),
+      lte(completedPayments.paidAt, now),
+      eq(completedPayments.amountSource, "grow"),
+    ));
     
     // Previous week for comparison
     const [[prevLeadRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM crm_leads WHERE createdAt >= ${twoWeeksAgo} AND createdAt < ${weekAgo}`) as any;
-    const [[prevPurchaseRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${twoWeeksAgo} AND created_at < ${weekAgo}`) as any;
-    
-    let revenue = 0;
-    const productBreakdown: { product: string; count: number; revenue: number }[] = [];
-    for (const row of (revenueRows as any[])) {
-      const cnt = Number(row.cnt);
-      const rev = cnt * (PRODUCT_PRICES[row.product] ?? 0);
-      revenue += rev;
-      productBreakdown.push({ product: row.product, count: cnt, revenue: rev });
-    }
+    const previousPaymentRows = await db.select({
+      product: completedPayments.product,
+      amountAgorot: completedPayments.amountAgorot,
+      amountSource: completedPayments.amountSource,
+      paidAt: completedPayments.paidAt,
+    }).from(completedPayments).where(and(
+      gte(completedPayments.paidAt, twoWeeksAgo),
+      lte(completedPayments.paidAt, weekAgo - 1),
+      eq(completedPayments.amountSource, "grow"),
+    ));
+
+    const currentPaymentSummary = summarizeVerifiedGrowPayments(currentPaymentRows);
+    const previousPaymentSummary = summarizeVerifiedGrowPayments(previousPaymentRows);
+    const productBreakdown = Object.entries(currentPaymentSummary.productSales).map(([product, count]) => ({
+      product,
+      count,
+      revenue: currentPaymentRows.filter(row => row.product === product).reduce((sum, row) => sum + row.amountAgorot / 100, 0),
+    }));
     
     const leads = Number(leadRow?.cnt ?? 0);
-    const purchases = Number(purchaseRow?.cnt ?? 0);
+    const purchases = currentPaymentSummary.purchases;
+    const revenue = currentPaymentSummary.revenue;
     const prevLeads = Number(prevLeadRow?.cnt ?? 0);
-    const prevPurchases = Number(prevPurchaseRow?.cnt ?? 0);
+    const prevPurchases = previousPaymentSummary.purchases;
     
     // Meta Ads data
     const since = formatMetaCalendarDate(weekAgo);
@@ -1465,11 +1545,11 @@ export const dashboardRouter = router({
     // Top campaigns
     const topCampaigns = metaData.campaigns
       .filter(c => c.spend > 0)
-      .sort((a, b) => (b.purchases * 299 - b.spend) - (a.purchases * 299 - a.spend))
+      .sort((a, b) => ((b.purchaseValue || 0) - b.spend) - ((a.purchaseValue || 0) - a.spend))
       .slice(0, 5);
     
     // Winning (high ROAS) and losing (high spend, no conversions) campaigns
-    const winners = metaData.campaigns.filter(c => c.roas >= 2 && c.purchases > 0);
+    const winners = metaData.campaigns.filter(c => (c.metaReportedRoas || 0) >= 2 && c.purchases > 0);
     const losers = metaData.campaigns.filter(c => c.spend > 50 && c.purchases === 0 && c.leads < 3);
     
     // Social insights
@@ -1477,7 +1557,7 @@ export const dashboardRouter = router({
     
     return {
       period: { start: weekAgo, end: now },
-      kpis: { leads, purchases, revenue, spend: totalSpend, roas: totalSpend > 0 ? Math.round(revenue / totalSpend * 10) / 10 : 0 },
+      kpis: { leads, purchases, revenue, spend: totalSpend, blendedRevenueToSpend: totalSpend > 0 ? Math.round(revenue / totalSpend * 10) / 10 : null, attribution: "not_attributed" as const },
       comparison: { 
         leadsChange: prevLeads > 0 ? Math.round((leads - prevLeads) / prevLeads * 100) : 0,
         purchasesChange: prevPurchases > 0 ? Math.round((purchases - prevPurchases) / prevPurchases * 100) : 0,
@@ -1665,23 +1745,13 @@ export const dashboardRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { startDate, endDate } = input;
 
-      // Daily leads with campaign breakdown
-      // Simple daily total leads
-      const [dailyLeadsTotal] = await db.execute(sql`
-        SELECT DATE(FROM_UNIXTIME(createdAt/1000)) as day, COUNT(*) as total_leads
-        FROM crm_leads 
-        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}
-        GROUP BY day ORDER BY day DESC
-      `) as any;
-
-      // Campaign leads (dna_quiz source = campaign leads)
-      const [dailyCampaignLeads] = await db.execute(sql`
-        SELECT DATE(FROM_UNIXTIME(createdAt/1000)) as day, COUNT(*) as campaign_leads
-        FROM crm_leads 
-        WHERE createdAt >= ${startDate} AND createdAt <= ${endDate}
-          AND source = 'dna_quiz'
-        GROUP BY day ORDER BY day DESC
-      `) as any;
+      const leadRows = await db.select({
+        createdAt: crmLeads.createdAt,
+        source: crmLeads.source,
+      }).from(crmLeads).where(and(
+        gte(crmLeads.createdAt, startDate),
+        lte(crmLeads.createdAt, endDate),
+      ));
 
       const verifiedPayments = await db.select({
         product: completedPayments.product,
@@ -1727,11 +1797,14 @@ export const dashboardRouter = router({
       const dbPurchaseMap = Object.fromEntries(dailyPayments.map(day => [day.date, day.databasePurchases]));
       const revenueMap = Object.fromEntries(dailyPayments.map(day => [day.date, day.revenue]));
       const campaignMap: Record<string, number> = {};
-      (dailyCampaignLeads as any[]).forEach((l: any) => { campaignMap[String(l.day).substring(0, 10)] = Number(l.campaign_leads); });
+      const totalLeadMap: Record<string, number> = {};
+      for (const lead of leadRows) {
+        const day = israelDateKey(Number(lead.createdAt));
+        totalLeadMap[day] = (totalLeadMap[day] || 0) + 1;
+        if (lead.source === "dna_quiz") campaignMap[day] = (campaignMap[day] || 0) + 1;
+      }
 
       // Build days array
-      const totalLeadMap: Record<string, number> = {};
-      (dailyLeadsTotal as any[]).forEach((l: any) => { totalLeadMap[String(l.day).substring(0, 10)] = Number(l.total_leads); });
       const dayKeys = Array.from(new Set([...Object.keys(totalLeadMap), ...dailyPayments.map(day => day.date)]))
         .sort((a, b) => b.localeCompare(a));
       const days = dayKeys.map(dayKey => {
@@ -1747,7 +1820,7 @@ export const dashboardRouter = router({
           totalPurchases: totalPurch,
           databasePurchases: dbPurch,
           revenue: revenueMap[dayKey] || 0,
-          conversionRate: campLeads > 0 ? Number(((dbPurch / campLeads) * 100).toFixed(1)) : 0,
+          databaseRevenue: dailyPayments.find(paymentDay => paymentDay.date === dayKey)?.databaseRevenue || 0,
         };
       });
 
@@ -1755,6 +1828,7 @@ export const dashboardRouter = router({
       const totalLeads = days.reduce((s, d) => s + d.totalLeads, 0);
       const totalCampaign = days.reduce((s, d) => s + d.campaignLeads, 0);
       const totalPurch = days.reduce((s, d) => s + d.databasePurchases, 0);
+      const totalDatabaseRevenue = days.reduce((s, d) => s + d.databaseRevenue, 0);
       const totalRevenue = days.reduce((s, d) => s + d.revenue, 0);
 
       // Insights
@@ -1773,53 +1847,65 @@ export const dashboardRouter = router({
         insights.push(`ימים חזקים ללידים: ${topDays.map((d: any) => dayNames[d.dow] || d.dow).join(', ')}`);
       }
 
-      // Conversion insight
-      const avgConv = totalCampaign > 0 ? ((totalPurch / totalCampaign) * 100).toFixed(1) : '0';
-      insights.push(`המרה ממוצעת: ${avgConv}% (${totalPurch} רכישות מ-${totalCampaign} לידים)`);
       insights.push(`ממוצע יומי: ${Math.round(totalCampaign / Math.max(days.length, 1))} לידים, ${Math.round(totalPurch / Math.max(days.length, 1))} רכישות`);
-
-      // Best conversion day
-      const bestDay = [...days].sort((a, b) => b.conversionRate - a.conversionRate)[0];
-      if (bestDay && bestDay.conversionRate > 0) {
-        insights.push(`יום עם ההמרה הגבוהה ביותר: ${new Date(bestDay.date).toLocaleDateString('he-IL')} (${bestDay.conversionRate}%)`);
-      }
 
       // Try to get Meta spend for the period
       let totalSpend = 0;
-      let dailySpendMap: Record<string, number> = {};
+      let totalSalesSpend = 0;
+      let totalProfileBoostSpend = 0;
+      let metaSpendStatus: "available" | "unavailable" = "unavailable";
+      const dailySalesSpendMap: Record<string, number> = {};
+      const dailyProfileBoostSpendMap: Record<string, number> = {};
       let prevTotalLeads = 0;
       let prevTotalPurch = 0;
       let prevTotalRevenue = 0;
       try {
         const metaToken = process.env.META_ADS_TOKEN;
         if (metaToken) {
-          const startDateStr = new Date(startDate).toISOString().split('T')[0];
-          const endDateStr = new Date(endDate).toISOString().split('T')[0];
+          const startDateStr = formatMetaCalendarDate(startDate);
+          const endDateStr = formatMetaCalendarDate(endDate);
           const mainAccountId = "act_254697595735216";
           const boostsAccountId = "act_3841144459522772";
+          const fetchAllDailySpend = async (accountId: string) => {
+            const rows: any[] = [];
+            let next: string | null = `https://graph.facebook.com/v25.0/${accountId}/insights?fields=spend&time_range={"since":"${startDateStr}","until":"${endDateStr}"}&time_increment=1&limit=100&access_token=${metaToken}`;
+            while (next) {
+              const response = await fetch(next, { signal: AbortSignal.timeout(8_000) });
+              const payload: any = await response.json();
+              if (!response.ok || payload.error) throw new Error(payload.error?.message || `Meta HTTP ${response.status}`);
+              rows.push(...(payload.data || []));
+              next = payload.paging?.next || null;
+            }
+            return rows;
+          };
           // Fetch daily spend from both accounts
-          const [mainRes, boostRes] = await Promise.all([
-            fetch(`https://graph.facebook.com/v19.0/${mainAccountId}/insights?fields=spend&time_range={"since":"${startDateStr}","until":"${endDateStr}"}&time_increment=1&limit=60&access_token=${metaToken}`).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
-            fetch(`https://graph.facebook.com/v19.0/${boostsAccountId}/insights?fields=spend&time_range={"since":"${startDateStr}","until":"${endDateStr}"}&time_increment=1&limit=60&access_token=${metaToken}`).then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
+          const [mainRows, boostRows] = await Promise.all([
+            fetchAllDailySpend(mainAccountId),
+            fetchAllDailySpend(boostsAccountId),
           ]);
-          for (const row of (mainRes.data || [])) {
+          for (const row of mainRows) {
             const day = row.date_start;
-            dailySpendMap[day] = (dailySpendMap[day] || 0) + parseFloat(row.spend || 0);
-            totalSpend += parseFloat(row.spend || 0);
+            const spend = parseFloat(row.spend || 0);
+            dailySalesSpendMap[day] = (dailySalesSpendMap[day] || 0) + spend;
+            totalSalesSpend += spend;
           }
-          for (const row of (boostRes.data || [])) {
+          for (const row of boostRows) {
             const day = row.date_start;
-            dailySpendMap[day] = (dailySpendMap[day] || 0) + parseFloat(row.spend || 0);
-            totalSpend += parseFloat(row.spend || 0);
+            const spend = parseFloat(row.spend || 0);
+            dailyProfileBoostSpendMap[day] = (dailyProfileBoostSpendMap[day] || 0) + spend;
+            totalProfileBoostSpend += spend;
           }
+          totalSpend = totalSalesSpend + totalProfileBoostSpend;
+          metaSpendStatus = "available";
         }
       } catch (e) { /* ignore */ }
 
       // Fetch previous period for comparison
+      const previousPeriod = previousComparisonPeriod(startDate, endDate);
+      const salesComparisonAvailable = hasVerifiedGrowCoverage(previousPeriod);
       try {
-        const periodLength = endDate - startDate;
-        const prevStart = startDate - periodLength;
-        const prevEnd = startDate;
+        const prevStart = previousPeriod.startDate;
+        const prevEnd = previousPeriod.endDate;
         const [prevLeadRows] = await db.execute(sql`
           SELECT COUNT(*) as cnt FROM crm_leads
           WHERE createdAt >= ${prevStart} AND createdAt <= ${prevEnd} AND source = 'dna_quiz'
@@ -1840,29 +1926,35 @@ export const dashboardRouter = router({
         prevTotalRevenue = previousSummary.revenue;
       } catch (e) { /* ignore */ }
 
-      // Add spend to each day
-      for (const day of days) {
-        (day as any).spend = Math.round(dailySpendMap[day.date] || 0);
-      }
+      const daysWithSpend = days.map(day => ({
+        ...day,
+        salesSpend: Math.round((dailySalesSpendMap[day.date] || 0) * 100) / 100,
+        profileBoostSpend: Math.round((dailyProfileBoostSpendMap[day.date] || 0) * 100) / 100,
+        totalPaidMediaSpend: Math.round(((dailySalesSpendMap[day.date] || 0) + (dailyProfileBoostSpendMap[day.date] || 0)) * 100) / 100,
+      }));
 
       return {
-        days,
+        days: daysWithSpend,
         totals: {
           totalLeads,
           totalCampaign,
           totalPurchases: totalPurch,
+          totalDatabaseRevenue,
           totalRevenue,
           totalSpend,
-          roas: totalSpend > 0 ? Number((totalRevenue / totalSpend).toFixed(1)) : 0,
-          avgConversionRate: Number(avgConv),
+          totalSalesSpend,
+          totalProfileBoostSpend,
+          metaSpendStatus,
           avgDailyLeads: Math.round(totalCampaign / Math.max(days.length, 1)),
           avgDailyPurchases: Math.round(totalPurch / Math.max(days.length, 1)),
           prevTotalLeads,
           prevTotalPurch,
           prevTotalRevenue,
           leadsChange: prevTotalLeads > 0 ? Number((((totalCampaign - prevTotalLeads) / prevTotalLeads) * 100).toFixed(0)) : 0,
-          purchChange: prevTotalPurch > 0 ? Number((((totalPurch - prevTotalPurch) / prevTotalPurch) * 100).toFixed(0)) : 0,
-          revenueChange: prevTotalRevenue > 0 ? Number((((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100).toFixed(0)) : 0,
+          purchChange: salesComparisonAvailable && prevTotalPurch > 0 ? Number((((totalPurch - prevTotalPurch) / prevTotalPurch) * 100).toFixed(0)) : null,
+          revenueChange: salesComparisonAvailable && prevTotalRevenue > 0 ? Number((((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100).toFixed(0)) : null,
+          comparisonBasis: previousPeriod.basis,
+          salesComparisonAvailable,
         },
        insights,
      };

@@ -7,7 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProfitAndLossSection } from "@/components/ProfitAndLossSection";
 import {
   formatIsraelCalendarDate,
+  formatIsraelDateRange,
   getCurrentIsraelMonthStart,
+  getIsraelCalendarDaysStart,
+  endOfIsraelCalendarDate,
   parseIsraelCalendarDate,
 } from "@/lib/dashboardDateRange";
 import {
@@ -32,6 +35,10 @@ function fmt(n: number) { return `₪${Math.round(n).toLocaleString("he-IL")}`; 
 function fmtPct(n: number) { return `${n.toFixed(1)}%`; }
 function fmtDate(ts: number) { return new Date(ts).toLocaleDateString("he-IL", { day: "numeric", month: "short" }); }
 function fmtDateTime(ts: number) { return new Date(ts).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }); }
+function pctDelta(current: number, previous: number) {
+  if (previous <= 0) return 0;
+  return Math.round(((current - previous) / previous) * 100);
+}
 
 const PAYMENT_ATTEMPT_LABELS: Record<string, { label: string; className: string }> = {
   sandbox_plus: { label: "ניסוי Plus", className: "bg-slate-100 text-slate-700" },
@@ -42,8 +49,8 @@ const PAYMENT_ATTEMPT_LABELS: Record<string, { label: string; className: string 
   abandoned_without_recovery: { label: "טרם טופל", className: "bg-orange-100 text-orange-800" },
 };
 
-function Change({ value, suffix = "%" }: { value: number; suffix?: string }) {
-  if (value === 0) return null;
+function Change({ value, suffix = "%" }: { value: number | null | undefined; suffix?: string }) {
+  if (value == null || value === 0) return null;
   const positive = value > 0;
   return (
     <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${positive ? 'text-green-600' : 'text-red-500'}`}>
@@ -80,19 +87,20 @@ export default function Dashboard() {
   const [useCustom, setUseCustom] = useState(false);
 
   const endDate = useMemo(() => {
-    if (useCustom && customEnd) return fromDateStr(customEnd) + 86400000 - 1;
+    if (useCustom && customEnd) return endOfIsraelCalendarDate(customEnd);
     return Date.now();
   }, [useCustom, customEnd]);
   const startDate = useMemo(() => {
     if (useCustom && customStart) return fromDateStr(customStart);
     const selected = PRESETS[preset];
-    return selected.days == null ? getCurrentIsraelMonthStart() : Date.now() - selected.days * 24 * 60 * 60 * 1000;
+    return selected.days == null ? getCurrentIsraelMonthStart() : getIsraelCalendarDaysStart(selected.days);
   }, [useCustom, customStart, preset]);
 
-  const dateInput = { startDate, endDate };
+  const dateInput = useMemo(() => ({ startDate, endDate }), [startDate, endDate]);
+  const rangeLabel = useMemo(() => formatIsraelDateRange(startDate, endDate), [startDate, endDate]);
+  const showMonthlyTargets = !useCustom && preset === 0;
 
   const comp = trpc.dashboard.overviewWithComparison.useQuery(dateInput);
-  const overview = trpc.dashboard.overview.useQuery(dateInput);
   const targets = trpc.dashboard.monthlyTargets.useQuery();
   const channels = trpc.dashboard.channelBreakdown.useQuery(dateInput);
   const metaAds = trpc.dashboard.metaAdsPerformance.useQuery(dateInput);
@@ -112,7 +120,13 @@ export default function Dashboard() {
   const isLoading = comp.isLoading;
   const t = targets.data;
   const c = comp.data;
-  const b = c?.benchmarks;
+  const comparisonLabel = c?.comparisonBasis === "same_dates_previous_month"
+    ? "אותם תאריכים בחודש הקודם"
+    : "התקופה הקודמת באותו אורך, ללא חפיפה";
+  const attributedCampaigns = useMemo(() => (channels.data || [])
+    .flatMap((channel: any) => (channel.campaigns || []).map((campaign: any) => ({ ...campaign, channel: channel.channel })))
+    .filter((campaign: any) => campaign.leads > 0 || campaign.purchases > 0)
+    .sort((a: any, b: any) => b.purchases - a.purchases || b.revenue - a.revenue || b.leads - a.leads), [channels.data]);
 
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
@@ -155,6 +169,11 @@ export default function Dashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-5 space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[11px] text-blue-900">
+          <span><strong>טווח:</strong> {rangeLabel}, שעון ישראל</span>
+          <span>השוואה: {comparisonLabel}</span>
+          {c && !c.salesComparisonAvailable && <span className="font-semibold text-amber-800">השוואת לידים זמינה; השוואת Grow אינה מלאה לפני 22.8 ולכן אחוזי מכירות והכנסה אינם מוצגים.</span>}
+        </div>
 
         {/* ═══════════════════════════════════════════════════════════════════════
             SECTION 1: TOP KPIs — THE BIG PICTURE
@@ -168,56 +187,60 @@ export default function Dashboard() {
               <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-green-500">
                 <div className="flex items-center gap-2 mb-1">
                   <DollarSign size={14} className="text-green-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">מכירות ברוטו</span>
+                  <span className="text-[11px] text-gray-500 font-medium">הכנסות ברוטו · Grow מאומת</span>
                 </div>
                 <div className="text-2xl font-black text-gray-900">{fmt(c.current.revenue)}</div>
                 <Change value={c.change.revenue} />
-                {t && <div className="mt-1 w-full bg-gray-100 rounded-full h-1.5"><div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${Math.min((c.current.revenue / t.revenue) * 100, 100)}%` }} /></div>}
-                {t && <div className="text-[9px] text-gray-400 mt-0.5">יעד: {fmt(t.revenue)}</div>}
+                {showMonthlyTargets && t && <div className="mt-1 w-full bg-gray-100 rounded-full h-1.5"><div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${Math.min((c.current.revenue / t.revenue) * 100, 100)}%` }} /></div>}
+                {showMonthlyTargets && t && <div className="text-[9px] text-gray-400 mt-0.5">יעד חודשי: {fmt(t.revenue)}</div>}
               </div>
               {/* Purchases */}
               <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-purple-500">
                 <div className="flex items-center gap-2 mb-1">
                   <ShoppingCart size={14} className="text-purple-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">רכישות</span>
+                  <span className="text-[11px] text-gray-500 font-medium">רכישות · Grow מאומת</span>
                 </div>
                 <div className="text-2xl font-black text-gray-900">{c.current.purchases}</div>
                 <Change value={c.change.purchases} />
-                {t && <div className="mt-1 w-full bg-gray-100 rounded-full h-1.5"><div className="h-full rounded-full bg-purple-500 transition-all" style={{ width: `${Math.min((c.current.purchases / t.purchases) * 100, 100)}%` }} /></div>}
+                {showMonthlyTargets && t && <div className="mt-1 w-full bg-gray-100 rounded-full h-1.5"><div className="h-full rounded-full bg-purple-500 transition-all" style={{ width: `${Math.min((c.current.trackedTargetPurchases / t.purchases) * 100, 100)}%` }} /></div>}
+                {showMonthlyTargets && t && <div className="text-[9px] text-gray-400 mt-0.5">מוצרי היעד: {c.current.trackedTargetPurchases}/{t.purchases}</div>}
               </div>
               {/* Leads */}
               <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-blue-500">
                 <div className="flex items-center gap-2 mb-1">
                   <Users size={14} className="text-blue-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">לידים</span>
+                  <span className="text-[11px] text-gray-500 font-medium">לידים חדשים · CRM</span>
                 </div>
                 <div className="text-2xl font-black text-gray-900">{c.current.leads}</div>
                 <Change value={c.change.leads} />
-                {t && <div className="mt-1 w-full bg-gray-100 rounded-full h-1.5"><div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min((c.current.leads / t.leads) * 100, 100)}%` }} /></div>}
+                {showMonthlyTargets && t && <div className="mt-1 w-full bg-gray-100 rounded-full h-1.5"><div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min((c.current.leads / t.leads) * 100, 100)}%` }} /></div>}
               </div>
               {/* Spend */}
               <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-red-500">
                 <div className="flex items-center gap-2 mb-1">
                   <Megaphone size={14} className="text-red-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">הוצאות Meta, שני חשבונות</span>
+                  <span className="text-[11px] text-gray-500 font-medium">הוצאות Meta · כל החשבונות</span>
                 </div>
                 <div className="text-2xl font-black text-gray-900">
-                  {metaAds.data ? fmt(metaAds.data.accountTotals.totalSpend) : '—'}
+                  {metaAds.data && metaAds.data.status !== "unavailable" ? fmt(metaAds.data.accountTotals.totalSpend) : '—'}
                 </div>
-                {metaAds.data && (
-                  <div className="text-[9px] leading-4 text-gray-500 mt-0.5">
-                    קמפיינים: {fmt(metaAds.data.accountTotals.mainSpend)} · קידומי פוסטים: {fmt(metaAds.data.accountTotals.boostsSpend)}
+                {metaAds.data && metaAds.data.status !== "unavailable" && (
+                  <div className="text-[10px] text-gray-500 mt-0.5">
+                    מכירה ולידים: {fmt(metaAds.data.accountTotals.mainSpend)} · קידומי פרופיל/פוסטים: {fmt(metaAds.data.accountTotals.boostsSpend)}
                   </div>
                 )}
-                {metaAds.data && c.current.revenue > 0 && (
-                  <div className="text-[10px] text-gray-500">ROAS: <span className="font-bold text-green-600">{(c.current.revenue / Math.max(metaAds.data.accountTotals.totalSpend, 1)).toFixed(1)}x</span></div>
+                {showMonthlyTargets && t && t.budget !== null && metaAds.data && metaAds.data.status !== "unavailable" && (
+                  <div className="text-[9px] text-gray-400 mt-0.5">בפועל {fmt(metaAds.data.accountTotals.totalSpend)} מתוך תוכנית {fmt(t.budget)} · {t.sourceLabel}</div>
+                )}
+                {metaAds.data && metaAds.data.status !== "unavailable" && c.current.revenue > 0 && (
+                  <div className="text-[10px] text-gray-500">יחס הכנסות Grow לכל הוצאות Meta: <span className="font-bold text-green-600">{(c.current.revenue / Math.max(metaAds.data.accountTotals.totalSpend, 1)).toFixed(1)}x</span> <span className="text-gray-400">(לא ייחוס)</span></div>
                 )}
               </div>
               {/* Database members */}
               <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-amber-500">
                 <div className="flex items-center gap-2 mb-1">
                   <Heart size={14} className="text-amber-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">חברי מאגר</span>
+                  <span className="text-[11px] text-gray-500 font-medium">חברי מאגר פעילים כיום</span>
                 </div>
                 <div className="text-2xl font-black text-gray-900">{demographics.data?.total.count || '—'}</div>
                 <div className="text-[10px] text-gray-500">
@@ -275,9 +298,10 @@ export default function Dashboard() {
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <BarChart3 size={18} className="text-emerald-600" />
-                <h3 className="font-bold text-gray-900">ביצועים לפי ערוץ</h3>
-                <Badge className="bg-gray-100 text-gray-600 text-[10px]">השוואה לחודש שעבר</Badge>
+                <h3 className="font-bold text-gray-900">שיוך לפי ערוץ ו־UTM</h3>
+                <Badge className="bg-gray-100 text-gray-600 text-[10px]">מול {comparisonLabel}</Badge>
               </div>
+              <p className="mt-1 text-[10px] text-gray-500">הרכישות הן חיובי Grow מאומתים ששויכו לליד האחרון של אותו מייל שנוצר לפני התשלום. זהו שיוך תפעולי, לא הוכחה סיבתית.</p>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -286,17 +310,15 @@ export default function Dashboard() {
                     <tr className="border-b text-gray-500 text-[11px]">
                       <th className="text-right py-2 font-medium">ערוץ</th>
                       <th className="text-center py-2 font-medium">לידים</th>
-                      <th className="text-center py-2 font-medium">רכישות</th>
-                      <th className="text-center py-2 font-medium">הכנסות</th>
-                      <th className="text-center py-2 font-medium">הוצאות</th>
-                      <th className="text-center py-2 font-medium">המרה</th>
+                      <th className="text-center py-2 font-medium">רכישות ששויכו</th>
+                      <th className="text-center py-2 font-medium">הכנסות ששויכו</th>
+                      <th className="text-center py-2 font-medium">תקציב מכירה Meta</th>
                     </tr>
                   </thead>
                   <tbody>
                     {channels.data.map((ch: any) => {
                       const leadChange = ch.prevLeads > 0 ? Math.round((ch.leads - ch.prevLeads) / ch.prevLeads * 100) : 0;
-                      const purchaseChange = ch.prevPurchases > 0 ? Math.round((ch.purchases - ch.prevPurchases) / ch.prevPurchases * 100) : 0;
-                      const convRate = ch.leads > 0 ? ((ch.purchases / ch.leads) * 100).toFixed(1) : "0";
+                      const purchaseChange = ch.salesComparisonAvailable && ch.prevPurchases > 0 ? Math.round((ch.purchases - ch.prevPurchases) / ch.prevPurchases * 100) : null;
                       const isExpanded = expandedChannel === ch.channel;
                       return (
                         <Fragment key={ch.channel}>
@@ -310,25 +332,22 @@ export default function Dashboard() {
                             </td>
                             <td className="text-center py-2.5">
                               <span className="font-bold">{ch.purchases}</span>
-                              {purchaseChange !== 0 && <span className={`block text-[10px] ${purchaseChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{purchaseChange > 0 ? '↑' : '↓'}{Math.abs(purchaseChange)}%</span>}
+                              {purchaseChange !== null && purchaseChange !== 0 && <span className={`block text-[10px] ${purchaseChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{purchaseChange > 0 ? '↑' : '↓'}{Math.abs(purchaseChange)}%</span>}
                             </td>
                             <td className="text-center py-2.5 font-bold text-emerald-700">₪{ch.revenue.toLocaleString()}</td>
                             <td className="text-center py-2.5">
-                              {ch.spend > 0 ? <span className="font-bold text-red-600">₪{ch.spend.toLocaleString()}</span> : <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="text-center py-2.5">
-                              <span className={`font-bold ${parseFloat(convRate) >= 10 ? 'text-green-600' : parseFloat(convRate) >= 5 ? 'text-amber-600' : 'text-gray-600'}`}>{convRate}%</span>
+                              {ch.spend !== null && ch.spend > 0 ? <span className="font-bold text-red-600">₪{ch.spend.toLocaleString()}</span> : <span className="text-gray-300">—</span>}
                             </td>
                           </tr>
                           {isExpanded && (
-                            <tr><td colSpan={6} className="bg-blue-50/50 p-3 border-b">
+                            <tr><td colSpan={5} className="bg-blue-50/50 p-3 border-b">
                               <div className="text-xs text-gray-700">
                                 {ch.campaigns && ch.campaigns.length > 0 && (
                                   <div className="space-y-1">
                                     {ch.campaigns.slice(0, 5).map((camp: any) => (
                                       <div key={camp.name} className="flex justify-between items-center bg-white rounded-lg px-3 py-1.5 shadow-sm">
                                         <span className="font-medium truncate max-w-[200px]">{camp.name}</span>
-                                        <span className="text-gray-500">{camp.leads} לידים → {camp.purchases} רכישות (₪{camp.revenue.toLocaleString()})</span>
+                                        <span className="text-gray-500">{camp.leads} לידים · {camp.purchases} רכישות משויכות · ₪{camp.revenue.toLocaleString()}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -347,11 +366,11 @@ export default function Dashboard() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════════
-            SECTION 3: DAILY LEAD FUNNEL — CHART + TABLE
+            SECTION 3: DAILY CRM, GROW AND META ACTIVITY
         ═══════════════════════════════════════════════════════════════════════ */}
         {!dailyFunnel.data && dailyFunnel.isLoading && (
           <Card className="border-0 shadow-sm p-6">
-            <h3 className="font-bold text-gray-900 mb-4">🎯 משפך יומי: ליד → רכישה</h3>
+            <h3 className="font-bold text-gray-900 mb-4">פעילות יומית: לידים ומכירות</h3>
             <div className="text-sm text-gray-500 mb-3">טוען נתונים...</div>
             <Skeleton className="h-64 w-full rounded-lg" />
           </Card>
@@ -368,15 +387,14 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <Target size={18} className="text-blue-600" />
                     <div>
-                      <h3 className="font-bold text-gray-900">משפך יומי: ליד → רכישה</h3>
-                      <p className="mt-0.5 text-[10px] text-gray-500">המכירות מבוססות על חיובי Grow שהושלמו. סיכום התנועות ב־Grow הוא נטו לאחר זיכויים ועמלות ולכן עשוי להיות נמוך יותר.</p>
+                      <h3 className="font-bold text-gray-900">פעילות יומית: CRM, Grow ו־Meta</h3>
+                      <p className="mt-0.5 text-[10px] text-gray-500">אלה מדדים מקבילים לפי יום, לא משפך ולא ייחוס סיבתי. המכירות מבוססות על חיובי Grow שהושלמו; תקציבי Meta מפוצלים לפי החשבון שממנו יצאו.</p>
                     </div>
                 </div>
                 {totals && (
                   <div className="text-[11px] text-gray-500">
-                    ממוצע: <span className="font-bold text-blue-600">{totals.avgDailyLeads}</span> לידים/יום →
-                    <span className="font-bold text-green-600"> {totals.avgDailyPurchases}</span> רכישות/יום =
-                    <span className="font-bold text-amber-600"> {totals.avgConversionRate}%</span>
+                    ממוצע: <span className="font-bold text-blue-600">{totals.avgDailyLeads}</span> לידי DNA ביום ·
+                    <span className="font-bold text-green-600"> {totals.avgDailyPurchases}</span> רכישות מאגר ביום
                   </div>
                 )}
               </div>
@@ -384,29 +402,33 @@ export default function Dashboard() {
             <CardContent>
               {/* Summary cards */}
               {totals && (
-               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                  <div className="bg-blue-50 rounded-lg p-3 text-center">
                    <div className="text-xl font-bold text-blue-600">{totals.totalCampaign}</div>
-                   <div className="text-[10px] text-gray-500">לידים מקמפיין</div>
-                    {(totals as any).leadsChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).leadsChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).leadsChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).leadsChange)}% מחודש שעבר</div>}
+                   <div className="text-[10px] text-gray-500">לידי DNA ב־CRM</div>
+                    {(totals as any).leadsChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).leadsChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).leadsChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).leadsChange)}% מול {comparisonLabel}</div>}
                  </div>
                  <div className="bg-green-50 rounded-lg p-3 text-center">
                    <div className="text-xl font-bold text-green-600">{totals.totalPurchases}</div>
                    <div className="text-[10px] text-gray-500">רכישות מאגר</div>
-                    {(totals as any).purchChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).purchChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).purchChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).purchChange)}% מחודש שעבר</div>}
+                    {typeof (totals as any).purchChange === 'number' && (totals as any).purchChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).purchChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).purchChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).purchChange)}% מול {comparisonLabel}</div>}
                  </div>
                  <div className="bg-amber-50 rounded-lg p-3 text-center">
-                   <div className="text-xl font-bold text-amber-600">{totals.avgConversionRate}%</div>
-                   <div className="text-[10px] text-gray-500">המרה</div>
+                   <div className="text-xl font-bold text-amber-600">{totals.totalLeads}</div>
+                   <div className="text-[10px] text-gray-500">כל הלידים ב־CRM</div>
                  </div>
                  <div className="bg-purple-50 rounded-lg p-3 text-center">
-                   <div className="text-xl font-bold text-purple-600">{totals.totalSpend > 0 ? '₪' + Math.round(totals.totalSpend).toLocaleString() : '—'}</div>
-                   <div className="text-[10px] text-gray-500">הוצאות מטא</div>
+                   <div className="text-xl font-bold text-purple-600">{totals.metaSpendStatus === 'available' ? '₪' + Math.round(totals.totalSalesSpend).toLocaleString() : '—'}</div>
+                   <div className="text-[10px] text-gray-500">קמפייני מכירה ולידים</div>
+                 </div>
+                 <div className="bg-pink-50 rounded-lg p-3 text-center">
+                   <div className="text-xl font-bold text-pink-600">{totals.metaSpendStatus === 'available' ? '₪' + Math.round(totals.totalProfileBoostSpend).toLocaleString() : '—'}</div>
+                   <div className="text-[10px] text-gray-500">קידומי פרופיל/פוסטים</div>
                  </div>
                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
                    <div className="text-xl font-bold text-emerald-600">₪{totals.totalRevenue.toLocaleString()}</div>
                    <div className="text-[10px] text-gray-500">מכירות ברוטו מאומתות</div>
-                    {(totals as any).revenueChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).revenueChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).revenueChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).revenueChange)}% מחודש שעבר</div>}
+                    {typeof (totals as any).revenueChange === 'number' && (totals as any).revenueChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).revenueChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).revenueChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).revenueChange)}% מול {comparisonLabel}</div>}
                  </div>
                </div>
               )}
@@ -416,12 +438,13 @@ export default function Dashboard() {
                 <table className="w-full text-xs">
                   <thead><tr className="border-b-2 border-gray-200 text-gray-600 text-[11px]">
                    <th className="py-2 text-right font-semibold">תאריך</th>
-                   <th className="py-2 text-center font-semibold">לידים</th>
+                   <th className="py-2 text-center font-semibold">לידי DNA / כל CRM</th>
                    <th className="py-2 text-center font-semibold w-28">גרף</th>
                    <th className="py-2 text-center font-semibold">רכישות</th>
-                   <th className="py-2 text-center font-semibold">המרה</th>
-                    <th className="py-2 text-center font-semibold">הוצאות</th>
-                    <th className="py-2 text-center font-semibold">ברוטו מאומת</th>
+                    <th className="py-2 text-center font-semibold">הכנסות מאגר</th>
+                    <th className="py-2 text-center font-semibold">תקציב מכירה</th>
+                    <th className="py-2 text-center font-semibold">קידומי פרופיל</th>
+                    <th className="py-2 text-center font-semibold">Grow כל המוצרים</th>
                   </tr></thead>
                   <tbody>
                     {days.map((day, i) => {
@@ -439,8 +462,9 @@ export default function Dashboard() {
                           </div>
                         </td>
                         <td className="py-2 text-center"><span className="text-green-600 font-bold">{day.databasePurchases}</span></td>
-                        <td className="py-2 text-center"><span className={`font-bold px-1.5 py-0.5 rounded text-[11px] ${day.conversionRate >= 15 ? 'bg-green-100 text-green-700' : day.conversionRate >= 8 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>{day.conversionRate}%</span></td>
-                        <td className="py-2 text-center text-purple-600 font-medium">{(day as any).spend > 0 ? '₪' + (day as any).spend : '—'}</td>
+                        <td className="py-2 text-center text-amber-700 font-medium">₪{day.databaseRevenue.toLocaleString()}</td>
+                        <td className="py-2 text-center text-purple-600 font-medium">{day.salesSpend > 0 ? fmt(day.salesSpend) : '—'}</td>
+                        <td className="py-2 text-center text-pink-600 font-medium">{day.profileBoostSpend > 0 ? fmt(day.profileBoostSpend) : '—'}</td>
                         <td className="py-2 text-center text-emerald-600 font-semibold">₪{day.revenue.toLocaleString()}</td>
                       </tr>
                       );
@@ -453,8 +477,9 @@ export default function Dashboard() {
                       <td className="py-2 text-center text-blue-700">{totals.totalCampaign}</td>
                       <td></td>
                       <td className="py-2 text-center text-green-700">{totals.totalPurchases}</td>
-                      <td className="py-2 text-center text-amber-700">{totals.avgConversionRate}%</td>
-                      <td className="py-2 text-center text-purple-700">{totals.totalSpend > 0 ? '₪' + Math.round(totals.totalSpend).toLocaleString() : '—'}</td>
+                      <td className="py-2 text-center text-amber-700">₪{totals.totalDatabaseRevenue.toLocaleString()}</td>
+                      <td className="py-2 text-center text-purple-700">{totals.metaSpendStatus === 'available' ? fmt(totals.totalSalesSpend) : '—'}</td>
+                      <td className="py-2 text-center text-pink-700">{totals.metaSpendStatus === 'available' ? fmt(totals.totalProfileBoostSpend) : '—'}</td>
                       <td className="py-2 text-center text-emerald-700">₪{totals.totalRevenue.toLocaleString()}</td>
                     </tr>
                   </tfoot>
@@ -559,7 +584,7 @@ export default function Dashboard() {
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <Users size={18} className="text-pink-600" />
-                <h3 className="font-bold text-gray-900">דמוגרפיה של המאגר</h3>
+                <h3 className="font-bold text-gray-900">דמוגרפיה: מצבה כיום מול נרשמים בטווח</h3>
                 <Badge className="bg-pink-100 text-pink-700 text-[10px]">{demographics.data.total.count} פעילים</Badge>
               </div>
             </CardHeader>
@@ -581,7 +606,7 @@ export default function Dashboard() {
 
               {/* Age groups - horizontal bars */}
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-gray-600 mb-2">התפלגות גילאים</h4>
+                <h4 className="text-xs font-semibold text-gray-600 mb-2">התפלגות גילאים בקרב הנרשמים בטווח ({demographics.data.period.count})</h4>
                 <div className="space-y-2">
                   {demographics.data.ageGroups.filter((a: any) => a.group !== 'לא צוין' && a.count > 0).map((ag: any) => {
                     const maxCount = Math.max(...demographics.data!.ageGroups.filter((x: any) => x.group !== 'לא צוין').map((x: any) => x.count), 1);
@@ -602,7 +627,7 @@ export default function Dashboard() {
               {/* Top areas */}
               {demographics.data.areas.length > 0 && (
                 <div className="mb-4">
-                  <h4 className="text-xs font-semibold text-gray-600 mb-2">ערים מובילות</h4>
+                  <h4 className="text-xs font-semibold text-gray-600 mb-2">ערים מובילות בקרב הנרשמים בטווח</h4>
                   <div className="flex flex-wrap gap-2">
                     {demographics.data.areas.slice(0, 10).map((a: any) => (
                       <div key={a.city} className="bg-gray-50 rounded-lg px-3 py-1.5 text-xs border">
@@ -627,38 +652,49 @@ export default function Dashboard() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════════
-            SECTION 5: META ADS + CAMPAIGN RECOMMENDATIONS
+            SECTION 5: META ADS + VERIFIED UTM ATTRIBUTION
         ═══════════════════════════════════════════════════════════════════════ */}
-        {metaAds.data && (metaAds.data.campaigns.length > 0 || metaAds.data.boosts.length > 0) && (
+        {metaAds.error && <Card className="border border-red-100 bg-red-50 p-4 text-sm text-red-800">נתוני Meta אינם זמינים כרגע. לא מוצגים אפסים במקום נתונים חסרים.</Card>}
+        {metaAds.data?.status === "unavailable" && <Card className="border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">נתוני Meta אינם זמינים כרגע. לא מוצגים אפסים במקום נתונים חסרים.</Card>}
+        {metaAds.data && metaAds.data.status !== "unavailable" && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <Megaphone size={18} className="text-blue-600" />
-                <h3 className="font-bold text-gray-900">Meta Ads — קמפיינים והמלצות</h3>
-                <Badge className="bg-blue-100 text-blue-700 text-[10px]">Live</Badge>
+                <h3 className="font-bold text-gray-900">Meta Ads — תקציב ותוצאות מדווחות</h3>
+                <Badge className="bg-blue-100 text-blue-700 text-[10px]">{metaAds.data.status === "available" ? "זמין" : metaAds.data.status === "partial" ? "חלקי" : "לא זמין"}</Badge>
               </div>
+              <p className="mt-1 text-[10px] text-gray-500">לידים ורכישות בטבלה הם דיווחי הייחוס של Meta. הם אינם זהים בהכרח לחיובי Grow המאומתים, וערך/ROAS מוצגים רק כש־Meta מחזירה ערך רכישה.</p>
             </CardHeader>
             <CardContent>
-              {/* Campaign table */}
+              <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="rounded-lg bg-blue-50 p-3 text-center"><div className="text-xl font-bold text-blue-700">{fmt(metaAds.data.accountTotals.mainSpend)}</div><div className="text-[10px] text-gray-500">מכירה ולידים</div></div>
+                <div className="rounded-lg bg-pink-50 p-3 text-center"><div className="text-xl font-bold text-pink-700">{fmt(metaAds.data.accountTotals.boostsSpend)}</div><div className="text-[10px] text-gray-500">קידומי פרופיל/פוסטים</div></div>
+                <div className="rounded-lg bg-purple-50 p-3 text-center"><div className="text-xl font-bold text-purple-700">{metaAds.data.totals.metaReportedLeads}</div><div className="text-[10px] text-gray-500">לידים מדווחי Meta</div></div>
+                <div className="rounded-lg bg-green-50 p-3 text-center"><div className="text-xl font-bold text-green-700">{metaAds.data.totals.metaReportedPurchases}</div><div className="text-[10px] text-gray-500">Purchase מדווח Meta</div></div>
+              </div>
+
               {metaAds.data.campaigns.length > 0 && (
                 <div className="mb-4 overflow-x-auto">
+                  <h4 className="mb-2 text-xs font-bold text-gray-700">קמפייני מכירה ולידים</h4>
                   <table className="w-full text-xs">
                     <thead><tr className="text-[10px] text-gray-500 border-b">
-                      <th className="text-right pb-1.5">קמפיין</th><th className="text-center pb-1.5">הוצאה</th>
-                      <th className="text-center pb-1.5">לידים</th><th className="text-center pb-1.5">רכישות</th>
-                      <th className="text-center pb-1.5">CPL</th><th className="text-center pb-1.5">CPA</th>
-                      <th className="text-center pb-1.5">ROAS</th>
+                      <th className="text-right pb-1.5">קמפיין</th><th className="text-right pb-1.5">יעד</th><th className="text-center pb-1.5">הוצאה</th>
+                      <th className="text-center pb-1.5">לידים Meta</th><th className="text-center pb-1.5">Purchase Meta</th>
+                      <th className="text-center pb-1.5">CPL Meta</th><th className="text-center pb-1.5">CPA Meta</th>
+                      <th className="text-center pb-1.5">ROAS ערך Meta</th>
                     </tr></thead>
                     <tbody>
                       {metaAds.data.campaigns.map((camp, i) => (
                         <tr key={i} className="border-b border-gray-50 hover:bg-blue-50/50">
                           <td className="py-1.5 text-right font-medium max-w-[160px] truncate" title={camp.name}>{camp.name}</td>
+                          <td className="py-1.5 text-right text-gray-500">{camp.objective || '—'}</td>
                           <td className="py-1.5 text-center text-red-600">{fmt(camp.spend)}</td>
                           <td className="py-1.5 text-center">{camp.leads || '—'}</td>
                           <td className="py-1.5 text-center">{camp.purchases > 0 ? <Badge className="bg-green-100 text-green-700 text-[10px]">{camp.purchases}</Badge> : '—'}</td>
-                          <td className="py-1.5 text-center">{camp.cpl > 0 ? fmt(camp.cpl) : '—'}</td>
-                          <td className="py-1.5 text-center">{camp.cpa > 0 ? fmt(camp.cpa) : '—'}</td>
-                          <td className="py-1.5 text-center"><span className={camp.roas >= 3 ? 'text-green-600 font-bold' : camp.roas > 0 ? 'text-amber-600' : ''}>{camp.roas > 0 ? camp.roas + 'x' : '—'}</span></td>
+                          <td className="py-1.5 text-center">{camp.cpl !== null ? fmt(camp.cpl) : '—'}</td>
+                          <td className="py-1.5 text-center">{camp.cpa !== null ? fmt(camp.cpa) : '—'}</td>
+                          <td className="py-1.5 text-center">{camp.metaReportedRoas !== null ? `${camp.metaReportedRoas}x` : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -666,27 +702,25 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Recommendations */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {metaAds.data.campaigns.filter(camp => camp.roas >= 3 && camp.purchases > 0).map((camp, i) => (
-                  <div key={i} className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="flex items-center gap-1 mb-1"><span className="text-green-600 font-bold text-xs">✅ להגדיל תקציב</span></div>
-                    <div className="text-xs text-gray-700">"{camp.name.substring(0, 30)}" — ROAS {camp.roas}x, CPA {fmt(camp.cpa)}</div>
-                  </div>
-                ))}
-                {metaAds.data.campaigns.filter(camp => camp.spend > 100 && camp.purchases === 0 && camp.leads > 20).map((camp, i) => (
-                  <div key={i} className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <div className="flex items-center gap-1 mb-1"><span className="text-red-600 font-bold text-xs">⚠️ לבדוק/לכבות</span></div>
-                    <div className="text-xs text-gray-700">"{camp.name.substring(0, 30)}" — {camp.leads} לידים, 0 רכישות, הוצאה {fmt(camp.spend)}</div>
-                  </div>
-                ))}
-                {metaAds.data.campaigns.filter(camp => camp.cpl > 0 && camp.cpl <= 5).map((camp, i) => (
-                  <div key={i} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div className="flex items-center gap-1 mb-1"><span className="text-blue-600 font-bold text-xs">💡 CPL מצוין</span></div>
-                    <div className="text-xs text-gray-700">"{camp.name.substring(0, 30)}" — CPL {fmt(camp.cpl)} (ממוצע תעשייה: ₪15)</div>
-                  </div>
-                ))}
-              </div>
+              {attributedCampaigns.length > 0 && (
+                <div className="mb-4 overflow-x-auto rounded-xl border border-emerald-100 bg-emerald-50/30 p-3">
+                  <h4 className="mb-1 text-xs font-bold text-emerald-900">תוצאות האתר לפי UTM · Grow מאומת</h4>
+                  <p className="mb-2 text-[9px] text-gray-500">הרכישה משויכת לליד האחרון של אותו מייל שנוצר לפני התשלום. הטבלה משלימה את דיווח Meta, אך אינה הוכחה סיבתית מלאה.</p>
+                  <table className="w-full text-xs"><thead><tr className="border-b text-[10px] text-gray-500"><th className="pb-1.5 text-right">קמפיין UTM</th><th className="pb-1.5 text-right">ערוץ</th><th className="pb-1.5 text-center">לידי CRM</th><th className="pb-1.5 text-center">רכישות Grow ששויכו</th><th className="pb-1.5 text-center">הכנסה מאומתת</th></tr></thead><tbody>
+                    {attributedCampaigns.slice(0, 20).map((campaign: any, i: number) => <tr key={`${campaign.channel}-${campaign.name}-${i}`} className="border-b border-emerald-100"><td className="py-1.5 font-medium">{campaign.name}</td><td className="py-1.5 text-gray-500">{campaign.channel}</td><td className="py-1.5 text-center">{campaign.leads}</td><td className="py-1.5 text-center font-bold text-green-700">{campaign.purchases}</td><td className="py-1.5 text-center font-bold text-emerald-700">{fmt(campaign.revenue)}</td></tr>)}
+                  </tbody></table>
+                </div>
+              )}
+
+              {metaAds.data.boosts.length > 0 && (
+                <div className="overflow-x-auto rounded-xl border border-pink-100 bg-pink-50/30 p-3">
+                  <h4 className="mb-2 text-xs font-bold text-pink-800">קידומי פרופיל ופוסטים · לא נכללים בטבלת המכירה</h4>
+                  <table className="w-full text-xs">
+                    <thead><tr className="border-b text-[10px] text-gray-500"><th className="pb-1.5 text-right">קידום</th><th className="pb-1.5 text-center">הוצאה</th><th className="pb-1.5 text-center">חשיפה</th><th className="pb-1.5 text-center">Reach</th><th className="pb-1.5 text-center">קליקים</th><th className="pb-1.5 text-center">מעורבות</th></tr></thead>
+                    <tbody>{metaAds.data.boosts.map((boost, i) => <tr key={i} className="border-b border-pink-100"><td className="max-w-[260px] truncate py-1.5 font-medium" title={boost.name}>{boost.name}</td><td className="py-1.5 text-center text-red-600">{fmt(boost.spend)}</td><td className="py-1.5 text-center">{boost.impressions.toLocaleString()}</td><td className="py-1.5 text-center">{boost.reach.toLocaleString()}</td><td className="py-1.5 text-center">{boost.clicks.toLocaleString()}</td><td className="py-1.5 text-center">{boost.postEngagement.toLocaleString()}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -697,7 +731,8 @@ export default function Dashboard() {
         {emailEngagement.data && emailEngagement.data.totals.sent > 0 && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
-              <div className="flex items-center gap-2"><Mail size={18} className="text-amber-500" /><h3 className="font-bold text-gray-900">מיילים ומסעות</h3></div>
+              <div className="flex items-center gap-2"><Mail size={18} className="text-amber-500" /><h3 className="font-bold text-gray-900">מיילים ומסעות · נשלחו בטווח</h3></div>
+              <p className="mt-1 text-[10px] text-gray-500">פתיחות וקליקים מתעדכנים לאחר השליחה, ולכן ימים אחרונים עשויים עדיין להשתנות.</p>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -710,22 +745,41 @@ export default function Dashboard() {
           </Card>
         )}
 
+        {socialInsights.isLoading && <Card className="border-0 shadow-sm p-6"><Skeleton className="h-40 w-full rounded-lg" /></Card>}
+        {socialInsights.error && <Card className="border border-red-100 bg-red-50 p-4 text-sm text-red-800">נתוני הסושיאל אינם זמינים כרגע. לא מוצג 0 במקום שגיאת API.</Card>}
+        {socialInsights.data === null && !socialInsights.isLoading && !socialInsights.error && <Card className="border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">נתוני הסושיאל אינם זמינים כרגע. לא מוצג 0 במקום נתון חסר.</Card>}
         {socialInsights.data && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
-              <div className="flex items-center gap-2"><Instagram size={18} className="text-pink-500" /><h3 className="font-bold text-gray-900">סושיאל</h3></div>
+              <div className="flex items-center gap-2"><Instagram size={18} className="text-pink-500" /><h3 className="font-bold text-gray-900">סושיאל · Instagram ו־Facebook</h3></div>
+              <p className="mt-1 text-[10px] text-gray-500">{socialInsights.data.note}</p>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-pink-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-pink-600">{socialInsights.data.instagram.followers.toLocaleString()}</div><div className="text-[10px] text-gray-500">עוקבים IG</div>{socialInsights.data.instagram.followerGrowth !== 0 && <Change value={socialInsights.data.instagram.followerGrowth} suffix="" />}</div>
-                <div className="bg-purple-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-purple-600">{socialInsights.data.instagram.avgDailyReach.toLocaleString()}</div><div className="text-[10px] text-gray-500">Reach/יום</div></div>
-                <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-blue-600">{socialInsights.data.instagram.engagementRate}%</div><div className="text-[10px] text-gray-500">Engagement</div></div>
-                <div className="bg-green-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-green-600">{socialInsights.data.whatsappGroupSize.toLocaleString()}</div><div className="text-[10px] text-gray-500">קהילה WA</div></div>
+                <div className="bg-pink-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-pink-600">{socialInsights.data.instagram.followers.toLocaleString()}</div><div className="text-[10px] text-gray-500">עוקבי IG כעת</div><div className="text-[9px] text-gray-400">אין עדיין בסיס אמין לשינוי נטו</div></div>
+                <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-blue-600">{socialInsights.data.facebook.followers.toLocaleString()}</div><div className="text-[10px] text-gray-500">עוקבי Facebook כעת</div></div>
+                <div className="bg-purple-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-purple-600">{socialInsights.data.instagram.totalInteractions.toLocaleString()}</div><div className="text-[10px] text-gray-500">אינטראקציות בטווח</div><Change value={pctDelta(socialInsights.data.instagram.totalInteractions, socialInsights.data.instagram.previousTotalInteractions)} /></div>
+                <div className="bg-green-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-green-600">{socialInsights.data.instagram.accountsEngaged.toLocaleString()}</div><div className="text-[10px] text-gray-500">חשבונות מעורבים</div><Change value={pctDelta(socialInsights.data.instagram.accountsEngaged, socialInsights.data.instagram.previousAccountsEngaged)} /></div>
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px] text-gray-600">
+                <div className="rounded-lg bg-gray-50 p-2"><strong className="block text-sm text-gray-900">{socialInsights.data.instagram.likes}</strong>לייקים</div>
+                <div className="rounded-lg bg-gray-50 p-2"><strong className="block text-sm text-gray-900">{socialInsights.data.instagram.comments}</strong>תגובות</div>
+                <div className="rounded-lg bg-gray-50 p-2"><strong className="block text-sm text-gray-900">{socialInsights.data.instagram.shares}</strong>שיתופים</div>
+                <div className="rounded-lg bg-gray-50 p-2"><strong className="block text-sm text-gray-900">{socialInsights.data.instagram.saves}</strong>שמירות</div>
               </div>
               {socialInsights.data.instagram.dailyReach.length > 0 && (
                 <div className="mt-3">
-                  <div className="text-[10px] text-gray-500 mb-1">Reach יומי</div>
+                  <div className="text-[10px] text-gray-500 mb-1">Reach יומי משוער, כולל פעילות ממומנת; הימים האחרונים עשויים להיות חלקיים</div>
                   <MiniBarChart data={socialInsights.data.instagram.dailyReach.map((d: any) => ({ label: d.date, value: d.value }))} color="bg-pink-400" height={48} />
+                </div>
+              )}
+              {socialInsights.data.instagram.topPosts.length > 0 && (
+                <div className="mt-4 overflow-x-auto">
+                  <h4 className="mb-2 text-xs font-bold text-gray-700">פוסטים מהטווח לפי לייקים ותגובות</h4>
+                  <table className="w-full text-xs"><thead><tr className="border-b text-[10px] text-gray-500"><th className="py-1.5 text-right">פוסט</th><th className="py-1.5 text-center">תאריך</th><th className="py-1.5 text-center">לייקים</th><th className="py-1.5 text-center">תגובות</th></tr></thead><tbody>
+                    {socialInsights.data.instagram.topPosts.map((post: any) => <tr key={post.id} className="border-b border-gray-50"><td className="max-w-[420px] py-2"><a className="font-medium text-blue-700 hover:underline" href={post.permalink || '#'} target="_blank" rel="noreferrer">{post.caption || post.mediaType}</a></td><td className="py-2 text-center text-gray-500">{post.timestamp ? new Date(post.timestamp).toLocaleDateString('he-IL') : '—'}</td><td className="py-2 text-center">{post.likes}</td><td className="py-2 text-center">{post.comments}</td></tr>)}
+                  </tbody></table>
+                  <p className="mt-2 text-[9px] text-gray-400">הטבלה משווה תגובות ולייקים של תוכן Instagram. ייחוס לידים או מכירות לפוסט יוצג רק כשיש קישור/מודעה מזוהים.</p>
                 </div>
               )}
             </CardContent>
@@ -744,14 +798,14 @@ export default function Dashboard() {
                   { label: "ביקור", value: siteTraffic.data.funnel.pageViews, color: "bg-indigo-500" },
                   { label: "DNA", value: siteTraffic.data.funnel.dnaStarts, color: "bg-blue-500" },
                   { label: "השלמה", value: siteTraffic.data.funnel.dnaCompletes, color: "bg-purple-500" },
-                  { label: "רכישה", value: siteTraffic.data.funnel.purchases, color: "bg-green-500" },
+                  { label: "פתיחת תשלום", value: siteTraffic.data.funnel.paymentStarts, color: "bg-green-500" },
                 ].map((step, i, arr) => (
                   <div key={i} className="flex items-center gap-1">
                     <div className="text-center">
                       <div className={`${step.color} text-white rounded-lg px-4 py-2`}><div className="text-lg font-bold">{step.value}</div></div>
                       <div className="text-[9px] text-gray-500 mt-0.5">{step.label}</div>
                     </div>
-                    {i < arr.length - 1 && step.value > 0 && <div className="text-gray-400 text-sm">→ <span className="text-[10px] font-bold text-gray-600">{((arr[i + 1].value / step.value) * 100).toFixed(0)}%</span></div>}
+                    {i < arr.length - 1 && <div className="text-gray-300 text-sm">·</div>}
                   </div>
                 ))}
               </div>

@@ -3013,3 +3013,16 @@
 - [x] לתקן את נוסחת הדשבורד אם נמצא חישוב שגוי ולהוסיף בדיקת רגרסיה: טווח Meta משתמש כעת בתאריך ישראל, וכרטיס ההוצאות מציג בנפרד חשבון קמפיינים, קידומי פוסטים וסך הכול
 - [x] להריץ בדיקות ממוקדות, pnpm test, pnpm check, pnpm build ו־git diff --check אם הקוד משתנה: 465 בדיקות עברו, בדיקה אחת דולגה כמתוכנן
 - [x] לאמת בדשבורד החי את הסכום המתוקן ולמסור פירוט מספרי ברור של מקור הפער: לאחר הפרסום והמשך הוצאה שוטפת, 11,385.07 ₪ בחשבון הראשי ועוד 2,052.95 ₪ בקידומי פוסטים, סך הכול 13,438.02 ₪; הדומיין החי עודכן בהצלחה
+
+## Dashboard data audit and measurement corrections (September 17)
+
+- [x] Audit every visible dashboard section against live Grow, CRM, Meta, email and social sources
+- [x] Use verified Grow payments only and exclude 1 ILS test transactions from business metrics
+- [x] Separate sales/lead campaigns from profile and post boosts in totals, tables and P&L
+- [x] Replace misleading funnel and fixed-price ROAS calculations with transparent parallel metrics
+- [x] Compare month-to-date with the same dates in the previous month and rolling ranges with the prior equal window
+- [x] Suppress sales comparison when the previous period predates complete verified Grow coverage
+- [x] Fix email analytics to use the live journeyKey schema
+- [x] Remove false follower decline and show social snapshots, comparable engagement and post detail
+- [x] Align dashboard targets with the daily midnight report settings and approved September media plan
+- [x] Run live aggregate smoke test, full tests, TypeScript, build and diff validation

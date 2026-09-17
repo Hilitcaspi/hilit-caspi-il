@@ -7,6 +7,7 @@ describe("dashboard verified Grow revenue", () => {
       { product: "database", amountAgorot: 29_900, amountSource: "grow", paidAt: 1 },
       { product: "match_boost", amountAgorot: 1_990, amountSource: "grow", paidAt: 2 },
       { product: "bundle_new_year", amountAgorot: 39_900, amountSource: "estimated", paidAt: 3 },
+      { product: "database", amountAgorot: 100, amountSource: "grow", paidAt: 4 },
     ]);
 
     expect(result).toEqual({
@@ -25,8 +26,8 @@ describe("dashboard verified Grow revenue", () => {
       { product: "match_boost", amountAgorot: 1_990, amountSource: "grow", paidAt: Date.parse("2026-09-01T20:59:59.000Z") },
       { product: "database", amountAgorot: 29_900, amountSource: "grow", paidAt: Date.parse("2026-09-01T21:00:00.000Z") },
     ])).toEqual([
-      { date: "2026-09-01", purchases: 2, databasePurchases: 1, revenue: 318.9 },
-      { date: "2026-09-02", purchases: 1, databasePurchases: 1, revenue: 299 },
+      { date: "2026-09-01", purchases: 2, databasePurchases: 1, revenue: 318.9, databaseRevenue: 299 },
+      { date: "2026-09-02", purchases: 1, databasePurchases: 1, revenue: 299, databaseRevenue: 299 },
     ]);
   });
 });

@@ -3,36 +3,45 @@
  * Aggregates dashboard data and sends a beautiful HTML email to hilitcaspi@gmail.com
  */
 import { getDb } from "./db";
-import { sql } from "drizzle-orm";
+import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { sendEmail } from "./brevo";
+import { completedPayments } from "../drizzle/schema";
+import { formatMetaCalendarDate, metaActionValue } from "./dashboardMetaSpend";
+import { summarizeVerifiedGrowPayments } from "./dashboardRevenue";
 
-const PRODUCT_PRICES: Record<string, number> = {
-  database: 299, guide: 149, course: 249, session: 500, coaching: 2900, coaching_mas: 2900, bundle_tubav: 349, bundle_new_year: 399,
-};
 const PRODUCT_LABELS: Record<string, string> = {
   database: "מאגר", guide: "מדריך", course: "קורס", session: "פגישה", coaching: "ליווי", coaching_mas: "ליווי מאסטר", bundle_tubav: "חבילת טו באב", bundle_new_year: "חבילת שנה חדשה",
 };
 
 async function fetchMetaSpend(since: string, until: string) {
   const token = process.env.META_ADS_TOKEN;
-  if (!token) return { spend: 0, campaigns: [] as any[] };
-  const accountId = "act_254697595735216";
+  if (!token) return { status: "unavailable" as const, spend: 0, salesSpend: 0, profileBoostSpend: 0, campaigns: [] as any[] };
+  const accountIds = ["act_254697595735216", "act_3841144459522772"];
   try {
-    const url = `https://graph.facebook.com/v19.0/${accountId}/insights?fields=campaign_name,spend,actions&time_range={"since":"${since}","until":"${until}"}&level=campaign&limit=50&access_token=${token}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.error || !data.data) return { spend: 0, campaigns: [] };
-    let totalSpend = 0;
-    const campaigns = data.data.map((r: any) => {
+    const fetchAccount = async (accountId: string) => {
+      const rows: any[] = [];
+      let next: string | null = `https://graph.facebook.com/v25.0/${accountId}/insights?fields=campaign_name,spend,actions&time_range={"since":"${since}","until":"${until}"}&level=campaign&limit=100&access_token=${token}`;
+      while (next) {
+        const res = await fetch(next);
+        const data: any = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error?.message || `Meta HTTP ${res.status}`);
+        rows.push(...(data.data || []));
+        next = data.paging?.next || null;
+      }
+      return rows;
+    };
+    const [salesRows, profileBoostRows] = await Promise.all(accountIds.map(fetchAccount));
+    const campaigns = salesRows.map((r: any) => {
       const spend = Number(r.spend || 0);
-      totalSpend += spend;
       const actions = r.actions || [];
-      const leads = Number(actions.find((a: any) => a.action_type === 'lead')?.value || 0);
-      const purchases = Number(actions.find((a: any) => a.action_type === 'purchase')?.value || 0);
+      const leads = metaActionValue(actions, ['lead', 'onsite_conversion.lead_grouped']);
+      const purchases = metaActionValue(actions, ['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase']);
       return { name: r.campaign_name, spend, leads, purchases };
     });
-    return { spend: totalSpend, campaigns: campaigns.filter((c: any) => c.spend > 0).sort((a: any, b: any) => b.spend - a.spend) };
-  } catch { return { spend: 0, campaigns: [] }; }
+    const salesSpend = salesRows.reduce((sum: number, row: any) => sum + Number(row.spend || 0), 0);
+    const profileBoostSpend = profileBoostRows.reduce((sum: number, row: any) => sum + Number(row.spend || 0), 0);
+    return { status: "available" as const, spend: salesSpend + profileBoostSpend, salesSpend, profileBoostSpend, campaigns: campaigns.filter((c: any) => c.spend > 0).sort((a: any, b: any) => b.spend - a.spend) };
+  } catch { return { status: "unavailable" as const, spend: 0, salesSpend: 0, profileBoostSpend: 0, campaigns: [] }; }
 }
 
 export async function generateAndSendWeeklyReport(): Promise<{ success: boolean; error?: string }> {
@@ -46,31 +55,44 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
     
     // KPIs
     const [[leadRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM crm_leads WHERE createdAt >= ${weekAgo}`) as any;
-    const [[purchaseRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${weekAgo}`) as any;
-    const [revenueRows] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${weekAgo} GROUP BY product`) as any;
+    const currentPayments = await db.select({
+      product: completedPayments.product,
+      amountAgorot: completedPayments.amountAgorot,
+      amountSource: completedPayments.amountSource,
+      paidAt: completedPayments.paidAt,
+    }).from(completedPayments).where(and(
+      gte(completedPayments.paidAt, weekAgo),
+      lte(completedPayments.paidAt, now),
+      eq(completedPayments.amountSource, "grow"),
+    ));
     
     // Previous period KPIs (same period last week)
     const [[prevLeadRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM crm_leads WHERE createdAt >= ${twoWeeksAgo} AND createdAt < ${weekAgo}`) as any;
-    const [[prevPurchaseRow]] = await db.execute(sql`SELECT COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${twoWeeksAgo} AND created_at < ${weekAgo}`) as any;
-    const [prevRevenueRows] = await db.execute(sql`SELECT product, COUNT(*) as cnt FROM payment_leads WHERE created_at >= ${twoWeeksAgo} AND created_at < ${weekAgo} GROUP BY product`) as any;
+    const previousPayments = await db.select({
+      product: completedPayments.product,
+      amountAgorot: completedPayments.amountAgorot,
+      amountSource: completedPayments.amountSource,
+      paidAt: completedPayments.paidAt,
+    }).from(completedPayments).where(and(
+      gte(completedPayments.paidAt, twoWeeksAgo),
+      lt(completedPayments.paidAt, weekAgo),
+      eq(completedPayments.amountSource, "grow"),
+    ));
     
     const leads = Number(leadRow?.cnt ?? 0);
-    const purchases = Number(purchaseRow?.cnt ?? 0);
-    let revenue = 0;
+    const currentPaymentSummary = summarizeVerifiedGrowPayments(currentPayments);
+    const previousPaymentSummary = summarizeVerifiedGrowPayments(previousPayments);
+    const purchases = currentPaymentSummary.purchases;
+    const revenue = currentPaymentSummary.revenue;
     const productLines: string[] = [];
-    for (const row of (revenueRows as any[])) {
-      const cnt = Number(row.cnt);
-      const rev = cnt * (PRODUCT_PRICES[row.product] ?? 0);
-      revenue += rev;
-      productLines.push(`${PRODUCT_LABELS[row.product] || row.product}: ${cnt} רכישות (₪${rev.toLocaleString()})`);
+    for (const [product, count] of Object.entries(currentPaymentSummary.productSales)) {
+      const productRevenue = currentPayments.filter(row => row.product === product && row.amountAgorot > 100).reduce((sum, row) => sum + row.amountAgorot / 100, 0);
+      productLines.push(`${PRODUCT_LABELS[product] || product}: ${count} רכישות (₪${productRevenue.toLocaleString()})`);
     }
     
     const prevLeads = Number(prevLeadRow?.cnt ?? 0);
-    const prevPurchases = Number(prevPurchaseRow?.cnt ?? 0);
-    let prevRevenue = 0;
-    for (const row of (prevRevenueRows as any[])) {
-      prevRevenue += Number(row.cnt) * (PRODUCT_PRICES[row.product] ?? 0);
-    }
+    const prevPurchases = previousPaymentSummary.purchases;
+    const prevRevenue = previousPaymentSummary.revenue;
     
     const pctChange = (curr: number, prev: number): string => {
       if (prev === 0) return curr > 0 ? '+100%' : '—';
@@ -83,8 +105,8 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
     };
     
     // Meta Ads
-    const since = new Date(weekAgo).toISOString().split("T")[0];
-    const until = new Date(now).toISOString().split("T")[0];
+    const since = formatMetaCalendarDate(weekAgo);
+    const until = formatMetaCalendarDate(now);
     const meta = await fetchMetaSpend(since, until);
     
     // Channel breakdown (leads + purchases by source)
@@ -114,10 +136,23 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
       GROUP BY channel, medium ORDER BY cnt DESC
     `) as any;
     const [chPurchRows] = await db.execute(sql`
-      SELECT COALESCE(cl.utmSource, cl.source, 'direct') as channel, cl.utmMedium as medium, pl.product, COUNT(*) as cnt
-      FROM payment_leads pl JOIN crm_leads cl ON cl.email = pl.email
-      WHERE pl.created_at >= ${weekAgo} AND pl.created_at <= ${now}
-      GROUP BY channel, medium, pl.product
+      SELECT COALESCE(attributed.utmSource, attributed.source, 'direct') as channel,
+             attributed.utmMedium as medium,
+             attributed.product,
+             COUNT(*) as cnt,
+             SUM(attributed.amount_agorot) / 100 as revenue
+      FROM (
+        SELECT cp.id, cp.product, cp.amount_agorot,
+               cl.utmSource, cl.source, cl.utmMedium,
+               ROW_NUMBER() OVER (PARTITION BY cp.id ORDER BY cl.createdAt DESC, cl.id DESC) AS leadRank
+        FROM completed_payments cp
+        LEFT JOIN crm_leads cl
+          ON LOWER(TRIM(cl.email)) = LOWER(TRIM(cp.email))
+          AND cl.createdAt <= cp.paid_at
+        WHERE cp.paid_at >= ${weekAgo} AND cp.paid_at <= ${now} AND cp.amount_source = 'grow' AND cp.amount_agorot > 100
+      ) attributed
+      WHERE attributed.leadRank = 1
+      GROUP BY channel, medium, attributed.product
     `) as any;
     
     const chData: Record<string, { leads: number; purchases: number; revenue: number }> = {};
@@ -131,17 +166,15 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
       if (!chData[ch]) chData[ch] = { leads: 0, purchases: 0, revenue: 0 };
       const cnt = Number(r.cnt);
       chData[ch].purchases += cnt;
-      chData[ch].revenue += cnt * (PRODUCT_PRICES[r.product] ?? 0);
+      chData[ch].revenue += Number(r.revenue || 0);
     }
     const channelRows = Object.entries(chData).sort((a, b) => b[1].leads - a[1].leads);
     
-    const roas = meta.spend > 0 ? (revenue / meta.spend).toFixed(1) : "N/A";
-    const convRate = leads > 0 ? ((purchases / leads) * 100).toFixed(1) : "0";
+    const revenueToSpend = meta.spend > 0 ? (revenue / meta.spend).toFixed(1) : "N/A";
+    const metaSpendText = meta.status === "available" ? `₪${Math.round(meta.spend).toLocaleString()}` : "לא זמין";
     
     // Top campaigns
     const topCampaigns = meta.campaigns.slice(0, 5);
-    const winners = meta.campaigns.filter((c: any) => c.purchases > 0);
-    const losers = meta.campaigns.filter((c: any) => c.spend > 50 && c.purchases === 0 && c.leads < 2);
     
     // Build HTML
     const dateRange = `${new Date(weekAgo).toLocaleDateString('he-IL')} — ${new Date(now).toLocaleDateString('he-IL')}`;
@@ -180,8 +213,8 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
         </td>
         <td style="width: 4%;"></td>
         <td style="text-align: center; padding: 12px; background: #fdf2f8; border-radius: 8px; width: 25%;">
-          <div style="font-size: 24px; font-weight: bold; color: #db2777;">${convRate}%</div>
-          <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">המרה</div>
+          <div style="font-size: 24px; font-weight: bold; color: #db2777;">${meta.status === 'available' ? `₪${Math.round(meta.salesSpend).toLocaleString()}` : 'לא זמין'}</div>
+          <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">תקציב מכירה ולידים</div>
         </td>
       </tr>
     </table>
@@ -192,10 +225,11 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
     <div style="background: #fafafa; border-radius: 12px; padding: 16px;">
       <h3 style="margin: 0 0 12px; font-size: 14px; color: #374151;">💰 הוצאות ו-ROI</h3>
       <table style="width: 100%; font-size: 13px;">
-        <tr><td style="color: #6b7280;">הוצאה על קמפיינים:</td><td style="font-weight: bold; color: #dc2626; text-align: left;">₪${Math.round(meta.spend).toLocaleString()}</td></tr>
-        <tr><td style="color: #6b7280;">הכנסות מרכישות:</td><td style="font-weight: bold; color: #16a34a; text-align: left;">₪${revenue.toLocaleString()}</td></tr>
-        <tr><td style="color: #6b7280;">ROAS:</td><td style="font-weight: bold; color: ${Number(roas) >= 2 ? '#16a34a' : '#dc2626'}; text-align: left;">${roas}x</td></tr>
-        <tr><td style="color: #6b7280;">רווח נקי (הכנסות - הוצאות):</td><td style="font-weight: bold; color: ${revenue - meta.spend > 0 ? '#16a34a' : '#dc2626'}; text-align: left;">₪${Math.round(revenue - meta.spend).toLocaleString()}</td></tr>
+        <tr><td style="color: #6b7280;">קמפייני מכירה ולידים:</td><td style="font-weight: bold; color: #dc2626; text-align: left;">${meta.status === 'available' ? `₪${Math.round(meta.salesSpend).toLocaleString()}` : 'לא זמין'}</td></tr>
+        <tr><td style="color: #6b7280;">קידומי פרופיל ופוסטים:</td><td style="font-weight: bold; color: #dc2626; text-align: left;">${meta.status === 'available' ? `₪${Math.round(meta.profileBoostSpend).toLocaleString()}` : 'לא זמין'}</td></tr>
+        <tr><td style="color: #6b7280;">סה״כ הוצאות Meta:</td><td style="font-weight: bold; color: #dc2626; text-align: left;">${meta.status === 'available' ? `₪${Math.round(meta.spend).toLocaleString()}` : 'לא זמין'}</td></tr>
+        <tr><td style="color: #6b7280;">הכנסות Grow מאומתות:</td><td style="font-weight: bold; color: #16a34a; text-align: left;">₪${revenue.toLocaleString()}</td></tr>
+        <tr><td style="color: #6b7280;">יחס הכנסות / הוצאות Meta (לא ייחוס):</td><td style="font-weight: bold; color: ${Number(revenueToSpend) >= 2 ? '#16a34a' : '#dc2626'}; text-align: left;">${revenueToSpend === 'N/A' ? 'לא זמין' : `${revenueToSpend}x`}</td></tr>
       </table>
     </div>
   </div>
@@ -227,12 +261,10 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
     </table>
   </div>` : ''}
   
-  <!-- Recommendations -->
+  <!-- Measurement note -->
   <div style="padding: 0 24px 24px;">
-    <h3 style="margin: 0 0 8px; font-size: 14px; color: #374151;">💡 המלצות</h3>
-    ${winners.length > 0 ? `<div style="background: #f0fdf4; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 12px;"><strong style="color: #166534;">✅ להגדיל:</strong> <span style="color: #15803d;">${winners.map((c: any) => c.name.substring(0, 25)).join(', ')} — מביאים רכישות בעלות טובה</span></div>` : ''}
-    ${losers.length > 0 ? `<div style="background: #fef2f2; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 12px;"><strong style="color: #991b1b;">⚠️ לשקול לכבות:</strong> <span style="color: #b91c1c;">${losers.map((c: any) => c.name.substring(0, 25)).join(', ')} — הוצאה ללא המרות</span></div>` : ''}
-    <div style="background: #eff6ff; border-radius: 8px; padding: 10px 12px; font-size: 12px;"><strong style="color: #1e40af;">📊 סיכום:</strong> <span style="color: #1d4ed8;">${revenue > meta.spend ? `רווחי השבוע! הכנסת ₪${Math.round(revenue - meta.spend).toLocaleString()} מעבר להוצאות.` : meta.spend > 0 ? `ההוצאות גבוהות מההכנסות ב-₪${Math.round(meta.spend - revenue).toLocaleString()}. כדאי לבדוק קמפיינים לא ממירים.` : 'אין נתוני הוצאות השבוע.'}</span></div>
+    <h3 style="margin: 0 0 8px; font-size: 14px; color: #374151;">הבהרת מדידה</h3>
+    <div style="background: #eff6ff; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #1d4ed8;">הכנסות Grow הן עסקאות מאומתות. לידים ורכישות ברמת קמפיין הם דיווחי Meta לפי חלון הייחוס שלה. היחס הכולל אינו מוכיח שכל ההכנסה נוצרה מהקמפיינים.</div>
   </div>
   
   <!-- Footer -->
@@ -247,7 +279,7 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
       to: { email: "hilitcaspi@gmail.com", name: "הילית כספי" },
       subject: `📊 דוח שבועי: ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות`,
       htmlContent: html,
-      textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות. הוצאה: ₪${Math.round(meta.spend).toLocaleString()}. ROAS: ${roas}x.`,
+      textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות Grow מאומתות, ₪${revenue.toLocaleString()} הכנסות. הוצאות Meta: ${metaSpendText}. יחס הכנסות להוצאות Meta, ללא ייחוס: ${revenueToSpend}.`,
     });
     
     // Also send to Shahar Netanel
@@ -255,7 +287,7 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
       to: { email: "shaharnat08@gmail.com", name: "שחר נתנאל" },
       subject: `📊 דוח שבועי: ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות`,
       htmlContent: html,
-      textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות. הוצאה: ₪${Math.round(meta.spend).toLocaleString()}. ROAS: ${roas}x.`,
+      textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות Grow מאומתות, ₪${revenue.toLocaleString()} הכנסות. הוצאות Meta: ${metaSpendText}. יחס הכנסות להוצאות Meta, ללא ייחוס: ${revenueToSpend}.`,
     });
     
     // Also send to Netaneal (campaign manager)
@@ -263,7 +295,7 @@ export async function generateAndSendWeeklyReport(): Promise<{ success: boolean;
       to: { email: "netaneal@menteshdigital.com", name: "נתנאל" },
       subject: `📊 דוח שבועי: ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות`,
       htmlContent: html,
-      textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות, ₪${revenue.toLocaleString()} הכנסות. הוצאה: ₪${Math.round(meta.spend).toLocaleString()}. ROAS: ${roas}x.`,
+      textContent: `דוח שבועי (${dateRange}): ${leads} לידים, ${purchases} רכישות Grow מאומתות, ₪${revenue.toLocaleString()} הכנסות. הוצאות Meta: ${metaSpendText}. יחס הכנסות להוצאות Meta, ללא ייחוס: ${revenueToSpend}.`,
     });
     
     console.log(`[WeeklyReport] Sent: leads=${leads}, purchases=${purchases}, revenue=₪${revenue}, spend=₪${Math.round(meta.spend)}`);

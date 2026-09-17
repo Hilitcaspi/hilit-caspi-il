@@ -10,7 +10,12 @@ export type DashboardDailyRevenue = {
   purchases: number;
   databasePurchases: number;
   revenue: number;
+  databaseRevenue: number;
 };
+
+export function isVerifiedBusinessPayment(row: DashboardPaymentRow) {
+  return row.amountSource === "grow" && row.amountAgorot > 100;
+}
 
 export function israelDateKey(timestamp: number): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -27,22 +32,27 @@ export function aggregateVerifiedGrowPayments(rows: DashboardPaymentRow[]): Dash
   const days = new Map<string, DashboardDailyRevenue>();
 
   for (const row of rows) {
-    if (row.amountSource !== "grow") continue;
+    if (!isVerifiedBusinessPayment(row)) continue;
     const date = israelDateKey(row.paidAt);
-    const current = days.get(date) ?? { date, purchases: 0, databasePurchases: 0, revenue: 0 };
+    const current = days.get(date) ?? { date, purchases: 0, databasePurchases: 0, revenue: 0, databaseRevenue: 0 };
     current.purchases += 1;
     current.databasePurchases += row.product === "database" ? 1 : 0;
     current.revenue += row.amountAgorot / 100;
+    if (row.product === "database") current.databaseRevenue += row.amountAgorot / 100;
     days.set(date, current);
   }
 
   return Array.from(days.values())
-    .map(day => ({ ...day, revenue: Math.round(day.revenue * 100) / 100 }))
+    .map(day => ({
+      ...day,
+      revenue: Math.round(day.revenue * 100) / 100,
+      databaseRevenue: Math.round(day.databaseRevenue * 100) / 100,
+    }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function summarizeVerifiedGrowPayments(rows: DashboardPaymentRow[]) {
-  const verified = rows.filter(row => row.amountSource === "grow");
+  const verified = rows.filter(isVerifiedBusinessPayment);
   const productSales: Record<string, number> = {};
   let revenue = 0;
 
