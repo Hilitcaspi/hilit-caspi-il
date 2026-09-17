@@ -104,16 +104,19 @@ export default function PlusPilotAdminSection() {
 
       {relaunchStats.cohort > 0 && <div className="mt-3 rounded-xl border border-pink-200 bg-pink-50 p-3">
         <div className="flex items-center justify-between gap-2"><strong className="text-xs text-pink-950">גל ההשקה עם מתנת המדריך</strong><span className="text-[10px] text-pink-800">חלון אישי של 72 שעות</span></div>
-        <div className="mt-2 grid grid-cols-3 gap-1 text-center text-[10px] sm:grid-cols-6">
+        <div className="mt-2 grid grid-cols-3 gap-1 text-center text-[10px] sm:grid-cols-8">
           {[
             ["קהל", relaunchStats.cohort],
             ["מייל נשלח", relaunchStats.emailSent],
             ["SMS נשלח", relaunchStats.smsSent],
+            ["SMS נכשל", relaunchStats.smsFailed],
+            ["ללא נייד", relaunchStats.noMobile],
             ["פתחו מייל", relaunchStats.uniqueOpened],
             ["הקליקו", relaunchStats.uniqueClicked],
             ["רכשו", relaunchStats.active],
           ].map(([label, value]) => <div key={String(label)} className="rounded-lg bg-white/80 p-2"><strong className="block text-sm text-[#191265]">{value}</strong>{label}</div>)}
         </div>
+        {relaunchStats.smsFailed > 0 && <p className="mt-2 text-[10px] text-amber-800">הודעות ה־SMS שנכשלו נשמרו וניתנות לשליחה חוזרת בטוחה לאחר חידוש יתרת Vibrate; המייל כבר נשלח אליהן.</p>}
       </div>}
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">

@@ -446,12 +446,18 @@ export const plusPilotRouter = router({
       },
     };
     const relaunchMembers = rows.filter(row => row.pilot.pilotCohort === PLUS_RELAUNCH_COHORT);
+    const relaunchSmsRecipients = new Set(relaunchLogs
+      .filter(row => row.journeyKey === PLUS_RELAUNCH_SMS_JOURNEY)
+      .map(row => row.recipientEmail.toLowerCase()));
     const relaunchStats = {
       cohort: relaunchMembers.length,
       invited: relaunchMembers.filter(row => row.pilot.status === "invited").length,
       active: relaunchMembers.filter(row => row.pilot.status === "active").length,
       emailSent: relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_EMAIL_JOURNEY && row.status === "sent").length,
+      emailFailed: relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_EMAIL_JOURNEY && row.status === "failed").length,
       smsSent: relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_SMS_JOURNEY && row.status === "sent").length,
+      smsFailed: relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_SMS_JOURNEY && row.status === "failed").length,
+      noMobile: relaunchMembers.filter(row => !relaunchSmsRecipients.has(String(row.single.email || "").toLowerCase())).length,
       uniqueOpened: new Set(relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_EMAIL_JOURNEY && row.openedAt).map(row => row.recipientEmail.toLowerCase())).size,
       uniqueClicked: new Set(relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_EMAIL_JOURNEY && row.clickedAt).map(row => row.recipientEmail.toLowerCase())).size,
     };

@@ -3047,5 +3047,6 @@
 - [x] Audit the previous launch funnel and identify the 45 safe unsent recipients
 - [x] Create a measured 72-hour relaunch offer with the Choose Right guide bonus
 - [x] Add campaign funnel metrics to the Plus CRM tab
-- [ ] Publish the corrected Plus experience and sync GitHub
-- [ ] Prepare, send and verify the relaunch email and SMS cohort
+- [x] Publish the corrected Plus experience and sync GitHub
+- [x] Prepare, send and verify the relaunch cohort: 45 emails and 29 SMS accepted
+- [ ] Retry only the 15 failed SMS after Vibrate credit is replenished
