@@ -168,11 +168,13 @@ describe("CRM Matchmaking Overhaul - Procedures", () => {
       ).rejects.toThrow();
     });
 
-    it("should return array for admin", async () => {
+    it("should return a paginated result for admin", async () => {
       const { ctx } = createAdminContext();
       const trpc = caller(ctx);
       const result = await (trpc.matchmaking as any).getSinglesWithoutMatches();
-      expect(Array.isArray(result)).toBe(true);
+      expect(Array.isArray(result.items)).toBe(true);
+      expect(result.total).toBeTypeOf("number");
+      expect(result.page).toBe(1);
     });
   });
 });

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNotNull, isNull, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { z } from "zod";
 import {
@@ -10,6 +10,8 @@ import {
   testimonialUsage,
   feedbackAutomationSettings,
   emailLog,
+  feedbackFollowupContacts,
+  feedbackFollowups,
   matches,
   singles,
   webhookIdempotency,
@@ -37,6 +39,7 @@ import {
   sendFeedbackRequestBatch,
   sendFeedbackRequestNow,
 } from "./feedbackAutomation";
+import { syncAllFeedbackFollowups, upsertFeedbackFollowup } from "./feedbackFollowup";
 import {
   buildTestimonialDraft,
   consentAllowsChannel,
@@ -250,6 +253,93 @@ export const testimonialRouter = router({
         usage: usageRows.filter(usage => usage.recordId === record.id),
         publicFormPath: `/testimonial/feedback?token=${record.publicToken}`,
       }));
+    }),
+
+    followupOverview: teamProcedure.query(async () => {
+      const db = await requireDb();
+      const rows = await db.select().from(feedbackFollowups);
+      const active = rows.filter(row => !["resolved", "dismissed"].includes(row.status));
+      return {
+        total: rows.length,
+        open: active.length,
+        urgent: active.filter(row => row.priority === "urgent").length,
+        high: active.filter(row => row.priority === "high").length,
+        positive: active.filter(row => row.isPositive).length,
+        serviceRecovery: active.filter(row => row.needsServiceRecovery).length,
+        matchmakingAttention: active.filter(row => row.needsMatchmakingAttention).length,
+        personalAttention: active.filter(row => row.needsPersonalAttention).length,
+        publishingReview: active.filter(row => row.needsPublishingReview).length,
+        waitingCustomer: rows.filter(row => row.status === "waiting_customer").length,
+        resolved: rows.filter(row => row.status === "resolved").length,
+        overdue: active.filter(row => row.nextActionAt && row.nextActionAt < Date.now()).length,
+      };
+    }),
+
+    followups: teamProcedure.input(z.object({
+      queue: z.enum(["all", "positive", "service_recovery", "matchmaking", "personal", "publishing"]).default("all"),
+      status: z.enum(["all", "open", "in_progress", "waiting_customer", "resolved", "dismissed"]).default("all"),
+      limit: z.number().int().min(1).max(250).default(150),
+    }).optional()).query(async ({ input }) => {
+      const db = await requireDb();
+      const conditions = [];
+      if (input?.status && input.status !== "all") conditions.push(eq(feedbackFollowups.status, input.status));
+      if (input?.queue === "positive") conditions.push(eq(feedbackFollowups.isPositive, true));
+      if (input?.queue === "service_recovery") conditions.push(eq(feedbackFollowups.needsServiceRecovery, true));
+      if (input?.queue === "matchmaking") conditions.push(eq(feedbackFollowups.needsMatchmakingAttention, true));
+      if (input?.queue === "personal") conditions.push(eq(feedbackFollowups.needsPersonalAttention, true));
+      if (input?.queue === "publishing") conditions.push(eq(feedbackFollowups.needsPublishingReview, true));
+      const rows = await db.select({ followup: feedbackFollowups, record: testimonialRecords })
+        .from(feedbackFollowups)
+        .innerJoin(testimonialRecords, eq(feedbackFollowups.testimonialRecordId, testimonialRecords.id))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(asc(feedbackFollowups.status), desc(feedbackFollowups.priority), asc(feedbackFollowups.nextActionAt), desc(feedbackFollowups.updatedAt))
+        .limit(input?.limit ?? 150);
+      const followupIds = rows.map(row => row.followup.id);
+      const contacts = followupIds.length
+        ? await db.select().from(feedbackFollowupContacts).where(inArray(feedbackFollowupContacts.followupId, followupIds)).orderBy(desc(feedbackFollowupContacts.contactedAt))
+        : [];
+      return rows.map(row => ({ ...row, contacts: contacts.filter(contact => contact.followupId === row.followup.id) }));
+    }),
+
+    syncFollowups: teamProcedure.mutation(async () => {
+      const db = await requireDb();
+      return syncAllFeedbackFollowups(db);
+    }),
+
+    updateFollowup: teamProcedure.input(z.object({
+      id: z.number().int().positive(),
+      status: z.enum(["open", "in_progress", "waiting_customer", "resolved", "dismissed"]).optional(),
+      priority: z.enum(["normal", "high", "urgent"]).optional(),
+      ownerNotes: z.string().max(5000).nullable().optional(),
+      nextActionAt: z.number().nullable().optional(),
+      contactChannel: z.enum(["email", "sms", "phone", "whatsapp", "other"]).optional(),
+      contactNote: z.string().max(3000).optional(),
+      outcome: z.string().max(3000).nullable().optional(),
+    })).mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      const { id, contactChannel, contactNote, ...changes } = input;
+      const now = Date.now();
+      await db.update(feedbackFollowups).set({
+        ...changes,
+        ...(contactChannel ? {
+          contactChannel,
+          contactNote: contactNote || null,
+          contactedAt: now,
+          status: changes.status || "waiting_customer",
+        } : {}),
+        resolvedAt: changes.status === "resolved" ? now : changes.status ? null : undefined,
+        updatedAt: now,
+      }).where(eq(feedbackFollowups.id, id));
+      if (contactChannel) {
+        await db.insert(feedbackFollowupContacts).values({
+          followupId: id,
+          channel: contactChannel,
+          note: contactNote || null,
+          contactedAt: now,
+          actorRef: actorFromContext(ctx),
+        });
+      }
+      return { success: true };
     }),
 
     automationOverview: teamProcedure.query(async () => {
@@ -898,6 +988,18 @@ export const testimonialRouter = router({
         lastResponseAt: now,
         updatedAt: now,
       }).where(eq(testimonialRecords.id, record.id));
+      await upsertFeedbackFollowup(db, {
+        ...record,
+        rating: input.rating ?? null,
+        npsScore: input.npsScore ?? null,
+        feedbackText: input.feedbackText,
+        improvementText: input.improvementText || null,
+        testimonialTextOriginal: isSatisfactionSurvey ? null : input.testimonialText || null,
+        consentText: isSatisfactionSurvey ? false : input.consentText,
+        consentPhoto: isSatisfactionSurvey ? false : input.consentPhoto,
+        consentVideo: isSatisfactionSurvey ? false : input.consentVideo,
+        lastResponseAt: now,
+      });
       await appendEvent({ db, recordId: record.id, eventType: "feedback_submitted", actorType: "customer", metadata: { hasTestimonialText: Boolean(input.testimonialText), status } });
       if (anyConsent) await appendEvent({ db, recordId: record.id, eventType: "consent_granted", actorType: "customer", metadata: { consentVersion: TESTIMONIAL_CONSENT_VERSION, channels: allowedChannels } });
       return {

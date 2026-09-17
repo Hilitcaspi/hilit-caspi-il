@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { matches } from "../drizzle/schema";
 import type { getDb } from "./db";
 import { sendSMS } from "./vibrate";
+import { matchDeliveryEventKey, recordMatchDelivery } from "./matchDeliveryLog";
 
 type AppDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type MatchSide = "A" | "B";
@@ -10,6 +11,7 @@ type SmsSender = (phone: string, message: string) => Promise<boolean>;
 
 export type MatchSmsRecipient = {
   side: MatchSide;
+  singleId?: number;
   phone?: string | null;
   firstName: string;
   matchFirstName: string;
@@ -96,6 +98,24 @@ export async function sendInitialMatchSmsOnce(
     const [sentA, sentB] = await Promise.all([
       messageA && canReceiveMatchSms(input.recipientA) ? sender(input.recipientA.phone, messageA) : Promise.resolve(false),
       messageB && canReceiveMatchSms(input.recipientB) ? sender(input.recipientB.phone, messageB) : Promise.resolve(false),
+    ]);
+    await Promise.all([
+      input.recipientA.singleId && messageA ? recordMatchDelivery(db, {
+        eventKey: matchDeliveryEventKey({ matchId: input.matchId, singleId: input.recipientA.singleId, channel: "sms" }),
+        matchId: input.matchId,
+        singleId: input.recipientA.singleId,
+        side: "A",
+        channel: "sms",
+        success: sentA,
+      }) : Promise.resolve(),
+      input.recipientB.singleId && messageB ? recordMatchDelivery(db, {
+        eventKey: matchDeliveryEventKey({ matchId: input.matchId, singleId: input.recipientB.singleId, channel: "sms" }),
+        matchId: input.matchId,
+        singleId: input.recipientB.singleId,
+        side: "B",
+        channel: "sms",
+        success: sentB,
+      }) : Promise.resolve(),
     ]);
     return { skipped: false, sentA, sentB };
   } catch (error) {

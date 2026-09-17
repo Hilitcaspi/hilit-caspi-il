@@ -7,7 +7,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { singles, dnaQuizResults, matches, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, plusCheckoutIntents, matchBoostMemberships } from "../drizzle/schema";
+import { singles, dnaQuizResults, matches, matchDeliveryEvents, feedbackFollowups, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, plusCheckoutIntents, matchBoostMemberships } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
 import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, buildAnonymousBoostCard, cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
@@ -37,6 +37,7 @@ import {
 } from "./emailUnsubscribe";
 import { sendSMS } from "./vibrate";
 import { sendInitialMatchSmsOnce } from "./matchSms";
+import { matchDeliveryEventKey, recordMatchDelivery, recordProposalEmailResults } from "./matchDeliveryLog";
 import { calculateMatchmakingMetrics } from "./matchmakingMetrics";
 import { calculateOutcomeSegments } from "./matchmakingSegments";
 import { calculateAgeFromBirthDate, normalizeIsraeliPhone } from "../shared/profileValidation";
@@ -3001,13 +3002,19 @@ export const appRouter = router({
         const activeMatchA = await db.select({ id: matches.id }).from(matches).where(
           and(
             or(eq(matches.singleAId, input.idA), eq(matches.singleBId, input.idA)),
-            eq(matches.status, "proposed")
+            or(
+              eq(matches.status, "proposed"),
+              and(eq(matches.status, "matched"), isNull(matches.returnedToPoolAt), or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended"))),
+            )
           )
         ).limit(1);
         const activeMatchB = await db.select({ id: matches.id }).from(matches).where(
           and(
             or(eq(matches.singleAId, input.idB), eq(matches.singleBId, input.idB)),
-            eq(matches.status, "proposed")
+            or(
+              eq(matches.status, "proposed"),
+              and(eq(matches.status, "matched"), isNull(matches.returnedToPoolAt), or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended"))),
+            )
           )
         ).limit(1);
         const activeWarnings: string[] = [];
@@ -3045,7 +3052,13 @@ export const appRouter = router({
         const answersB = await db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleB.id)).limit(1);
         const parsedA: MatchAnswer[] = answersA[0]?.answersJson ? (typeof answersA[0].answersJson === 'string' ? JSON.parse(answersA[0].answersJson) : answersA[0].answersJson as MatchAnswer[]) : [];
         const parsedB: MatchAnswer[] = answersB[0]?.answersJson ? (typeof answersB[0].answersJson === 'string' ? JSON.parse(answersB[0].answersJson) : answersB[0].answersJson as MatchAnswer[]) : [];
-        const breakdown = computeFullScoreAdmin(singleA as any, singleB as any, parsedA, parsedB);
+        const breakdown = computeFullScore(singleA as any, singleB as any, parsedA, parsedB);
+        if (breakdown.total === 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: breakdown.details.find(detail => detail.startsWith("פסילה מוחלטת:")) || "ההתאמה סותרת קו אדום ולא תישלח.",
+          });
+        }
         const score = breakdown.total;
 
         let matchId: number;
@@ -3134,16 +3147,20 @@ export const appRouter = router({
           trackingPixelUrl: `${baseUrl}/api/match-open?token=${tokenB}&side=b`,
         });
 
-        await Promise.all([
+        const [emailResultA, emailResultB] = await Promise.all([
           sendEmail({ to: { email: singleA.email!, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
-
+        await recordProposalEmailResults(db, {
+          matchId,
+          recipientA: { singleId: singleA.id, result: emailResultA },
+          recipientB: { singleId: singleB.id, result: emailResultB },
+        });
         await sendInitialMatchSmsOnce(db, {
           matchId,
           score,
-          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
-          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
+          recipientA: { singleId: singleA.id, phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
+          recipientB: { singleId: singleB.id, phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
         });
 
         return { success: true, matchId, score };
@@ -4291,19 +4308,35 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const [singleA] = await db.select().from(singles).where(eq(singles.id, match.singleAId)).limit(1);
         const [singleB] = await db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1);
         if (!singleA || !singleB) throw new TRPCError({ code: "NOT_FOUND" });
+        const [answerRowA, answerRowB] = await Promise.all([
+          db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleA.id)).limit(1),
+          db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleB.id)).limit(1),
+        ]);
+        const parsedA: MatchAnswer[] = answerRowA[0]?.answersJson ? (typeof answerRowA[0].answersJson === "string" ? JSON.parse(answerRowA[0].answersJson) : answerRowA[0].answersJson as MatchAnswer[]) : [];
+        const parsedB: MatchAnswer[] = answerRowB[0]?.answersJson ? (typeof answerRowB[0].answersJson === "string" ? JSON.parse(answerRowB[0].answersJson) : answerRowB[0].answersJson as MatchAnswer[]) : [];
+        const verifiedBreakdown = computeFullScore(singleA as any, singleB as any, parsedA, parsedB);
+        if (verifiedBreakdown.total === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: verifiedBreakdown.details.find(detail => detail.startsWith("פסילה מוחלטת:")) || "ההתאמה סותרת קו אדום ולא תישלח." });
+        }
 
-        // ⚠️ Check if either single already has an active proposed match
+        // Check whether either person already has an active proposal or connection.
         const activeMatchA = await db.select({ id: matches.id }).from(matches).where(
           and(
             or(eq(matches.singleAId, match.singleAId), eq(matches.singleBId, match.singleAId)),
-            eq(matches.status, "proposed"),
+            or(
+              eq(matches.status, "proposed"),
+              and(eq(matches.status, "matched"), isNull(matches.returnedToPoolAt), or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended"))),
+            ),
             ne(matches.id, input.matchId)
           )
         ).limit(1);
         const activeMatchB = await db.select({ id: matches.id }).from(matches).where(
           and(
             or(eq(matches.singleAId, match.singleBId), eq(matches.singleBId, match.singleBId)),
-            eq(matches.status, "proposed"),
+            or(
+              eq(matches.status, "proposed"),
+              and(eq(matches.status, "matched"), isNull(matches.returnedToPoolAt), or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended"))),
+            ),
             ne(matches.id, input.matchId)
           )
         ).limit(1);
@@ -4330,10 +4363,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           approvalExpiresAt: expiresAt,
           proposedAt: now,
           ownerApprovedAt: now,
+          score: verifiedBreakdown.total,
           updatedAt: now,
         }).where(eq(matches.id, input.matchId));
 
-        const score = match.score ?? 0;
+        const score = verifiedBreakdown.total;
         const baseUrl = "https://hilitcaspi.com";
 
         // Build Hilit's personal note based on DNA compatibility + profile details
@@ -4389,16 +4423,20 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           trackingPixelUrl: `${baseUrl}/api/match-open?token=${tokenB}&side=b`,
         });
 
-        await Promise.all([
+        const [emailResultA, emailResultB] = await Promise.all([
           sendEmail({ to: { email: singleA.email!, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
-
+        await recordProposalEmailResults(db, {
+          matchId: input.matchId,
+          recipientA: { singleId: singleA.id, result: emailResultA },
+          recipientB: { singleId: singleB.id, result: emailResultB },
+        });
         await sendInitialMatchSmsOnce(db, {
           matchId: input.matchId,
           score,
-          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
-          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
+          recipientA: { singleId: singleA.id, phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
+          recipientB: { singleId: singleB.id, phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
         });
 
         await syncBoostRequestAfterMatchDecision(db, { matchId: input.matchId, decision: "approved" });
@@ -4433,6 +4471,28 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const [singleA] = await db.select().from(singles).where(eq(singles.id, match.singleAId)).limit(1);
         const [singleB] = await db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1);
         if (!singleA || !singleB) throw new TRPCError({ code: "NOT_FOUND" });
+        const activeConnection = await db.select({ id: matches.id }).from(matches).where(and(
+          ne(matches.id, match.id),
+          or(
+            eq(matches.singleAId, singleA.id), eq(matches.singleBId, singleA.id),
+            eq(matches.singleAId, singleB.id), eq(matches.singleBId, singleB.id),
+          ),
+          or(
+            eq(matches.status, "proposed"),
+            and(eq(matches.status, "matched"), isNull(matches.returnedToPoolAt), or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended"))),
+          ),
+        )).limit(1);
+        if (activeConnection.length) throw new TRPCError({ code: "CONFLICT", message: "אחד הצדדים כבר בהתאמה או קשר פעיל, ולכן ההצעה לא נשלחה." });
+        const [answerRowA, answerRowB] = await Promise.all([
+          db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleA.id)).limit(1),
+          db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleB.id)).limit(1),
+        ]);
+        const parsedA: MatchAnswer[] = answerRowA[0]?.answersJson ? (typeof answerRowA[0].answersJson === "string" ? JSON.parse(answerRowA[0].answersJson) : answerRowA[0].answersJson as MatchAnswer[]) : [];
+        const parsedB: MatchAnswer[] = answerRowB[0]?.answersJson ? (typeof answerRowB[0].answersJson === "string" ? JSON.parse(answerRowB[0].answersJson) : answerRowB[0].answersJson as MatchAnswer[]) : [];
+        const verifiedBreakdown = computeFullScore(singleA as any, singleB as any, parsedA, parsedB);
+        if (verifiedBreakdown.total === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: verifiedBreakdown.details.find(detail => detail.startsWith("פסילה מוחלטת:")) || "ההתאמה סותרת קו אדום ולא תישלח." });
+        }
         const tokenA = crypto.randomBytes(24).toString("hex");
         const tokenB = crypto.randomBytes(24).toString("hex");
         const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
@@ -4444,9 +4504,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           approvalExpiresAt: expiresAt,
           proposedAt: now,
           ownerApprovedAt: now,
+          score: verifiedBreakdown.total,
           updatedAt: now,
         }).where(eq(matches.id, match.id));
-        const score = match.score ?? 0;
+        const score = verifiedBreakdown.total;
         const baseUrl = "https://hilitcaspi.com";
         const matchReason = `על בסיס ${score}% התאמה, שניכם חולקים ערכים דומים בתחום הזוגיות, אורח החיים והתקשורת. זה בדיוק הסוג של חיבור שמוביל לזוגיות אמיתית. במידה ושניכם תאשרו: יחשפו הפרטים. אם לא: צפו להתאמה הבאה 💛`;
         const emailA = buildMatchProposalEmailTemplate({
@@ -4489,16 +4550,21 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           singleId: singleB.id,
           trackingPixelUrl: `${baseUrl}/api/match-open?token=${tokenB}&side=b`,
         });
-        await Promise.all([
+        const [emailResultA, emailResultB] = await Promise.all([
           sendEmail({ to: { email: singleA.email!, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
           sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
         ]);
+        await recordProposalEmailResults(db, {
+          matchId: match.id,
+          recipientA: { singleId: singleA.id, result: emailResultA },
+          recipientB: { singleId: singleB.id, result: emailResultB },
+        });
         await notifyOwner({ title: "✅ התאמה נשלחה!", content: `ההצעה ל-${singleA.firstName} ו-${singleB.firstName} נשלחה בהצלחה.` });
         await sendInitialMatchSmsOnce(db, {
           matchId: match.id,
           score,
-          recipientA: { phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
-          recipientB: { phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
+          recipientA: { singleId: singleA.id, phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
+          recipientB: { singleId: singleB.id, phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
         });
         return { success: true, action: "approved", sentTo: [singleA.email, singleB.email] };
       }),
@@ -5080,54 +5146,83 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     }),
 
     /**
-     * Admin: get active singles who have NEVER received any match proposal.
-     * Ordered by registration date (oldest first = waiting longest).
+     * Admin: active, eligible singles whose last accepted proposal delivery was
+     * more than 14 days ago (or who never received one). Recipient-level
+     * delivery evidence prevents failed email for one side from being counted.
      */
-    getSinglesWithoutMatches: teamProcedure.query(async ({ ctx }) => {
+    getSinglesWithoutMatches: teamProcedure
+      .input(z.object({ page: z.number().int().min(1).default(1), limit: z.number().int().min(10).max(100).default(40) }).optional())
+      .query(async ({ ctx, input }) => {
       if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
-      if (!db) return [];
+      const page = input?.page ?? 1;
+      const limit = input?.limit ?? 40;
+      if (!db) return { items: [], total: 0, page, limit, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0 } };
 
       // Get all active singles
       const allSingles = await db.select().from(singles)
-        .where(eq(singles.isActive, true))
+        .where(and(
+          eq(singles.isActive, true),
+          eq(singles.isPaid, true),
+          eq(singles.isSeed, false),
+          eq(singles.consentMatchmaking, true),
+          isNotNull(singles.questionnaireCompletedAt),
+        ))
         .orderBy(asc(singles.createdAt)); // oldest first = waiting longest
 
-      // Get only SENT match rows (proposed/matched/rejected/expired) — NOT pending (pending = algorithm generated, never actually sent)
-      const sentMatchRows = await db.select({
-        singleAId: matches.singleAId,
-        singleBId: matches.singleBId,
-        proposedAt: matches.proposedAt,
-        status: matches.status,
-      }).from(matches).where(
-        inArray(matches.status, ["proposed", "matched", "rejected", "expired"])
-      );
+      const [allMatchRows, acceptedDeliveries, feedbackAttentionRows] = await Promise.all([
+        db.select().from(matches),
+        db.select({
+          matchId: matchDeliveryEvents.matchId,
+          singleId: matchDeliveryEvents.singleId,
+          acceptedAt: matchDeliveryEvents.acceptedAt,
+        }).from(matchDeliveryEvents).where(eq(matchDeliveryEvents.status, "accepted")),
+        db.select({ singleId: feedbackFollowups.singleId }).from(feedbackFollowups).where(and(
+          eq(feedbackFollowups.needsMatchmakingAttention, true),
+          inArray(feedbackFollowups.status, ["open", "in_progress", "waiting_customer"]),
+          isNotNull(feedbackFollowups.singleId),
+        )),
+      ]);
+      const sentMatchRows = allMatchRows.filter(wasMatchProposalSent);
+      const fourteenDaysAgo = Date.now() - (14 * 24 * 60 * 60 * 1000);
+      const acceptedByMatchAndSingle = new Set(acceptedDeliveries.map(row => `${row.matchId}:${row.singleId}`));
+      const feedbackAttentionIds = new Set(feedbackAttentionRows.map(row => Number(row.singleId)).filter(Boolean));
 
-      const twoMonthsAgo = Date.now() - (60 * 24 * 60 * 60 * 1000);
-
-      // Track last SENT match date per single, active proposal status, and total sent count
+      // Track the latest provider-accepted delivery for each recipient.
       const lastMatchDateBySingle = new Map<number, number>();
       const activeProposalBySingle = new Map<number, boolean>();
       const sentMatchCountBySingle = new Map<number, number>();
+      for (const delivery of acceptedDeliveries) {
+        const ts = delivery.acceptedAt ?? 0;
+        const prev = lastMatchDateBySingle.get(delivery.singleId) ?? 0;
+        if (ts > prev) lastMatchDateBySingle.set(delivery.singleId, ts);
+      }
       for (const m of sentMatchRows) {
-        const ts = m.proposedAt ?? 0;
-        const ids = [m.singleAId, m.singleBId].filter(Boolean) as number[];
-        for (const id of ids) {
-          const prev = lastMatchDateBySingle.get(id) ?? 0;
-          if (ts > prev) lastMatchDateBySingle.set(id, ts);
+        for (const id of [m.singleAId, m.singleBId]) {
+          if (!acceptedByMatchAndSingle.has(`${m.id}:${id}`)) continue;
           sentMatchCountBySingle.set(id, (sentMatchCountBySingle.get(id) ?? 0) + 1);
-          if (m.status === "proposed") activeProposalBySingle.set(id, true);
+          const stillInActiveConnection = m.status === "proposed"
+            || (m.status === "matched" && !m.returnedToPoolAt && m.matchDetailStatus !== "ended");
+          if (stillInActiveConnection) activeProposalBySingle.set(id, true);
         }
       }
 
-      // Filter to singles who never received a sent match, OR last sent match was 60+ days ago
-      // Also exclude singles currently in an active proposal (they already have a match pending)
+      // Never delivered, or last accepted delivery is older than 14 days.
       const singlesWithout = allSingles.filter(s => {
-        if (activeProposalBySingle.get(s.id)) return false; // currently in active proposal
+        if (activeProposalBySingle.get(s.id)) return false;
+        if (feedbackAttentionIds.has(s.id)) return true;
+        const eligibleSince = Number(s.questionnaireCompletedAt || s.createdAt || Date.now());
         const lastMatch = lastMatchDateBySingle.get(s.id);
-        if (!lastMatch) return true; // never had a sent match
-        return lastMatch < twoMonthsAgo; // last sent match was 60+ days ago
+        if (!lastMatch) return eligibleSince < fourteenDaysAgo;
+        return lastMatch < fourteenDaysAgo;
+      }).sort((a, b) => {
+        const feedbackPriority = Number(feedbackAttentionIds.has(b.id)) - Number(feedbackAttentionIds.has(a.id));
+        if (feedbackPriority) return feedbackPriority;
+        const aWaitingFrom = lastMatchDateBySingle.get(a.id) || Number(a.questionnaireCompletedAt || a.createdAt || Date.now());
+        const bWaitingFrom = lastMatchDateBySingle.get(b.id) || Number(b.questionnaireCompletedAt || b.createdAt || Date.now());
+        return aWaitingFrom - bWaitingFrom;
       });
+      const pagedSingles = singlesWithout.slice((page - 1) * limit, page * limit);
 
       // For each, find potential matches from the pool
       const pool = allSingles.map(s => ({
@@ -5145,19 +5240,16 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         answersBySingleId.set(row.singleId, parsed);
       }
 
-      return singlesWithout.map(s => {
+      const items = pagedSingles.map(s => {
         const sAnswers = answersBySingleId.get(s.id) ?? [];
 
         // Find top 3 potential matches using the full algorithm
-        const candidates = pool.filter(c =>
-          c.id !== s.id &&
-          c.gender !== s.gender
-        );
+        const candidates = pool.filter(c => c.id !== s.id && !activeProposalBySingle.get(c.id));
 
         const suggestions = candidates
           .map(c => {
             const cAnswers = answersBySingleId.get(c.id) ?? [];
-            const breakdown = computeFullScoreAdmin(s as any, c as any, sAnswers, cAnswers);
+            const breakdown = computeFullScore(s as any, c as any, sAnswers, cAnswers);
             return {
               id: c.id,
               name: `${c.firstName} ${c.lastName || ''}`.trim(),
@@ -5188,12 +5280,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               totalSentMatches: sentMatchCountBySingle.get(c.id) ?? 0,
             };
           })
+          .filter(candidate => candidate.score >= 60)
           .sort((a, b) => b.score - a.score)
           .slice(0, 3);
 
-        const waitingDays = s.createdAt
-          ? Math.floor((Date.now() - (typeof s.createdAt === 'number' ? s.createdAt : new Date(s.createdAt).getTime())) / (1000 * 60 * 60 * 24))
-          : 0;
+        const waitingFrom = lastMatchDateBySingle.get(s.id) || Number(s.questionnaireCompletedAt || s.createdAt || Date.now());
+        const waitingDays = Math.max(0, Math.floor((Date.now() - waitingFrom) / (1000 * 60 * 60 * 24)));
 
         return {
           id: s.id,
@@ -5230,9 +5322,24 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           createdAt: s.createdAt,
           waitingDays,
           lastMatchAt: lastMatchDateBySingle.get(s.id) ?? null,
+          feedbackNeedsMatchmaking: feedbackAttentionIds.has(s.id),
           suggestions,
         };
       });
+      return {
+        items,
+        total: singlesWithout.length,
+        page,
+        limit,
+        summary: {
+          over14: singlesWithout.filter(item => {
+            const waitingFrom = lastMatchDateBySingle.get(item.id) || Number(item.questionnaireCompletedAt || item.createdAt || Date.now());
+            return waitingFrom < fourteenDaysAgo;
+          }).length,
+          fromFeedback: singlesWithout.filter(item => feedbackAttentionIds.has(item.id)).length,
+          neverDelivered: singlesWithout.filter(item => !lastMatchDateBySingle.has(item.id)).length,
+        },
+      };
     }),
 
     /**
@@ -5642,7 +5749,21 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           </div>` : ''}
           <p style="color:#727272;font-size:12px;">בברכה, הילית כספי</p>
         </div>`;
-        await sendEmail({ to: { email: single.email, name: single.firstName }, subject, htmlContent: html });
+        const attemptedAt = Date.now();
+        const result = await sendEmail({ to: { email: single.email, name: single.firstName }, subject, htmlContent: html });
+        await recordMatchDelivery(db, {
+          eventKey: matchDeliveryEventKey({ matchId: match.id, singleId: single.id, channel: "email", attemptType: "followup", attemptRef: attemptedAt }),
+          matchId: match.id,
+          singleId: single.id,
+          side: isA ? "A" : "B",
+          channel: "email",
+          attemptType: "followup",
+          success: result.success,
+          providerMessageId: result.messageId,
+          failureReason: result.error,
+          attemptedAt,
+        });
+        if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "ספק המייל לא קיבל את התזכורת" });
         return { success: true };
       }),
     /**

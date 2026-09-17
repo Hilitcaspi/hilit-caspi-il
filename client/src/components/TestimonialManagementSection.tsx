@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from "sonner";
 import { Archive, CheckCircle2, Clipboard, Eye, FileVideo, Filter, Image as ImageIcon, Loader2, MailCheck, Plus, RefreshCw, Search, ShieldCheck, XCircle } from "lucide-react";
 import TestimonialCreativeLibrarySection from "./TestimonialCreativeLibrarySection";
+import FeedbackFollowupBoard from "./FeedbackFollowupBoard";
 
 const statusLabels: Record<string, string> = {
   draft: "טיוטה",
@@ -95,7 +96,7 @@ type Touchpoint = "manual" | "match_mutual" | "match_week" | "dna_result" | "dat
 
 export default function TestimonialManagementSection({ preview = false }: { preview?: boolean }) {
   const utils = trpc.useUtils();
-  const [view, setView] = useState<"pipeline" | "library">("pipeline");
+  const [view, setView] = useState<"pipeline" | "followups" | "library">("followups");
   const [quickView, setQuickView] = useState<"all" | "positive" | "review" | "satisfaction" | "outreach">("positive");
   const [status, setStatus] = useState<RecordStatus | "all">("all");
   const [sourceType, setSourceType] = useState<SourceType | "all">("all");
@@ -171,6 +172,7 @@ export default function TestimonialManagementSection({ preview = false }: { prev
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant={view === "pipeline" ? "default" : "outline"} onClick={() => setView("pipeline")} className="rounded-full">המשפך</Button>
+          <Button variant={view === "followups" ? "default" : "outline"} onClick={() => setView("followups")} className="rounded-full">מעקב וטיפול</Button>
           <Button variant={view === "library" ? "default" : "outline"} onClick={() => setView("library")} className="rounded-full">ספר מאושרות</Button>
           {view === "pipeline" && !preview && <CreateDraftDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={async id => { setSelectedId(id); await refreshAll(); }} />}
           {view === "pipeline" && !preview && <Button variant="outline" disabled={syncCandidates.isPending} onClick={async () => {
@@ -193,7 +195,7 @@ export default function TestimonialManagementSection({ preview = false }: { prev
         ].map(([key, label]) => <Button key={key} size="sm" variant={quickView === key ? "default" : "outline"} onClick={() => chooseQuickView(key as typeof quickView)} className="rounded-full">{label}</Button>)}
       </div>}
 
-      {view === "library" ? <div className="mt-6"><TestimonialCreativeLibrarySection /></div> : <>
+      {view === "library" ? <div className="mt-6"><TestimonialCreativeLibrarySection /></div> : view === "followups" ? <FeedbackFollowupBoard /> : <>
         <div className={`mt-6 rounded-2xl border p-4 ${automation?.settings?.enabled ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="font-bold text-[#2a1712]">מצב האוטומציה: {automation?.settings?.enabled ? "פעילה" : "כבויה"}</p><p className="mt-1 text-sm text-[#6f5d55]">{automation?.settings?.enabled ? "התור נבדק כל חצי שעה. אחרי כן הדדי נשלחת בקשת משוב ייעודית במייל וב־SMS; תזכורת שבועית נשלחת במייל בלבד." : "האוטומציה כבויה ולא נשלחות פניות חדשות."}</p></div><div className="flex flex-wrap gap-2 text-xs"><Badge variant="outline">ממתינות: {automation?.queued || 0}</Badge><Badge variant="outline">מוכנות עכשיו: {automation?.dueNow || 0}</Badge><Badge variant="outline">מיילים התקבלו בספק: {automation?.emailAccepted || 0}</Badge><Badge variant="outline">SMS התקבלו בספק: {automation?.smsAccepted || 0}</Badge><Badge variant="outline">צינון: {automation?.settings?.cooldownDays || 45} ימים</Badge></div></div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">

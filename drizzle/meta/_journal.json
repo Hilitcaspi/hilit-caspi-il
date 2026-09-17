@@ -169,6 +169,20 @@
       "when": 1789295061256,
       "tag": "0023_little_shooting_star",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1789676631577,
+      "tag": "0024_lively_karen_page",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1789678063925,
+      "tag": "0025_windy_shotgun",
+      "breakpoints": true
     }
   ]
 }

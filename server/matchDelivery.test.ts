@@ -39,4 +39,13 @@ describe("wasMatchProposalSent", () => {
     expect(ownerApprovalSource).toContain("wasMatchProposalSent(match)");
     expect(ownerApprovalSource).toContain("לא תישלח פעם נוספת");
   });
+
+  it("treats a mutual match as active until it is returned to the pool", () => {
+    const start = routerSource.indexOf("createAndSendMatch: teamProcedure");
+    const end = routerSource.indexOf("adminCreateMatch: teamProcedure", start);
+    const createAndSendSource = routerSource.slice(start, end);
+    expect(createAndSendSource).toContain('eq(matches.status, "matched")');
+    expect(createAndSendSource).toContain("isNull(matches.returnedToPoolAt)");
+    expect(createAndSendSource).toContain('ne(matches.matchDetailStatus, "ended")');
+  });
 });

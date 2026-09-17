@@ -3072,3 +3072,20 @@
 - [x] Fix the reversed RTL NPS scale and mark historical NPS values as unreliable
 - [x] Document the findings and proposed recovery process
 - [~] Deferred pending explicit approval: grant benefits or contact the recovery cohorts
+
+## Smart feedback follow-up and matchmaking care queue (September 18)
+
+- [x] Create one operational follow-up record for every submitted feedback response and auto-create it for future responses
+- [x] Separate positive feedback, service recovery, matchmaking attention, personal attention and publishing review queues
+- [x] Add priority, next-action deadlines, workflow statuses, internal notes and resolution outcomes
+- [x] Add append-only contact history for email, SMS, phone and WhatsApp follow-up
+- [x] Reconcile and sync all 106 existing feedback responses without sending benefits or customer messages
+- [x] Correct historical NPS handling and prevent positive match feedback from entering the matchmaking-problem queue
+- [x] Replace the stale unmatched tab with a recipient-delivery-based 14-day care queue
+- [x] Include open matchmaking feedback in the care queue while excluding unpaid drafts and active relationships
+- [x] Add pagination and operational counts for over-14-day, feedback-driven and never-delivered profiles
+- [x] Backfill recipient-level delivery history idempotently and record future email/SMS delivery per recipient
+- [x] Enforce existing questionnaire red lines for children, marriage, existing children and animal allergy
+- [x] Block new proposals when either person is already in an active proposal or unreleased mutual match
+- [x] Audit the full production queue: 718 eligible members, 692 with valid suggestions and 26 without a current suggestion
+- [ ] Run final full tests, publish, sync GitHub and verify the live bundles

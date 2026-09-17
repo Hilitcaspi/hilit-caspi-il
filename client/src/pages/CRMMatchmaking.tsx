@@ -348,6 +348,7 @@ export default function CRMMatchmaking() {
   const [photoUploadSingleId, setPhotoUploadSingleId] = useState<number | null>(null);
   const [editingSingleId, setEditingSingleId] = useState<number | null>(null);
   const [topMatchesPage, setTopMatchesPage] = useState<Record<number, number>>({}); // singleId -> page (0=first 3, 1=next 3, etc.)
+  const [unmatchedPage, setUnmatchedPage] = useState(1);
 
   // Queries
   const { data: singles = [], refetch: refetchSingles } = trpc.matchmaking.listSingles.useQuery(undefined, {
@@ -359,9 +360,10 @@ export default function CRMMatchmaking() {
   const { data: tokens = [], refetch: refetchTokens } = trpc.invites.getAll.useQuery(undefined, {
     enabled: !!user && user.role === "admin",
   });
-  const { data: singlesWithoutMatches = [], refetch: refetchUnmatched } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery(undefined, {
+  const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0 } }, refetch: refetchUnmatched } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40 }, {
     enabled: !!user && user.role === "admin" && activeTab === "unmatched",
   });
+  const singlesWithoutMatches = unmatchedResult.items ?? [];
   const { data: inactiveSingles = [] } = (trpc.matchmaking as any).listInactiveSingles.useQuery(undefined, {
     enabled: !!user && user.role === "admin" && activeTab === "inactive_leads",
   });
@@ -863,7 +865,7 @@ export default function CRMMatchmaking() {
           {[
             { id: "singles" as const, label: "חברי המאגר", icon: <Users size={14} /> },
             { id: "matches" as const, label: `התאמות (${pendingCount} ממתינות)`, icon: <Heart size={14} /> },
-            { id: "unmatched" as const, label: "ללא התאמה", icon: <Clock size={14} /> },
+            { id: "unmatched" as const, label: "התאמות לטיפול", icon: <Clock size={14} /> },
             { id: "inactive_leads" as const, label: "לידים מאגר", icon: <span>💰</span> },
             { id: "tokens" as const, label: "טוקנים חינמיים", icon: <Gift size={14} /> },
             { id: "missing_data" as const, label: "חסרי נתונים ⚠️", icon: <span>🔧</span> },
@@ -2184,8 +2186,10 @@ export default function CRMMatchmaking() {
           <div className="space-y-3">
             <div className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold text-[#191265]">🔍 לא קיבלו התאמה בחודשיים האחרונים</p>
-                <p className="text-xs text-[#727272]">רווקים פעילים שלא נשלחה להם הצעה ב-60 הימים האחרונים (כולל מי שמעולם לא קיבל)</p>
+                <p className="text-sm font-bold text-[#191265]">🔍 לא קיבלו התאמה יותר מ־14 יום או ביקשו טיפול דרך המשוב</p>
+                <p className="text-xs text-[#727272]">רק חברי מאגר פעילים ומשולמים, עם שאלון והסכמה. הספירה מבוססת על מסירה אישית שנרשמה או שוחזרה מנתוני העבר, ולא על מועמדות פנימית שלא נשלחה.</p>
+                <p className="text-xs font-semibold text-[#191265] mt-1">{unmatchedResult.total} ממתינים לטיפול · עמוד {unmatchedResult.page} מתוך {Math.max(1, Math.ceil(unmatchedResult.total / unmatchedResult.limit))}</p>
+                <div className="flex flex-wrap gap-2 mt-2 text-[10px]"><span className="bg-orange-100 text-orange-800 rounded-full px-2 py-1">{unmatchedResult.summary.over14} מעל 14 יום</span><span className="bg-violet-100 text-violet-800 rounded-full px-2 py-1">{unmatchedResult.summary.fromFeedback} בעקבות משוב</span><span className="bg-red-100 text-red-800 rounded-full px-2 py-1">{unmatchedResult.summary.neverDelivered} מעולם לא קיבלו</span></div>
               </div>
               <button
                 onClick={() => refetchUnmatched()}
@@ -2198,11 +2202,11 @@ export default function CRMMatchmaking() {
             {(singlesWithoutMatches as any[]).length === 0 ? (
               <div className="bg-white rounded-xl p-8 text-center">
                 <div className="text-4xl mb-3">🎉</div>
-                <p className="text-[#191265] font-bold">כל הרווקים קיבלו התאמה!</p>
-                <p className="text-xs text-[#727272] mt-1">אין רווקים פעילים ללא התאמה כרגע</p>
+                <p className="text-[#191265] font-bold">אין כרגע התאמות שממתינות לטיפול</p>
+                <p className="text-xs text-[#727272] mt-1">אין פרופיל שעבר 14 יום ואין פידבק פתוח שדורש בדיקת התאמות</p>
               </div>
-            ) : (
-              (singlesWithoutMatches as any[]).map((s: any) => (
+            ) : (<>
+              {(singlesWithoutMatches as any[]).map((s: any) => (
                 <div key={s.id} className={`rounded-xl shadow-sm overflow-hidden ${s.isCoachingClient ? 'bg-pink-50 border border-pink-200 ring-1 ring-pink-100' : 'bg-white border border-orange-100'}`}>
                   <div className="p-4">
                     {/* Person header */}
@@ -2225,8 +2229,9 @@ export default function CRMMatchmaking() {
                           <p className="font-bold text-[#191265]">{s.firstName} {s.lastName || ''}</p>
                           {s.isCoachingClient && <span className="text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
                           {s.isNotBasic && <span className="text-[9px] bg-amber-200 text-amber-800 font-bold px-1.5 py-0.5 rounded-full">⭐ דורש תשומת לב</span>}
+                          {s.feedbackNeedsMatchmaking && <span className="text-[9px] bg-violet-100 text-violet-800 font-bold px-1.5 py-0.5 rounded-full">💬 נכנס בעקבות משוב</span>}
                           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
-                            ⏳ {s.waitingDays} ימים במאגר
+                            ⏳ {s.waitingDays} ימים ללא התאמה שנמסרה
                           </span>
                           {s.lastMatchAt ? (
                             <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-semibold">
@@ -2371,8 +2376,9 @@ export default function CRMMatchmaking() {
                     )}
                   </div>
                 </div>
-              ))
-            )}
+              ))}
+              {unmatchedResult.total > unmatchedResult.limit && <div className="flex items-center justify-center gap-3 bg-white rounded-xl p-3 shadow-sm"><button disabled={unmatchedPage <= 1} onClick={() => setUnmatchedPage(page => Math.max(1, page - 1))} className="px-4 py-2 rounded-lg border text-sm font-semibold disabled:opacity-40">הקודם</button><span className="text-sm text-[#727272]">עמוד {unmatchedPage} מתוך {Math.ceil(unmatchedResult.total / unmatchedResult.limit)}</span><button disabled={unmatchedPage >= Math.ceil(unmatchedResult.total / unmatchedResult.limit)} onClick={() => setUnmatchedPage(page => page + 1)} className="px-4 py-2 rounded-lg bg-[#191265] text-white text-sm font-semibold disabled:opacity-40">הבא</button></div>}
+            </>)}
           </div>
         )}
 

@@ -267,6 +267,81 @@ export type Match = typeof matches.$inferSelect;
 export type InsertMatch = typeof matches.$inferInsert;
 
 /**
+ * Recipient-level delivery evidence for match proposals.
+ * A match candidate can exist before anything is sent, so proposedAt/status are
+ * not sufficient evidence for the 14-day queue or delivery troubleshooting.
+ */
+export const matchDeliveryEvents = mysqlTable("match_delivery_events", {
+  id: int("id").autoincrement().primaryKey(),
+  eventKey: varchar("eventKey", { length: 191 }).notNull(),
+  matchId: int("matchId").notNull(),
+  singleId: int("singleId").notNull(),
+  side: mysqlEnum("side", ["A", "B"]).notNull(),
+  channel: mysqlEnum("channel", ["email", "sms"]).notNull(),
+  attemptType: mysqlEnum("attemptType", ["initial", "manual_resend", "followup"]).default("initial").notNull(),
+  status: mysqlEnum("status", ["accepted", "failed", "skipped"]).notNull(),
+  providerMessageId: varchar("providerMessageId", { length: 255 }),
+  failureReason: text("failureReason"),
+  attemptedAt: bigint("attemptedAt", { mode: "number" }).notNull(),
+  acceptedAt: bigint("acceptedAt", { mode: "number" }),
+}, table => [
+  uniqueIndex("match_delivery_event_key_unique").on(table.eventKey),
+  index("match_delivery_match_single_idx").on(table.matchId, table.singleId),
+  index("match_delivery_single_status_idx").on(table.singleId, table.status),
+]);
+
+export type MatchDeliveryEvent = typeof matchDeliveryEvents.$inferSelect;
+
+/**
+ * One operational follow-up card per submitted feedback record. Category flags
+ * let the CRM show the same person in the relevant queues without duplicating
+ * ownership, contact history, or resolution state.
+ */
+export const feedbackFollowups = mysqlTable("feedback_followups", {
+  id: int("id").autoincrement().primaryKey(),
+  testimonialRecordId: int("testimonialRecordId").notNull(),
+  singleId: int("singleId"),
+  matchId: int("matchId"),
+  isPositive: boolean("isPositive").default(false).notNull(),
+  needsServiceRecovery: boolean("needsServiceRecovery").default(false).notNull(),
+  needsMatchmakingAttention: boolean("needsMatchmakingAttention").default(false).notNull(),
+  needsPersonalAttention: boolean("needsPersonalAttention").default(false).notNull(),
+  needsPublishingReview: boolean("needsPublishingReview").default(false).notNull(),
+  priority: mysqlEnum("priority", ["normal", "high", "urgent"]).default("normal").notNull(),
+  status: mysqlEnum("status", ["open", "in_progress", "waiting_customer", "resolved", "dismissed"]).default("open").notNull(),
+  recommendedAction: text("recommendedAction"),
+  ownerNotes: text("ownerNotes"),
+  assignedTeamMemberId: int("assignedTeamMemberId"),
+  nextActionAt: bigint("nextActionAt", { mode: "number" }),
+  contactedAt: bigint("contactedAt", { mode: "number" }),
+  contactChannel: mysqlEnum("contactChannel", ["email", "sms", "phone", "whatsapp", "other"]),
+  contactNote: text("contactNote"),
+  outcome: text("outcome"),
+  resolvedAt: bigint("resolvedAt", { mode: "number" }),
+  createdAt: bigint("createdAt", { mode: "number" }).notNull(),
+  updatedAt: bigint("updatedAt", { mode: "number" }).notNull(),
+}, table => [
+  uniqueIndex("feedback_followup_record_unique").on(table.testimonialRecordId),
+  index("feedback_followup_status_priority_idx").on(table.status, table.priority),
+  index("feedback_followup_single_idx").on(table.singleId),
+]);
+
+export type FeedbackFollowup = typeof feedbackFollowups.$inferSelect;
+
+export const feedbackFollowupContacts = mysqlTable("feedback_followup_contacts", {
+  id: int("id").autoincrement().primaryKey(),
+  followupId: int("followupId").notNull(),
+  channel: mysqlEnum("channel", ["email", "sms", "phone", "whatsapp", "other"]).notNull(),
+  note: text("note"),
+  contactedAt: bigint("contactedAt", { mode: "number" }).notNull(),
+  actorRef: varchar("actorRef", { length: 191 }),
+}, table => [
+  index("feedback_followup_contact_idx").on(table.followupId, table.contactedAt),
+]);
+
+export type FeedbackFollowupContact = typeof feedbackFollowupContacts.$inferSelect;
+
+/**
  * CRM Lead statuses:
  * new_lead        - filled DNA quiz + left contact details, no purchase yet
  * needs_followup  - 48h passed with no purchase → flag for WhatsApp follow-up

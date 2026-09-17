@@ -1237,6 +1237,49 @@ function scoreSmokingCompatibility(a: Single, b: Single): { bonus: number; detai
   return { bonus: 2, detail: null };
 }
 
+function numericAnswer(answers: MatchAnswer[], qId: string) {
+  const answer = answers.find(item => item.qId === qId);
+  return answer && typeof answer.myAnswer === "number" ? answer : null;
+}
+
+/**
+ * Hard filters based on answers that already exist in the scientific
+ * questionnaire. A soft preference never becomes a blocker: except for an
+ * explicit allergy, importance=2 is required.
+ */
+export function passesAnswerHardFilters(
+  a: Single,
+  b: Single,
+  answersA: MatchAnswer[],
+  answersB: MatchAnswer[],
+): { pass: boolean; reason?: string } {
+  const kidsA = numericAnswer(answersA, "q_kids_future");
+  const kidsB = numericAnswer(answersB, "q_kids_future");
+  if (kidsA && kidsB) {
+    const opposite = (kidsA.myAnswer === 0 && kidsB.myAnswer === 3) || (kidsA.myAnswer === 3 && kidsB.myAnswer === 0);
+    if (opposite && (kidsA.importance === 2 || kidsB.importance === 2)) return { pass: false, reason: "קו אדום מנוגד בנושא ילדים" };
+  }
+
+  const marriageA = numericAnswer(answersA, "q_marriage");
+  const marriageB = numericAnswer(answersB, "q_marriage");
+  if (marriageA && marriageB) {
+    const opposite = (marriageA.myAnswer === 0 && marriageB.myAnswer === 2) || (marriageA.myAnswer === 2 && marriageB.myAnswer === 0);
+    if (opposite && (marriageA.importance === 2 || marriageB.importance === 2)) return { pass: false, reason: "קו אדום מנוגד בנושא נישואין" };
+  }
+
+  const existingKidsA = numericAnswer(answersA, "q_kids_existing");
+  const existingKidsB = numericAnswer(answersB, "q_kids_existing");
+  if (existingKidsA?.myAnswer === 3 && existingKidsA.importance === 2 && b.hasKids) return { pass: false, reason: "לא פתוח/ה לבן או בת זוג עם ילדים" };
+  if (existingKidsB?.myAnswer === 3 && existingKidsB.importance === 2 && a.hasKids) return { pass: false, reason: "לא פתוח/ה לבן או בת זוג עם ילדים" };
+
+  const petsA = numericAnswer(answersA, "q_pets");
+  const petsB = numericAnswer(answersB, "q_pets");
+  if (petsA?.myAnswer === 3 && b.hasPets) return { pass: false, reason: "אלרגיה לבעלי חיים מול בית עם בעל חיים" };
+  if (petsB?.myAnswer === 3 && a.hasPets) return { pass: false, reason: "אלרגיה לבעלי חיים מול בית עם בעל חיים" };
+
+  return { pass: true };
+}
+
 export function computeFullScore(
   a: Single,
   b: Single,
@@ -1248,6 +1291,16 @@ export function computeFullScore(
   const hardCheck = passesHardFilters(a, b);
   if (!hardCheck.pass) {
     details.push(`פסילה מוחלטת: ${hardCheck.reason}`);
+    return {
+      total: 0, questionnaire: 0, lifeStage: 0, dna: 0, textBonus: 0,
+      practical: 0, religiosity: 0, education: 0, interactionBonus: 0,
+      astrologyBonus: 0, cityIntelligence: 0, details,
+    };
+  }
+
+  const answerHardCheck = passesAnswerHardFilters(a, b, answersA, answersB);
+  if (!answerHardCheck.pass) {
+    details.push(`פסילה מוחלטת: ${answerHardCheck.reason}`);
     return {
       total: 0, questionnaire: 0, lifeStage: 0, dna: 0, textBonus: 0,
       practical: 0, religiosity: 0, education: 0, interactionBonus: 0,
@@ -1315,6 +1368,8 @@ export function computeFullScoreAdmin(
   if (!hardCheck.pass) {
     warnings.push(`⚠️ ${hardCheck.reason}`);
   }
+  const answerHardCheck = passesAnswerHardFilters(a, b, answersA, answersB);
+  if (!answerHardCheck.pass) warnings.push(`⚠️ ${answerHardCheck.reason}`);
   const qScore      = scoreQuestionnaire(answersA, answersB, a, b);
   const lsScore     = scoreLifeStage(a, b);
   const dnaScore    = getDnaSynergy(a.dnaType, b.dnaType, a.gender, b.gender);
