@@ -3049,7 +3049,7 @@
 - [x] Add campaign funnel metrics to the Plus CRM tab
 - [x] Publish the corrected Plus experience and sync GitHub
 - [x] Prepare, send and verify the relaunch cohort: 45 emails and 29 SMS accepted
-- [ ] Retry only the 15 failed SMS after Vibrate credit is replenished
+- [~] Deferred: retry only the 15 failed SMS after the user replenishes Vibrate credit; no duplicate retry will run before then
 
 ## Match history integrity and duplicate-send prevention (September 17)
 - [x] Audit the affected profile's full match history and provider events without exposing personal data
