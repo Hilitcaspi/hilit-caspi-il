@@ -499,11 +499,22 @@ function MatchBoostCard({
   }
 
   if (!status.profileReady) {
+    const missingFields = status.missingProfileFields || [];
     return (
       <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
         <p className="text-xs font-black text-[#ffe27c]">✓ אישור Boost נשמר בפרופיל</p>
-        <h3 className="mt-2 text-xl font-black text-white">האישור הושלם בהצלחה</h3>
-        <p className="mt-3 text-sm leading-7 text-white/85">אפשרויות Boost מתאימות יופיעו כאן כאשר יהיו זמינות עבורך.</p>
+        <h3 className="mt-2 text-xl font-black text-white">נשאר רק להשלים כמה פרטים</h3>
+        <p className="mt-3 text-sm leading-7 text-white/85">כדי שאפשר יהיה לשלוח Boost בבטחה, השלימו את הפרטים הבאים בפרופיל:</p>
+        {missingFields.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {missingFields.map((field: string) => (
+              <span key={field} className="rounded-full bg-white/15 px-3 py-1 text-xs font-black text-white">{field}</span>
+            ))}
+          </div>
+        )}
+        <button type="button" onClick={onCompleteProfile} className="mt-4 w-full rounded-xl bg-[#ffe27c] px-5 py-3 text-sm font-black text-[#191265] transition-transform active:scale-[0.97]">
+          השלמת הפרטים בפרופיל
+        </button>
         <details className="mt-4 text-center text-[11px] text-white/75">
           <summary className="cursor-pointer font-bold text-white">ניהול מסלול Boost</summary>
           <button type="button" disabled={leavePool.isPending} onClick={() => leavePool.mutate({ email, token })} className="mt-2 rounded-lg border border-white/25 bg-white/10 px-3 py-2 font-bold text-white disabled:opacity-50">יציאה מהמסלול</button>
@@ -1007,6 +1018,10 @@ function UpdateProfileSection({ profile, token, autoOpen = false }: { profile: a
   const [submitted, setSubmitted] = useState(false);
   const pendingQuery = trpc.profileUpdates.getMyPending.useQuery({ token }, { enabled: !!token });
 
+  useEffect(() => {
+    if (autoOpen) setShowForm(true);
+  }, [autoOpen]);
+
   if (submitted || pendingQuery.data) {
     return (
       <div className="bg-[#e8f5e9] rounded-2xl p-5 text-right border border-[#a5d6a7]">
@@ -1054,6 +1069,7 @@ export default function UserDashboard() {
         ? requestedTab
         : "profile",
   );
+  const [openProfileEditor, setOpenProfileEditor] = useState(false);
 
   const { data, isLoading, error } = trpc.singles.getDashboard.useQuery(
     { email, token },
@@ -1206,21 +1222,10 @@ export default function UserDashboard() {
               className="space-y-4">
               <DatabaseExpectations compact showStats={false} />
               <PlusPilotCard email={email} token={token} />
-              <MissingFieldsBanner profile={profile} onEditClick={() => {
-                // Scroll to update section and click the edit button
-                const section = document.getElementById('update-profile-section');
-                if (section) {
-                  section.scrollIntoView({ behavior: 'smooth' });
-                  // Auto-click the edit button after scroll
-                  setTimeout(() => {
-                    const editBtn = section.querySelector('button');
-                    if (editBtn) editBtn.click();
-                  }, 400);
-                }
-              }} />
+              <MissingFieldsBanner profile={profile} onEditClick={() => setOpenProfileEditor(true)} />
               <ProfileSection profile={profile} />
               <div id="update-profile-section">
-                <UpdateProfileSection profile={profile} token={token} />
+                <UpdateProfileSection profile={profile} token={token} autoOpen={openProfileEditor} />
               </div>
             </motion.div>
           )}
@@ -1247,7 +1252,10 @@ export default function UserDashboard() {
                 token={token}
                 profile={profile}
                 hasCompletedQuestionnaire={hasCompletedQuestionnaire}
-                onCompleteProfile={() => setActiveTab("profile")}
+                onCompleteProfile={() => {
+                  setOpenProfileEditor(true);
+                  setActiveTab("profile");
+                }}
               />
 
               <div id="regular-matches" className="scroll-mt-24 rounded-2xl border border-[#e9e8e8] bg-white p-4 text-right shadow-sm">

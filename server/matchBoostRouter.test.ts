@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, MIN_BOOST_SCORE, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, parseBoostCheckoutReference, selectOnDemandBoostCandidates } from "./matchBoostRouter";
+import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, MIN_BOOST_SCORE, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, getBoostProfileReadiness, parseBoostCheckoutReference, selectOnDemandBoostCandidates } from "./matchBoostRouter";
 
 const NOW = new Date("2026-08-25T12:00:00Z").getTime();
 
@@ -130,6 +130,18 @@ describe("match boost eligibility", () => {
     expect(result.eligible).toBe(true);
     expect(result.candidateCount).toBe(1);
     expect(result.topScore).toBe(82);
+  });
+
+  it("does not block Boost only because the legacy free-text partner description is missing", () => {
+    const readiness = getBoostProfileReadiness(completeSingle({ partnerDescription: null }));
+    expect(readiness.ready).toBe(true);
+    expect(readiness.missingFields).toEqual([]);
+  });
+
+  it("still blocks Boost when the personal description is missing", () => {
+    const readiness = getBoostProfileReadiness(completeSingle({ about: "על עצמי" }));
+    expect(readiness.ready).toBe(false);
+    expect(readiness.missingFields).toContain("על עצמי");
   });
 
   it("keeps multiple eligible Boost options sorted by score for an explicit card choice", () => {

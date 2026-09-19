@@ -68,8 +68,14 @@ function hasActiveBoostConsent(membership: any) {
   );
 }
 
-function getBoostProfileReadiness(single: any) {
-  const missingFields = getMissingProfileFields(single);
+const OPTIONAL_BOOST_PROFILE_FIELDS = new Set(["מחפש בבת זוג", "מחפשת בבן זוג"]);
+
+export function getMissingBoostProfileFields(single: any) {
+  return getMissingProfileFields(single).filter(field => !OPTIONAL_BOOST_PROFILE_FIELDS.has(field));
+}
+
+export function getBoostProfileReadiness(single: any) {
+  const missingFields = getMissingBoostProfileFields(single);
   const scientificQuestionnaireComplete = Boolean(single.questionnaireCompletedAt);
   const photoStored = Boolean(single.photoUrl);
   return {
@@ -78,6 +84,7 @@ function getBoostProfileReadiness(single: any) {
     photoStored,
     ready: missingFields.length === 0 && scientificQuestionnaireComplete && photoStored,
     missingFieldsCount: missingFields.length,
+    missingFields,
   };
 }
 
@@ -391,7 +398,7 @@ export function evaluateBoostEligibility(input: {
   now?: number;
 }) {
   const now = input.now ?? Date.now();
-  const missingFields = getMissingProfileFields(input.single);
+  const missingFields = getMissingBoostProfileFields(input.single);
   const activeMatch = input.memberMatches.some(match =>
     !match.returnedToPoolAt && (match.status === "proposed" || match.status === "matched"),
   );
@@ -511,7 +518,7 @@ async function loadBoostContext(db: any, single: any) {
       profile
       && profile.isPaid
       && profile.isActive
-      && getMissingProfileFields(profile).length === 0
+      && getMissingBoostProfileFields(profile).length === 0
       && Boolean(profile.questionnaireCompletedAt)
       && Boolean(profile.photoUrl)
       && !unavailableCandidateIds.has(candidateId)
@@ -705,7 +712,7 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     const recentActivityAt = Number(membership?.lastActiveAt || membership?.consentedAt || 0);
     return party.isPaid
       && party.isActive
-      && getMissingProfileFields(party).length === 0
+      && getMissingBoostProfileFields(party).length === 0
       && hasActiveBoostConsent(membership)
       && recentActivityAt >= Date.now() - 90 * DAY_MS;
   });
@@ -1060,6 +1067,7 @@ export const matchBoostRouter = router({
         paymentConfigured: true,
         profileReady: profileReadiness.ready,
         missingProfileFieldsCount: profileReadiness.missingFieldsCount,
+        missingProfileFields: profileReadiness.missingFields,
       };
     }),
 

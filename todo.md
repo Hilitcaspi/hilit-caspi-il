@@ -3089,3 +3089,13 @@
 - [x] Block new proposals when either person is already in an active proposal or unreleased mutual match
 - [x] Audit the full production queue: 718 eligible members, 692 with valid suggestions and 26 without a current suggestion
 - [x] Run final full tests, publish, sync GitHub and verify the live bundles
+
+## Boost profile-readiness blocker (September 19)
+
+- [x] Verify membership, consent, payment, candidate and request status without exposing customer data
+- [x] Restore a previously approved personal description that had been lost from the active profile
+- [x] Stop the legacy free-text partner description from blocking Boost when structured preferences are complete
+- [x] Keep the scientific questionnaire, photo, personal description and core profile fields mandatory
+- [x] Show exact missing fields and a direct profile-completion action in the personal area
+- [x] Verify the affected account now has one eligible Boost option and no blocker without sending or charging
+- [x] Run 504 tests, TypeScript, build and diff validation
