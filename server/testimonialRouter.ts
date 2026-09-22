@@ -41,6 +41,11 @@ import {
 } from "./feedbackAutomation";
 import { syncAllFeedbackFollowups, upsertFeedbackFollowup } from "./feedbackFollowup";
 import {
+  getFeedbackRecoveryJourneys,
+  sendFeedbackRecoveryUpdate,
+  summarizeFeedbackRecovery,
+} from "./feedbackRecovery";
+import {
   buildTestimonialDraft,
   consentAllowsChannel,
   deriveSubmissionStatus,
@@ -257,7 +262,10 @@ export const testimonialRouter = router({
 
     followupOverview: teamProcedure.query(async () => {
       const db = await requireDb();
-      const rows = await db.select().from(feedbackFollowups);
+      const [rows, recoveryJourneys] = await Promise.all([
+        db.select().from(feedbackFollowups),
+        getFeedbackRecoveryJourneys(),
+      ]);
       const active = rows.filter(row => !["resolved", "dismissed"].includes(row.status));
       return {
         total: rows.length,
@@ -272,11 +280,12 @@ export const testimonialRouter = router({
         waitingCustomer: rows.filter(row => row.status === "waiting_customer").length,
         resolved: rows.filter(row => row.status === "resolved").length,
         overdue: active.filter(row => row.nextActionAt && row.nextActionAt < Date.now()).length,
+        recovery: summarizeFeedbackRecovery(recoveryJourneys),
       };
     }),
 
     followups: teamProcedure.input(z.object({
-      queue: z.enum(["all", "positive", "service_recovery", "matchmaking", "personal", "publishing"]).default("all"),
+      queue: z.enum(["all", "positive", "service_recovery", "recovery_progress", "matchmaking", "personal", "publishing"]).default("all"),
       status: z.enum(["all", "open", "in_progress", "waiting_customer", "resolved", "dismissed"]).default("all"),
       limit: z.number().int().min(1).max(250).default(150),
     }).optional()).query(async ({ input }) => {
@@ -285,6 +294,7 @@ export const testimonialRouter = router({
       if (input?.status && input.status !== "all") conditions.push(eq(feedbackFollowups.status, input.status));
       if (input?.queue === "positive") conditions.push(eq(feedbackFollowups.isPositive, true));
       if (input?.queue === "service_recovery") conditions.push(eq(feedbackFollowups.needsServiceRecovery, true));
+      if (input?.queue === "recovery_progress") conditions.push(eq(feedbackFollowups.needsServiceRecovery, true));
       if (input?.queue === "matchmaking") conditions.push(eq(feedbackFollowups.needsMatchmakingAttention, true));
       if (input?.queue === "personal") conditions.push(eq(feedbackFollowups.needsPersonalAttention, true));
       if (input?.queue === "publishing") conditions.push(eq(feedbackFollowups.needsPublishingReview, true));
@@ -294,17 +304,34 @@ export const testimonialRouter = router({
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(asc(feedbackFollowups.status), desc(feedbackFollowups.priority), asc(feedbackFollowups.nextActionAt), desc(feedbackFollowups.updatedAt))
         .limit(input?.limit ?? 150);
-      const followupIds = rows.map(row => row.followup.id);
+      const recoveryJourneys = await getFeedbackRecoveryJourneys();
+      const recoveryByOriginalRecord = new Map(recoveryJourneys.map(journey => [journey.originalRecordId, journey]));
+      const visibleRows = input?.queue === "recovery_progress"
+        ? rows.filter(row => Boolean(recoveryByOriginalRecord.get(row.record.id)?.newMatchCount))
+        : rows;
+      const followupIds = visibleRows.map(row => row.followup.id);
       const contacts = followupIds.length
         ? await db.select().from(feedbackFollowupContacts).where(inArray(feedbackFollowupContacts.followupId, followupIds)).orderBy(desc(feedbackFollowupContacts.contactedAt))
         : [];
-      return rows.map(row => ({ ...row, contacts: contacts.filter(contact => contact.followupId === row.followup.id) }));
+      return visibleRows.map(row => ({
+        ...row,
+        recovery: recoveryByOriginalRecord.get(row.record.id) || null,
+        contacts: contacts.filter(contact => contact.followupId === row.followup.id),
+      }));
     }),
 
     syncFollowups: teamProcedure.mutation(async () => {
       const db = await requireDb();
       return syncAllFeedbackFollowups(db);
     }),
+
+    sendRecoveryUpdate: teamProcedure.input(z.object({
+      originalRecordId: z.number().int().positive(),
+      includeSms: z.boolean().default(true),
+    })).mutation(async ({ input, ctx }) => sendFeedbackRecoveryUpdate({
+      ...input,
+      sentBy: actorFromContext(ctx),
+    })),
 
     updateFollowup: teamProcedure.input(z.object({
       id: z.number().int().positive(),

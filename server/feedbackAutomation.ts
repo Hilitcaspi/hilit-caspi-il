@@ -76,9 +76,12 @@ export function buildFeedbackUrl(token: string): string {
   return `${SITE_BASE}/testimonial/feedback?token=${encodeURIComponent(token)}`;
 }
 
-export function buildFeedbackSmsMessage(input: { firstName: string; contactEmail: string; feedbackUrl: string }): string {
+export function buildFeedbackSmsMessage(input: { firstName: string; contactEmail: string; feedbackUrl: string; campaignVariant?: TestimonialCampaignVariant }): string {
   const firstName = input.firstName.trim().split(/\s+/)[0] || "שלום";
   const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.contactEmail });
+  if (input.campaignVariant === "service_recovery_followup") {
+    return `היי ${firstName}, לקחתי ברצינות את הפידבק שלך. מאז נשלחה לך התאמה חדשה שבה שני הצדדים אמרו כן, וחשוב לי לשמוע אם הרגשת שיפור ומה עוד נכון לי לשפר: ${input.feedbackUrl} הילית\nלהסרה: ${unsubscribeUrl}`;
+  }
   return `היי ${firstName}, שמחתי ששניכם אמרתם כן להתאמה 💗 אשמח לשמוע בכמה מילים על החוויה מהמאגר ומהדרך שבה נבחרה ההתאמה. הפידבק שלך יכול לעזור לעוד אנשים להכיר את המאגר ולהצטרף, וכך ליצור יותר הזדמנויות לכולם. למילוי קצר ולקבלת מתנה אישית: ${input.feedbackUrl} הילית\nלהסרה: ${unsubscribeUrl}`;
 }
 
@@ -409,6 +412,7 @@ export async function sendFeedbackSmsNow(input: { recordId: number; sentBy: stri
     firstName: record.contactName,
     contactEmail: record.contactEmail,
     feedbackUrl,
+    campaignVariant: campaignVariantFromSnapshot(record.sourceSnapshot),
   });
   let smsLogId = existingLog?.id || 0;
   if (!smsLogId) {

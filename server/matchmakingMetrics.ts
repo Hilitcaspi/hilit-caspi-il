@@ -1,3 +1,6 @@
+import { wasMatchProposalSent } from "../shared/matchDelivery";
+import { israelLocalTimeUtc, israelZonedParts } from "./dashboardPeriods";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type MatchmakingMetricSingle = {
@@ -30,10 +33,20 @@ export type MatchmakingMetricMatch = {
   singleBId: number;
   status: string;
   proposedAt?: number | null;
+  ownerApprovedAt?: number | null;
+  approvalTokenA?: string | null;
+  approvalTokenB?: string | null;
+  singleAToken?: string | null;
+  singleBToken?: string | null;
   emailAOpenedAt?: number | null;
   emailBOpenedAt?: number | null;
+  tokenAUsedAt?: number | null;
+  tokenBUsedAt?: number | null;
   approvedByA: boolean;
   approvedByB: boolean;
+  emailRetriedAt?: number | null;
+  waSentAt?: number | null;
+  notes?: string | null;
   matchedAt?: number | null;
   contactRevealedAt?: number | null;
   returnedToPoolAt?: number | null;
@@ -105,12 +118,11 @@ export function calculateMatchmakingMetrics(
   const paidSingles = singles.filter(single => single.isPaid && !single.isSeed);
   const activeSingles = paidSingles.filter(single => single.isActive);
   const activeIds = new Set(activeSingles.map(single => single.id));
-  const cohortMatches = matches.filter(match => {
+  const proposedMatches = matches.filter(match => toTimestamp(match.proposedAt) > 0 && wasMatchProposalSent(match));
+  const cohortMatches = proposedMatches.filter(match => {
     const proposedAt = toTimestamp(match.proposedAt);
     return proposedAt >= from && proposedAt <= to;
   });
-
-  const proposedMatches = matches.filter(match => toTimestamp(match.proposedAt) > 0);
   const matchesBySingle = new Map<number, MatchmakingMetricMatch[]>();
   const addMatch = (singleId: number, match: MatchmakingMetricMatch) => {
     if (!singleId) return;
@@ -279,14 +291,17 @@ export function calculateMatchmakingMetrics(
 
   const dailySignups: { date: string; count: number }[] = [];
   const dailyMatches: { date: string; sent: number; mutuallyApproved: number }[] = [];
+  const todayInIsrael = israelZonedParts(now);
+  const todayAnchor = Date.UTC(todayInIsrael.year, todayInIsrael.month - 1, todayInIsrael.day);
   for (let index = 29; index >= 0; index--) {
-    const dayStart = new Date(now);
-    dayStart.setHours(0, 0, 0, 0);
-    dayStart.setDate(dayStart.getDate() - index);
-    const dayEnd = new Date(dayStart.getTime() + DAY_MS);
-    const start = dayStart.getTime();
-    const end = dayEnd.getTime();
-    const label = `${dayStart.getDate()}/${dayStart.getMonth() + 1}`;
+    const calendarDate = new Date(todayAnchor - index * DAY_MS);
+    const year = calendarDate.getUTCFullYear();
+    const month = calendarDate.getUTCMonth() + 1;
+    const day = calendarDate.getUTCDate();
+    const nextCalendarDate = new Date(todayAnchor - (index - 1) * DAY_MS);
+    const start = israelLocalTimeUtc(year, month, day);
+    const end = israelLocalTimeUtc(nextCalendarDate.getUTCFullYear(), nextCalendarDate.getUTCMonth() + 1, nextCalendarDate.getUTCDate());
+    const label = `${day}/${month}`;
     dailySignups.push({
       date: label,
       count: paidSingles.filter(single => {

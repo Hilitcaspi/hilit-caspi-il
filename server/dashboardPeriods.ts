@@ -5,7 +5,7 @@ export type DashboardPeriod = {
 
 const ISRAEL_TIMEZONE = "Asia/Jerusalem";
 
-function zonedParts(timestamp: number) {
+export function israelZonedParts(timestamp: number) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: ISRAEL_TIMEZONE,
     year: "numeric",
@@ -21,11 +21,11 @@ function zonedParts(timestamp: number) {
 }
 
 function timezoneOffsetMs(timestamp: number) {
-  const parts = zonedParts(timestamp);
+  const parts = israelZonedParts(timestamp);
   return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - Math.floor(timestamp / 1000) * 1000;
 }
 
-function israelLocalTimeUtc(year: number, month: number, day: number, hour = 0, minute = 0, second = 0, millisecond = 0) {
+export function israelLocalTimeUtc(year: number, month: number, day: number, hour = 0, minute = 0, second = 0, millisecond = 0) {
   const base = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
   let result = base;
   for (let index = 0; index < 3; index += 1) result = base - timezoneOffsetMs(result);
@@ -54,12 +54,12 @@ export function previousComparisonPeriod(startDate: number, endDate: number): Da
   if (!Number.isFinite(startDate) || !Number.isFinite(endDate) || endDate < startDate) {
     throw new Error("Invalid dashboard date range");
   }
-  const start = zonedParts(startDate);
+  const start = israelZonedParts(startDate);
   if (start.day !== 1 || start.hour !== 0 || start.minute !== 0 || start.second !== 0) {
     return { ...previousEqualPeriod(startDate, endDate), basis: "previous_equal_period" };
   }
 
-  const end = zonedParts(endDate);
+  const end = israelZonedParts(endDate);
   const previousMonthDate = new Date(Date.UTC(start.year, start.month - 2, 1));
   const previousYear = previousMonthDate.getUTCFullYear();
   const previousMonth = previousMonthDate.getUTCMonth() + 1;

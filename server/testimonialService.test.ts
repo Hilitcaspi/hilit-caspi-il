@@ -57,6 +57,7 @@ describe("testimonial service", () => {
     const matchDraft = buildTestimonialDraft({ firstName: "דנה", sourceType: "match", campaignVariant: "match_testimonial_request" });
     const reminderDraft = buildTestimonialDraft({ firstName: "דנה", sourceType: "match", campaignVariant: "match_testimonial_reminder" });
     const followupDraft = buildTestimonialDraft({ firstName: "דנה", sourceType: "match", campaignVariant: "match_success_followup" });
+    const recoveryDraft = buildTestimonialDraft({ firstName: "דנה", sourceType: "match", campaignVariant: "service_recovery_followup" });
     const dnaDraft = buildTestimonialDraft({ firstName: "נועם", sourceType: "dna", campaignVariant: "dna_engaged_nonbuyers" });
     expect(matchDraft.body).toContain("המאגר");
     expect(matchDraft.body).toContain("הסכמה משני הצדדים");
@@ -65,6 +66,9 @@ describe("testimonial service", () => {
     expect(followupDraft.subject).toContain("הקשר עדיין ממשיך");
     expect(followupDraft.body).toContain("תמונה משותפת");
     expect(followupDraft.body).toContain("בלי רשות מפורשת");
+    expect(recoveryDraft.subject).toContain("לקחתי את הפידבק שלך ברצינות");
+    expect(recoveryDraft.body).toContain("התאמה חדשה");
+    expect(recoveryDraft.body).toContain("מה עדיין נכון לי לשפר");
     expect(dnaDraft.subject).toContain("שאלון ה־DNA");
     expect(dnaDraft.body).toContain("אינה פנייה לרכישה");
     expect(dnaDraft.body).toContain("השאלון החינמי");

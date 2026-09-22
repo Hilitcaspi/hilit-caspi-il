@@ -39,6 +39,7 @@ export const TESTIMONIAL_CAMPAIGN_VARIANTS = [
   "match_testimonial_request",
   "match_testimonial_reminder",
   "match_success_followup",
+  "service_recovery_followup",
   "dna_engaged_nonbuyers",
 ] as const;
 
@@ -138,6 +139,12 @@ export function buildTestimonialDraft(input: {
     return {
       subject: `${firstName}, האם הקשר עדיין ממשיך? אשמח לשמוע מה שלומכם`,
       body: `היי ${firstName}, בעבר שיתפת אותי בחוויה שלך מההתאמה ומהמאגר, ורציתי לשאול בעדינות מה שלומכם היום והאם הקשר עדיין ממשיך. אם כן, ורק אם מתאים לשניכם, אשמח שתשתפו עוד כמה מילים על הדרך, השיטה והמאגר, ואפשר גם לצרף תמונה משותפת. סיפור אמיתי שלכם יכול לתת תקווה ולעזור לעוד אנשים שמחפשים אהבה להכיר את האפשרות הזאת. צירוף תמונה ואישור לפרסם אותה הם בחירה נפרדת לחלוטין, ושום דבר לא יפורסם בלי רשות מפורשת ובדיקת הצוות.`,
+    };
+  }
+  if (input.campaignVariant === "service_recovery_followup") {
+    return {
+      subject: `${firstName}, לקחתי את הפידבק שלך ברצינות — אשמח לשמוע מה השתנה`,
+      body: `היי ${firstName}, תודה שכתבת לי בכנות על מה שלא עבד עבורך. לקחתי את הפידבק ברצינות, חזרתי לבדוק את הדרך שלך במאגר, ומאז נשלחה לך התאמה חדשה שבה שני הצדדים אמרו כן. חשוב לי לא להניח שהכול הסתדר רק בגלל האישור, אלא לשמוע ממך באמת: האם הרגשת שיפור, מה היה מדויק יותר, ומה עדיין נכון לי לשפר?`,
     };
   }
   if (input.campaignVariant === "dna_engaged_nonbuyers") {

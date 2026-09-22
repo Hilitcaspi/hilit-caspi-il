@@ -64,6 +64,19 @@ describe("feedback automation", () => {
     expect(sms).toContain("/unsubscribe?token=");
   });
 
+  it("builds a dedicated recovery SMS after a new mutual match", () => {
+    const sms = buildFeedbackSmsMessage({
+      firstName: "דנה",
+      contactEmail: "dana@example.com",
+      feedbackUrl: "https://example.com/recovery",
+      campaignVariant: "service_recovery_followup",
+    });
+    expect(sms).toContain("לקחתי ברצינות את הפידבק");
+    expect(sms).toContain("שני הצדדים אמרו כן");
+    expect(sms).toContain("מה עוד נכון לי לשפר");
+    expect(sms).not.toContain("לקבלת מתנה");
+  });
+
   it("uses the last three Israel calendar days including today", () => {
     const range = recentIsraelCalendarWindow(new Date("2026-09-17T09:00:00.000Z").getTime(), 3);
     expect(range.startAt).toBe(new Date("2026-09-14T21:00:00.000Z").getTime());

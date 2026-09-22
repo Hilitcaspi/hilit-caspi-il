@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, Clock3, HeartHandshake, Loader2, MessageCircle, RefreshCw, Sparkles, UserRoundSearch } from "lucide-react";
+import { CheckCircle2, Clock3, HeartHandshake, Loader2, MessageCircle, RefreshCw, Sparkles, TrendingUp, UserRoundSearch } from "lucide-react";
 import { toast } from "sonner";
 
-type Queue = "all" | "positive" | "service_recovery" | "matchmaking" | "personal" | "publishing";
+type Queue = "all" | "positive" | "service_recovery" | "recovery_progress" | "matchmaking" | "personal" | "publishing";
 type FollowupStatus = "all" | "open" | "in_progress" | "waiting_customer" | "resolved" | "dismissed";
 type ContactChannel = "email" | "sms" | "phone" | "whatsapp" | "other";
 
@@ -15,6 +15,7 @@ const queueLabels: Record<Queue, string> = {
   all: "כל המעקב",
   positive: "הגיבו בחיוב",
   service_recovery: "דורשים טיפול",
+  recovery_progress: "שיקום מתקדם",
   matchmaking: "דורשים התאמות",
   personal: "יחס אישי",
   publishing: "המלצות לפרסום",
@@ -59,6 +60,7 @@ export default function FeedbackFollowupBoard() {
   const list = trpc.testimonial.team.followups.useQuery({ queue, status, limit: 200 });
   const sync = trpc.testimonial.team.syncFollowups.useMutation();
   const update = trpc.testimonial.team.updateFollowup.useMutation();
+  const sendRecoveryUpdate = trpc.testimonial.team.sendRecoveryUpdate.useMutation();
   const rows = list.data || [];
   const selected = useMemo(() => rows.find(row => row.followup.id === selectedId) || null, [rows, selectedId]);
 
@@ -92,6 +94,7 @@ export default function FeedbackFollowupBoard() {
     { key: "all", count: summary?.open || 0, icon: Clock3 },
     { key: "positive", count: summary?.positive || 0, icon: Sparkles },
     { key: "service_recovery", count: summary?.serviceRecovery || 0, icon: HeartHandshake },
+    { key: "recovery_progress", count: summary?.recovery?.receivedNewMatch || 0, icon: TrendingUp },
     { key: "matchmaking", count: summary?.matchmakingAttention || 0, icon: UserRoundSearch },
     { key: "personal", count: summary?.personalAttention || 0, icon: MessageCircle },
     { key: "publishing", count: summary?.publishingReview || 0, icon: CheckCircle2 },
@@ -123,6 +126,17 @@ export default function FeedbackFollowupBoard() {
         <Metric label="טופלו" value={summary?.resolved || 0} tone="green" />
         <Metric label="סה״כ מתועדים" value={summary?.total || 0} />
       </div>
+      <div className="mt-4 rounded-2xl border border-[#ecd7df] bg-[#fff7fa] p-4">
+        <div className="flex items-center gap-2 text-[#6f3f52]"><TrendingUp className="h-5 w-5" /><p className="font-semibold">ממעקב שיקום לשביעות רצון</p></div>
+        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-5">
+          <RecoveryMetric label="פידבקים שליליים במעקב" value={summary?.recovery?.negativeTracked || 0} />
+          <RecoveryMetric label="קיבלו התאמה חדשה" value={summary?.recovery?.receivedNewMatch || 0} />
+          <RecoveryMetric label="אישור משני הצדדים" value={summary?.recovery?.mutualYesAfterFeedback || 0} />
+          <RecoveryMetric label="ממתינים לפידבק חדש" value={summary?.recovery?.awaitingUpdatedFeedback || 0} />
+          <RecoveryMetric label="עברו לחיובי" value={summary?.recovery?.recoveredPositive || 0} emphasis />
+        </div>
+        <p className="mt-3 text-xs leading-5 text-[#806c62]">המעבר ל״חיובי״ נרשם רק לאחר תשובה חדשה של הלקוח/ה — לא מעצם זה שהייתה התאמה.</p>
+      </div>
     </div>
 
     <div className="flex flex-wrap gap-2 rounded-2xl border border-[#e6d7ce] bg-white p-3 shadow-sm">
@@ -145,6 +159,11 @@ export default function FeedbackFollowupBoard() {
             {row.followup.needsMatchmakingAttention && <Badge className="bg-amber-100 text-amber-900">התאמות</Badge>}
             {row.followup.needsPersonalAttention && <Badge className="bg-violet-100 text-violet-800">יחס אישי</Badge>}
             {row.followup.needsPublishingReview && <Badge className="bg-blue-100 text-blue-800">פרסום</Badge>}
+            {row.recovery?.stage === "new_match_sent" && <Badge className="bg-sky-100 text-sky-800">נשלחה התאמה חדשה</Badge>}
+            {row.recovery?.stage === "mutual_yes" && <Badge className="bg-fuchsia-100 text-fuchsia-800">כן משני הצדדים</Badge>}
+            {row.recovery?.stage === "awaiting_updated_feedback" && <Badge className="bg-indigo-100 text-indigo-800">ממתינים לעדכון</Badge>}
+            {row.recovery?.stage === "recovered_positive" && <Badge className="bg-emerald-100 text-emerald-800">עבר/ה לחיובי</Badge>}
+            {row.recovery?.stage === "still_needs_attention" && <Badge className="bg-rose-100 text-rose-800">עדיין דורש טיפול</Badge>}
           </div>
           <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#66534a]">{row.record.feedbackText || row.record.testimonialTextOriginal || "לא נכתב טקסט"}</p>
           {row.followup.contactedAt && <p className="mt-2 text-xs font-medium text-emerald-700">פנייה תועדה ב־{new Date(row.followup.contactedAt).toLocaleDateString("he-IL")}</p>}
@@ -156,6 +175,21 @@ export default function FeedbackFollowupBoard() {
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div><h4 className="text-2xl font-bold text-[#2a1712]">{selected.record.contactName}</h4><p className="mt-1 text-sm text-[#806c62]">התקבל ב־{new Date(selected.record.lastResponseAt || selected.followup.createdAt).toLocaleString("he-IL")}</p></div><StatusBadge status={selected.followup.status} priority={selected.followup.priority} /></div>
           <div className="rounded-xl bg-[#f6f1ed] p-4 text-sm leading-7 text-[#59463d] whitespace-pre-wrap">{selected.record.feedbackText || "לא נכתב משוב ראשי"}</div>
           {selected.record.improvementText && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm font-semibold text-amber-900">מה ביקשו לשפר</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950">{selected.record.improvementText}</p></div>}
+          {selected.recovery && <div className="rounded-xl border border-[#e8cbd6] bg-[#fff7fa] p-4">
+            <div className="flex items-center gap-2 text-[#6f3f52]"><TrendingUp className="h-5 w-5" /><p className="font-semibold">מסלול השיקום מאז הפידבק</p></div>
+            <p className="mt-2 text-sm leading-6 text-[#66534a]">מאז הפידבק נשלחו {selected.recovery.newMatchCount} התאמות חדשות{selected.recovery.mutualYesMatchId ? ", ובהתאמה האחרונה הייתה הסכמה משני הצדדים" : ""}.</p>
+            {selected.recovery.eligibleForOutreach && <Button className="mt-3 bg-[#6f3f52] text-white hover:bg-[#593142]" disabled={sendRecoveryUpdate.isPending} onClick={async () => {
+              try {
+                const result = await sendRecoveryUpdate.mutateAsync({ originalRecordId: selected.record.id, includeSms: true });
+                toast.success(`הפנייה נשלחה: מייל ${result.email === "accepted" ? "התקבל" : result.email}, SMS ${result.sms === "accepted" ? "התקבל" : result.sms}`);
+                await refresh();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "שליחת הפנייה נכשלה");
+              }
+            }}>{sendRecoveryUpdate.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}שליחת בקשת פידבק מעודכנת במייל וב־SMS</Button>}
+            {selected.recovery.stage === "awaiting_updated_feedback" && <p className="mt-2 text-xs font-medium text-indigo-700">הפנייה נשלחה וממתינה לתשובה חדשה.</p>}
+            {selected.recovery.stage === "recovered_positive" && <p className="mt-2 text-xs font-medium text-emerald-700">התקבל פידבק חדש וחיובי — מסלול השיקום הושלם.</p>}
+          </div>}
           <div className="rounded-xl border border-[#eadfd7] p-4"><p className="text-sm font-semibold text-[#2a1712]">הפעולה המומלצת</p><p className="mt-2 text-sm leading-6 text-[#66534a]">{selected.followup.recommendedAction}</p><p className="mt-2 text-xs text-[#8a766d]">המלצה זו אינה שולחת Boost או הטבה אוטומטית. קודם בודקים את החשבון והבעיה.</p></div>
 
           <div className="grid gap-3 md:grid-cols-2"><label><span className="mb-1 block text-xs text-[#806c62]">עדיפות</span><select value={selected.followup.priority} onChange={event => void apply({ id: selected.followup.id, priority: event.target.value as "normal" | "high" | "urgent" }, "העדיפות עודכנה")} className="h-10 w-full rounded-md border bg-white px-3 text-sm"><option value="normal">רגילה</option><option value="high">גבוהה</option><option value="urgent">דחופה</option></select></label><label><span className="mb-1 block text-xs text-[#806c62]">פעולה הבאה</span><Input type="datetime-local" value={nextActionAt} onChange={event => setNextActionAt(event.target.value)} onBlur={() => void apply({ id: selected.followup.id, nextActionAt: nextActionAt ? new Date(nextActionAt).getTime() : null }, "מועד המעקב נשמר")} /></label></div>
@@ -175,6 +209,10 @@ export default function FeedbackFollowupBoard() {
 function Metric({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "red" | "amber" | "green" }) {
   const colors = tone === "red" ? "bg-red-50 text-red-800" : tone === "amber" ? "bg-amber-50 text-amber-900" : tone === "green" ? "bg-emerald-50 text-emerald-800" : "bg-[#f7f3ef] text-[#2a1712]";
   return <div className={`rounded-xl p-3 ${colors}`}><p className="text-2xl font-bold">{value}</p><p className="mt-1 text-xs">{label}</p></div>;
+}
+
+function RecoveryMetric({ label, value, emphasis = false }: { label: string; value: number; emphasis?: boolean }) {
+  return <div className={`rounded-xl px-3 py-2.5 ${emphasis ? "bg-emerald-100 text-emerald-900" : "bg-white text-[#432432]"}`}><p className="text-xl font-bold">{value}</p><p className="mt-1 text-[11px] leading-4">{label}</p></div>;
 }
 
 function StatusBadge({ status, priority }: { status: string; priority: string }) {

@@ -101,7 +101,7 @@ describe("matchmaking metrics", () => {
     ];
     const matches = [
       makeMatch({ proposedAt: NOW - 100 * DAY }),
-      makeMatch({ id: 102, singleAId: 3, singleBId: 2, proposedAt: NOW - 5 * DAY, approvedByA: false, approvedByB: false, status: "proposed", matchDetailStatus: null }),
+      makeMatch({ id: 102, singleAId: 3, singleBId: 2, proposedAt: NOW - 5 * DAY, ownerApprovedAt: NOW - 5 * DAY, approvedByA: false, approvedByB: false, status: "proposed", matchDetailStatus: null }),
     ];
 
     const result = calculateMatchmakingMetrics(singles, matches, { now: NOW });
@@ -118,5 +118,23 @@ describe("matchmaking metrics", () => {
 
     expect(result.noMatchDuration).toEqual({ over14: 1, over30: 1 });
     expect(result.attentionList[0]).toMatchObject({ id: 9, daysWaiting: 45, neverReceivedMatch: true });
+  });
+
+  it("counts one delivered pair once and ignores internal candidates", () => {
+    const singles = [
+      makeSingle({ id: 1 }),
+      makeSingle({ id: 2, firstName: "יואב", gender: "male" }),
+      makeSingle({ id: 3, firstName: "רוני" }),
+    ];
+    const deliveredAt = NOW - DAY;
+    const result = calculateMatchmakingMetrics(singles, [
+      makeMatch({ id: 201, proposedAt: deliveredAt, status: "proposed", ownerApprovedAt: deliveredAt, approvedByA: false, approvedByB: false, matchedAt: null, contactRevealedAt: null, emailAOpenedAt: null, emailBOpenedAt: null, matchDetailStatus: null }),
+      makeMatch({ id: 202, singleAId: 1, singleBId: 3, proposedAt: deliveredAt, status: "proposed", ownerApprovedAt: null, approvalTokenA: null, approvalTokenB: null, approvedByA: false, approvedByB: false, matchedAt: null, contactRevealedAt: null, emailAOpenedAt: null, emailBOpenedAt: null, matchDetailStatus: null }),
+    ], { now: NOW, from: NOW - 2 * DAY, to: NOW });
+
+    expect(result.kpis.matchesSent).toBe(1);
+    expect(result.pairFunnel.proposed).toBe(1);
+    expect(result.sideFunnel.proposals).toBe(2);
+    expect(result.dailyMatches.reduce((sum, day) => sum + day.sent, 0)).toBe(1);
   });
 });
