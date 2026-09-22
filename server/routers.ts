@@ -3388,6 +3388,8 @@ export const appRouter = router({
         partnerDescription: z.string().max(2000).optional(),
         minAgePreference: z.number().optional(),
         maxAgePreference: z.number().optional(),
+        minHeightPreference: z.number().min(100).max(250).optional(),
+        maxHeightPreference: z.number().min(100).max(250).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

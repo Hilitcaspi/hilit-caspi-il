@@ -166,6 +166,8 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
     smokingPreference: single.smokingPreference || '',
     minAgePreference: single.minAgePreference || '',
     maxAgePreference: single.maxAgePreference || '',
+    minHeightPreference: single.minHeightPreference || '',
+    maxHeightPreference: single.maxHeightPreference || '',
     about: single.about || single.aboutMe || '',
     partnerDescription: single.partnerDescription || '',
     acceptsKids: single.acceptsKids ?? false,
@@ -200,6 +202,8 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
     if (form.smokingPreference && form.smokingPreference !== single.smokingPreference) payload.smokingPreference = form.smokingPreference;
     if (form.minAgePreference && Number(form.minAgePreference) !== single.minAgePreference) payload.minAgePreference = Number(form.minAgePreference);
     if (form.maxAgePreference && Number(form.maxAgePreference) !== single.maxAgePreference) payload.maxAgePreference = Number(form.maxAgePreference);
+    if (form.minHeightPreference && Number(form.minHeightPreference) !== single.minHeightPreference) payload.minHeightPreference = Number(form.minHeightPreference);
+    if (form.maxHeightPreference && Number(form.maxHeightPreference) !== single.maxHeightPreference) payload.maxHeightPreference = Number(form.maxHeightPreference);
     if (form.about !== (single.about || single.aboutMe || '')) payload.about = form.about;
     if (form.partnerDescription !== (single.partnerDescription || '')) payload.partnerDescription = form.partnerDescription;
     if (form.acceptsKids !== (single.acceptsKids ?? false)) payload.acceptsKids = form.acceptsKids;
@@ -270,6 +274,8 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
           <div className="grid grid-cols-3 gap-3">
             <div><label className={labelCls}>גיל מינימום</label><input type="number" className={inputCls} value={form.minAgePreference} onChange={e => set('minAgePreference', e.target.value)} min={18} max={120} /></div>
             <div><label className={labelCls}>גיל מקסימום</label><input type="number" className={inputCls} value={form.maxAgePreference} onChange={e => set('maxAgePreference', e.target.value)} min={18} max={120} /></div>
+            <div><label className={labelCls}>גובה מינימלי (ס״מ)</label><input type="number" className={inputCls} value={form.minHeightPreference} onChange={e => set('minHeightPreference', e.target.value)} min={100} max={250} /></div>
+            <div><label className={labelCls}>גובה מקסימלי (ס״מ)</label><input type="number" className={inputCls} value={form.maxHeightPreference} onChange={e => set('maxHeightPreference', e.target.value)} min={100} max={250} /></div>
             <div><label className={labelCls}>העדפת עישון</label><select className={selectCls} value={form.smokingPreference} onChange={e => set('smokingPreference', e.target.value)}><option value="">בחר</option><option value="no_smokers">לא מעשנים</option><option value="occasionally_ok">לפעמים בסדר</option><option value="doesnt_matter">לא משנה</option></select></div>
           </div>
         </div>
@@ -579,6 +585,8 @@ export default function CRMMatchmaking() {
     hasKids?: boolean | null; numKids?: number | null; wantsKids?: string | null;
     wantsChildren?: string | null; about?: string | null; aboutMe?: string | null; partnerDescription?: string | null;
     height?: number | null; religiosity?: string | null; education?: string | null;
+    minAgePreference?: number | null; maxAgePreference?: number | null;
+    minHeightPreference?: number | null; maxHeightPreference?: number | null;
     questionnaireCompletedAt?: number | null; questionnaireToken?: string | null;
     plusStatus?: string | null; plusBillingStatus?: string | null; plusPremiumSupport?: boolean;
   }>;
@@ -1128,6 +1136,26 @@ export default function CRMMatchmaking() {
                         })()}
                         {single.seekingGender && <div><span className="font-semibold text-[#191265]">מחפש/ת:</span> {single.seekingGender === 'male' ? 'גבר' : single.seekingGender === 'female' ? 'אישה' : 'לא משנה'}</div>}
                         {single.dnaType && <div><span className="font-semibold text-[#191265]">DNA:</span> {DNA_LABELS[single.dnaType] || single.dnaType}</div>}
+                        {(single.minAgePreference || single.maxAgePreference) && (
+                          <div className="rounded-lg bg-[#f8f7fc] px-2 py-1">
+                            <span className="font-semibold text-[#191265]">גיל מבוקש:</span>{' '}
+                            {single.minAgePreference && single.maxAgePreference
+                              ? `${single.minAgePreference}–${single.maxAgePreference}`
+                              : single.minAgePreference
+                                ? `מ־${single.minAgePreference}`
+                                : `עד ${single.maxAgePreference}`}
+                          </div>
+                        )}
+                        {(single.minHeightPreference || single.maxHeightPreference) && (
+                          <div className="rounded-lg bg-[#f8f7fc] px-2 py-1">
+                            <span className="font-semibold text-[#191265]">גובה מבוקש:</span>{' '}
+                            {single.minHeightPreference && single.maxHeightPreference
+                              ? `${single.minHeightPreference}–${single.maxHeightPreference} ס״מ`
+                              : single.minHeightPreference
+                                ? `מ־${single.minHeightPreference} ס״מ`
+                                : `עד ${single.maxHeightPreference} ס״מ`}
+                          </div>
+                        )}
                       </div>
                     </div>
 
