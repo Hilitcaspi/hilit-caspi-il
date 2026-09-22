@@ -396,6 +396,7 @@ export function evaluateBoostEligibility(input: {
   membership?: any | null;
   boostRequests?: any[];
   now?: number;
+  ignoreRequestCooldown?: boolean;
 }) {
   const now = input.now ?? Date.now();
   const missingFields = getMissingBoostProfileFields(input.single);
@@ -441,7 +442,7 @@ export function evaluateBoostEligibility(input: {
   if (positiveOutcome) blockers.push("הבוסט אינו מוצע בזמן תוצאה זוגית פעילה");
   if (candidates.length === 0) blockers.push("אין כרגע התאמה אפשרית שמתאימה לבדיקת בוסט");
   if (openRequest) blockers.push("בקשת בוסט קודמת עדיין בטיפול");
-  if (recentRequest && !openRequest) blockers.push("ניתן להפעיל בוסט אחד בכל 30 יום");
+  if (recentRequest && !openRequest && !input.ignoreRequestCooldown) blockers.push("ניתן להפעיל בוסט אחד בכל 30 יום");
 
   return {
     eligible: blockers.length === 0,
@@ -631,9 +632,17 @@ export async function fulfillPaidBoostPayment(input: {
       eq(matchBoostRequests.id, bound.requestId),
       eq(matchBoostRequests.singleId, single.id),
       eq(matchBoostRequests.source, "paid"),
-      eq(matchBoostRequests.status, "awaiting_payment"),
     )).limit(1);
-    if (!request) throw new Error("Bound Boost checkout is not awaiting payment");
+    if (!request) throw new Error("Bound Boost checkout was not found");
+    if (["paid", "queued", "reviewing", "approved", "rejected"].includes(request.status) || (request.status === "refunded" && request.paidAt)) {
+      return {
+        success: true,
+        delivered: ["approved", "rejected"].includes(request.status),
+        creditAvailable: hasReusablePaidBoostCredit(request),
+        requestId: request.id,
+        alreadyProcessed: true,
+      };
+    }
   }
   if (!request && !input.checkoutReference) {
     [request] = await db.select().from(matchBoostRequests).where(and(
@@ -644,15 +653,15 @@ export async function fulfillPaidBoostPayment(input: {
   }
   if (!request) throw new Error(`No pending Boost checkout found for ${normalizedEmail}`);
   if (request.status === "approved" && request.fulfilledAt) {
-    return { success: true, delivered: true, creditAvailable: false, requestId: request.id };
+    return { success: true, delivered: true, creditAvailable: false, requestId: request.id, alreadyProcessed: true };
   }
   if (hasReusablePaidBoostCredit(request)) {
-    return { success: true, delivered: false, creditAvailable: true, requestId: request.id };
+    return { success: true, delivered: false, creditAvailable: true, requestId: request.id, alreadyProcessed: true };
   }
 
   const now = Date.now();
   if (request.status === "awaiting_payment") {
-    await db.update(matchBoostRequests).set({
+    const updateResult = await db.update(matchBoostRequests).set({
       status: "paid",
       amountAgorot: input.amountAgorot || BOOST_PRICE_AGOROT,
       providerTransactionId: input.transactionId || request.providerTransactionId,
@@ -660,15 +669,19 @@ export async function fulfillPaidBoostPayment(input: {
       decisionReason: "grow_payment_confirmed_pending_final_eligibility",
       updatedAt: now,
     }).where(and(eq(matchBoostRequests.id, request.id), eq(matchBoostRequests.status, "awaiting_payment")));
+    const affectedRows = Number((Array.isArray(updateResult) ? updateResult[0] : updateResult)?.affectedRows || 0);
+    if (affectedRows < 1) {
+      return { success: true, delivered: false, creditAvailable: false, requestId: request.id, alreadyProcessed: true };
+    }
   }
 
   try {
     const result = await dispatchAlgorithmicBoostProposal(db, request.id);
-    return { ...result, delivered: true, creditAvailable: false };
+    return { ...result, delivered: true, creditAvailable: false, alreadyProcessed: false };
   } catch (error: any) {
     const [current] = await db.select().from(matchBoostRequests).where(eq(matchBoostRequests.id, request.id)).limit(1);
     if (current?.status === "approved" && current.fulfilledAt) {
-      return { success: true, delivered: true, creditAvailable: false, requestId: request.id };
+      return { success: true, delivered: true, creditAvailable: false, requestId: request.id, alreadyProcessed: true };
     }
     await db.update(matchBoostRequests).set({
       status: "refunded",
@@ -676,7 +689,7 @@ export async function fulfillPaidBoostPayment(input: {
       expiresAt: null,
       updatedAt: Date.now(),
     }).where(eq(matchBoostRequests.id, request.id));
-    return { success: true, delivered: false, creditAvailable: true, requestId: request.id };
+    return { success: true, delivered: false, creditAvailable: true, requestId: request.id, alreadyProcessed: false };
   }
 }
 
@@ -1013,7 +1026,8 @@ export const matchBoostRouter = router({
     .query(async ({ input }) => {
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const context = await loadBoostContext(db, single);
-      const eligibility = evaluateBoostEligibility({ single, ...context });
+      const creditCount = context.requests.filter(hasReusablePaidBoostCredit).length;
+      const eligibility = evaluateBoostEligibility({ single, ...context, ignoreRequestCooldown: creditCount > 0 });
       const profileReadiness = getBoostProfileReadiness(single);
       const latestRequest = context.requests[0] || null;
       const latestRequestMatch = latestRequest
@@ -1062,7 +1076,8 @@ export const matchBoostRouter = router({
           fulfilledAt: latestRequest.fulfilledAt,
         } : null,
         awaitingRecipientResponse,
-        creditAvailable: context.requests.some(hasReusablePaidBoostCredit),
+        creditAvailable: creditCount > 0,
+        creditCount,
         priceAgorot: BOOST_PRICE_AGOROT,
         paymentConfigured: true,
         profileReady: profileReadiness.ready,
@@ -1288,6 +1303,7 @@ export const matchBoostRouter = router({
         plusMember: context.plusMember,
         membership: context.membership,
         boostRequests: context.requests.filter((request: any) => request.id !== credit.id),
+        ignoreRequestCooldown: true,
       });
       const selectedCandidate = input.matchId
         ? eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)

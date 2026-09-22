@@ -223,6 +223,19 @@ describe("match boost eligibility", () => {
     expect(result.blockers).toContain("בקשת בוסט קודמת עדיין בטיפול");
   });
 
+  it("lets a paid recovery credit bypass only the 30-day purchase cooldown", () => {
+    const result = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [pendingMatch()],
+      membership: activeMembership(),
+      boostRequests: [{ id: 1, status: "approved", requestedAt: NOW - 1000, source: "paid" }],
+      now: NOW,
+      ignoreRequestCooldown: true,
+    });
+    expect(result.eligible).toBe(true);
+    expect(result.blockers).not.toContain("ניתן להפעיל בוסט אחד בכל 30 יום");
+  });
+
   it("includes one Plus boost per active billing cycle only", () => {
     const plusMember = {
       status: "active",
@@ -415,11 +428,20 @@ describe("match boost privacy and payment gate", () => {
     expect(source).toContain("boost_credit_available:");
     expect(source).toContain("redeemPaidCredit: publicProcedure");
     expect(uiSource).toContain("מימוש קרדיט ושליחת Boost");
-    expect(webhookSource).toContain('case "match_boost": await handleMatchBoost');
+    expect(webhookSource).toContain("const boostResult = await handleMatchBoost");
+    expect(webhookSource).toContain("shouldApplyTemporalWebhookDedupe(product, Boolean(verifiedBoostReference))");
+    expect(webhookSource).toContain("completedPaymentDedupeKey");
     expect(webhookSource).toContain('product !== "match_boost" && sum >= 19 && sum <= 21');
     expect(source).toContain("checkoutReference?: string");
     expect(source).toContain("parseBoostCheckoutReference(input.checkoutReference)");
     expect(source).toContain("if (!request && !input.checkoutReference)");
+    expect(source).toContain('eq(matchBoostRequests.status, "awaiting_payment")');
+    expect(source).toContain("if (affectedRows < 1)");
+    expect(source).toContain("alreadyProcessed: true");
+    expect(source).toContain("creditCount");
+    expect(source).toContain("ignoreRequestCooldown: true");
+    expect(uiSource).toContain("קרדיטי Boost שמורים עבורך");
+    expect(uiSource).toContain("קרדיטים זמינים");
   });
 
   it("generates anonymous pending choices without sending messages or charging and hides them from Hilit's regular queue", () => {

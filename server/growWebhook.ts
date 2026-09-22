@@ -82,6 +82,22 @@ export function detectProductByAmount(sum: number): string | null {
   return null;
 }
 
+export function shouldApplyTemporalWebhookDedupe(product: string | null, hasVerifiedBoostReference: boolean) {
+  return !(product === "match_boost" && hasVerifiedBoostReference);
+}
+
+export function completedPaymentDedupeKey(input: {
+  email: string;
+  product: string;
+  transactionId: string;
+  verifiedBoostReference?: string;
+}) {
+  const logicalPaymentId = input.product === "match_boost" && input.verifiedBoostReference
+    ? `boost:${crypto.createHash("sha256").update(input.verifiedBoostReference).digest("hex").slice(0, 40)}`
+    : input.transactionId;
+  return `${input.email}|${input.product}|${logicalPaymentId}`.slice(0, 255);
+}
+
 // Fallback: detect by description
 export function detectProductByDesc(desc: string): string | null {
   const d = (desc || "").toLowerCase();
@@ -579,12 +595,15 @@ async function handleMatchBoost(email: string, transactionId: string, sum: numbe
     amountAgorot: Math.round(sum * 100),
     checkoutReference,
   });
-  await notifyOwner({
-    title: result.delivered ? "Boost נרכש ונשלח" : "Boost נרכש ונשמר כקרדיט",
-    content: result.delivered
-      ? `עסקת Boost בסך ${sum} ש״ח אושרה וההצעה האלגוריתמית נשלחה.`
-      : `עסקת Boost בסך ${sum} ש״ח אושרה, אך המועמד/ת לא היו זמינים בבדיקה הסופית. נשמר קרדיט אוטומטי.`,
-  });
+  if (!result.alreadyProcessed) {
+    await notifyOwner({
+      title: result.delivered ? "Boost נרכש ונשלח" : "Boost נרכש ונשמר כקרדיט",
+      content: result.delivered
+        ? `עסקת Boost בסך ${sum} ש״ח אושרה וההצעה האלגוריתמית נשלחה.`
+        : `עסקת Boost בסך ${sum} ש״ח אושרה, אך המועמד/ת לא היו זמינים בבדיקה הסופית. נשמר קרדיט אוטומטי.`,
+    });
+  }
+  return result;
 }
 
 // ─── UTM extraction helper ────────────────────────────────────────────────────
@@ -635,6 +654,17 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   const transactionId: string = data.transactionId || data.transactionCode || "";
   const processToken: string = data.paymentLinkProcessToken || "";
   const hasVerifiedPlusReference = verifyPlusCheckoutReference(context.plusCheckoutReference, email);
+  let verifiedBoostReference: string | undefined;
+  if (context.boostCheckoutReference) {
+    try {
+      const { parseBoostCheckoutReference } = await import("./matchBoostRouter");
+      if (parseBoostCheckoutReference(context.boostCheckoutReference)) {
+        verifiedBoostReference = context.boostCheckoutReference;
+      }
+    } catch (error) {
+      console.warn("[GrowWebhook] Boost checkout reference verification failed", error);
+    }
+  }
   // Extract UTM attribution data from the webhook payload
   let utm = extractUtmFromWebhook(data);
   if (utm.utmSource) console.log(`[GrowWebhook] UTM detected from webhook: source=${utm.utmSource} medium=${utm.utmMedium} campaign=${utm.utmCampaign}`);
@@ -794,7 +824,9 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   // Both have DIFFERENT transactionIds, so a unique-on-transactionId guard is not enough.
   // Strategy: block on BOTH conditions:
   //   a) Same transactionId (catches exact duplicates / retries)
-  //   b) Same email+product within a 10-minute window (catches the two-webhook pattern)
+  //   b) Same email+product within a 10-minute window for legacy products.
+  // Boost is intentionally excluded when it carries a verified checkout reference,
+  // because one member may buy several distinct Boosts within a few minutes.
   {
     const db = await getDb();
     if (db) {
@@ -816,7 +848,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
         }
 
         // (b) Check email+product within last 10 minutes (catches the two-webhook pattern)
-        if (email && product) {
+        if (email && product && shouldApplyTemporalWebhookDedupe(product, Boolean(verifiedBoostReference))) {
           const windowMs = 10 * 60 * 1000; // 10 minutes
           const since = Date.now() - windowMs;
           const { gt, and: drizzleAnd, eq: drizzleEq } = await import("drizzle-orm");
@@ -855,6 +887,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   }
 
   try {
+    let businessActionAlreadyProcessed = false;
     switch (product) {
       case "guide":    await handleGuide(email, name); break;
       case "course":   await handleCourse(email, name); break;
@@ -865,11 +898,15 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId, sum); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
-      case "match_boost": await handleMatchBoost(email, transactionId, sum, context.boostCheckoutReference); break;
+      case "match_boost": {
+        const boostResult = await handleMatchBoost(email, transactionId, sum, verifiedBoostReference);
+        businessActionAlreadyProcessed = Boolean(boostResult.alreadyProcessed);
+        break;
+      }
       case "plus": await handlePlus(email, name, transactionId, sum, data); break;
     }
 
-    if (transactionId && product) {
+    if (transactionId && product && !businessActionAlreadyProcessed) {
       await queueProductFeedbackAfterPurchase({
         product,
         transactionId,
@@ -885,7 +922,12 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
         const db = await getDb();
         if (db) {
           const normalizedTransaction = transactionId || `grow-${email}-${product}-${Date.now()}`;
-          const dedupeKey = `${email}|${product}|${normalizedTransaction}`;
+          const dedupeKey = completedPaymentDedupeKey({
+            email,
+            product,
+            transactionId: normalizedTransaction,
+            verifiedBoostReference,
+          });
           await db.insert(completedPayments).values({
             transactionId: normalizedTransaction,
             dedupeKey,
@@ -905,7 +947,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       }
     }
 
-    if (purchaseTracking && transactionId && sum > 0) {
+    if (purchaseTracking && transactionId && sum > 0 && !businessActionAlreadyProcessed) {
       try {
         const db = await getDb();
         if (db) {
@@ -945,14 +987,14 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     // Fire GA4 purchase event server-side via Measurement Protocol
     const GA4_KEYS = ["guide", "course", "coaching", "coaching_mas", "session", "database", "bundle_tubav", "bundle_new_year", "match_boost", "plus"] as const;
     type GA4Key = typeof GA4_KEYS[number];
-    if (GA4_KEYS.includes(product as GA4Key)) {
+    if (GA4_KEYS.includes(product as GA4Key) && !businessActionAlreadyProcessed) {
       // Prefer the real browser client_id (from _ga cookie) for accurate DebugView stitching
       const ga4ClientId = storedGa4ClientId || clientIdFromEmail(email);
       ga4Purchase(ga4ClientId, product as GA4Key, transactionId || undefined, utm, storedGa4SessionId).catch(() => {});
     }
 
     // Fire Meta Conversions API Purchase event (server-side, deduplicates with browser pixel)
-    capiPurchase({
+    if (!businessActionAlreadyProcessed) capiPurchase({
       email,
       name,
       phone,

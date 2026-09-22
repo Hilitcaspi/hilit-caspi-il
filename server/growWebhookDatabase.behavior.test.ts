@@ -15,7 +15,7 @@ vi.mock("./_core/ga4", () => ({ ga4Purchase: vi.fn(), clientIdFromEmail: vi.fn()
 vi.mock("./_core/metaCapi", () => ({ capiPurchase: vi.fn() }));
 
 import { crmLeads, leads, singles } from "../drizzle/schema";
-import { handleDatabase } from "./growWebhook";
+import { completedPaymentDedupeKey, handleDatabase, shouldApplyTemporalWebhookDedupe } from "./growWebhook";
 
 function createDbHarness(selectRows: unknown[][], singleInsertId = 73) {
   const inserts: Array<{ table: unknown; values: Record<string, unknown> }> = [];
@@ -116,5 +116,37 @@ describe("Grow database payment activation", () => {
     expect(mocks.notifyOwner).toHaveBeenCalledWith(expect.objectContaining({
       title: "נדרש שחזור פרופיל לאחר תשלום",
     }));
+  });
+});
+
+describe("Grow Boost payment idempotency", () => {
+  it("does not collapse separate Boost checkouts that happen within ten minutes", () => {
+    expect(shouldApplyTemporalWebhookDedupe("match_boost", true)).toBe(false);
+    expect(shouldApplyTemporalWebhookDedupe("match_boost", false)).toBe(true);
+    expect(shouldApplyTemporalWebhookDedupe("database", true)).toBe(true);
+  });
+
+  it("deduplicates Grow's two callbacks by the signed Boost checkout reference", () => {
+    const firstCallback = completedPaymentDedupeKey({
+      email: "boost@example.com",
+      product: "match_boost",
+      transactionId: "numeric-callback-id",
+      verifiedBoostReference: "123.456.signed-reference",
+    });
+    const secondCallback = completedPaymentDedupeKey({
+      email: "boost@example.com",
+      product: "match_boost",
+      transactionId: "base64-callback-id",
+      verifiedBoostReference: "123.456.signed-reference",
+    });
+    const nextPurchase = completedPaymentDedupeKey({
+      email: "boost@example.com",
+      product: "match_boost",
+      transactionId: "next-callback-id",
+      verifiedBoostReference: "124.456.other-signed-reference",
+    });
+
+    expect(firstCallback).toBe(secondCallback);
+    expect(nextPurchase).not.toBe(firstCallback);
   });
 });

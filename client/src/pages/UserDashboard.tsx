@@ -545,7 +545,7 @@ function MatchBoostCard({
         <p className="text-xs font-black text-[#ffe27c]">Boost פעיל</p>
         <h3 className="mt-1 text-xl font-black text-white">{refreshOptions.isPending ? "מחפשים עבורך אפשרויות Boost..." : "אין כרגע אפשרויות Boost זמינות"}</h3>
         <p className="mt-2 text-sm leading-6 text-white/80">{refreshOptions.isPending ? "המערכת בודקת כעת רק חברי מאגר פעילים שאישרו Boost ועומדים בתנאי ההתאמה ההדדיים." : "נבדקו חברי המאגר שאישרו Boost. כשתימצא אפשרות חדשה שעוברת את תנאי ההתאמה ההדדיים, היא תופיע כאן."}</p>
-        {status.creditAvailable && <p className="mt-3 rounded-xl bg-[#f5f2ff] p-3 text-xs font-bold leading-5 text-[#51448c]">קרדיט ה־Boost שלך שמור. ברגע שיופיע כרטיס חדש שעובר את כל תנאי הסף, ניתן יהיה לממש אותו ללא חיוב נוסף.</p>}
+        {status.creditAvailable && <p className="mt-3 rounded-xl bg-[#f5f2ff] p-3 text-xs font-bold leading-5 text-[#51448c]">{status.creditCount === 1 ? "קרדיט Boost אחד שמור עבורך." : `${status.creditCount} קרדיטי Boost שמורים עבורך.`} ברגע שיופיע כרטיס חדש שעובר את כל תנאי הסף, ניתן יהיה לממש אותם ללא חיוב נוסף, אחד בכל פעם.</p>}
         <button type="button" disabled={leavePool.isPending} onClick={() => leavePool.mutate({ email, token })} className="mt-4 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">ניהול או יציאה משירות Boost</button>
         {resultMessage && <p className="mt-3 text-xs font-bold text-emerald-700">{resultMessage}</p>}
       </section>
@@ -582,6 +582,7 @@ function MatchBoostCard({
           <div>
             <p className="text-xs font-black text-[#ffe27c]">אפשרויות Boost לבחירה עצמאית</p>
             <h3 className="mt-1 text-2xl font-black text-white">בחרו למי תרצו לשלוח בקשת Boost</h3>
+            {status.creditAvailable && <p className="mt-2 text-sm font-black text-[#ffe27c]">{status.creditCount === 1 ? "קרדיט אחד זמין" : `${status.creditCount} קרדיטים זמינים`} — ללא חיוב נוסף</p>}
           </div>
           <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black text-white">
             {status.candidateCount} אפשרויות זמינות
@@ -641,7 +642,7 @@ function MatchBoostCard({
                   <div className="mt-4">
                     {status.creditAvailable ? (
                       <button type="button" disabled={!status.eligible || redeemCredit.isPending} onClick={() => redeemCredit.mutate({ email, token, matchId: option.matchId })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
-                        {redeemCredit.isPending ? "מפעיל את הקרדיט..." : "מימוש קרדיט ושליחת Boost"}
+                        {redeemCredit.isPending ? "מפעיל את הקרדיט..." : `מימוש קרדיט ושליחת Boost${status.creditCount > 1 ? ` · יישארו ${status.creditCount - 1}` : ""}`}
                       </button>
                     ) : status.plusBenefitAvailable ? (
                       <button type="button" disabled={!status.eligible || redeemPlus.isPending} onClick={() => redeemPlus.mutate({ email, token, matchId: option.matchId })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
