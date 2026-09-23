@@ -82,6 +82,7 @@ const MatchBoostDemo = lazy(() => import("@/pages/MatchBoostDemo"));
 const DatabasePlusSales = lazy(() => import("@/pages/DatabasePlusSales"));
 const TermsPlus = lazy(() => import("@/pages/TermsPlus"));
 const ThankYouPlus = lazy(() => import("@/pages/ThankYouPlus"));
+const GeneratedLandingPage = lazy(() => import("@/pages/GeneratedLandingPage"));
 
 // US English (EN) pages
 const EnHome = lazy(() => import("@/pages/en/Home"));
@@ -271,6 +272,7 @@ function HeRouter() {
           <Route path={"/unsubscribe"} component={Unsubscribe} />
           <Route path={"/course"} component={CourseSales} />
           <Route path={"/blog/:slug"} component={BlogPost} />
+          <Route path={"/pages/:slug"} component={GeneratedLandingPage} />
           <Route path={"/blog"} component={Blog} />
           <Route path={"/speaking"} component={Speaking} />
           <Route path={"/thank-you/database"} component={ThankYouDatabase} />

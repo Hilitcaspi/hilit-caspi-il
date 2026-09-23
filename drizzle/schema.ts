@@ -3,6 +3,7 @@ import {
   bigint,
   mysqlEnum,
   mysqlTable,
+  mediumtext,
   text,
   timestamp,
   varchar,
@@ -1370,3 +1371,75 @@ export const dailyReportRuns = mysqlTable("daily_report_runs", {
 }));
 export type DailyReportRun = typeof dailyReportRuns.$inferSelect;
 export type InsertDailyReportRun = typeof dailyReportRuns.$inferInsert;
+
+/**
+ * Aggregate-only events used to measure which recurring tasks moved from
+ * Manus/manual work into the admin control center. No customer PII is stored.
+ */
+export const selfServiceEvents = mysqlTable("self_service_events", {
+  id: int("id").primaryKey().autoincrement(),
+  eventKey: varchar("event_key", { length: 191 }).notNull(),
+  actionKey: varchar("action_key", { length: 100 }).notNull(),
+  category: mysqlEnum("category", ["database", "dashboard", "content", "tracking"]).notNull(),
+  channel: mysqlEnum("channel", ["self_service", "in_app_ai", "manus", "manual"]).notNull(),
+  outcome: mysqlEnum("outcome", ["completed", "previewed", "drafted", "published", "failed"]).notNull(),
+  durationMs: int("duration_ms"),
+  model: varchar("model", { length: 80 }),
+  promptTokens: int("prompt_tokens"),
+  completionTokens: int("completion_tokens"),
+  metadataJson: text("metadata_json"),
+  actorHash: varchar("actor_hash", { length: 64 }),
+  occurredAt: bigint("occurred_at", { mode: "number" }).notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, table => ({
+  eventKeyIdx: uniqueIndex("self_service_event_key_idx").on(table.eventKey),
+  actionDateIdx: index("self_service_action_date_idx").on(table.actionKey, table.occurredAt),
+  categoryChannelIdx: index("self_service_category_channel_idx").on(table.category, table.channel),
+}));
+export type SelfServiceEvent = typeof selfServiceEvents.$inferSelect;
+export type InsertSelfServiceEvent = typeof selfServiceEvents.$inferInsert;
+
+/**
+ * Versioned drafts generated in the internal content studio. Published landing
+ * pages are rendered from structured JSON only; arbitrary HTML/scripts are never stored.
+ */
+export const contentStudioDocuments = mysqlTable("content_studio_documents", {
+  id: int("id").primaryKey().autoincrement(),
+  kind: mysqlEnum("kind", ["landing_page", "story", "ad_copy", "email", "course"]).notNull(),
+  title: varchar("title", { length: 220 }).notNull(),
+  slug: varchar("slug", { length: 160 }),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
+  templateKey: varchar("template_key", { length: 80 }).notNull().default("signature_dark"),
+  brief: text("brief").notNull(),
+  contentJson: mediumtext("content_json").notNull(),
+  model: varchar("model", { length: 80 }),
+  promptTokens: int("prompt_tokens"),
+  completionTokens: int("completion_tokens"),
+  createdByHash: varchar("created_by_hash", { length: 64 }),
+  publishedAt: bigint("published_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({
+  slugIdx: uniqueIndex("content_studio_slug_idx").on(table.slug),
+  statusKindIdx: index("content_studio_status_kind_idx").on(table.status, table.kind),
+  updatedIdx: index("content_studio_updated_idx").on(table.updatedAt),
+}));
+export type ContentStudioDocument = typeof contentStudioDocuments.$inferSelect;
+export type InsertContentStudioDocument = typeof contentStudioDocuments.$inferInsert;
+
+/** Immutable snapshots for restoring or comparing content studio drafts. */
+export const contentStudioVersions = mysqlTable("content_studio_versions", {
+  id: int("id").primaryKey().autoincrement(),
+  documentId: int("document_id").notNull(),
+  version: int("version").notNull(),
+  title: varchar("title", { length: 220 }).notNull(),
+  templateKey: varchar("template_key", { length: 80 }).notNull(),
+  contentJson: mediumtext("content_json").notNull(),
+  createdByHash: varchar("created_by_hash", { length: 64 }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, table => ({
+  documentVersionIdx: uniqueIndex("content_studio_document_version_idx").on(table.documentId, table.version),
+  documentIdx: index("content_studio_version_document_idx").on(table.documentId),
+}));
+export type ContentStudioVersion = typeof contentStudioVersions.$inferSelect;
+export type InsertContentStudioVersion = typeof contentStudioVersions.$inferInsert;

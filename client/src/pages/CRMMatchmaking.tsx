@@ -8,13 +8,14 @@ import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
 import BoostMembersAdminSection from "@/components/BoostMembersAdminSection";
 import TestimonialManagementSection from "@/components/TestimonialManagementSection";
 import DailyReportManagementSection from "@/components/DailyReportManagementSection";
+import SelfServiceControlCenter from "@/components/SelfServiceControlCenter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles, MessageSquareText } from "lucide-react";
+import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles, MessageSquareText, Command } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getMatchTrackingSummary, hasMutualYes, isUnsuccessfulMatch, isWaitingForMatchResponses } from "@shared/matchLifecycle";
 import { wasMatchProposalSent } from "@shared/matchDelivery";
@@ -301,11 +302,11 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report">(() => {
+  const [activeTab, setActiveTab] = useState<"self_service" | "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report">(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    const allowedTabs = new Set(["singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "testimonials", "daily_report"]);
+    const allowedTabs = new Set(["self_service", "singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "testimonials", "daily_report"]);
     return allowedTabs.has(requestedTab || "")
-      ? requestedTab as "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report"
+      ? requestedTab as "self_service" | "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report"
       : "singles";
   });
   // Filter-search tab state
@@ -871,6 +872,7 @@ export default function CRMMatchmaking() {
         {/* Tabs */}
         <div className="flex max-w-full gap-2 mb-4 overflow-x-auto rounded-xl bg-white p-1 shadow-sm scroll-smooth [scrollbar-width:thin]">
           {[
+            { id: "self_service" as const, label: "מרכז שליטה", icon: <Command size={14} /> },
             { id: "singles" as const, label: "חברי המאגר", icon: <Users size={14} /> },
             { id: "matches" as const, label: `התאמות (${pendingCount} ממתינות)`, icon: <Heart size={14} /> },
             { id: "unmatched" as const, label: "התאמות לטיפול", icon: <Clock size={14} /> },
@@ -900,6 +902,10 @@ export default function CRMMatchmaking() {
             </button>
           ))}
         </div>
+
+        {activeTab === "self_service" && (
+          <SelfServiceControlCenter />
+        )}
 
         {/* Singles Tab */}
         {activeTab === "singles" && (

@@ -48,4 +48,12 @@ describe("wasMatchProposalSent", () => {
     expect(createAndSendSource).toContain("isNull(matches.returnedToPoolAt)");
     expect(createAndSendSource).toContain('ne(matches.matchDetailStatus, "ended")');
   });
+
+  it("rejects reminder delivery when the requested single is not a match participant", () => {
+    const start = routerSource.indexOf("sendMatchReminder: teamProcedure");
+    const end = routerSource.indexOf("updateSinglePhoto: teamProcedure", start);
+    const reminderSource = routerSource.slice(start, end);
+    expect(reminderSource).toContain("match.singleAId !== input.singleId && match.singleBId !== input.singleId");
+    expect(reminderSource).toContain("הנמען אינו משתתף בהתאמה");
+  });
 });

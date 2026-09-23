@@ -57,10 +57,15 @@ import { buildOutcomeFeedbackRequestEmail, shouldOfferTestimonialRequest, TESTIM
 import { buildApprovedTestimonialCreativeVariants } from "./testimonialCreative";
 import { testimonialRouter } from "./testimonialRouter";
 import { dailyReportRouter } from "./dailyReportRouter";
+import { controlCenterRouter } from "./controlCenterRouter";
+import { contentStudioRouter } from "./contentStudioRouter";
+import { dashboardAssistantRouter } from "./dashboardAssistantRouter";
+import { usageRouter } from "./usageRouter";
 import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivacy";
 import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYMENT_ATTRIBUTION_TTL_MS } from "./paymentAttribution";
 import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
 import { wasMatchProposalSent } from "../shared/matchDelivery";
+import { hashActor, recordSelfServiceEventSafely } from "./usageMetrics";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -633,6 +638,10 @@ export const appRouter = router({
   operations: operationsRouter,
   testimonial: testimonialRouter,
   dailyReport: dailyReportRouter,
+  controlCenter: controlCenterRouter,
+  contentStudio: contentStudioRouter,
+  dashboardAssistant: dashboardAssistantRouter,
+  usage: usageRouter,
   publicProof: router({
     approvedTestimonials: publicProcedure.query(async () => {
       const db = await getDb();
@@ -3176,6 +3185,17 @@ export const appRouter = router({
           recipientB: { singleId: singleB.id, phone: singleB.phone, firstName: singleB.firstName, matchFirstName: singleA.firstName, isActive: singleB.isActive, isSeed: singleB.isSeed },
         });
 
+        await recordSelfServiceEventSafely(db, {
+          eventKey: `match:${matchId}:proposal-sent`,
+          actionKey: "match.send",
+          category: "database",
+          channel: "self_service",
+          outcome: "completed",
+          actorHash: hashActor(ctx),
+          occurredAt: now,
+          metadata: { mode: heightOverrideApplied ? "height_override" : "standard" },
+        });
+
         return { success: true, matchId, score };
       }),
 
@@ -5574,6 +5594,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           updatedAt: now,
           notes: setLegacyMatchNote(current.notes, "שוחרר ידנית"),
         }).where(eq(matches.id, input.matchId));
+        await recordSelfServiceEventSafely(db, {
+          eventKey: `match:${input.matchId}:released:${now}`,
+          actionKey: "match.release",
+          category: "database",
+          channel: "self_service",
+          outcome: "completed",
+          actorHash: hashActor(ctx),
+          occurredAt: now,
+        });
         return { success: true };
       }),
     /**
@@ -5726,7 +5755,17 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        await db.update(singles).set({ isActive: input.isActive }).where(eq(singles.id, input.singleId));
+        const now = Date.now();
+        await db.update(singles).set({ isActive: input.isActive, updatedAt: now }).where(eq(singles.id, input.singleId));
+        await recordSelfServiceEventSafely(db, {
+          eventKey: `profile:${input.singleId}:active:${input.isActive}:${now}`,
+          actionKey: input.isActive ? "profile.activate" : "profile.deactivate",
+          category: "database",
+          channel: "self_service",
+          outcome: "completed",
+          actorHash: hashActor(ctx),
+          occurredAt: now,
+        });
         return { success: true };
       }),
     /**
@@ -5741,6 +5780,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const [match] = await db.select().from(matches).where(eq(matches.id, input.matchId)).limit(1);
         if (!match) throw new TRPCError({ code: "NOT_FOUND", message: "התאמה לא נמצאה" });
         if (match.status !== 'proposed') throw new TRPCError({ code: "BAD_REQUEST", message: "ההתאמה אינה פעילה" });
+        if (match.singleAId !== input.singleId && match.singleBId !== input.singleId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "הנמען אינו משתתף בהתאמה" });
+        }
         const isA = match.singleAId === input.singleId;
         const [single] = await db.select().from(singles).where(eq(singles.id, input.singleId)).limit(1);
         if (!single || !single.email) throw new TRPCError({ code: "BAD_REQUEST", message: "אין כתובת מייל לרווק/ה" });
@@ -5779,6 +5821,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           attemptedAt,
         });
         if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "ספק המייל לא קיבל את התזכורת" });
+        await recordSelfServiceEventSafely(db, {
+          eventKey: `match:${input.matchId}:reminder:${input.singleId}:${attemptedAt}`,
+          actionKey: "match.reminder",
+          category: "database",
+          channel: "self_service",
+          outcome: "completed",
+          actorHash: hashActor(ctx),
+          occurredAt: attemptedAt,
+        });
         return { success: true };
       }),
     /**
@@ -5858,6 +5909,16 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           patch.age = age;
         }
         await db.update(singles).set(patch).where(eq(singles.id, id));
+        await recordSelfServiceEventSafely(db, {
+          eventKey: `profile:${id}:updated:${patch.updatedAt}`,
+          actionKey: "profile.update",
+          category: "database",
+          channel: "self_service",
+          outcome: "completed",
+          actorHash: hashActor(ctx),
+          occurredAt: patch.updatedAt,
+          metadata: { filterCount: Object.values(fields).filter(value => value !== undefined).length },
+        });
         return { success: true };
       }),
 
@@ -6059,7 +6120,17 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        await db.update(singles).set({ isActive: false, updatedAt: Date.now() }).where(eq(singles.id, input.id));
+        const now = Date.now();
+        await db.update(singles).set({ isActive: false, updatedAt: now }).where(eq(singles.id, input.id));
+        await recordSelfServiceEventSafely(db, {
+          eventKey: `profile:${input.id}:deactivated:${now}`,
+          actionKey: "profile.deactivate",
+          category: "database",
+          channel: "self_service",
+          outcome: "completed",
+          actorHash: hashActor(ctx),
+          occurredAt: now,
+        });
         return { success: true };
       }),
 
