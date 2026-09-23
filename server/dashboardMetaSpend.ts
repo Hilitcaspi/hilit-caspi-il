@@ -6,6 +6,7 @@ export type MetaCampaignClassification = "sales_acquisition" | "profile_boosted_
 export type MetaAction = { action_type?: string; value?: string | number };
 
 export type MetaCampaignSummary = {
+  id: string;
   name: string;
   objective: string;
   accountRole: MetaAccountRole;
@@ -70,6 +71,7 @@ export function normalizeMetaCampaign(
   const purchaseValueRaw = metaActionValue(row.action_values, ["purchase", "omni_purchase", "offsite_conversion.fb_pixel_purchase"]);
   const purchaseValue = purchaseValueRaw > 0 ? roundCurrency(purchaseValueRaw) : null;
   return {
+    id: String(row.campaign_id || row.id || row.campaignId || ""),
     name: String(row.campaign_name || ""),
     objective: String(row.objective || ""),
     accountRole,

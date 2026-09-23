@@ -142,6 +142,126 @@ function aggregateJourneyAttribution(rows: any[]): Array<{ campaign: string; sou
     .slice(0, 15);
 }
 
+export function normalizeLandingCategory(urlOrTag: string | null | undefined) {
+  const raw = String(urlOrTag || "").trim();
+  if (!raw) return { category: "unknown", label: "לא זוהה" };
+  const value = raw.toLowerCase();
+  if (/^\/?utm_/i.test(value)) return { category: "unknown", label: "לא זוהה" };
+  try {
+    const parsed = new URL(raw.startsWith("http") ? raw : `https://hilitcaspi.com${raw.startsWith("/") ? raw : `/${raw}`}`);
+    const path = parsed.pathname.toLowerCase();
+    const params = parsed.searchParams;
+    const campaign = `${params.get("utm_campaign") || ""} ${params.get("utm_content") || ""}`.toLowerCase();
+    const combined = `${path} ${campaign}`;
+    if (combined.includes("dna") || combined.includes("quiz")) return { category: "dna_quiz", label: "שאלון DNA" };
+    if (combined.includes("database") || combined.includes("singles") || combined.includes("maagar") || combined.includes("/join")) return { category: "database", label: "עמוד המאגר" };
+    if (combined.includes("boost-now") || combined.includes("match-boost")) return { category: "boost", label: "עמוד Boost" };
+    if (combined.includes("new-year") || combined.includes("bundle") || combined.includes("holiday")) return { category: "bundle", label: "עמוד הטבה/באנדל" };
+    if (path === "/" || path === "") return { category: "home", label: "עמוד הבית" };
+    return { category: path.replace(/^\//, "") || "other", label: path || "עמוד אחר" };
+  } catch {
+    if (value.includes("dna") || value.includes("quiz")) return { category: "dna_quiz", label: "שאלון DNA" };
+    if (value.includes("database") || value.includes("singles") || value.includes("maagar") || value.includes("/join")) return { category: "database", label: "עמוד המאגר" };
+    if (value.includes("boost-now") || value.includes("match-boost")) return { category: "boost", label: "עמוד Boost" };
+    if (value.includes("bundle") || value.includes("holiday")) return { category: "bundle", label: "עמוד הטבה/באנדל" };
+    if (value.includes("hilitcaspi.com/") || value.endsWith("hilitcaspi.com")) return { category: "home", label: "עמוד הבית" };
+    return { category: "unknown", label: "לא זוהה" };
+  }
+}
+
+function collectUrlsDeep(value: unknown, urls: Set<string>) {
+  if (!value) return;
+  if (typeof value === "string") {
+    if (/^https?:\/\//i.test(value) || value.includes("utm_campaign") || value.startsWith("/")) urls.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach(item => collectUrlsDeep(item, urls));
+    return;
+  }
+  if (typeof value === "object") {
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      if (["link", "website_url", "url", "url_tags"].includes(key)) collectUrlsDeep(nested, urls);
+      else if (typeof nested === "object") collectUrlsDeep(nested, urls);
+    }
+  }
+}
+
+function extractUtmCampaign(raw: string) {
+  const match = raw.match(/(?:^|[?&])utm_campaign=([^&#]+)/i);
+  if (!match) return null;
+  try { return decodeURIComponent(match[1].replace(/\+/g, " ")).trim(); } catch { return match[1].trim(); }
+}
+
+let metaDestinationsCache: { fetchedAt: number; data: Record<string, { labels: string[]; categories: string[]; utmCampaigns: string[]; activeAds: number; ads: number }> } | null = null;
+
+async function fetchMetaCampaignDestinations() {
+  if (metaDestinationsCache && Date.now() - metaDestinationsCache.fetchedAt < 10 * 60 * 1000) return metaDestinationsCache.data;
+  const token = process.env.META_ADS_TOKEN;
+  if (!token) return metaDestinationsCache?.data || {};
+  const accountId = "act_254697595735216";
+  const fields = "campaign_id,campaign_name,effective_status,creative{object_story_spec,asset_feed_spec,url_tags}";
+  const byCampaign: Record<string, { labels: Set<string>; categories: Set<string>; utmCampaigns: Set<string>; activeAds: number; ads: number }> = {};
+  try {
+    let next: string | null = `https://graph.facebook.com/v25.0/${accountId}/ads?fields=${fields}&limit=200&access_token=${token}`;
+    while (next) {
+      const res = await fetch(next, { signal: AbortSignal.timeout(20_000) });
+      const payload: any = await res.json();
+      if (!res.ok || payload.error) throw new Error(payload.error?.message || `Meta HTTP ${res.status}`);
+      for (const ad of payload.data || []) {
+        const id = String(ad.campaign_id || "");
+        if (!id) continue;
+        if (!byCampaign[id]) byCampaign[id] = { labels: new Set(), categories: new Set(), utmCampaigns: new Set(), activeAds: 0, ads: 0 };
+        byCampaign[id].ads += 1;
+        if (ad.effective_status === "ACTIVE") byCampaign[id].activeAds += 1;
+        const urls = new Set<string>();
+        collectUrlsDeep(ad.creative, urls);
+        urls.forEach(url => {
+          const landing = normalizeLandingCategory(url);
+          if (landing.category !== "unknown") {
+            byCampaign[id].labels.add(landing.label);
+            byCampaign[id].categories.add(landing.category);
+          }
+          const utmCampaign = extractUtmCampaign(url);
+          if (utmCampaign) byCampaign[id].utmCampaigns.add(utmCampaign.toLowerCase());
+        });
+      }
+      next = payload.paging?.next || null;
+    }
+  } catch (error) {
+    console.error("Meta destination fetch error:", error);
+    return metaDestinationsCache?.data || {};
+  }
+  const data = Object.fromEntries(Object.entries(byCampaign).map(([id, value]) => [id, {
+    labels: Array.from(value.labels).filter(Boolean).slice(0, 4),
+    categories: Array.from(value.categories).filter(Boolean).slice(0, 4),
+    utmCampaigns: Array.from(value.utmCampaigns).filter(Boolean).slice(0, 8),
+    activeAds: value.activeAds,
+    ads: value.ads,
+  }]));
+  metaDestinationsCache = { fetchedAt: Date.now(), data };
+  return data;
+}
+
+export function inferCampaignUtmAliases(name: string, explicit: string[] = []) {
+  const normalized = name.toLowerCase();
+  const explicitAliases = explicit.map(value => value.toLowerCase().trim()).filter(Boolean);
+  if (explicitAliases.length > 0) return Array.from(new Set(explicitAliases));
+  const aliases = new Set<string>();
+  const isLeadCampaign = normalized.includes("lead") || normalized.includes("ליד");
+  const isSalesCampaign = normalized.includes("sales") || normalized.includes("מכירה");
+  if (normalized.includes("סיפורי הצלחה")) aliases.add("dna_leads_cold_success_stories");
+  if ((normalized.includes("קהל קר") || normalized.includes("cold")) && isLeadCampaign) {
+    aliases.add("lead_cold_measure");
+    aliases.add("lead_cold_120");
+  }
+  if ((normalized.includes("קהל חם") || normalized.includes("warm")) && isLeadCampaign) aliases.add("lead_warm_30d");
+  if ((normalized.includes("קהל קר") || normalized.includes("cold")) && isSalesCampaign) aliases.add("database_purchase");
+  if ((normalized.includes("קהל חם") || normalized.includes("warm")) && isSalesCampaign) aliases.add("sales_warm_audience");
+  if (normalized.includes("יום הולדת")) aliases.add("‏shabek campign - גברים - נשים - יום הולדת | 06/08".toLowerCase());
+  return Array.from(aliases);
+}
+
 function guardAdmin(ctx: any) {
   if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
   if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -238,11 +358,11 @@ export async function fetchSocialInsights(since: number, until: number) {
   }
 }
 
-export async function fetchMetaAdsInsights(since: string, until: string) {
+async function fetchMetaAdsInsightsUncached(since: string, until: string) {
   const token = process.env.META_ADS_TOKEN;
   const mainAccountId = "act_254697595735216";
   const boostsAccountId = "act_3841144459522772";
-  const fields = "campaign_name,objective,spend,impressions,clicks,reach,actions,action_values";
+  const fields = "campaign_id,campaign_name,objective,spend,impressions,clicks,reach,actions,action_values";
   type AccountFetchResult = {
     rows: ReturnType<typeof normalizeMetaCampaign>[];
     status: "available" | "unavailable";
@@ -274,6 +394,26 @@ export async function fetchMetaAdsInsights(since: string, until: string) {
     ? "available" as const
     : statuses.some(value => value === "available") ? "partial" as const : "unavailable" as const;
   return { campaigns: main.rows || [], boosts: boosts.rows || [], status, fetchedAt: Date.now() };
+}
+
+type MetaAdsInsightsResult = Awaited<ReturnType<typeof fetchMetaAdsInsightsUncached>>;
+const metaAdsInsightsCache = new Map<string, { expiresAt: number; data: MetaAdsInsightsResult }>();
+const metaAdsInsightsInFlight = new Map<string, Promise<MetaAdsInsightsResult>>();
+
+export async function fetchMetaAdsInsights(since: string, until: string) {
+  const cacheKey = `${since}:${until}`;
+  const cached = metaAdsInsightsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const inFlight = metaAdsInsightsInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
+  const request = fetchMetaAdsInsightsUncached(since, until)
+    .then(data => {
+      metaAdsInsightsCache.set(cacheKey, { expiresAt: Date.now() + 5 * 60 * 1000, data });
+      return data;
+    })
+    .finally(() => metaAdsInsightsInFlight.delete(cacheKey));
+  metaAdsInsightsInFlight.set(cacheKey, request);
+  return request;
 }
 
 const BUSINESS_EXPENSE_CATEGORIES = [
@@ -1407,6 +1547,242 @@ export const dashboardRouter = router({
             : null,
         },
         boostsTotals: { spend: metaData.boosts.reduce((s, c) => s + c.spend, 0), impressions: metaData.boosts.reduce((s, c) => s + c.impressions, 0), reach: metaData.boosts.reduce((s, c) => s + c.reach, 0), clicks: metaData.boosts.reduce((s, c) => s + c.clicks, 0), engagement: metaData.boosts.reduce((s, c) => s + c.postEngagement, 0), likes: metaData.boosts.reduce((s, c) => s + c.likes, 0), comments: metaData.boosts.reduce((s, c) => s + c.comments, 0), shares: metaData.boosts.reduce((s, c) => s + c.shares, 0), saves: metaData.boosts.reduce((s, c) => s + c.saves, 0), videoViews: metaData.boosts.reduce((s, c) => s + c.videoViews, 0) },
+      };
+    }),
+
+  // ── Campaign journey: Meta → landing → CRM lead → email assist → Grow ───
+  campaignJourney: teamProcedure
+    .input(z.object({ startDate: z.number(), endDate: z.number() }))
+    .query(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const since = formatMetaCalendarDate(input.startDate);
+      const until = formatMetaCalendarDate(input.endDate);
+      const [metaData, destinations] = await Promise.all([
+        fetchMetaAdsInsights(since, until),
+        fetchMetaCampaignDestinations(),
+      ]);
+
+      const [cohortRows] = await db.execute(sql`
+        SELECT
+          LOWER(TRIM(COALESCE(cl.utmCampaign, ''))) AS utmCampaign,
+          COALESCE(cl.utmSource, cl.source, 'direct') AS source,
+          COUNT(DISTINCT cl.id) AS leads,
+          COUNT(DISTINCT CASE WHEN cp.id IS NOT NULL THEN LOWER(TRIM(cl.email)) END) AS buyers,
+          COUNT(DISTINCT CASE WHEN cp.id IS NOT NULL AND email_any.sentAt IS NOT NULL THEN LOWER(TRIM(cl.email)) END) AS buyersWithEmailBeforePurchase,
+          COUNT(DISTINCT CASE WHEN cp.id IS NOT NULL AND email_click.clickedAt IS NOT NULL THEN LOWER(TRIM(cl.email)) END) AS buyersWithEmailClickBeforePurchase,
+          COUNT(DISTINCT cp.id) AS purchases,
+          COALESCE(SUM(CASE WHEN cp.id IS NOT NULL THEN cp.amount_agorot ELSE 0 END), 0) / 100 AS revenue
+        FROM (
+          SELECT first_touch.*
+          FROM (
+            SELECT cl_inner.*,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY LOWER(TRIM(cl_inner.email))
+                     ORDER BY cl_inner.createdAt ASC, cl_inner.id ASC
+                   ) AS firstTouchRank
+            FROM crm_leads cl_inner
+          ) first_touch
+          WHERE first_touch.firstTouchRank = 1
+        ) cl
+        LEFT JOIN completed_payments cp
+          ON LOWER(TRIM(cp.email)) = LOWER(TRIM(cl.email))
+          AND cp.product = 'database'
+          AND cp.amount_source = 'grow'
+          AND cp.amount_agorot > 100
+          AND cp.paid_at >= cl.createdAt
+          AND cp.paid_at <= ${input.endDate}
+        LEFT JOIN (
+          SELECT LOWER(TRIM(recipientEmail)) AS email, MIN(sentAt) AS sentAt
+          FROM email_log
+          WHERE status = 'sent' AND sentAt IS NOT NULL
+          GROUP BY LOWER(TRIM(recipientEmail))
+        ) email_any ON email_any.email = LOWER(TRIM(cl.email)) AND email_any.sentAt <= cp.paid_at
+        LEFT JOIN (
+          SELECT LOWER(TRIM(recipientEmail)) AS email, MIN(clickedAt) AS clickedAt
+          FROM email_log
+          WHERE status = 'sent' AND clickedAt IS NOT NULL
+          GROUP BY LOWER(TRIM(recipientEmail))
+        ) email_click ON email_click.email = LOWER(TRIM(cl.email)) AND email_click.clickedAt <= cp.paid_at
+        WHERE cl.createdAt >= ${input.startDate} AND cl.createdAt <= ${input.endDate}
+        GROUP BY LOWER(TRIM(COALESCE(cl.utmCampaign, ''))), COALESCE(cl.utmSource, cl.source, 'direct')
+      `) as any;
+
+      const [directRows] = await db.execute(sql`
+        SELECT
+          LOWER(TRIM(COALESCE(payment_attribution.utmCampaign, ''))) AS utmCampaign,
+          COUNT(DISTINCT payment_attribution.paymentId) AS purchases,
+          COUNT(DISTINCT payment_attribution.email) AS buyers,
+          COALESCE(SUM(payment_attribution.amount_agorot), 0) / 100 AS revenue
+        FROM (
+          SELECT
+            cp.id AS paymentId,
+            LOWER(TRIM(cp.email)) AS email,
+            cp.amount_agorot,
+            cl.utmCampaign,
+            ROW_NUMBER() OVER (
+              PARTITION BY cp.id
+              ORDER BY cl.createdAt DESC, cl.id DESC
+            ) AS lastTouchRank
+          FROM completed_payments cp
+          LEFT JOIN crm_leads cl
+            ON LOWER(TRIM(cl.email)) = LOWER(TRIM(cp.email))
+            AND cl.createdAt <= cp.paid_at
+          WHERE cp.product = 'database'
+            AND cp.amount_source = 'grow'
+            AND cp.amount_agorot > 100
+            AND cp.paid_at >= ${input.startDate}
+            AND cp.paid_at <= ${input.endDate}
+        ) payment_attribution
+        WHERE payment_attribution.lastTouchRank = 1
+        GROUP BY LOWER(TRIM(COALESCE(payment_attribution.utmCampaign, '')))
+      `) as any;
+
+      type CohortMetrics = {
+        leads: number;
+        buyers: number;
+        buyersWithEmailBeforePurchase: number;
+        buyersWithEmailClickBeforePurchase: number;
+        purchases: number;
+        revenue: number;
+      };
+      const zero = (): CohortMetrics => ({ leads: 0, buyers: 0, buyersWithEmailBeforePurchase: 0, buyersWithEmailClickBeforePurchase: 0, purchases: 0, revenue: 0 });
+      const byUtm = new Map<string, CohortMetrics>();
+      for (const raw of cohortRows as any[]) {
+        const key = String(raw.utmCampaign || "").toLowerCase();
+        const current = byUtm.get(key) || zero();
+        current.leads += Number(raw.leads || 0);
+        current.buyers += Number(raw.buyers || 0);
+        current.buyersWithEmailBeforePurchase += Number(raw.buyersWithEmailBeforePurchase || 0);
+        current.buyersWithEmailClickBeforePurchase += Number(raw.buyersWithEmailClickBeforePurchase || 0);
+        current.purchases += Number(raw.purchases || 0);
+        current.revenue += Number(raw.revenue || 0);
+        byUtm.set(key, current);
+      }
+      const directByUtm = new Map<string, { purchases: number; buyers: number; revenue: number }>();
+      for (const raw of directRows as any[]) {
+        directByUtm.set(String(raw.utmCampaign || "").toLowerCase(), {
+          purchases: Number(raw.purchases || 0),
+          buyers: Number(raw.buyers || 0),
+          revenue: Number(raw.revenue || 0),
+        });
+      }
+
+      const consumedUtm = new Set<string>();
+      const rows = [...metaData.campaigns].sort((a, b) => b.spend - a.spend).map(campaign => {
+        const destination = destinations[campaign.id] || { labels: [], categories: [], utmCampaigns: [], activeAds: 0, ads: 0 };
+        const aliases = inferCampaignUtmAliases(campaign.name, destination.utmCampaigns);
+        const cohort = zero();
+        const direct = { purchases: 0, buyers: 0, revenue: 0 };
+        for (const alias of aliases) {
+          if (consumedUtm.has(alias)) continue;
+          const matched = byUtm.get(alias);
+          consumedUtm.add(alias);
+          if (matched) {
+            cohort.leads += matched.leads;
+            cohort.buyers += matched.buyers;
+            cohort.buyersWithEmailBeforePurchase += matched.buyersWithEmailBeforePurchase;
+            cohort.buyersWithEmailClickBeforePurchase += matched.buyersWithEmailClickBeforePurchase;
+            cohort.purchases += matched.purchases;
+            cohort.revenue += matched.revenue;
+          }
+          const directMatched = directByUtm.get(alias);
+          if (directMatched) {
+            direct.purchases += directMatched.purchases;
+            direct.buyers += directMatched.buyers;
+            direct.revenue += directMatched.revenue;
+          }
+        }
+        const landingLabels = destination.labels.length > 0
+          ? destination.labels
+          : campaign.objective.includes("LEAD") ? ["טופס לידים / יעד לא זוהה"] : ["לא זוהה"];
+        return {
+          campaignId: campaign.id,
+          campaignName: campaign.name,
+          objective: campaign.objective,
+          status: destination.activeAds > 0 ? "active" as const : "inactive" as const,
+          activeAds: destination.activeAds,
+          ads: destination.ads,
+          landingLabels,
+          landingCategories: destination.categories,
+          spend: campaign.spend,
+          metaLeads: campaign.leads,
+          metaPurchases: campaign.purchases,
+          crmLeads: cohort.leads,
+          growBuyers: cohort.buyers,
+          growPurchases: cohort.purchases,
+          growRevenue: Math.round(cohort.revenue * 100) / 100,
+          buyersWithEmailBeforePurchase: cohort.buyersWithEmailBeforePurchase,
+          buyersWithEmailClickBeforePurchase: cohort.buyersWithEmailClickBeforePurchase,
+          leadToBuyerRate: cohort.leads > 0 ? Math.round(cohort.buyers / cohort.leads * 1000) / 10 : null,
+          growCac: cohort.buyers > 0 ? Math.round(campaign.spend / cohort.buyers * 100) / 100 : null,
+          growRoas: campaign.spend > 0 && cohort.revenue > 0 ? Math.round(cohort.revenue / campaign.spend * 100) / 100 : null,
+          directGrowBuyers: direct.buyers,
+          directGrowPurchases: direct.purchases,
+          directGrowRevenue: Math.round(direct.revenue * 100) / 100,
+          directGrowCac: direct.buyers > 0 ? Math.round(campaign.spend / direct.buyers * 100) / 100 : null,
+          directGrowRoas: campaign.spend > 0 && direct.revenue > 0 ? Math.round(direct.revenue / campaign.spend * 100) / 100 : null,
+          utmAliases: aliases,
+          attributionBasis: destination.utmCampaigns.length > 0
+            ? "utm_creative" as const
+            : aliases.length > 0 ? "utm_name_fallback" as const : "meta_only" as const,
+        };
+      });
+
+      const unmappedUtmKeys = new Set([...Array.from(byUtm.keys()), ...Array.from(directByUtm.keys())]);
+      const unmappedWebsiteRows = Array.from(unmappedUtmKeys)
+        .filter(utm => {
+          const cohort = byUtm.get(utm) || zero();
+          const direct = directByUtm.get(utm);
+          return !consumedUtm.has(utm) && (cohort.leads > 0 || cohort.purchases > 0 || Number(direct?.purchases || 0) > 0);
+        })
+        .map(utm => {
+          const cohort = byUtm.get(utm) || zero();
+          const direct = directByUtm.get(utm);
+          return {
+            campaignId: "",
+            campaignName: translateCampaign(utm),
+            objective: "SITE_ONLY",
+            status: "unknown" as const,
+            activeAds: 0,
+            ads: 0,
+            landingLabels: ["יעד לא מתועד"],
+            landingCategories: ["unknown"],
+            spend: null,
+            metaLeads: null,
+            metaPurchases: null,
+            crmLeads: cohort.leads,
+            growBuyers: cohort.buyers,
+            growPurchases: cohort.purchases,
+            growRevenue: Math.round(cohort.revenue * 100) / 100,
+            buyersWithEmailBeforePurchase: cohort.buyersWithEmailBeforePurchase,
+            buyersWithEmailClickBeforePurchase: cohort.buyersWithEmailClickBeforePurchase,
+            leadToBuyerRate: cohort.leads > 0 ? Math.round(cohort.buyers / cohort.leads * 1000) / 10 : null,
+            growCac: null,
+            growRoas: null,
+            directGrowBuyers: direct?.buyers || 0,
+            directGrowPurchases: direct?.purchases || 0,
+            directGrowRevenue: Math.round((direct?.revenue || 0) * 100) / 100,
+            directGrowCac: null,
+            directGrowRoas: null,
+            utmAliases: utm ? [utm] : [],
+            attributionBasis: "website_only" as const,
+          };
+        });
+
+      return {
+        status: metaData.status,
+        fetchedAt: metaData.fetchedAt,
+        cohort: {
+          leadCreatedFrom: input.startDate,
+          leadCreatedTo: input.endDate,
+          purchasesObservedThrough: input.endDate,
+          definition: "לידים שנוצרו בטווח והרכישות המאומתות שלהם ב־Grow עד סוף הטווח",
+        },
+        rows: [...rows, ...unmappedWebsiteRows]
+          .filter(row => Number(row.spend || 0) > 0 || row.crmLeads > 0 || row.growPurchases > 0 || row.directGrowPurchases > 0)
+          .sort((a, b) => Number(b.spend || 0) - Number(a.spend || 0) || b.directGrowPurchases - a.directGrowPurchases || b.growPurchases - a.growPurchases),
       };
     }),
 

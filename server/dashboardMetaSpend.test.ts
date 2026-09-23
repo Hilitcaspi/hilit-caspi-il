@@ -19,7 +19,8 @@ describe("dashboard Meta spend", () => {
   });
 
   it("classifies the dedicated profile promotion account independently of campaign name", () => {
-    const row = normalizeMetaCampaign({ campaign_name: "שם שרירותי", spend: "55" }, "profile_boosts");
+    const row = normalizeMetaCampaign({ campaign_id: "123456789", campaign_name: "שם שרירותי", spend: "55" }, "profile_boosts");
+    expect(row.id).toBe("123456789");
     expect(row.classification).toBe("profile_boosted_post");
     expect(row.accountRole).toBe("profile_boosts");
   });
