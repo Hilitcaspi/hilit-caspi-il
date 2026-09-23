@@ -14,7 +14,7 @@ import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, buildAnonymousBoost
 import { getBoostAdminState, summarizeBoostMembers } from "./boostAdmin";
 import { matchBoostPilotRouter } from "./matchBoostPilotRouter";
 import { operationsRouter } from "./operationsRouter";
-import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
+import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeFullScoreForAdminSend, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
 import type { ScoreBreakdown as FullScoreBreakdown } from "./compatibility";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
 import crypto from "crypto";
@@ -2988,6 +2988,7 @@ export const appRouter = router({
         idA: z.number(),
         idB: z.number(),
         hilitsNote: z.string().optional(),
+        allowHeightOverride: z.boolean().optional().default(false),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -3052,7 +3053,13 @@ export const appRouter = router({
         const answersB = await db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleB.id)).limit(1);
         const parsedA: MatchAnswer[] = answersA[0]?.answersJson ? (typeof answersA[0].answersJson === 'string' ? JSON.parse(answersA[0].answersJson) : answersA[0].answersJson as MatchAnswer[]) : [];
         const parsedB: MatchAnswer[] = answersB[0]?.answersJson ? (typeof answersB[0].answersJson === 'string' ? JSON.parse(answersB[0].answersJson) : answersB[0].answersJson as MatchAnswer[]) : [];
-        const breakdown = computeFullScore(singleA as any, singleB as any, parsedA, parsedB);
+        const { breakdown, heightOverrideApplied } = computeFullScoreForAdminSend(
+          singleA as any,
+          singleB as any,
+          parsedA,
+          parsedB,
+          input.allowHeightOverride,
+        );
         if (breakdown.total === 0) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -3065,7 +3072,12 @@ export const appRouter = router({
         if (existingMatch.length > 0) {
           matchId = existingMatch[0].id;
           // Reset to pending so approveMatch logic can run
-          await db.update(matches).set({ status: "pending", score, updatedAt: Date.now() }).where(eq(matches.id, matchId));
+          await db.update(matches).set({
+            status: "pending",
+            score,
+            notes: heightOverrideApplied ? "[HEIGHT_OVERRIDE] Admin-approved one-off match" : existingMatch[0].notes,
+            updatedAt: Date.now(),
+          }).where(eq(matches.id, matchId));
         } else {
           const [inserted] = await db.insert(matches).values({
             singleId: input.idA,
@@ -3074,6 +3086,7 @@ export const appRouter = router({
             singleBId: input.idB,
             score,
             status: "pending",
+            notes: heightOverrideApplied ? "[HEIGHT_OVERRIDE] Admin-approved one-off match" : null,
             updatedAt: Date.now(),
           }).$returningId();
           matchId = inserted.id;

@@ -1415,6 +1415,44 @@ export function computeFullScoreAdmin(
   };
 }
 
+/**
+ * Used only for an explicit, one-off admin decision to send a match despite a
+ * height hard filter. Every other profile and questionnaire hard filter stays
+ * enforced. The final score keeps the real profile data; height is cleared only
+ * in the verification pass that checks for additional blockers.
+ */
+export function computeFullScoreForAdminSend(
+  a: Single,
+  b: Single,
+  answersA: MatchAnswer[],
+  answersB: MatchAnswer[],
+  allowHeightOverride = false,
+): { breakdown: ScoreBreakdown; heightOverrideApplied: boolean; warnings: string[] } {
+  const strictBreakdown = computeFullScore(a, b, answersA, answersB);
+  if (strictBreakdown.total > 0 || !allowHeightOverride) {
+    return { breakdown: strictBreakdown, heightOverrideApplied: false, warnings: [] };
+  }
+
+  const strictReason = strictBreakdown.details.find(detail => detail.startsWith("פסילה מוחלטת:")) || "";
+  if (!strictReason.includes("גובה")) {
+    return { breakdown: strictBreakdown, heightOverrideApplied: false, warnings: [] };
+  }
+
+  const withoutHeightA = { ...a, height: null, minHeightPreference: null, maxHeightPreference: null } as Single;
+  const withoutHeightB = { ...b, height: null, minHeightPreference: null, maxHeightPreference: null } as Single;
+  const remainingHardFilters = computeFullScore(withoutHeightA, withoutHeightB, answersA, answersB);
+  if (remainingHardFilters.total === 0) {
+    return { breakdown: remainingHardFilters, heightOverrideApplied: false, warnings: [] };
+  }
+
+  const adminBreakdown = computeFullScoreAdmin(a, b, answersA, answersB);
+  return {
+    breakdown: adminBreakdown,
+    heightOverrideApplied: true,
+    warnings: adminBreakdown.warnings,
+  };
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 14: MATCH FINDING
