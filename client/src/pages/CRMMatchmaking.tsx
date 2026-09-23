@@ -825,6 +825,12 @@ export default function CRMMatchmaking() {
             <p className="text-white/60 text-xs">{activeCount} פעילים · {pendingCount} ממתינים לאישור · {mutualYesCount} זוגות אמרו כן · {activeMutualYesCount} עדיין בהתאמה</p>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <a href="/crm/dashboard#campaign-journey">
+              <Button size="sm" className="h-8 border-0 bg-emerald-400 text-xs font-bold text-[#191265] hover:bg-emerald-300">
+                <BarChart3 size={12} className="ml-1" />
+                דשבורד שיווק ומכירות
+              </Button>
+            </a>
             <Button
               size="sm"
               onClick={() => runMatching.mutate()}
@@ -887,7 +893,7 @@ export default function CRMMatchmaking() {
             { id: "plus" as const, label: "חברי PLUS", icon: <span className="font-black text-[#8b7420]">＋</span> },
             { id: "testimonials" as const, label: "משובים והמלצות", icon: <span>✍️</span> },
             { id: "daily_report" as const, label: "דוח חצות", icon: <MessageSquareText size={14} /> },
-            { id: "dashboard" as const, label: "דאשבורד 📊", icon: <BarChart3 size={14} /> },
+            { id: "dashboard" as const, label: "דשבורד התאמות 📊", icon: <BarChart3 size={14} /> },
           ].map(tab => (
             <button
               key={tab.id}

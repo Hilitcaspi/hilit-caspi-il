@@ -61,4 +61,12 @@ describe("campaign journey attribution", () => {
     expect(dashboardSource).toContain("אינה טוענת שהמייל לבדו יצר את המכירה");
     expect(dashboardSource).toContain("אינה הוכחה שסיבת הרכישה הייתה המודעה האחרונה");
   });
+
+  it("shows the campaign journey once, before the general KPI sections", () => {
+    expect(dashboardSource.match(/id="campaign-journey"/g)).toHaveLength(1);
+    expect(dashboardSource.indexOf('id="campaign-journey"')).toBeLessThan(
+      dashboardSource.indexOf("SECTION 1: TOP KPIs"),
+    );
+    expect(dashboardSource).toContain("המעקב החדש שסיכמנו");
+  });
 });
