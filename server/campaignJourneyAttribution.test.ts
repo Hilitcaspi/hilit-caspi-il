@@ -50,6 +50,11 @@ describe("campaign journey attribution", () => {
     expect(inferCampaignUtmAliases("קהל קר לידים", [])).toEqual(expect.arrayContaining(["lead_cold_measure", "lead_cold_120"]));
   });
 
+  it("drops generic page tags when an active creative also has a campaign-specific UTM", () => {
+    expect(inferCampaignUtmAliases("קהל חם לידים", ["database", "lead_warm_30d", "dna-quiz"])).toEqual(["lead_warm_30d"]);
+    expect(inferCampaignUtmAliases("קהל חם לידים", ["database"])).toEqual(["database"]);
+  });
+
   it("never exposes technical UTM fragments as landing-page labels", () => {
     expect(normalizeLandingCategory("/utm_source=facebook&utm_campaign=lead_cold")).toEqual({ category: "unknown", label: "לא זוהה" });
     expect(normalizeLandingCategory("https://hilitcaspi.com/dna-quiz?utm_campaign=lead_cold")).toEqual({ category: "dna_quiz", label: "שאלון DNA" });
@@ -75,5 +80,11 @@ describe("campaign journey attribution", () => {
     expect(dashboardSource).toContain("cohortMetricsReliable");
     expect(dashboardSource).toContain("לא מוצג · כיסוי UTM חלקי");
     expect(dashboardSource).toContain("היום הנוכחי עדיין חלקי");
+  });
+
+  it("uses destination labels and UTM tags from active ads when a campaign is active", () => {
+    expect(routerSource).toContain("activeUtmCampaigns");
+    expect(routerSource).toContain("value.activeAds > 0 ? value.activeUtmCampaigns : value.utmCampaigns");
+    expect(routerSource).toContain("value.activeAds > 0 ? value.activeLabels : value.labels");
   });
 });

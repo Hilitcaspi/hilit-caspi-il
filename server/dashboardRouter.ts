@@ -201,7 +201,16 @@ async function fetchMetaCampaignDestinations() {
   if (!token) return metaDestinationsCache?.data || {};
   const accountId = "act_254697595735216";
   const fields = "campaign_id,campaign_name,effective_status,creative{object_story_spec,asset_feed_spec,url_tags}";
-  const byCampaign: Record<string, { labels: Set<string>; categories: Set<string>; utmCampaigns: Set<string>; activeAds: number; ads: number }> = {};
+  const byCampaign: Record<string, {
+    labels: Set<string>;
+    categories: Set<string>;
+    utmCampaigns: Set<string>;
+    activeLabels: Set<string>;
+    activeCategories: Set<string>;
+    activeUtmCampaigns: Set<string>;
+    activeAds: number;
+    ads: number;
+  }> = {};
   try {
     let next: string | null = `https://graph.facebook.com/v25.0/${accountId}/ads?fields=${fields}&limit=200&access_token=${token}`;
     while (next) {
@@ -211,9 +220,19 @@ async function fetchMetaCampaignDestinations() {
       for (const ad of payload.data || []) {
         const id = String(ad.campaign_id || "");
         if (!id) continue;
-        if (!byCampaign[id]) byCampaign[id] = { labels: new Set(), categories: new Set(), utmCampaigns: new Set(), activeAds: 0, ads: 0 };
+        if (!byCampaign[id]) byCampaign[id] = {
+          labels: new Set(),
+          categories: new Set(),
+          utmCampaigns: new Set(),
+          activeLabels: new Set(),
+          activeCategories: new Set(),
+          activeUtmCampaigns: new Set(),
+          activeAds: 0,
+          ads: 0,
+        };
         byCampaign[id].ads += 1;
-        if (ad.effective_status === "ACTIVE") byCampaign[id].activeAds += 1;
+        const isActive = ad.effective_status === "ACTIVE";
+        if (isActive) byCampaign[id].activeAds += 1;
         const urls = new Set<string>();
         collectUrlsDeep(ad.creative, urls);
         urls.forEach(url => {
@@ -221,9 +240,17 @@ async function fetchMetaCampaignDestinations() {
           if (landing.category !== "unknown") {
             byCampaign[id].labels.add(landing.label);
             byCampaign[id].categories.add(landing.category);
+            if (isActive) {
+              byCampaign[id].activeLabels.add(landing.label);
+              byCampaign[id].activeCategories.add(landing.category);
+            }
           }
           const utmCampaign = extractUtmCampaign(url);
-          if (utmCampaign) byCampaign[id].utmCampaigns.add(utmCampaign.toLowerCase());
+          if (utmCampaign) {
+            const normalizedUtm = utmCampaign.toLowerCase();
+            byCampaign[id].utmCampaigns.add(normalizedUtm);
+            if (isActive) byCampaign[id].activeUtmCampaigns.add(normalizedUtm);
+          }
         });
       }
       next = payload.paging?.next || null;
@@ -233,9 +260,9 @@ async function fetchMetaCampaignDestinations() {
     return metaDestinationsCache?.data || {};
   }
   const data = Object.fromEntries(Object.entries(byCampaign).map(([id, value]) => [id, {
-    labels: Array.from(value.labels).filter(Boolean).slice(0, 4),
-    categories: Array.from(value.categories).filter(Boolean).slice(0, 4),
-    utmCampaigns: Array.from(value.utmCampaigns).filter(Boolean).slice(0, 8),
+    labels: Array.from(value.activeAds > 0 ? value.activeLabels : value.labels).filter(Boolean).slice(0, 4),
+    categories: Array.from(value.activeAds > 0 ? value.activeCategories : value.categories).filter(Boolean).slice(0, 4),
+    utmCampaigns: Array.from(value.activeAds > 0 ? value.activeUtmCampaigns : value.utmCampaigns).filter(Boolean).slice(0, 8),
     activeAds: value.activeAds,
     ads: value.ads,
   }]));
@@ -246,7 +273,11 @@ async function fetchMetaCampaignDestinations() {
 export function inferCampaignUtmAliases(name: string, explicit: string[] = []) {
   const normalized = name.toLowerCase();
   const explicitAliases = explicit.map(value => value.toLowerCase().trim()).filter(Boolean);
-  if (explicitAliases.length > 0) return Array.from(new Set(explicitAliases));
+  if (explicitAliases.length > 0) {
+    const genericAliases = new Set(["database", "dna-quiz", "dna_quiz", "home"]);
+    const specificAliases = explicitAliases.filter(value => !genericAliases.has(value));
+    return Array.from(new Set(specificAliases.length > 0 ? specificAliases : explicitAliases));
+  }
   const aliases = new Set<string>();
   const isLeadCampaign = normalized.includes("lead") || normalized.includes("ליד");
   const isSalesCampaign = normalized.includes("sales") || normalized.includes("מכירה");
