@@ -23,6 +23,7 @@ describe("Database Plus launch attribution", () => {
   it("does not overwrite the original CRM lead source when Plus checkout begins", () => {
     const router = read("server/routers.ts");
     expect(router).toContain('input.product !== "plus"');
+    expect(router).toContain('attributionVersion: "plus_checkout_utm_v1"');
   });
 
   it("captures link UTM values and passes them to the verified checkout flow", () => {

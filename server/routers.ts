@@ -7737,7 +7737,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
   payment: router({
     plusCheckoutConfig: publicProcedure.query(async () => {
       const { getPlusCheckoutConfig } = await import("./growPayment");
-      return getPlusCheckoutConfig();
+      return {
+        ...getPlusCheckoutConfig(),
+        attributionVersion: "plus_checkout_utm_v1" as const,
+      };
     }),
     createProcess: publicProcedure
       .input(z.object({
