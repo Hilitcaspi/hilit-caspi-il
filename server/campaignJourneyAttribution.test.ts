@@ -69,4 +69,11 @@ describe("campaign journey attribution", () => {
     );
     expect(dashboardSource).toContain("המעקב החדש שסיכמנו");
   });
+
+  it("warns about partial UTM coverage and hides cohort CAC when coverage is weak", () => {
+    expect(dashboardSource).toContain("איכות מיפוי מקור ראשון");
+    expect(dashboardSource).toContain("cohortMetricsReliable");
+    expect(dashboardSource).toContain("לא מוצג · כיסוי UTM חלקי");
+    expect(dashboardSource).toContain("היום הנוכחי עדיין חלקי");
+  });
 });

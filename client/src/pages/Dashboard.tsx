@@ -99,6 +99,7 @@ export default function Dashboard() {
   const dateInput = useMemo(() => ({ startDate, endDate }), [startDate, endDate]);
   const rangeLabel = useMemo(() => formatIsraelDateRange(startDate, endDate), [startDate, endDate]);
   const showMonthlyTargets = !useCustom && preset === 0;
+  const includesPartialToday = toDateStr(endDate) === toDateStr(Date.now());
 
   const comp = trpc.dashboard.overviewWithComparison.useQuery(dateInput);
   const targets = trpc.dashboard.monthlyTargets.useQuery();
@@ -131,17 +132,28 @@ export default function Dashboard() {
     const totalGrowRevenue = metaRows.reduce((sum: number, row: any) => sum + Number(row.growRevenue || 0), 0);
     const totalGrowBuyers = metaRows.reduce((sum: number, row: any) => sum + Number(row.growBuyers || 0), 0);
     const totalEmailAssisted = metaRows.reduce((sum: number, row: any) => sum + Number(row.buyersWithEmailBeforePurchase || 0), 0);
+    const totalFirstTouchLeads = campaignJourneyRows.reduce((sum: number, row: any) => sum + Number(row.crmLeads || 0), 0);
+    const mappedFirstTouchLeads = metaRows.reduce((sum: number, row: any) => sum + Number(row.crmLeads || 0), 0);
+    const mappingCoveragePct = totalFirstTouchLeads > 0 ? Math.round(mappedFirstTouchLeads / totalFirstTouchLeads * 1000) / 10 : null;
+    const cohortMetricsReliable = mappingCoveragePct !== null && mappingCoveragePct >= 80;
     const totalDirectPurchases = campaignJourneyRows.reduce((sum: number, row: any) => sum + Number(row.directGrowPurchases || 0), 0);
     const totalDirectRevenue = campaignJourneyRows.reduce((sum: number, row: any) => sum + Number(row.directGrowRevenue || 0), 0);
+    const directMetaPurchases = metaRows.reduce((sum: number, row: any) => sum + Number(row.directGrowPurchases || 0), 0);
     const directMetaRevenue = metaRows.reduce((sum: number, row: any) => sum + Number(row.directGrowRevenue || 0), 0);
     return {
       totalSpend,
       totalGrowRevenue,
       totalGrowBuyers,
       totalEmailAssisted,
+      totalFirstTouchLeads,
+      mappedFirstTouchLeads,
+      mappingCoveragePct,
+      cohortMetricsReliable,
       totalDirectPurchases,
       totalDirectRevenue,
+      directMetaPurchases,
       directMetaRevenue,
+      directMetaCac: directMetaPurchases > 0 ? Math.round(totalSpend / directMetaPurchases * 100) / 100 : null,
       directMetaRoas: totalSpend > 0 ? Math.round((directMetaRevenue / totalSpend) * 100) / 100 : null,
     };
   }, [campaignJourneyRows]);
@@ -190,6 +202,7 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[11px] text-blue-900">
           <span><strong>טווח:</strong> {rangeLabel}, שעון ישראל</span>
           <span>השוואה: {comparisonLabel}</span>
+          {includesPartialToday && <span className="font-semibold text-amber-800">היום הנוכחי עדיין חלקי; להשוואת קצב נקייה עדיף לבחור ימים מלאים שהסתיימו.</span>}
           {c && !c.salesComparisonAvailable && <span className="font-semibold text-amber-800">השוואת לידים זמינה; השוואת Grow אינה מלאה לפני 22.8 ולכן אחוזי מכירות והכנסה אינם מוצגים.</span>}
         </div>
 
@@ -209,12 +222,18 @@ export default function Dashboard() {
             {campaignJourney.error && <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">מפת המסע אינה זמינה כרגע; שאר מדדי הדשבורד עדיין מוצגים.</div>}
             {campaignJourney.data && (
               <>
+                <div className={`mb-3 rounded-lg border p-3 text-[11px] leading-5 ${campaignJourneyTotals.cohortMetricsReliable ? "border-emerald-100 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
+                  <strong>איכות מיפוי מקור ראשון: {campaignJourneyTotals.mappingCoveragePct ?? 0}%.</strong>{" "}
+                  {campaignJourneyTotals.cohortMetricsReliable
+                    ? "רוב לידי המקור הראשון בטווח נושאים UTM שמתחבר לקמפיין, ולכן מדדי הקוהורט שימושיים לצד רכישות Grow הישירות."
+                    : "רק חלק מלידי המקור הראשון בטווח נושאים UTM שמתחבר לקמפיין. בתקופה הזאת אין להסתמך על המרת ליד או CAC קוהורטי; רכישות והכנסות Grow הישירות עדיין מאומתות."}
+                </div>
                 <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
                   <div className="rounded-lg bg-indigo-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-indigo-700">{campaignJourneyTotals.totalGrowBuyers}</div><div className="text-[9px] text-gray-500">לידים שהפכו לרוכשים בקוהורט</div></div>
                   <div className="rounded-lg bg-emerald-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-emerald-700">{fmt(campaignJourneyTotals.totalGrowRevenue)}</div><div className="text-[9px] text-gray-500">הכנסה מאומתת מהקוהורט</div></div>
                   <div className="rounded-lg bg-amber-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-amber-700">{campaignJourneyTotals.totalEmailAssisted}</div><div className="text-[9px] text-gray-500">רוכשים שקיבלו מייל לפני הקנייה</div></div>
                   <div className="rounded-lg bg-teal-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-teal-700">{campaignJourneyTotals.totalDirectPurchases}</div><div className="text-[9px] text-gray-500">כל רכישות Grow בטווח · {fmt(campaignJourneyTotals.totalDirectRevenue)}</div></div>
-                  <div className="rounded-lg bg-blue-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-blue-700">{campaignJourneyTotals.directMetaRoas !== null ? `${campaignJourneyTotals.directMetaRoas}x` : '—'}</div><div className="text-[9px] text-gray-500">ROAS ישיר שמופה ל־Meta</div></div>
+                  <div className="rounded-lg bg-blue-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-blue-700">{campaignJourneyTotals.directMetaRoas !== null ? `${campaignJourneyTotals.directMetaRoas}x` : '—'}</div><div className="text-[9px] text-gray-500">ROAS ישיר שמופה ל־Meta</div><div className="text-[9px] text-gray-400">CAC ישיר {campaignJourneyTotals.directMetaCac !== null ? fmt(campaignJourneyTotals.directMetaCac) : '—'}</div></div>
                 </div>
 
                 <div className="space-y-2 md:hidden">
@@ -234,8 +253,8 @@ export default function Dashboard() {
                         <div className="rounded-lg bg-gray-50 p-2"><div className="text-[9px] text-gray-500">לידים CRM / Meta</div><div className="font-bold">{row.crmLeads || '—'} <span className="font-normal text-gray-400">/ {row.metaLeads || '—'}</span></div></div>
                         <div className="rounded-lg bg-green-50 p-2"><div className="text-[9px] text-gray-500">לידים שהפכו לרוכשים</div><div className="font-bold text-green-700">{row.growBuyers || '—'}</div></div>
                         <div className="rounded-lg bg-amber-50 p-2"><div className="text-[9px] text-gray-500">מייל לפני רכישה</div><div className="font-bold text-amber-700">{row.buyersWithEmailBeforePurchase || '—'}</div>{row.buyersWithEmailClickBeforePurchase > 0 && <div className="text-[9px] text-gray-400">{row.buyersWithEmailClickBeforePurchase} גם הקליקו</div>}</div>
-                        <div className="rounded-lg bg-emerald-50 p-2"><div className="text-[9px] text-gray-500">רכישה ישירה · Grow</div><div className="font-bold text-emerald-700">{row.directGrowPurchases || '—'}</div>{row.directGrowRevenue > 0 && <div className="text-[9px] text-gray-500">{fmt(row.directGrowRevenue)}</div>}</div>
-                        <div className="rounded-lg bg-indigo-50 p-2"><div className="text-[9px] text-gray-500">המרת ליד / CAC קוהורט</div><div className="font-bold text-indigo-700">{row.leadToBuyerRate !== null ? `${row.leadToBuyerRate}%` : '—'}</div><div className="text-[9px] text-gray-400">CAC {row.growCac !== null ? fmt(row.growCac) : '—'}</div></div>
+                        <div className="rounded-lg bg-emerald-50 p-2"><div className="text-[9px] text-gray-500">רכישה ישירה · Grow</div><div className="font-bold text-emerald-700">{row.directGrowPurchases || '—'}</div>{row.directGrowRevenue > 0 && <div className="text-[9px] text-gray-500">{fmt(row.directGrowRevenue)}</div>}{row.directGrowCac !== null && <div className="text-[9px] text-gray-400">CAC ישיר {fmt(row.directGrowCac)}</div>}</div>
+                        <div className="rounded-lg bg-indigo-50 p-2"><div className="text-[9px] text-gray-500">המרת ליד / CAC קוהורט</div><div className="font-bold text-indigo-700">{campaignJourneyTotals.cohortMetricsReliable && row.leadToBuyerRate !== null ? `${row.leadToBuyerRate}%` : '—'}</div><div className="text-[9px] text-gray-400">{campaignJourneyTotals.cohortMetricsReliable ? `CAC ${row.growCac !== null ? fmt(row.growCac) : '—'}` : 'לא מוצג · כיסוי UTM חלקי'}</div></div>
                         <div className="col-span-2 rounded-lg bg-blue-50 p-2"><div className="text-[9px] text-gray-500">ROAS ישיר</div><div className="font-bold text-blue-700">{row.directGrowRoas !== null ? `${row.directGrowRoas}x` : '—'}</div></div>
                       </div>
                     </div>
@@ -251,7 +270,7 @@ export default function Dashboard() {
                       <th className="pb-2 text-center">לידים CRM / Meta</th>
                       <th className="pb-2 text-center">לידים שהפכו לרוכשים</th>
                       <th className="pb-2 text-center">מייל לפני רכישה</th>
-                      <th className="pb-2 text-center">רכישה ישירה · Grow</th>
+                      <th className="pb-2 text-center">רכישה / CAC ישיר · Grow</th>
                       <th className="pb-2 text-center">המרת ליד / CAC קוהורט</th>
                       <th className="pb-2 text-center">ROAS ישיר</th>
                     </tr></thead>
@@ -275,8 +294,8 @@ export default function Dashboard() {
                         <td className="py-2 text-center"><strong>{row.crmLeads || '—'}</strong><span className="text-gray-400"> / {row.metaLeads || '—'}</span></td>
                         <td className="py-2 text-center">{row.growBuyers > 0 ? <Badge className="bg-green-100 text-green-700 text-[10px]">{row.growBuyers}</Badge> : '—'}</td>
                         <td className="py-2 text-center"><strong>{row.buyersWithEmailBeforePurchase || '—'}</strong>{row.buyersWithEmailClickBeforePurchase > 0 && <div className="text-[9px] text-gray-400">{row.buyersWithEmailClickBeforePurchase} גם הקליקו</div>}</td>
-                        <td className="py-2 text-center"><strong className="text-emerald-700">{row.directGrowPurchases || '—'}</strong>{row.directGrowRevenue > 0 && <div className="text-[9px] text-gray-500">{fmt(row.directGrowRevenue)}</div>}</td>
-                        <td className="py-2 text-center"><div>{row.leadToBuyerRate !== null ? `${row.leadToBuyerRate}%` : '—'}</div><div className="text-[9px] text-gray-400">CAC {row.growCac !== null ? fmt(row.growCac) : '—'}</div></td>
+                        <td className="py-2 text-center"><strong className="text-emerald-700">{row.directGrowPurchases || '—'}</strong>{row.directGrowRevenue > 0 && <div className="text-[9px] text-gray-500">{fmt(row.directGrowRevenue)}</div>}{row.directGrowCac !== null && <div className="text-[9px] text-gray-400">CAC ישיר {fmt(row.directGrowCac)}</div>}</td>
+                        <td className="py-2 text-center"><div>{campaignJourneyTotals.cohortMetricsReliable && row.leadToBuyerRate !== null ? `${row.leadToBuyerRate}%` : '—'}</div><div className="text-[9px] text-gray-400">{campaignJourneyTotals.cohortMetricsReliable ? `CAC ${row.growCac !== null ? fmt(row.growCac) : '—'}` : 'לא מוצג · כיסוי UTM חלקי'}</div></td>
                         <td className="py-2 text-center font-bold text-indigo-700">{row.directGrowRoas !== null ? `${row.directGrowRoas}x` : '—'}</td>
                       </tr>
                     ))}</tbody>
