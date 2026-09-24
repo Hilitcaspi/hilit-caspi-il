@@ -21,35 +21,31 @@
 
 ## פרמטרי המדידה
 
-את כתובת האתר יש להשאיר נקייה בשדה Website URL. את הפרמטרים יש להכניס בשדה URL parameters של כל מודעה. Meta תומכת בפרמטרים דינמיים של מזהה קמפיין, קבוצת מודעות, מודעה ומיקום.[1] [2]
+את כתובת האתר משאירים נקייה בשדה Website URL:
 
-הפרמטרים המשותפים לכל המודעות הם:
+`https://hilitcaspi.com/dna-quiz`
 
-```text
-utm_source=meta&utm_medium=paid_social&utm_campaign=dna_lead_cold_sep26&utm_term=broad_25_55&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source={{site_source_name}}
-```
+בשדה URL parameters מכניסים שורה אחת פשוטה לכל מודעה. כל הפרמטרים זהים, ורק מספר המודעה משתנה:
 
-לכל מודעה יתווסף ערך `utm_content` שונה:
+**מודעה 1**
 
 ```text
-מודעה 1: utm_content=pattern_video
-מודעה 2: utm_content=chemistry_static
-מודעה 3: utm_content=method_video
+utm_source=meta&utm_medium=paid_social&utm_campaign=dna_cold_sep26&utm_content=ad_1
 ```
 
-הקישורים המלאים לצורכי בדיקה הם:
+**מודעה 2**
 
 ```text
-https://hilitcaspi.com/dna-quiz?utm_source=meta&utm_medium=paid_social&utm_campaign=dna_lead_cold_sep26&utm_content=pattern_video&utm_term=broad_25_55&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source={{site_source_name}}
+utm_source=meta&utm_medium=paid_social&utm_campaign=dna_cold_sep26&utm_content=ad_2
 ```
 
-```text
-https://hilitcaspi.com/dna-quiz?utm_source=meta&utm_medium=paid_social&utm_campaign=dna_lead_cold_sep26&utm_content=chemistry_static&utm_term=broad_25_55&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source={{site_source_name}}
-```
+**מודעה 3**
 
 ```text
-https://hilitcaspi.com/dna-quiz?utm_source=meta&utm_medium=paid_social&utm_campaign=dna_lead_cold_sep26&utm_content=method_video&utm_term=broad_25_55&meta_campaign_id={{campaign.id}}&meta_adset_id={{adset.id}}&meta_ad_id={{ad.id}}&placement={{placement}}&site_source={{site_source_name}}
+utm_source=meta&utm_medium=paid_social&utm_campaign=dna_cold_sep26&utm_content=ad_3
 ```
+
+כך בדשבורד יהיה קל לראות איזו מודעה הביאה כל ליד או רכישה, בלי פרמטרים מיותרים. מזהי הקמפיין והמודעה נשארים זמינים בתוך Meta עצמה ואינם נדרשים בתוך ה־UTM לצורך ההשוואה שלנו.
 
 ## מודעה 1: הדפוס שחוזר
 
@@ -138,8 +134,3 @@ https://hilitcaspi.com/dna-quiz?utm_source=meta&utm_medium=paid_social&utm_campa
 בשלושת הימים הראשונים לא יבוצע שינוי, אלא אם קיימת תקלה טכנית. לאחר 72 שעות ולפחות 30 עד 40 לידים תקינים ייבחנו מחיר ליד, שיעור לידים חדשים ב CRM, איכות הפרטים, פתיחת המיילים והמשך לעמוד המאגר. אם הביצועים טובים, התקציב יעלה מ 80 ל 100 ₪, ובהמשך במדרגות מתונות כל 48 עד 72 שעות.
 
 מודעה לא תוחלף בגלל תדירות בלבד. החלפה תישקל כאשר תדירות שבעת הימים האחרונים עולה מעל 2.5 ובמקביל שיעור ההקלקה יורד או מחיר הליד עולה באופן מהותי.
-
-## References
-
-[1]: https://www.facebook.com/business/help/2360940870872492 "Specifications for dynamic URL parameters in Meta Ads Manager"
-[2]: https://www.facebook.com/business/help/1016122818401732 "Add URL parameters to your Meta ads in Meta Ads Manager"
