@@ -190,6 +190,13 @@
       "when": 1790184361770,
       "tag": "0026_condemned_azazel",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1790285203854,
+      "tag": "0027_talented_warpath",
+      "breakpoints": true
     }
   ]
 }

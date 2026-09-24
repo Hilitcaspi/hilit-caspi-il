@@ -7856,6 +7856,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             renewalAccepted: true,
             termsAccepted: true,
             boostAccepted: true,
+            utmSource: input.utmSource,
+            utmMedium: input.utmMedium,
+            utmCampaign: input.utmCampaign,
+            utmContent: input.utmContent,
+            utmTerm: input.utmTerm,
             createdAt: now,
             updatedAt: now,
           }).onDuplicateKeyUpdate({ set: {
@@ -7866,6 +7871,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             renewalAccepted: true,
             termsAccepted: true,
             boostAccepted: true,
+            utmSource: input.utmSource,
+            utmMedium: input.utmMedium,
+            utmCampaign: input.utmCampaign,
+            utmContent: input.utmContent,
+            utmTerm: input.utmTerm,
             processToken: null,
             providerTransactionId: null,
             providerSubscriptionId: null,
@@ -7918,7 +7928,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
 
         // Save/update UTM + ga4ClientId + ga4SessionId in crm_leads so the webhook can use them later
-        if (db && (input.utmSource || input.utmMedium || input.utmCampaign || input.metaCampaignId || input.metaAdId || input.ga4ClientId || input.ga4SessionId)) {
+        if (db && input.product !== "plus" && (input.utmSource || input.utmMedium || input.utmCampaign || input.metaCampaignId || input.metaAdId || input.ga4ClientId || input.ga4SessionId)) {
           try {
             const { crmLeads: crmLeadsTable } = await import("../drizzle/schema");
             // Upsert: update existing lead or insert new one
