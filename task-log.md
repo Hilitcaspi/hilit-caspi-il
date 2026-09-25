@@ -773,20 +773,20 @@
 **Trigger:** reactive/production issue
 **Continuation of:** חידוד הטבת ההשקה והנצנוץ במייל Database Plus
 **Before:** המשתמשת אישרה מפורשות את העיצוב החדש ואת השליחה במייל וב-SMS. נדרש לבצע preflight עדכני, לוודא יתרת SMS ועלות משוערת, להחריג את מי שכבר קיבלו את שני ערוצי ההשקה, מי שרכשו Plus בינתיים, מסירי דיוור ולקוחות ליווי, ולשלוח רק לקהל הנותר באופן idempotent עם עצירת חירום ורישום מצרפי. בנוסף נדרש למסור UTM נפרד לקבוצת WhatsApp, ללא שליחה לקבוצה במסגרת המשימה.
-**After:** pending
-**Status:** stopped/restarted
+**After (completed 2026-09-25 17:17 Asia/Jerusalem, duration 1h 39m):** בוצע preflight עם יתרת SMS מספקת, הקמפיין חודש רק לאחר שהובהר כי הקוהורט עצמו מוגבל לחברי מאגר פעילים ומשלמים ורק לאחר שתיקון חסימת הרכישה החיצונית עלה לייצור. כל הרשומות שנותרו עובדו באופן idempotent. בסיכום המצרפי קיימים 1,070 מיילים שנקלטו בהצלחה אצל הספק ו־1,059 הודעות SMS שנקלטו בהצלחה; ארבע הודעות SMS נכשלו אצל הספק ושלושה מהכשלים היו שגיאות רשת, ובשבע רשומות נוספות לא היה מספר נייד תקין. כל מי שלא קיבל SMS קיבל את המייל. לא בוצע retry אוטומטי לכשלי הרשת כדי למנוע סיכון להודעת SMS כפולה במקרה של timeout לאחר קליטה.
+**Status:** resolved
 **Cost:** unavailable
-**Notes:** אישור המשתמשת כולל מייל ו-SMS, אך השליחה תחל רק לאחר preflight תקין. אין לחשוף פרטי נמענים או מזהים ביומן או בסיכום.
+**Notes:** UTM לקבוצת WhatsApp: source=whatsapp, medium=group, campaign=plus_launch_sep26, content=plus_launch_group. הקמפיין הסתיים ואין תהליכי שליחה פעילים. יש לבדוק למחרת רכישות לפי completed_payments כמקור אמת ולהצליב עם UTM השמור ב-plus_checkout_intents.
 ---
 ## Task: יצירת שלושה סטוריז חגיגיים להשקת Database Plus
 **Category:** marketing
 **Trigger:** reactive/production issue
 **Continuation of:** שליחת השקת Database Plus המאושרת במייל וב-SMS
 **Before:** המשתמשת ביקשה סדרה של שלושה סטוריז אנכיים וחגיגיים: סטורי טיזר של "משהו מרגש קורה", ולאחריו שני סטוריז שמסבירים מהו שירות Database Plus ואת הטבת ההשקה. נדרש לשמור על עיצוב עדין בצבעי המותג, נצנוץ זהוב, תמונת הילית, טקסט עברי קריא ופונט מותג, ולהכין UTM נפרד לסטורי. אין לפרסם את הסטוריז במסגרת המשימה.
-**After:** pending
-**Status:** stopped/restarted
+**After (completed 2026-09-25 17:17 Asia/Jerusalem, duration 1h 22m):** הופקה סדרה של שלושה סטוריז אנכיים חגיגיים ביחס 9:16: טיזר "משהו מרגש קורה", הסבר על שירות Database Plus וההטבות, וסיום עם הטבת שלוש התאמות במקום שתיים בחודש הראשון. נשמרו תמונת הילית, שפת הבורדו/שמנת/זהב והנצנוץ העדין. הכותרת בסטורי הראשון תוקנה לאחר בדיקה חזותית. לא בוצע פרסום.
+**Status:** resolved
 **Cost:** unavailable
-**Notes:** שלושת הסטוריז צריכים לעבוד כרצף אחד ולהיות ברורים גם ללא הקשר קודם. הקישור יקבל source=instagram, medium=story ו-content נפרד לכל סטורי.
+**Notes:** קישורי הסטורי משתמשים ב-source=instagram, medium=story, campaign=plus_launch_sep26 וב-content נפרד: plus_launch_story_teaser, plus_launch_story_benefits, plus_launch_story_offer.
 ---
 ## Task: חסימת רכישת Plus ללא הצטרפות תקינה למאגר
 **Category:** payment/billing
