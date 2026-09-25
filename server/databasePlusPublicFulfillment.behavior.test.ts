@@ -6,12 +6,16 @@ const mocks = vi.hoisted(() => ({
   sendEmail: vi.fn().mockResolvedValue({ success: true }),
   notifyOwner: vi.fn().mockResolvedValue(true),
   activatePlusForSingle: vi.fn().mockResolvedValue({ memberId: 91 }),
+  activatePendingPlusAfterRegistration: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("./db", () => ({ getDb: mocks.getDb }));
 vi.mock("./brevo", () => ({ sendEmail: mocks.sendEmail }));
 vi.mock("./_core/notification", () => ({ notifyOwner: mocks.notifyOwner }));
-vi.mock("./plusFulfillment", () => ({ activatePlusForSingle: mocks.activatePlusForSingle }));
+vi.mock("./plusFulfillment", () => ({
+  activatePlusForSingle: mocks.activatePlusForSingle,
+  activatePendingPlusAfterRegistration: mocks.activatePendingPlusAfterRegistration,
+}));
 
 import { handlePlus } from "./growWebhook";
 
@@ -44,8 +48,8 @@ function createDbHarness(selectRows: unknown[][]) {
 describe("Database Plus public payment fulfillment", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("accepts a confirmed Plus payment without a singles profile and creates a bound completion link", async () => {
-    const harness = createDbHarness([[], [], []]);
+  it("records a confirmed legacy Plus payment without granting free database access", async () => {
+    const harness = createDbHarness([[], []]);
     mocks.getDb.mockResolvedValue(harness.db);
 
     await handlePlus("new.member@example.com", "New Member", "tx-plus-public", 1, {
@@ -60,14 +64,17 @@ describe("Database Plus public payment fulfillment", () => {
       singleId: null,
     });
     expect(harness.inserts).toEqual(expect.arrayContaining([
-      expect.objectContaining({ email: "new.member@example.com", source: "plus_subscription" }),
       expect.objectContaining({ email: "new.member@example.com", status: "new_lead" }),
+    ]));
+    expect(harness.inserts).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ source: "plus_subscription" }),
     ]));
     expect(mocks.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: { email: "new.member@example.com", name: "New Member" },
       subject: "התשלום ל־Database Plus התקבל",
-      htmlContent: expect.stringContaining("/join?free_token="),
+      htmlContent: expect.stringContaining("/database"),
     }));
+    expect(mocks.sendEmail.mock.calls[0][0].htmlContent).not.toContain("free_token");
     expect(mocks.activatePlusForSingle).not.toHaveBeenCalled();
   });
 

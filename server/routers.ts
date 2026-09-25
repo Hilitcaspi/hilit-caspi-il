@@ -1009,6 +1009,9 @@ export const appRouter = router({
           .where(sql`LOWER(TRIM(${freeAccessTokens.token})) = ${normalizedToken}`).limit(1);
         const [inviteRow] = accessRow ? [] : await db.select().from(inviteTokens)
           .where(sql`LOWER(TRIM(${inviteTokens.token})) = ${normalizedToken}`).limit(1);
+        if (accessRow?.source === "plus_subscription") {
+          return { valid: false, reason: "not_found", email: null };
+        }
         const validation = validateFreeAccessTokenState(accessRow ? {
           usedAt: accessRow.usedAt,
           expiresAt: accessRow.expiresAt,
@@ -1032,6 +1035,9 @@ export const appRouter = router({
           .where(sql`LOWER(TRIM(${freeAccessTokens.token})) = ${normalizedToken}`).limit(1);
         const [inviteRow] = accessRow ? [] : await db.select().from(inviteTokens)
           .where(sql`LOWER(TRIM(${inviteTokens.token})) = ${normalizedToken}`).limit(1);
+        if (accessRow?.source === "plus_subscription") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "קישור זה אינו תקף להצטרפות למאגר. יש להשלים הרשמה רגילה למאגר" });
+        }
         const validation = validateFreeAccessTokenState(accessRow ? {
           usedAt: accessRow.usedAt,
           expiresAt: accessRow.expiresAt,
@@ -1975,6 +1981,9 @@ export const appRouter = router({
           } else {
             const [accessRow] = await db.select().from(freeAccessTokens)
               .where(sql`LOWER(TRIM(${freeAccessTokens.token})) = ${normalizedRegistrationFreeToken}`).limit(1);
+            if (accessRow?.source === "plus_subscription") {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "קישור זה אינו תקף להצטרפות למאגר. יש להשלים הרשמה רגילה למאגר" });
+            }
             const validation = validateFreeAccessTokenState(accessRow ? {
               usedAt: accessRow.usedAt,
               usedByEmail: accessRow.usedByEmail,
@@ -2166,6 +2175,8 @@ export const appRouter = router({
                 firstName: input.firstName,
                 lastName: input.lastName || null,
                 questionnaireToken: existingProfile.questionnaireToken || null,
+                isPaid: activatesWithFreeToken ? true : existingProfile.isPaid,
+                isActive: hasValidFreeToken ? true : (existingProfile.isPaid || existingProfile.isActive),
               });
             }
             return { singleId: existingProfile.id, questionnaireToken: existingProfile.questionnaireToken || "", success: true, alreadyExists: false };
@@ -2188,6 +2199,8 @@ export const appRouter = router({
               firstName: existingProfile.firstName,
               lastName: input.lastName || null,
               questionnaireToken: existingProfile.questionnaireToken || null,
+              isPaid: existingProfile.isPaid,
+              isActive: existingProfile.isActive,
             });
           }
           return { singleId: existingProfile.id, questionnaireToken: existingProfile.questionnaireToken || "", success: true, alreadyExists: true };
@@ -2380,6 +2393,8 @@ export const appRouter = router({
             firstName: input.firstName,
             lastName: input.lastName || null,
             questionnaireToken,
+            isPaid: hasValidFreeToken,
+            isActive: hasValidFreeToken,
           });
         }
         return { singleId: newSingleId, questionnaireToken, success: true };
@@ -7834,10 +7849,21 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           if (existingIntent?.status === "paid_pending_profile" || existingIntent?.status === "active") {
             throw new TRPCError({ code: "CONFLICT", message: "התשלום עבור Plus כבר נקלט. אין צורך לשלם שוב" });
           }
-          const [existingSingle] = await db.select({ id: singles.id, gender: singles.gender })
+          const [existingSingle] = await db.select({
+            id: singles.id,
+            gender: singles.gender,
+            isPaid: singles.isPaid,
+            isActive: singles.isActive,
+          })
             .from(singles)
             .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`)
             .limit(1);
+          if (!existingSingle?.isPaid || !existingSingle.isActive) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Database Plus זמין רק לחברי המאגר הפעילים. יש להשלים תחילה את ההצטרפות למאגר בסך 299 ₪, ולאחר אישור התשלום לחזור לעמוד Plus",
+            });
+          }
           if (existingSingle) {
             const [existingMember] = await db.select({ id: plusPilotMembers.id })
               .from(plusPilotMembers)

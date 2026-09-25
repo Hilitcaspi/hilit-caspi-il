@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { buildPlusBoostMembershipValues } from "./plusFulfillment";
+import { activatePendingPlusAfterRegistration, buildPlusBoostMembershipValues } from "./plusFulfillment";
 
 describe("Database Plus benefits", () => {
   it("activates the current Boost consent only after Plus fulfillment", () => {
@@ -46,5 +46,17 @@ describe("Database Plus benefits", () => {
     expect(source).toContain("מהמחזור הבא היעד הוא שתי הצעות בכל חודש");
     expect(source).toContain("בוסט אחד ללא תשלום נוסף");
     expect(source).not.toContain("לאחר ש־Grow יאשר");
+  });
+
+  it("does not activate a pending Plus payment before database membership is paid and active", async () => {
+    await expect(activatePendingPlusAfterRegistration({
+      id: 42,
+      email: "pending@example.com",
+      firstName: "Pending",
+      lastName: "Member",
+      questionnaireToken: "synthetic-token",
+      isPaid: false,
+      isActive: true,
+    })).resolves.toBeNull();
   });
 });

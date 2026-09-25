@@ -2,7 +2,7 @@ import { and, eq, inArray, or } from "drizzle-orm";
 import { completedPayments, crmLeads, emailLog, plusPilotMembers, singles } from "../drizzle/schema";
 import { isPermanentlyBlockedEmail, sendEmail } from "./brevo";
 import { getDb } from "./db";
-import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
+import { buildSignedUnsubscribeUrl } from "./emailUnsubscribe";
 import {
   PLUS_HOLIDAY_LAUNCH_COHORT,
   PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY,
@@ -332,7 +332,6 @@ export async function sendPreparedPlusRelaunchCampaign(options: { limit?: number
       || blockedEmails.has(email)
       || paidPlusEmails.has(email)
       || isPermanentlyBlockedEmail(email)
-      || (await isEmailMarketingSuppressed(email)).suppressed
       || !row.single.isPaid
       || !row.single.isActive
       || row.single.isSeed

@@ -31,9 +31,9 @@
  */
 
 import crypto from "crypto";
-import { and, desc as orderDesc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, desc as orderDesc, eq, gt, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, freeAccessTokens, plusPilotMembers, plusCheckoutIntents, paymentLeads } from "../drizzle/schema";
+import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusCheckoutIntents, paymentLeads } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
 import { queueProductFeedbackAfterPurchase } from "./feedbackAutomation";
@@ -41,7 +41,7 @@ import { startJourney } from "./automation";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
 import { buildNewYearBundleAccessEmail } from "./newYearBundleEmail";
-import { activatePlusForSingle } from "./plusFulfillment";
+import { activatePendingPlusAfterRegistration, activatePlusForSingle } from "./plusFulfillment";
 import { verifyPlusCheckoutReference } from "./plusCheckoutReference";
 
 const SITE_BASE = "https://hilitcaspi.com";
@@ -415,6 +415,18 @@ export async function handleDatabase(email: string, name: string, phone: string,
 
   await db.insert(leads).values({ name, email, phone, source: "paid_database" }).catch(() => {});
 
+  // If a legacy Plus payment was accepted before the database membership,
+  // activate it only now, after Grow has confirmed the database payment.
+  await activatePendingPlusAfterRegistration({
+    id: singleRecord.id,
+    email: normalizedEmail,
+    firstName,
+    lastName,
+    questionnaireToken: singleRecord.questionnaireToken,
+    isPaid: true,
+    isActive: true,
+  });
+
   const joinUrl = `${SITE_BASE}/join/questionnaire?token=${singleRecord.questionnaireToken}`;
 
   await notifyOwner({ title: "תשלום מאגר חדש! 💛", content: `${name} (${email}) שילם דמי רישום למאגר ב-299 ₪. Transaction: ${transactionId || 'N/A'}` });
@@ -539,23 +551,6 @@ export async function handlePlus(email: string, name: string, transactionId: str
     return;
   }
 
-  const [existingToken] = await db.select().from(freeAccessTokens).where(and(
-    eq(freeAccessTokens.email, email),
-    eq(freeAccessTokens.source, "plus_subscription"),
-    isNull(freeAccessTokens.usedAt),
-    gt(freeAccessTokens.expiresAt, now),
-  )).limit(1);
-  const token = existingToken?.token || crypto.randomBytes(32).toString("hex");
-  if (!existingToken) {
-    await db.insert(freeAccessTokens).values({
-      token,
-      email,
-      source: "plus_subscription",
-      expiresAt: now + 30 * 24 * 60 * 60 * 1000,
-      createdAt: now,
-    });
-  }
-
   const [existingCrm] = await db.select({ id: crmLeads.id }).from(crmLeads)
     .where(sql`LOWER(TRIM(${crmLeads.email})) = ${email}`).limit(1);
   if (existingCrm) {
@@ -578,13 +573,13 @@ export async function handlePlus(email: string, name: string, transactionId: str
     });
   }
 
-  const registrationUrl = `${SITE_BASE}/join?free_token=${encodeURIComponent(token)}`;
+  const registrationUrl = `${SITE_BASE}/database`;
   await sendEmail({
     to: { email, name },
     subject: "התשלום ל־Database Plus התקבל",
-    htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">ברוכים הבאים ל־Database Plus</h2><p style="line-height:1.8">התשלום התקבל בהצלחה. כדי שאוכל להתחיל לעבוד על ההתאמות שלך, נשאר להשלים את הפרופיל והשאלון.</p><p style="text-align:center;margin:28px 0"><a href="${registrationUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">להשלמת הפרופיל</a></p><p style="font-size:13px;color:#666;line-height:1.7">הקישור אישי ומחובר לכתובת המייל שבה בוצע התשלום.</p></div>`,
+    htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">התשלום ל־Database Plus התקבל</h2><p style="line-height:1.8">המנוי עדיין לא הופעל, משום שלא נמצאה חברות מאגר פעילה בכתובת המייל שבה בוצע התשלום.</p><p style="line-height:1.8">Database Plus הוא שירות המשך לחברי המאגר בלבד. כדי להפעיל אותו יש להשלים קודם את ההצטרפות למאגר. לאחר שתשלום המאגר יאושר, מנוי Plus שכבר שולם יופעל אוטומטית ואין צורך לשלם עליו שוב.</p><p style="text-align:center;margin:28px 0"><a href="${registrationUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">להצטרפות למאגר</a></p><p style="font-size:13px;color:#666;line-height:1.7">אם כבר קיימת חברות מאגר בכתובת מייל אחרת, יש לפנות אלינו כדי שנחבר בין הרשומות לפני ניסיון תשלום נוסף.</p></div>`,
   });
-  await notifyOwner({ title: "רכישת Database Plus חדשה", content: `${name} (${email}) רכש/ה Plus וממתין/ה להשלמת פרופיל.` });
+  await notifyOwner({ title: "נדרש טיפול: Plus שולם ללא חברות מאגר", content: `${name} (${email}) רכש/ה Plus, אך לא נמצאה חברות מאגר פעילה. אין להפעיל את Plus לפני אישור תשלום המאגר או חיבור לרשומת מאגר קיימת.` });
 }
 
 async function handleMatchBoost(email: string, transactionId: string, sum: number, checkoutReference?: string) {

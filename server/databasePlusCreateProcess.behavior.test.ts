@@ -39,9 +39,18 @@ function createPublicContext(): TrpcContext {
   };
 }
 
-function createDbHarness() {
+function createDbHarness(selectRows: unknown[][] = []) {
+  let selectIndex = 0;
   return {
-    select: vi.fn(),
+    select: vi.fn(() => {
+      const rows = selectRows[selectIndex++] ?? [];
+      const chain: any = {};
+      chain.from = vi.fn(() => chain);
+      chain.where = vi.fn(() => chain);
+      chain.innerJoin = vi.fn(() => chain);
+      chain.limit = vi.fn().mockResolvedValue(rows);
+      return chain;
+    }),
     insert: vi.fn(),
     update: vi.fn(),
   };
@@ -86,5 +95,29 @@ describe("Database Plus public createProcess safeguards", () => {
     expect(validInput.plusRenewalAccepted).toBe(true);
     expect(validInput.plusTermsAccepted).toBe(true);
     expect(validInput.plusBoostAccepted).toBe(true);
+  });
+
+  it("blocks Plus checkout when no active database membership exists", async () => {
+    const db = createDbHarness([[], []]);
+    mocks.getDb.mockResolvedValue(db);
+
+    await expect(appRouter.createCaller(createPublicContext()).payment.createProcess(validInput))
+      .rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+        message: expect.stringContaining("לחברי המאגר הפעילים"),
+      });
+
+    expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("blocks Plus checkout for an unpaid or inactive database profile", async () => {
+    const db = createDbHarness([[], [{ id: 42, gender: "female", isPaid: false, isActive: true }]]);
+    mocks.getDb.mockResolvedValue(db);
+
+    await expect(appRouter.createCaller(createPublicContext()).payment.createProcess(validInput))
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+
+    expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
   });
 });

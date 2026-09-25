@@ -107,4 +107,18 @@ describe("Database Plus hidden checkout", () => {
     expect(dashboard).not.toContain("לפרטים ולמסך התשלום");
     expect(pilotRouter).toContain("PLUS_CHECKOUT_PUBLICLY_AVAILABLE && input.status === \"invited\"");
   });
+
+  it("requires an active paid database membership before Plus checkout", () => {
+    const router = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
+    const salesPage = fs.readFileSync(path.join(process.cwd(), "client/src/pages/DatabasePlusSales.tsx"), "utf8");
+    const termsPage = fs.readFileSync(path.join(process.cwd(), "client/src/pages/TermsPlus.tsx"), "utf8");
+
+    expect(router).toContain("!existingSingle?.isPaid || !existingSingle.isActive");
+    expect(router).toContain("Database Plus זמין רק לחברי המאגר הפעילים");
+    expect(salesPage).toContain("Database Plus מיועד לחברי המאגר הפעילים בלבד");
+    expect(salesPage).toContain('href="/database"');
+    expect(salesPage).not.toContain("ההצטרפות פתוחה לכולם");
+    expect(termsPage).toContain("Plus הוא שירות המשך לחברי המאגר הפעילים בלבד");
+    expect(termsPage).not.toContain("אין צורך בחברות קודמת");
+  });
 });

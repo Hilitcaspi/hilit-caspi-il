@@ -185,6 +185,7 @@ export const plusPilotRouter = router({
           email: single.email,
           phone: single.phone,
         },
+        databaseMembershipActive: Boolean(single.isPaid && single.isActive),
         eligibility,
         cycleProgress: pilot[0] ? calculatePlusCycleProgress(pilot[0], memberMatches) : null,
         launchOffer: pilot[0] && qualifiesForPlusHolidayLaunch(pilot[0].pilotCohort)

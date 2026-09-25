@@ -200,8 +200,8 @@ export async function activatePlusForSingle(input: PlusActivationInput) {
   return { memberId: member.id, monthlyMatchTarget: cycleMatchTarget };
 }
 
-export async function activatePendingPlusAfterRegistration(single: Pick<Single, "id" | "email" | "firstName" | "lastName" | "questionnaireToken">) {
-  if (!single.email) return null;
+export async function activatePendingPlusAfterRegistration(single: Pick<Single, "id" | "email" | "firstName" | "lastName" | "questionnaireToken" | "isPaid" | "isActive">) {
+  if (!single.email || !single.isPaid || !single.isActive) return null;
   const db = await getDb();
   if (!db) return null;
   const normalizedEmail = single.email.trim().toLowerCase();

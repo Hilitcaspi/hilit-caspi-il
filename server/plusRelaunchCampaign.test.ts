@@ -87,6 +87,7 @@ describe("Database Plus holiday launch", () => {
     expect(source).toContain("!paidPlusEmails.has(email)");
     expect(source).toContain("eq(singles.isPaid, true)");
     expect(source).toContain("eq(singles.isActive, true)");
+    expect(source).not.toContain("await isEmailMarketingSuppressed(email)");
     expect(source).not.toContain("potentialMatchesUnderReview >= 3");
   });
 });
