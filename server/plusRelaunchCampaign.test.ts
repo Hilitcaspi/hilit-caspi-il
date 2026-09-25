@@ -65,4 +65,13 @@ describe("Database Plus holiday launch", () => {
     expect(source).toContain("hasPlusPilotCapacity(capacityRows, existingSingle.gender)");
     expect(source).toContain("מכסת ההשקה מלאה כרגע");
   });
+
+  it("targets database members broadly but excludes everyone who already paid for Plus", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/plusRelaunchCampaign.ts"), "utf8");
+    expect(source).toContain("completedPayments.product, \"plus\"");
+    expect(source).toContain("!paidPlusEmails.has(email)");
+    expect(source).toContain("eq(singles.isPaid, true)");
+    expect(source).toContain("eq(singles.isActive, true)");
+    expect(source).not.toContain("potentialMatchesUnderReview >= 3");
+  });
 });

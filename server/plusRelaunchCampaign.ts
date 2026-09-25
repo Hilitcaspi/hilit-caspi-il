@@ -1,5 +1,5 @@
 import { and, eq, inArray, or } from "drizzle-orm";
-import { crmLeads, emailLog, matches, plusPilotMembers, singles } from "../drizzle/schema";
+import { completedPayments, crmLeads, emailLog, plusPilotMembers, singles } from "../drizzle/schema";
 import { isPermanentlyBlockedEmail, sendEmail } from "./brevo";
 import { getDb } from "./db";
 import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
@@ -10,11 +10,10 @@ import {
   PLUS_HOLIDAY_LAUNCH_SMS_JOURNEY,
 } from "./plusLaunchOffer";
 import { isPlusPilotCoachingClient, loadCoachingClientEmails } from "./plusHolidayPilotCampaign";
-import { assessPlusEligibility } from "./plusPilotRouter";
 import { normalizeIsraeliMobile, sendSMSDetailed } from "./vibrate";
 
 const PLUS_PUBLIC_URL = "https://hilitcaspi.com/database-plus";
-const LAUNCH_DEADLINE_LABEL = "30.9";
+const LAUNCH_DEADLINE_LABEL = "היום";
 
 function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
@@ -54,7 +53,7 @@ export function buildPlusRelaunchEmail(input: { firstName: string; email: string
 
 אפשרות להישקל לפינת הרווקים, רק באישור מפורש מראש.
 
-ולכבוד ההשקה והחגים: כל מי שמצטרף עד ${LAUNCH_DEADLINE_LABEL} מקבל במחזור הראשון שלוש הצעות התאמה במקום שתיים.
+ולכבוד ההשקה והחגים: כל מי שמצטרף ${LAUNCH_DEADLINE_LABEL} מקבל במחזור הראשון שלוש הצעות התאמה במקום שתיים.
 
 המחיר הוא 99 ₪ לחודש בחיוב מתחדש עד לביטול. מספר המקומות מוגבל כדי שאוכל לשמור על רמת השירות האישית שהבטחתי.
 
@@ -71,37 +70,34 @@ ${unsubscribeUrl}`;
   const htmlContent = `<!doctype html>
 <html lang="he" dir="rtl">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>${subject}</title></head>
-<body style="margin:0;background:#eee9df;font-family:Arial,sans-serif;color:#171717">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0">אתם ביקשתם יותר הזדמנויות ויותר תשומת לב. Database Plus נפתח עם הטבת השקה מיוחדת.</div>
-  <div style="max-width:640px;margin:0 auto;padding:30px 14px">
-    <div style="overflow:hidden;border:1px solid #d5c29b;background:#fffdf8;box-shadow:0 24px 70px rgba(12,12,16,.18)">
-      <div style="background:#0b0b10;padding:20px 30px;text-align:center;border-bottom:1px solid #b99755">
-        <div style="font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#d8bd83;letter-spacing:3px;font-weight:700">HILIT CASPI · PRIVATE MEMBERSHIP</div>
+<body style="margin:0;background:#eee4d6;font-family:Arial,sans-serif;color:#17213d">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0">השירות החדש לחברי המאגר שרוצים יותר הזדמנויות, קדימות ותשומת לב.</div>
+  <div style="max-width:640px;margin:0 auto;padding:28px 16px">
+    <div style="overflow:hidden;border-radius:28px;box-shadow:0 20px 55px rgba(12,19,39,.16)">
+      <div style="background:linear-gradient(145deg,#0c1327 0%,#191265 100%);padding:42px 30px 36px;text-align:center">
+        <div style="color:#f4d889;font-size:21px;letter-spacing:9px;line-height:1">✦ ✧ ✦</div>
+        <div style="font-size:12px;color:#e8cb91;letter-spacing:1.5px;font-weight:700">HILIT CASPI | OFFICIAL MEMBERSHIP</div>
+        <div style="display:inline-block;margin-top:20px;padding:8px 17px;border:1px solid rgba(232,203,145,.55);color:#e8cb91;font-size:13px;font-weight:700">✦ השקה חדשה לחברי המאגר ✦</div>
+        <h1 style="margin:18px 0 0;color:#fffaf1;font-size:36px;line-height:1.2">Database Plus נפתח</h1>
+        <p style="margin:14px auto 0;max-width:500px;color:#dce1f0;font-size:17px;line-height:1.75">יותר הזדמנויות להכיר, יותר תשומת לב לפרופיל ויותר קצב בתוך המאגר.</p>
       </div>
-      <div style="background:linear-gradient(160deg,#0b0b10 0%,#171324 62%,#21183d 100%);padding:44px 30px 40px;text-align:center">
-        <div style="color:#d8bd83;font-size:18px;letter-spacing:7px">✦</div>
-        <div style="display:inline-block;margin-top:18px;padding:7px 18px;border-top:1px solid rgba(216,189,131,.8);border-bottom:1px solid rgba(216,189,131,.8);color:#e9d5a9;font-size:12px;letter-spacing:1px">השקה חדשה לחברי המאגר</div>
-        <h1 style="margin:24px 0 0;color:#fffdf8;font-family:Georgia,'Times New Roman',serif;font-size:40px;font-weight:400;line-height:1.18">Database Plus</h1>
-        <p style="margin:12px auto 0;max-width:500px;color:#f0eadf;font-size:21px;line-height:1.65">יותר הזדמנויות. יותר קדימות.<br />יותר תשומת לב אישית.</p>
-      </div>
-      <div style="height:5px;background:linear-gradient(90deg,#8f6c30,#f0dba7,#9f7938)"></div>
-      <div style="background:#fffdf8;padding:38px 32px;line-height:1.8;font-size:17px">
+      <div style="background:#fffaf1;padding:36px 31px;line-height:1.8;font-size:17px">
         <p style="margin-top:0">היי ${input.firstName},</p>
-        <p><strong>אתם ביקשתם יותר הזדמנויות, יותר קצב ויותר תשומת לב בתוך המאגר. הקשבתי.</strong></p>
-        <p>אני משיקה את <strong>Database Plus</strong>, השירות המתקדם והאישי ביותר לחברי המאגר. זהו מנוי למי שרוצים שאעבוד על הפרופיל שלהם בקדימות, אבחן עבורם יותר אפשרויות ואפתח עוד דרכים להכיר.</p>
-        <div style="margin:32px 0 17px;text-align:center;color:#8b692f;font-size:12px;font-weight:700;letter-spacing:1.4px">מה כולל המנוי בכל חודש פעיל</div>
-        <div style="border-top:1px solid #d9c7a1;padding:18px 4px 16px"><strong style="font-size:19px;color:#111">01 · לפחות שתי הצעות התאמה חדשות</strong><div style="margin-top:4px;color:#625d54;font-size:15px">הצעות שאני בודקת באופן אישי ושולחת בפועל בכל מחזור.</div></div>
-        <div style="border-top:1px solid #d9c7a1;padding:18px 4px 16px"><strong style="font-size:19px;color:#111">02 · בוסט אחד נוסף</strong><div style="margin-top:4px;color:#625d54;font-size:15px">הזדמנות נוספת ללא תשלום נוסף, מעבר להצעות ההתאמה של Plus.</div></div>
-        <div style="border-top:1px solid #d9c7a1;padding:18px 4px 16px"><strong style="font-size:19px;color:#111">03 · קדימות לפרופיל ולשירות</strong><div style="margin-top:4px;color:#625d54;font-size:15px">קדימות באיתור, בבדיקת התאמות, בעדכון ההעדפות ובמענה האישי.</div></div>
-        <div style="border-top:1px solid #d9c7a1;border-bottom:1px solid #d9c7a1;padding:18px 4px"><strong style="font-size:19px;color:#111">04 · אפשרות לפינת הרווקים</strong><div style="margin-top:4px;color:#625d54;font-size:15px">רק לאחר אישור מפורש ונפרד של התמונה והטקסט.</div></div>
-        <div style="margin:32px 0;padding:28px 24px;border:1px solid #b99755;background:#0b0b10;color:#fffdf8;text-align:center">
-          <div style="color:#d8bd83;font-size:17px;letter-spacing:5px">✦ ✦ ✦</div>
-          <div style="margin-top:13px;font-size:12px;color:#e9d5a9;font-weight:700;letter-spacing:1px">הטבת השקה לכבוד החגים</div>
-          <div style="margin-top:10px;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:400;line-height:1.45">מצטרפים עד ${LAUNCH_DEADLINE_LABEL} ומקבלים במחזור הראשון <strong style="color:#f0d69e">שלוש הצעות התאמה</strong> במקום שתיים</div>
+        <p><strong>ביקשתם יותר הזדמנויות, יותר קצב ויותר תשומת לב בתוך המאגר.</strong> לכן אני משיקה את Database Plus.</p>
+        <p>זהו השירות המתקדם לחברי המאגר שרוצים שאעבוד על הפרופיל שלהם בקדימות, אבחן עבורם יותר אפשרויות ואפתח עוד דרכים להכיר.</p>
+        <div style="margin:28px 0 14px;text-align:center;color:#9c7436;font-size:13px;font-weight:700;letter-spacing:.8px">מה כולל המנוי בכל חודש פעיל?</div>
+        <div style="background:#f7f1e6;border:1px solid #dfcda9;padding:19px 21px;margin:10px 0"><strong style="font-size:19px">לפחות שתי הצעות התאמה חדשות</strong><div style="margin-top:5px;color:#596173;font-size:15px">הצעות שאני בודקת ושולחת בפועל בכל מחזור.</div></div>
+        <div style="background:#f7f1e6;border:1px solid #dfcda9;padding:19px 21px;margin:10px 0"><strong style="font-size:19px">בוסט אחד נוסף</strong><div style="margin-top:5px;color:#596173;font-size:15px">הזדמנות נוספת ללא תשלום נוסף, מעבר לשתי ההצעות.</div></div>
+        <div style="background:#f7f1e6;border:1px solid #dfcda9;padding:19px 21px;margin:10px 0"><strong style="font-size:19px">קדימות לפרופיל ומענה בעדיפות</strong><div style="margin-top:5px;color:#596173;font-size:15px">קדימות באיתור, בבדיקה, בעדכון ההעדפות ובשירות Plus.</div></div>
+        <div style="background:#f7f1e6;border:1px solid #dfcda9;padding:19px 21px;margin:10px 0"><strong style="font-size:19px">אפשרות לפינת הרווקים</strong><div style="margin-top:5px;color:#596173;font-size:15px">רק לאחר אישור מפורש ונפרד של התמונה והטקסט.</div></div>
+        <div style="margin:28px 0;padding:24px;border:1px solid #d8b67e;background:#10182f;color:#fffaf1;text-align:center">
+          <div style="color:#f4d889;font-size:18px;letter-spacing:7px">✦ ✦ ✦</div>
+          <div style="margin-top:8px;font-size:13px;color:#e8cb91;font-weight:700">הטבת השקה לכבוד החגים</div>
+          <div style="margin-top:8px;font-size:23px;font-weight:700;line-height:1.45">מצטרפים ${LAUNCH_DEADLINE_LABEL} ומקבלים במחזור הראשון שלוש הצעות התאמה במקום שתיים</div>
         </div>
-        <p style="text-align:center;font-size:18px">המחיר הוא <strong>99 ₪ לחודש</strong> בחיוב מתחדש עד לביטול.<br /><span style="font-size:14px;color:#6b655c">מספר המקומות מוגבל כדי שאוכל לשמור על רמת השירות האישית שהבטחתי.</span></p>
-        <div style="text-align:center;margin:32px 0"><a href="${checkoutUrl}" style="display:inline-block;background:#c6a15b;color:#0b0b10;text-decoration:none;font-weight:700;padding:17px 38px;border:1px solid #9c7838;letter-spacing:.3px">לגלות את Database Plus ולהצטרף</a></div>
-        <p style="font-size:13px;line-height:1.7;color:#746f66;border-top:1px solid #e1d7c4;padding-top:18px">ההתחייבות היא להצעות שנבדקו ונשלחו. אישור הדדי, פגישה או זוגיות אינם מובטחים.</p>
+        <p style="text-align:center">המחיר הוא <strong>99 ₪ לחודש</strong> בחיוב מתחדש עד לביטול.<br />מספר המקומות מוגבל כדי שאוכל לתת את רמת השירות שהבטחתי.</p>
+        <div style="text-align:center;margin:30px 0"><a href="${checkoutUrl}" style="display:inline-block;background:#d8b67e;color:#10182f;text-decoration:none;font-weight:700;padding:16px 34px;border-radius:999px">לכל הפרטים ולהצטרפות</a></div>
+        <p style="font-size:13px;line-height:1.7;color:#6a7080">ההתחייבות היא להצעות שנבדקו ונשלחו. אישור הדדי, פגישה או זוגיות אינם מובטחים.</p>
         <p style="margin-bottom:0">באהבה,<br /><strong>הילית</strong></p>
       </div>
     </div>
@@ -121,7 +117,7 @@ export function buildPlusRelaunchSms(input: { email: string; token: string }) {
 
 אני משיקה את Database Plus, מנוי חודשי עם לפחות 2 הצעות התאמה שאני בודקת ושולחת, בוסט נוסף, קדימות לפרופיל ולשירות.
 
-לכבוד ההשקה והחגים, מצטרפים עד ${LAUNCH_DEADLINE_LABEL} מקבלים הצעה שלישית במחזור הראשון, כלומר 3 במקום 2. המחיר 99 ₪ לחודש, מתחדש עד ביטול. מספר המקומות מוגבל.
+לכבוד ההשקה והחגים, מצטרפים ${LAUNCH_DEADLINE_LABEL} ומקבלים הצעה שלישית במחזור הראשון, כלומר 3 במקום 2. המחיר 99 ₪ לחודש, מתחדש עד ביטול. מספר המקומות מוגבל.
 
 לכל הפרטים ולהצטרפות:
 ${checkoutUrl}
@@ -138,7 +134,7 @@ function trackedEmailContent(htmlContent: string, logId: number, checkoutUrl: st
 }
 
 async function loadCampaignCandidates(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
-  const [singleRows, memberRows, blockedRows, coachingEmails, matchRows] = await Promise.all([
+  const [singleRows, memberRows, blockedRows, coachingEmails, paidPlusRows] = await Promise.all([
     db.select().from(singles).where(and(
       eq(singles.isPaid, true),
       eq(singles.isActive, true),
@@ -149,40 +145,21 @@ async function loadCampaignCandidates(db: NonNullable<Awaited<ReturnType<typeof 
     db.select().from(plusPilotMembers),
     db.select({ email: crmLeads.email }).from(crmLeads).where(eq(crmLeads.emailUnsubscribed, true)),
     loadCoachingClientEmails(db),
-    db.select({
-      id: matches.id,
-      singleAId: matches.singleAId,
-      singleBId: matches.singleBId,
-      proposedAt: matches.proposedAt,
-      status: matches.status,
-      matchDetailStatus: matches.matchDetailStatus,
-      returnedToPoolAt: matches.returnedToPoolAt,
-    }).from(matches),
+    db.select({ email: completedPayments.email }).from(completedPayments)
+      .where(eq(completedPayments.product, "plus")),
   ]);
   const memberBySingleId = new Map(memberRows.map(row => [row.singleId, row]));
   const blockedEmails = new Set(blockedRows.map(row => normalizeEmail(row.email)).filter(Boolean));
-  const matchesBySingleId = new Map<number, typeof matchRows>();
-  for (const match of matchRows) {
-    for (const singleId of [match.singleAId, match.singleBId]) {
-      if (!singleId) continue;
-      const rows = matchesBySingleId.get(singleId) || [];
-      rows.push(match);
-      matchesBySingleId.set(singleId, rows);
-    }
-  }
+  const paidPlusEmails = new Set(paidPlusRows.map(row => normalizeEmail(row.email)).filter(Boolean));
   return singleRows.filter(single => {
     const email = normalizeEmail(single.email);
     const member = memberBySingleId.get(single.id);
-    const eligibility = assessPlusEligibility(single, matchesBySingleId.get(single.id) || []);
     return email.includes("@")
       && Boolean(String(single.questionnaireToken || "").trim())
       && !blockedEmails.has(email)
+      && !paidPlusEmails.has(email)
       && !isPlusPilotCoachingClient(single, coachingEmails)
-      && !(member?.status === "active" && member?.billingStatus === "active")
-      && eligibility.eligible
-      && !eligibility.activeMatch
-      && !eligibility.positiveOutcome
-      && eligibility.potentialMatchesUnderReview >= 3;
+      && !(member?.status === "active" && member?.billingStatus === "active");
   });
 }
 
@@ -244,8 +221,13 @@ export async function sendPreparedPlusRelaunchCampaign(options: { limit?: number
       inArray(plusPilotMembers.status, ["eligible", "invited"]),
       eq(plusPilotMembers.billingStatus, "not_configured"),
     ));
-  const blockedRows = await db.select({ email: crmLeads.email }).from(crmLeads).where(eq(crmLeads.emailUnsubscribed, true));
+  const [blockedRows, paidPlusRows] = await Promise.all([
+    db.select({ email: crmLeads.email }).from(crmLeads).where(eq(crmLeads.emailUnsubscribed, true)),
+    db.select({ email: completedPayments.email }).from(completedPayments)
+      .where(eq(completedPayments.product, "plus")),
+  ]);
   const blockedEmails = new Set(blockedRows.map(row => normalizeEmail(row.email)).filter(Boolean));
+  const paidPlusEmails = new Set(paidPlusRows.map(row => normalizeEmail(row.email)).filter(Boolean));
   const ordered = [...rows].sort((a, b) => a.single.id - b.single.id);
   const selected = options.limit ? ordered.slice(0, Math.max(0, options.limit)) : ordered;
   let emailAccepted = 0;
@@ -262,6 +244,7 @@ export async function sendPreparedPlusRelaunchCampaign(options: { limit?: number
     const suppressed = !email.includes("@")
       || !token
       || blockedEmails.has(email)
+      || paidPlusEmails.has(email)
       || isPermanentlyBlockedEmail(email)
       || (await isEmailMarketingSuppressed(email)).suppressed
       || !row.single.isPaid
