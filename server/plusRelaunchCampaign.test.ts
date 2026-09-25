@@ -23,15 +23,16 @@ describe("Database Plus holiday launch", () => {
 
   it("explains the service before the holiday benefit in the email", () => {
     const content = buildPlusRelaunchEmail({ firstName: "דנה", email: "dana@example.com", token: "safe-token" });
-    expect(content.subject).toContain("ההשקה שביקשתם נפתחה");
+    expect(content.subject).toContain("הטבה מיוחדת מחכה בפנים");
     expect(content.subject).toContain("Database Plus");
-    expect(content.textContent).toContain("לפחות שתי הצעות התאמה חדשות");
-    expect(content.textContent).toContain("בוסט אחד נוסף");
+    expect(content.textContent).toContain("התחייבות ללפחות שתי הצעות התאמה");
+    expect(content.textContent).toContain("בוסט אחד במתנה");
     expect(content.textContent).toContain("קדימות באיתור");
-    expect(content.textContent).toContain("מענה ועדכון העדפות בעדיפות");
-    expect(content.textContent).toContain("שלוש הצעות התאמה במקום שתיים");
+    expect(content.textContent).toContain("הטבות והזדמנויות מיוחדות שייפתחו רק לחברי Plus");
+    expect(content.textContent).toContain("בחודש הראשון 3 התאמות במקום 2");
+    expect(content.textContent).toContain("מספר המקומות ב-Plus מוגבל");
     expect(content.textContent).toContain("99 ₪ לחודש");
-    expect(content.textContent.indexOf("מה מקבלים בכל חודש פעיל?")).toBeLessThan(content.textContent.indexOf("לכבוד ההשקה"));
+    expect(content.textContent.indexOf("מה מקבלים בכל חודש פעיל?")).toBeLessThan(content.textContent.indexOf("רק עכשיו לכבוד ההשקה"));
     expect(content.checkoutUrl).toContain("utm_source=email");
     expect(content.checkoutUrl).toContain("utm_medium=launch");
     expect(content.checkoutUrl).toContain("utm_campaign=plus_launch_sep26");
@@ -39,6 +40,9 @@ describe("Database Plus holiday launch", () => {
     expect(content.htmlContent).toContain("plus-email-hilit-seated_52bbd335.jpg");
     expect(content.htmlContent).toContain("plus-email-hilit-full_0acd266d.jpg");
     expect(content.htmlContent).toContain("box-sizing: border-box !important");
+    expect(content.htmlContent).toContain("@keyframes plusSparkle");
+    expect(content.htmlContent).toContain('class="sparkle-glow"');
+    expect(content.htmlContent).toContain('class="launch-number"');
     expect(content.htmlContent.split(content.checkoutUrl)).toHaveLength(3);
     expect(content.textContent).not.toMatch(/[—–]/);
   });
@@ -53,8 +57,8 @@ describe("Database Plus holiday launch", () => {
     const content = buildPlusRelaunchSms({ email: "dana@example.com", token: "safe-token" });
     expect(content.message).toContain("מנוי חודשי");
     expect(content.message).toContain("2 הצעות");
-    expect(content.message).toContain("בוסט נוסף");
-    expect(content.message).toContain("הצעה שלישית במחזור הראשון");
+    expect(content.message).toContain("בוסט במתנה");
+    expect(content.message).toContain("בחודש הראשון 3 התאמות במקום 2");
     expect(content.message).toContain("99 ₪ לחודש");
     expect(content.message).toContain("להסרה:");
     expect(content.checkoutUrl).toContain("utm_source=sms");
