@@ -55,4 +55,20 @@ describe("payment failure operational alerts", () => {
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
     expect(sendSmsMock).not.toHaveBeenCalled();
   });
+
+  it("labels a Plus create-process failure as Plus instead of a database failure", async () => {
+    await notifyPaymentFailure({
+      customerName: "בדיקת מערכת",
+      customerEmail: "monitor@example.com",
+      product: "plus",
+      amount: 99,
+      errorMessage: "temporary_provider_error",
+      stage: "createProcess",
+    });
+
+    expect(sendSmsMock).toHaveBeenCalledTimes(1);
+    expect(sendSmsMock.mock.calls[0]?.[1]).toContain("Database Plus (99 ₪ לחודש)");
+    expect(sendSmsMock.mock.calls[0]?.[1]).toContain("ייתכן שהלקוח ינסה שוב ויצליח");
+    expect(sendSmsMock.mock.calls[0]?.[1]).not.toContain("תקלה במסלול ההצטרפות למאגר");
+  });
 });

@@ -64,6 +64,7 @@ export function resetPaymentFailureAlertStateForTests(): void {
 
 const PRODUCT_LABELS: Record<string, string> = {
   database: "מאגר הרווקים (299 ₪)",
+  plus: "Database Plus (99 ₪ לחודש)",
   guide: "מדריך לבחור נכון (149 ₪)",
   course: "קורס המסע (249 ₪)",
   coaching: "ליווי אישי (3 חודשים)",
@@ -111,10 +112,10 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
 
   if (shouldSendCriticalPaymentSms(info.stage)) {
     alertTasks.push(sendSMS(HILIT_PHONE, [
-      "🚨 תקלה במסלול ההצטרפות למאגר",
+      `🚨 תקלה זמנית ביצירת תשלום: ${productLabel}`,
       `שלב: ${stageLabel}`,
-      "לא בוצע חיוב.",
-      "נדרשת בדיקה באתר.",
+      "בניסיון הזה לא בוצע חיוב.",
+      "ייתכן שהלקוח ינסה שוב ויצליח; מייל עם הפרטים נשלח לבדיקה.",
       `זמן: ${now}`,
     ].join("\n")));
   }
