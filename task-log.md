@@ -678,3 +678,13 @@
 **Cost:** not available
 **Notes:** לפני שליחה יש לעדכן את עמוד Plus כך שיציג את הטבת ההשקה החדשה במקום מתנת המדריך ויעד של שתי הצעות, ולתמוך ביעד 3 במחזור הראשון בלבד. UTM המייל: `utm_source=brevo&utm_medium=email&utm_campaign=plus_launch_sep26&utm_content=launch`. UTM ה־SMS: `utm_source=via&utm_medium=sms&utm_campaign=plus_launch_sep26&utm_content=launch`.
 ---
+## Task: הכנת שליחת השקת Plus עם הסבר מלא על השירות
+**Category:** marketing
+**Trigger:** reactive/production issue
+**Continuation of:** תיקון מסר השקת Database Plus ובדיקת מקור הרכישות
+**Before:** המשתמשת מבקשת להוציא את ההשקה כעת, אך מבהירה שהמייל וה־SMS חייבים קודם להסביר מהו Database Plus ומה כל מנוי מקבל, ורק לאחר מכן להציג את ההצעה השלישית כהטבת השקה וחג. יש לעדכן את עמוד המכירה ואת מנגנון המנוי כך שההטבה ניתנת בפועל, להכין קהל נקי ומדורג בהתאם למכסה, ולהציג את הנוסח והכמות הסופיים לפני השליחה. טרם נשלחה הודעה במשימה זו.
+**After:** pending
+**Status:** stopped/restarted
+**Cost:** not available
+**Notes:** אין לשלוח הבטחה של שלוש הצעות לפני שהעמוד, ההפעלה והמעקב תומכים בה. יש להחריג מנויי Plus קיימים, פרופילים סגורים וחסרי הסכמה לדיוור.
+---

@@ -5,6 +5,7 @@ export default function ThankYouPlus() {
   const params = new URLSearchParams(window.location.search);
   const email = params.get("email") || "";
   const token = params.get("token") || "";
+  const hasThirdMatchLaunchOffer = params.get("offer") === "third_match";
   const hasPersonalLink = Boolean(email && token);
   const profileUrl = hasPersonalLink
     ? `/my-profile?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`
@@ -17,8 +18,8 @@ export default function ThankYouPlus() {
         <p className="mt-3 text-sm leading-7 text-[#666]">ההצטרפות שלך התקבלה. שלחנו אליך מייל אישי עם הצעד הבא.</p>
         <div className="mt-6 grid gap-3 text-right sm:grid-cols-2">
           <div className="rounded-2xl bg-[#f8f6ff] p-5">
-            <strong className="block text-lg">שתי התאמות בכל חודש</strong>
-            <span className="mt-1 block text-sm leading-6 text-[#666]">לפחות שתי הצעות חדשות שנבדקו ונשלחו בכל מחזור חיוב.</span>
+            <strong className="block text-lg">{hasThirdMatchLaunchOffer ? "שלוש הצעות במחזור הראשון" : "שתי הצעות בכל חודש"}</strong>
+            <span className="mt-1 block text-sm leading-6 text-[#666]">{hasThirdMatchLaunchOffer ? "הטבת ההשקה נוספה למנוי. מהמחזור הבא היעד הוא שתי הצעות בכל חודש." : "לפחות שתי הצעות חדשות שנבדקו ונשלחו בכל מחזור חיוב."}</span>
           </div>
           <div className="rounded-2xl bg-[#fff6dc] p-5">
             <strong className="block text-lg">בוסט אחד ללא תשלום נוסף</strong>

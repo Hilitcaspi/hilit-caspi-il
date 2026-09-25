@@ -28,6 +28,7 @@ import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as
 import { sendEmail } from "./brevo";
 import { createPlusCheckoutReference } from "./plusCheckoutReference";
 import { activatePendingPlusAfterRegistration } from "./plusFulfillment";
+import { hasPlusPilotCapacity } from "./plusPilotCapacity";
 import { normalizeFreeAccessToken, validateFreeAccessTokenState } from "./freeAccessTokenPolicy";
 import { verifyBoostNewsletterUnsubscribeToken } from "./boostNewsletterCampaign";
 import {
@@ -7833,7 +7834,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           if (existingIntent?.status === "paid_pending_profile" || existingIntent?.status === "active") {
             throw new TRPCError({ code: "CONFLICT", message: "התשלום עבור Plus כבר נקלט. אין צורך לשלם שוב" });
           }
-          const [existingSingle] = await db.select({ id: singles.id })
+          const [existingSingle] = await db.select({ id: singles.id, gender: singles.gender })
             .from(singles)
             .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`)
             .limit(1);
@@ -7848,6 +7849,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               .limit(1);
             if (existingMember) {
               throw new TRPCError({ code: "CONFLICT", message: "מנוי Plus כבר פעיל עבור כתובת המייל הזו" });
+            }
+            const capacityRows = await db.select({ status: plusPilotMembers.status, gender: singles.gender })
+              .from(plusPilotMembers)
+              .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id));
+            if (!hasPlusPilotCapacity(capacityRows, existingSingle.gender)) {
+              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "מכסת ההשקה מלאה כרגע. אפשר להשאיר פרטים ונעדכן כשייפתח מקום נוסף" });
             }
           }
           await db.insert(plusCheckoutIntents).values({

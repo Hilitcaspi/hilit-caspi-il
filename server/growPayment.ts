@@ -16,6 +16,7 @@
 // node-fetch sends a "node-fetch" User-Agent which gets blocked by Incapsula (403).
 // Native fetch + browser-like headers bypasses this.
 import { normalizeIsraeliPhone } from "../shared/profileValidation";
+import { PLUS_HOLIDAY_LAUNCH_COHORT } from "./plusLaunchOffer";
 
 export const PAYMENT_PHONE_INVALID = "PAYMENT_PHONE_INVALID";
 
@@ -157,6 +158,8 @@ export interface CreatePaymentInput {
   plusWebhookReference?: string;
   /** Browser origin used for the hosted Plus recurring-payment callback. */
   origin?: string;
+  /** Campaign identifier used only to render the matching post-payment offer state. */
+  utmCampaign?: string;
 }
 
 export interface CreatePaymentResult {
@@ -194,7 +197,15 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     form.append("pageField[fullName]", input.fullName);
     form.append("pageField[phone]", normalizedPhone || "");
     form.append("pageField[email]", input.email);
-    form.append("successUrl", `${callbackBase}/thank-you/plus`);
+    const plusSuccessUrl = new URL(`${callbackBase}/thank-you/plus`);
+    if (input.personalToken) {
+      plusSuccessUrl.searchParams.set("email", input.email);
+      plusSuccessUrl.searchParams.set("token", input.personalToken);
+    }
+    if (input.utmCampaign === PLUS_HOLIDAY_LAUNCH_COHORT) {
+      plusSuccessUrl.searchParams.set("offer", "third_match");
+    }
+    form.append("successUrl", plusSuccessUrl.toString());
     form.append("cancelUrl", callbackBase);
     const notifyUrl = new URL(`${callbackBase}/api/grow/webhook`);
     if (input.plusWebhookReference) notifyUrl.searchParams.set("plus_ref", input.plusWebhookReference);

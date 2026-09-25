@@ -9,7 +9,17 @@ import { getMissingProfileFields } from "./matchmakingMetrics";
 import { calculatePlusCycleProgress } from "./plusSubscription";
 import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
 import { PLUS_CHECKOUT_PUBLICLY_AVAILABLE } from "./growPayment";
-import { PLUS_RELAUNCH_BONUS_WINDOW_MS, PLUS_RELAUNCH_COHORT, PLUS_RELAUNCH_EMAIL_JOURNEY, PLUS_RELAUNCH_GUIDE_VALUE_ILS, PLUS_RELAUNCH_SMS_JOURNEY, qualifiesForPlusRelaunchGuideBonus } from "./plusLaunchOffer";
+import {
+  PLUS_HOLIDAY_LAUNCH_EXPIRES_AT,
+  PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET,
+  PLUS_RELAUNCH_BONUS_WINDOW_MS,
+  PLUS_RELAUNCH_COHORT,
+  PLUS_RELAUNCH_EMAIL_JOURNEY,
+  PLUS_RELAUNCH_GUIDE_VALUE_ILS,
+  PLUS_RELAUNCH_SMS_JOURNEY,
+  qualifiesForPlusHolidayLaunch,
+  qualifiesForPlusRelaunchGuideBonus,
+} from "./plusLaunchOffer";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 
 const PLUS_STATUSES = ["waitlist", "eligible", "invited", "active", "declined", "churned"] as const;
@@ -156,13 +166,20 @@ export const plusPilotRouter = router({
         },
         eligibility,
         cycleProgress: pilot[0] ? calculatePlusCycleProgress(pilot[0], memberMatches) : null,
-        launchOffer: pilot[0] && qualifiesForPlusRelaunchGuideBonus(pilot[0].pilotCohort, pilot[0].invitedAt)
+        launchOffer: pilot[0] && qualifiesForPlusHolidayLaunch(pilot[0].pilotCohort)
           ? {
-              guideIncluded: true,
-              guideValueIls: PLUS_RELAUNCH_GUIDE_VALUE_ILS,
-              expiresAt: Number(pilot[0].invitedAt || 0) + PLUS_RELAUNCH_BONUS_WINDOW_MS,
+              type: "third_match" as const,
+              firstCycleTarget: PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET,
+              expiresAt: PLUS_HOLIDAY_LAUNCH_EXPIRES_AT,
             }
-          : null,
+          : pilot[0] && qualifiesForPlusRelaunchGuideBonus(pilot[0].pilotCohort, pilot[0].invitedAt)
+            ? {
+                type: "guide" as const,
+                guideIncluded: true,
+                guideValueIls: PLUS_RELAUNCH_GUIDE_VALUE_ILS,
+                expiresAt: Number(pilot[0].invitedAt || 0) + PLUS_RELAUNCH_BONUS_WINDOW_MS,
+              }
+            : null,
         paymentConfigured: PLUS_CHECKOUT_PUBLICLY_AVAILABLE,
         benefits: [
           "לפחות שתי הצעות התאמה חדשות שנבדקו ונשלחו בכל מחזור חיוב",

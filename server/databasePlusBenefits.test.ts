@@ -39,9 +39,11 @@ describe("Database Plus benefits", () => {
     });
   });
 
-  it("explains the two matches and one included Boost without provider jargon", () => {
+  it("explains the regular benefits and the first-cycle launch bonus without provider jargon", () => {
     const source = fs.readFileSync(path.join(process.cwd(), "client/src/pages/ThankYouPlus.tsx"), "utf8");
-    expect(source).toContain("שתי התאמות בכל חודש");
+    expect(source).toContain("שתי הצעות בכל חודש");
+    expect(source).toContain("שלוש הצעות במחזור הראשון");
+    expect(source).toContain("מהמחזור הבא היעד הוא שתי הצעות בכל חודש");
     expect(source).toContain("בוסט אחד ללא תשלום נוסף");
     expect(source).not.toContain("לאחר ש־Grow יאשר");
   });

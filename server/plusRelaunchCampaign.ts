@@ -1,69 +1,144 @@
-import { and, eq, inArray, lte, sql } from "drizzle-orm";
-import {
-  crmLeads,
-  emailLog,
-  matches,
-  plusPilotMembers,
-  productAccessTokens,
-  singles,
-} from "../drizzle/schema";
+import { and, eq, inArray, or } from "drizzle-orm";
+import { crmLeads, emailLog, matches, plusPilotMembers, singles } from "../drizzle/schema";
 import { isPermanentlyBlockedEmail, sendEmail } from "./brevo";
 import { getDb } from "./db";
 import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
-import { loadCoachingClientEmails } from "./plusHolidayPilotCampaign";
-import { assessPlusEligibility } from "./plusPilotRouter";
 import {
-  PLUS_RELAUNCH_COHORT,
-  PLUS_RELAUNCH_EMAIL_JOURNEY,
-  PLUS_RELAUNCH_GUIDE_VALUE_ILS,
-  PLUS_RELAUNCH_SMS_JOURNEY,
+  PLUS_HOLIDAY_LAUNCH_COHORT,
+  PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY,
+  PLUS_HOLIDAY_LAUNCH_EXPIRES_AT,
+  PLUS_HOLIDAY_LAUNCH_SMS_JOURNEY,
 } from "./plusLaunchOffer";
+import { isPlusPilotCoachingClient, loadCoachingClientEmails } from "./plusHolidayPilotCampaign";
+import { assessPlusEligibility } from "./plusPilotRouter";
 import { normalizeIsraeliMobile, sendSMSDetailed } from "./vibrate";
 
 const PLUS_PUBLIC_URL = "https://hilitcaspi.com/database-plus";
-const INVITATION_WINDOW_MS = 72 * 60 * 60 * 1000;
-const PREVIOUS_PLUS_JOURNEYS = [
-  "plus_holiday_pilot_2026_09",
-  "plus_pilot_sms_2026_09",
-  "plus_payment_recovery_2026_09",
-  "plus_recovery_sms_2026_09",
-  PLUS_RELAUNCH_EMAIL_JOURNEY,
-  PLUS_RELAUNCH_SMS_JOURNEY,
-];
-
-type RelaunchCandidate = {
-  member: typeof plusPilotMembers.$inferSelect;
-  single: typeof singles.$inferSelect;
-  score: number;
-  tenureDays: number;
-};
+const LAUNCH_DEADLINE_LABEL = "30.9";
 
 function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
 
+function launchUrl(input: { email: string; token: string; source: "email" | "sms" }) {
+  const params = new URLSearchParams({
+    email: input.email,
+    token: input.token,
+    utm_source: input.source,
+    utm_medium: "launch",
+    utm_campaign: PLUS_HOLIDAY_LAUNCH_COHORT,
+  });
+  return `${PLUS_PUBLIC_URL}?${params.toString()}`;
+}
+
 export function buildPlusRelaunchEmail(input: { firstName: string; email: string; token: string }) {
-  const checkoutUrl = `${PLUS_PUBLIC_URL}?email=${encodeURIComponent(input.email)}&token=${encodeURIComponent(input.token)}&utm_source=email&utm_medium=plus_relaunch&utm_campaign=${PLUS_RELAUNCH_COHORT}`;
+  const checkoutUrl = launchUrl({ email: input.email, token: input.token, source: "email" });
   const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.email });
-  const subject = "אני רוצה לעבוד אישית על הפרופיל שלך — ויש לי מתנה ל־72 שעות";
-  const textContent = `היי ${input.firstName},\n\nכבר ביקשת לשמוע על Database Plus, והפעם חשוב לי להסביר מה באמת שונה בו.\n\nזה לא עוד כפתור או עוד אפליקציה. זה מסלול שבו אני והצוות מפנים יותר עבודה יזומה לפרופיל שלך: עוברים מחדש על הפרופיל וההעדפות, ובכל מחזור פעיל שולחים לפחות שתי הצעות התאמה חדשות שנבדקו בפועל. בנוסף מחכה לך בוסט אחד ללא תשלום נוסף.\n\nלרגל ההשקה, אם מצטרפים דרך הקישור האישי בתוך 72 שעות, מקבלים גם את המדריך המלא „לבחור נכון” בשווי ${PLUS_RELAUNCH_GUIDE_VALUE_ILS} ₪ במתנה.\n\nהמסלול עולה 99 ₪ לחודש בחיוב מתחדש עד ביטול. ההבטחה היא לעבודה ולהצעות שנשלחות; אישור הדדי, דייט או זוגיות תלויים גם בצד השני ואינם מובטחים.\n\nלפרטים ולהצטרפות: ${checkoutUrl}\n\nבאהבה,\nהילית\n\nלהסרה: ${unsubscribeUrl}`;
-  const htmlContent = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#fff3f5;font-family:Arial,sans-serif;color:#2b0a36"><div style="display:none;max-height:0;overflow:hidden">יותר עבודה יזומה סביב הפרופיל שלך, ומתנת השקה ל־72 שעות.</div><div style="max-width:620px;margin:auto;padding:24px 14px"><div style="overflow:hidden;border-radius:26px;box-shadow:0 18px 48px rgba(62,12,47,.12)"><div style="background:linear-gradient(140deg,#260b35,#7b2848);padding:38px 28px;text-align:center;color:white"><div style="font-size:13px;color:#ffbfd2">הילית כספי | Database Plus</div><h1 style="font-size:31px;line-height:1.3;margin:16px 0 10px">אני רוצה לעבוד יותר<br>בשביל ההיכרות שלך</h1><p style="margin:0;color:#f2dce6;line-height:1.7">לא עוד כפתורים. יותר תשומת לב יזומה סביב הפרופיל שלך.</p></div><div style="background:white;padding:32px 28px;font-size:16px;line-height:1.8"><p style="margin-top:0">היי ${input.firstName},</p><p>כבר ביקשת לשמוע על <strong>Database Plus</strong>, והפעם חשוב לי להסביר מה באמת שונה בו.</p><p><strong>זה לא עוד אפליקציה ולא עוד כפתור.</strong> זה מסלול שבו אני והצוות מפנים יותר עבודה יזומה לפרופיל שלך: עוברים מחדש על הפרופיל וההעדפות, ובכל מחזור פעיל שולחים לפחות <strong>שתי הצעות התאמה חדשות שנבדקו בפועל</strong>.</p><div style="display:grid;gap:10px;margin:22px 0"><div style="background:#fff4f7;border:1px solid #ffd5e1;border-radius:16px;padding:16px"><strong>2 הצעות Plus בכל מחזור</strong><br><span style="font-size:14px;color:#6e5b67">הצעות חדשות שנבדקו ונשלחו בפועל.</span></div><div style="background:#fff8ef;border:1px solid #f3dfc8;border-radius:16px;padding:16px"><strong>בוסט אחד ללא תשלום נוסף</strong><br><span style="font-size:14px;color:#6e5b67">הזדמנות נוספת מעבר לשתי הצעות ה־Plus.</span></div></div><div style="background:#2b0a36;color:white;border-radius:18px;padding:20px;text-align:center;margin:24px 0"><div style="font-size:13px;color:#ffbfd2;font-weight:bold">מתנת השקה ל־72 שעות</div><div style="font-size:21px;font-weight:bold;margin-top:6px">המדריך „לבחור נכון” במתנה</div><div style="font-size:14px;color:#f3dce6;margin-top:4px">שווי ${PLUS_RELAUNCH_GUIDE_VALUE_ILS} ₪ · הקישור יישלח לאחר אישור התשלום</div></div><p style="text-align:center"><strong>99 ₪ לחודש</strong>, בחיוב מתחדש עד ביטול.</p><p style="font-size:13px;color:#746a72">ההבטחה היא לעבודה ולהצעות שנשלחות. אישור הדדי, דייט או זוגיות תלויים גם בצד השני ואינם מובטחים.</p><div style="text-align:center;margin:28px 0"><a href="${checkoutUrl}" style="display:inline-block;background:#ff4466;color:white;text-decoration:none;padding:15px 28px;border-radius:999px;font-weight:bold">כן, אני רוצה יותר עבודה סביב הפרופיל שלי</a></div><p>באהבה,<br><strong>הילית</strong></p></div></div><div style="text-align:center;padding:16px;font-size:12px"><a href="${unsubscribeUrl}" style="color:#796d75">הסרה מרשימת הדיוור</a></div></div></body></html>`;
-  return { subject, textContent, htmlContent, checkoutUrl };
+  const subject = "חדש לחברי המאגר: Database Plus נפתח";
+  const textContent = `היי ${input.firstName},
+
+ביקשתם יותר הזדמנויות, יותר קצב ויותר תשומת לב בתוך המאגר. לכן אני משיקה את Database Plus, השירות המתקדם לחברי המאגר שרוצים שאעבוד על הפרופיל שלהם בקדימות ואפתח עבורם יותר אפשרויות להכיר.
+
+מה מקבלים בכל חודש פעיל?
+
+לפחות שתי הצעות התאמה חדשות שאני בודקת ושולחת בפועל.
+
+בוסט אחד נוסף ללא תשלום נוסף, מעבר לשתי ההצעות.
+
+קדימות באיתור ובבדיקה של מועמדים מתאימים.
+
+מענה ועדכון העדפות בעדיפות דרך שירות Plus.
+
+אפשרות להישקל לפינת הרווקים, רק באישור מפורש מראש.
+
+לכבוד ההשקה והחגים, כל מי שמצטרף עד ${LAUNCH_DEADLINE_LABEL} מקבל במחזור הראשון שלוש הצעות התאמה במקום שתיים.
+
+המחיר הוא 99 ₪ לחודש בחיוב מתחדש עד לביטול. מספר המקומות מוגבל כדי שאוכל לתת את רמת השירות שהבטחתי.
+
+להסבר המלא ולהצטרפות:
+${checkoutUrl}
+
+ההתחייבות היא להצעות שנבדקו ונשלחו. אישור הדדי, פגישה או זוגיות אינם מובטחים.
+
+באהבה,
+הילית
+
+להסרה ממסרים שיווקיים:
+${unsubscribeUrl}`;
+  const htmlContent = `<!doctype html>
+<html lang="he" dir="rtl">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>${subject}</title></head>
+<body style="margin:0;background:#eee4d6;font-family:Arial,sans-serif;color:#17213d">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0">השירות החדש לחברי המאגר שרוצים יותר הזדמנויות, קדימות ותשומת לב.</div>
+  <div style="max-width:640px;margin:0 auto;padding:28px 16px">
+    <div style="overflow:hidden;border-radius:28px;box-shadow:0 20px 55px rgba(12,19,39,.16)">
+      <div style="background:linear-gradient(145deg,#0c1327 0%,#191265 100%);padding:42px 30px 36px;text-align:center">
+        <div style="font-size:12px;color:#e8cb91;letter-spacing:1.5px;font-weight:700">HILIT CASPI | OFFICIAL MEMBERSHIP</div>
+        <div style="display:inline-block;margin-top:20px;padding:8px 17px;border:1px solid rgba(232,203,145,.55);color:#e8cb91;font-size:13px;font-weight:700">השקה חדשה לחברי המאגר</div>
+        <h1 style="margin:18px 0 0;color:#fffaf1;font-size:36px;line-height:1.2">Database Plus נפתח</h1>
+        <p style="margin:14px auto 0;max-width:500px;color:#dce1f0;font-size:17px;line-height:1.75">יותר הזדמנויות להכיר, יותר תשומת לב לפרופיל ויותר קצב בתוך המאגר.</p>
+      </div>
+      <div style="background:#fffaf1;padding:36px 31px;line-height:1.8;font-size:17px">
+        <p style="margin-top:0">היי ${input.firstName},</p>
+        <p><strong>ביקשתם יותר הזדמנויות, יותר קצב ויותר תשומת לב בתוך המאגר.</strong> לכן אני משיקה את Database Plus.</p>
+        <p>זהו השירות המתקדם לחברי המאגר שרוצים שאעבוד על הפרופיל שלהם בקדימות, אבחן עבורם יותר אפשרויות ואפתח עוד דרכים להכיר.</p>
+        <div style="margin:28px 0 14px;text-align:center;color:#9c7436;font-size:13px;font-weight:700;letter-spacing:.8px">מה כולל המנוי בכל חודש פעיל?</div>
+        <div style="background:#f7f1e6;border:1px solid #dfcda9;padding:19px 21px;margin:10px 0"><strong style="font-size:19px">לפחות שתי הצעות התאמה חדשות</strong><div style="margin-top:5px;color:#596173;font-size:15px">הצעות שאני בודקת ושולחת בפועל בכל מחזור.</div></div>
+        <div style="background:#f7f1e6;border:1px solid #dfcda9;padding:19px 21px;margin:10px 0"><strong style="font-size:19px">בוסט אחד נוסף</strong><div style="margin-top:5px;color:#596173;font-size:15px">הזדמנות נוספת ללא תשלום נוסף, מעבר לשתי ההצעות.</div></div>
+        <div style="background:#f7f1e6;border:1px solid #dfcda9;padding:19px 21px;margin:10px 0"><strong style="font-size:19px">קדימות לפרופיל ומענה בעדיפות</strong><div style="margin-top:5px;color:#596173;font-size:15px">קדימות באיתור, בבדיקה, בעדכון ההעדפות ובשירות Plus.</div></div>
+        <div style="background:#f7f1e6;border:1px solid #dfcda9;padding:19px 21px;margin:10px 0"><strong style="font-size:19px">אפשרות לפינת הרווקים</strong><div style="margin-top:5px;color:#596173;font-size:15px">רק לאחר אישור מפורש ונפרד של התמונה והטקסט.</div></div>
+        <div style="margin:28px 0;padding:24px;border:1px solid #d8b67e;background:#10182f;color:#fffaf1;text-align:center">
+          <div style="font-size:13px;color:#e8cb91;font-weight:700">הטבת השקה לכבוד החגים</div>
+          <div style="margin-top:8px;font-size:23px;font-weight:700;line-height:1.45">מצטרפים עד ${LAUNCH_DEADLINE_LABEL} ומקבלים במחזור הראשון שלוש הצעות התאמה במקום שתיים</div>
+        </div>
+        <p style="text-align:center">המחיר הוא <strong>99 ₪ לחודש</strong> בחיוב מתחדש עד לביטול.<br />מספר המקומות מוגבל כדי שאוכל לתת את רמת השירות שהבטחתי.</p>
+        <div style="text-align:center;margin:30px 0"><a href="${checkoutUrl}" style="display:inline-block;background:#d8b67e;color:#10182f;text-decoration:none;font-weight:700;padding:16px 34px;border-radius:999px">לכל הפרטים ולהצטרפות</a></div>
+        <p style="font-size:13px;line-height:1.7;color:#6a7080">ההתחייבות היא להצעות שנבדקו ונשלחו. אישור הדדי, פגישה או זוגיות אינם מובטחים.</p>
+        <p style="margin-bottom:0">באהבה,<br /><strong>הילית</strong></p>
+      </div>
+    </div>
+    <div style="text-align:center;padding:18px;font-size:12px;color:#777"><a href="${unsubscribeUrl}" style="color:#777">הסרה מרשימת הדיוור</a></div>
+  </div>
+</body>
+</html>`;
+  return { subject, htmlContent, textContent, checkoutUrl };
 }
 
 export function buildPlusRelaunchSms(input: { email: string; token: string }) {
-  const checkoutUrl = `${PLUS_PUBLIC_URL}?email=${encodeURIComponent(input.email)}&token=${encodeURIComponent(input.token)}&utm_source=sms&utm_medium=plus_relaunch&utm_campaign=${PLUS_RELAUNCH_COHORT}`;
+  const checkoutUrl = launchUrl({ email: input.email, token: input.token, source: "sms" });
   const unsubscribeUrl = buildSignedUnsubscribeUrl({ email: input.email });
-  const message = `היי, כאן הילית 🤍\n\nכבר ביקשת לשמוע על Database Plus. הפעם בניתי לך הזמנה הרבה יותר ברורה: יותר עבודה אישית סביב הפרופיל, לפחות 2 הצעות חדשות שנבדקו בכל מחזור + בוסט נוסף.\n\nובהצטרפות בתוך 72 שעות: המדריך „לבחור נכון” בשווי ${PLUS_RELAUNCH_GUIDE_VALUE_ILS} ₪ במתנה.\n\n99 ₪ לחודש, אפשר לבטל בכל עת:\n${checkoutUrl}\n\nלהסרה: ${unsubscribeUrl}`;
+  const message = `היי, כאן הילית 🤍
+
+ביקשתם יותר הזדמנויות במאגר, אז אני משיקה את Database Plus: מנוי חודשי עם לפחות 2 הצעות שאני בודקת ושולחת, בוסט נוסף, קדימות לפרופיל ומענה בעדיפות.
+
+בהשקת החג, מצטרפים עד ${LAUNCH_DEADLINE_LABEL} מקבלים הצעה שלישית במחזור הראשון. 99 ₪ לחודש, מתחדש עד ביטול. מספר המקומות מוגבל.
+
+לכל הפרטים ולהצטרפות:
+${checkoutUrl}
+
+להסרה:
+${unsubscribeUrl}`;
   return { message, checkoutUrl };
 }
 
-async function loadEligibleCandidates(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
-  const now = Date.now();
-  const [memberRows, matchRows, sentLogs, blockedLeads, guideRows, coachingEmails] = await Promise.all([
-    db.select({ member: plusPilotMembers, single: singles }).from(plusPilotMembers)
-      .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
-      .where(inArray(plusPilotMembers.status, ["waitlist", "eligible"])),
+function trackedEmailContent(htmlContent: string, logId: number, checkoutUrl: string) {
+  const clickUrl = `https://hilitcaspi.com/api/email/click/${logId}?url=${encodeURIComponent(checkoutUrl)}`;
+  const pixel = `<img src="https://hilitcaspi.com/api/email/open/${logId}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;opacity:0" />`;
+  return htmlContent.replace(checkoutUrl, clickUrl).replace("</body>", `${pixel}</body>`);
+}
+
+async function loadCampaignCandidates(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+  const [singleRows, memberRows, blockedRows, coachingEmails, matchRows] = await Promise.all([
+    db.select().from(singles).where(and(
+      eq(singles.isPaid, true),
+      eq(singles.isActive, true),
+      eq(singles.isSeed, false),
+      eq(singles.consentEmailMarketing, true),
+      inArray(singles.gender, ["female", "male"]),
+    )),
+    db.select().from(plusPilotMembers),
+    db.select({ email: crmLeads.email }).from(crmLeads).where(eq(crmLeads.emailUnsubscribed, true)),
+    loadCoachingClientEmails(db),
     db.select({
       id: matches.id,
       singleAId: matches.singleAId,
@@ -73,172 +148,238 @@ async function loadEligibleCandidates(db: NonNullable<Awaited<ReturnType<typeof 
       matchDetailStatus: matches.matchDetailStatus,
       returnedToPoolAt: matches.returnedToPoolAt,
     }).from(matches),
-    db.select({ recipientEmail: emailLog.recipientEmail }).from(emailLog)
-      .where(inArray(emailLog.journeyKey, PREVIOUS_PLUS_JOURNEYS)),
-    db.select({ email: crmLeads.email }).from(crmLeads).where(eq(crmLeads.emailUnsubscribed, true)),
-    db.select({ email: productAccessTokens.email }).from(productAccessTokens)
-      .where(and(eq(productAccessTokens.product, "guide_149"), sql`${productAccessTokens.expiresAt} > ${now}`)),
-    loadCoachingClientEmails(db),
   ]);
-  const sentEmails = new Set(sentLogs.map(row => normalizeEmail(row.recipientEmail)));
-  const blockedEmails = new Set(blockedLeads.map(row => normalizeEmail(row.email)));
-  const guideEmails = new Set(guideRows.map(row => normalizeEmail(row.email)));
-  const matchesBySingle = new Map<number, typeof matchRows>();
+  const memberBySingleId = new Map(memberRows.map(row => [row.singleId, row]));
+  const blockedEmails = new Set(blockedRows.map(row => normalizeEmail(row.email)).filter(Boolean));
+  const matchesBySingleId = new Map<number, typeof matchRows>();
   for (const match of matchRows) {
     for (const singleId of [match.singleAId, match.singleBId]) {
-      const list = matchesBySingle.get(singleId) || [];
-      list.push(match);
-      matchesBySingle.set(singleId, list);
+      if (!singleId) continue;
+      const rows = matchesBySingleId.get(singleId) || [];
+      rows.push(match);
+      matchesBySingleId.set(singleId, rows);
     }
   }
-  const candidates: RelaunchCandidate[] = [];
-  for (const row of memberRows) {
-    const email = normalizeEmail(row.single.email);
-    if (!email.includes("@") || !String(row.single.questionnaireToken || "").trim()) continue;
-    if (!row.single.isPaid || !row.single.isActive || row.single.isSeed || !row.single.consentEmailMarketing) continue;
-    if (sentEmails.has(email) || blockedEmails.has(email) || guideEmails.has(email) || coachingEmails.has(email)) continue;
-    if (isPermanentlyBlockedEmail(email) || (await isEmailMarketingSuppressed(email)).suppressed) continue;
-    const assessment = assessPlusEligibility(row.single, matchesBySingle.get(row.single.id) || [], now);
-    if (!assessment.eligible || assessment.activeMatch || assessment.positiveOutcome || assessment.potentialMatchesUnderReview < 2) continue;
-    candidates.push({ member: row.member, single: row.single, score: assessment.score, tenureDays: assessment.tenureDays });
-  }
-  return candidates.sort((a, b) => b.score - a.score || b.tenureDays - a.tenureDays || a.single.id - b.single.id);
+  return singleRows.filter(single => {
+    const email = normalizeEmail(single.email);
+    const member = memberBySingleId.get(single.id);
+    const eligibility = assessPlusEligibility(single, matchesBySingleId.get(single.id) || []);
+    return email.includes("@")
+      && Boolean(String(single.questionnaireToken || "").trim())
+      && !blockedEmails.has(email)
+      && !isPlusPilotCoachingClient(single, coachingEmails)
+      && !(member?.status === "active" && member?.billingStatus === "active")
+      && eligibility.eligible
+      && !eligibility.activeMatch
+      && !eligibility.positiveOutcome
+      && eligibility.potentialMatchesUnderReview >= 3;
+  });
 }
 
 export async function preparePlusRelaunchCohort(options: { dryRun?: boolean } = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const now = Date.now();
-  const expiredInvitations = await db.select({ id: plusPilotMembers.id }).from(plusPilotMembers).where(and(
-    eq(plusPilotMembers.status, "invited"),
-    eq(plusPilotMembers.billingStatus, "not_configured"),
-    lte(plusPilotMembers.invitedAt, now - INVITATION_WINDOW_MS),
-  ));
-  const candidates = await loadEligibleCandidates(db);
+  const [candidates, memberRows, existingLogs] = await Promise.all([
+    loadCampaignCandidates(db),
+    db.select().from(plusPilotMembers),
+    db.select({ recipientEmail: emailLog.recipientEmail, journeyKey: emailLog.journeyKey, sentAt: emailLog.sentAt })
+      .from(emailLog)
+      .where(and(
+        inArray(emailLog.journeyKey, [PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY, PLUS_HOLIDAY_LAUNCH_SMS_JOURNEY]),
+        eq(emailLog.status, "sent"),
+      )),
+  ]);
+  const memberBySingleId = new Map(memberRows.map(row => [row.singleId, row]));
+  const sentEmails = new Set(existingLogs.filter(row => row.sentAt).map(row => normalizeEmail(row.recipientEmail)));
+  const freshCandidates = candidates.filter(single => !sentEmails.has(normalizeEmail(single.email)));
   const summary = {
-    eligible: candidates.length,
-    female: candidates.filter(row => row.single.gender === "female").length,
-    male: candidates.filter(row => row.single.gender === "male").length,
-    withMobile: candidates.filter(row => Boolean(normalizeIsraeliMobile(String(row.single.phone || "")))).length,
-    expiredInvitations: expiredInvitations.length,
-    prepared: options.dryRun ? 0 : candidates.length,
+    prepared: freshCandidates.length,
+    female: freshCandidates.filter(row => row.gender === "female").length,
+    male: freshCandidates.filter(row => row.gender === "male").length,
+    expiresAt: PLUS_HOLIDAY_LAUNCH_EXPIRES_AT,
+    dryRun: Boolean(options.dryRun),
   };
   if (options.dryRun) return summary;
-  if (expiredInvitations.length > 0) {
-    await db.update(plusPilotMembers).set({ status: "declined", endedAt: now, updatedAt: now }).where(inArray(
-      plusPilotMembers.id,
-      expiredInvitations.map(row => row.id),
-    ));
-  }
-  for (const row of candidates) {
-    await db.update(plusPilotMembers).set({
-      status: "eligible",
-      billingStatus: "not_configured",
-      source: "plus_relaunch_guide_bonus",
-      pilotCohort: PLUS_RELAUNCH_COHORT,
+  const now = Date.now();
+  for (const single of freshCandidates) {
+    const existing = memberBySingleId.get(single.id);
+    const values = {
+      status: "eligible" as const,
+      billingStatus: "not_configured" as const,
+      source: PLUS_HOLIDAY_LAUNCH_COHORT,
+      pilotCohort: PLUS_HOLIDAY_LAUNCH_COHORT,
       pilotPriceAgorot: 9900,
       monthlyMatchTarget: 2,
       invitedAt: null,
+      lastEngagedAt: now,
       updatedAt: now,
-    }).where(and(
-      eq(plusPilotMembers.id, row.member.id),
-      inArray(plusPilotMembers.status, ["waitlist", "eligible"]),
-    ));
+    };
+    if (existing) {
+      await db.update(plusPilotMembers).set(values).where(eq(plusPilotMembers.id, existing.id));
+    } else {
+      await db.insert(plusPilotMembers).values({ singleId: single.id, ...values, waitlistedAt: now, createdAt: now });
+    }
   }
   return summary;
 }
 
-function trackedEmailContent(htmlContent: string, logId: number, checkoutUrl: string) {
-  const clickUrl = `https://hilitcaspi.com/api/email/click/${logId}?url=${encodeURIComponent(checkoutUrl)}`;
-  const pixel = `<img src="https://hilitcaspi.com/api/email/open/${logId}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;opacity:0" />`;
-  return htmlContent.replace(checkoutUrl, clickUrl).replace("</body>", `${pixel}</body>`);
-}
-
-export async function sendPreparedPlusRelaunchCampaign() {
+export async function sendPreparedPlusRelaunchCampaign(options: { limit?: number } = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const rows = await db.select({ member: plusPilotMembers, single: singles }).from(plusPilotMembers)
+  const rows = await db.select({ member: plusPilotMembers, single: singles })
+    .from(plusPilotMembers)
     .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
     .where(and(
-      eq(plusPilotMembers.pilotCohort, PLUS_RELAUNCH_COHORT),
+      eq(plusPilotMembers.pilotCohort, PLUS_HOLIDAY_LAUNCH_COHORT),
       inArray(plusPilotMembers.status, ["eligible", "invited"]),
       eq(plusPilotMembers.billingStatus, "not_configured"),
     ));
-  const eligible = await loadEligibleCandidates(db);
-  const eligibleIds = new Set(eligible.map(row => row.member.id));
-  const safeRows = rows.filter(row => eligibleIds.has(row.member.id) || row.member.status === "invited");
-  let emailSent = 0;
-  let smsSent = 0;
-  let failed = 0;
-  for (const row of safeRows) {
+  const blockedRows = await db.select({ email: crmLeads.email }).from(crmLeads).where(eq(crmLeads.emailUnsubscribed, true));
+  const blockedEmails = new Set(blockedRows.map(row => normalizeEmail(row.email)).filter(Boolean));
+  const ordered = [...rows].sort((a, b) => a.single.id - b.single.id);
+  const selected = options.limit ? ordered.slice(0, Math.max(0, options.limit)) : ordered;
+  let emailAccepted = 0;
+  let emailFailed = 0;
+  let smsAccepted = 0;
+  let smsFailed = 0;
+  let skipped = 0;
+
+  for (let index = 0; index < selected.length; index += 1) {
+    const row = selected[index];
     const email = normalizeEmail(row.single.email);
-    const [existingEmail] = await db.select().from(emailLog).where(and(
-      eq(emailLog.recipientEmail, email),
-      eq(emailLog.journeyKey, PLUS_RELAUNCH_EMAIL_JOURNEY),
-      eq(emailLog.emailIndex, 1),
-    )).limit(1);
-    let invitedAt = Number(row.member.invitedAt || 0);
-    if (!existingEmail?.sentAt) {
-      const content = buildPlusRelaunchEmail({ firstName: row.single.firstName || "שלום", email, token: String(row.single.questionnaireToken || "") });
-      const now = Date.now();
-      const inserted = existingEmail ? null : await db.insert(emailLog).values({
-        recipientEmail: email,
-        recipientName: `${row.single.firstName} ${row.single.lastName || ""}`.trim(),
-        journeyKey: PLUS_RELAUNCH_EMAIL_JOURNEY,
-        emailIndex: 1,
-        subject: content.subject,
-        htmlBody: content.htmlContent,
-        textBody: content.textContent,
-        scheduledAt: now,
-        status: "processing",
-        createdAt: now,
-      });
-      const logId = existingEmail?.id || Number((inserted as any)?.[0]?.insertId || 0);
-      const htmlContent = logId ? trackedEmailContent(content.htmlContent, logId, content.checkoutUrl) : content.htmlContent;
-      if (logId) await db.update(emailLog).set({ status: "processing", htmlBody: htmlContent, errorMessage: null }).where(eq(emailLog.id, logId));
-      const delivery = await sendEmail({ to: { email, name: `${row.single.firstName} ${row.single.lastName || ""}`.trim() }, subject: content.subject, htmlContent, textContent: content.textContent });
-      invitedAt = Date.now();
-      if (!delivery.success || delivery.messageId === "blocked") {
-        failed++;
-        if (logId) await db.update(emailLog).set({ status: "failed", sentAt: invitedAt, errorMessage: String(delivery.error || "provider_rejected").slice(0, 500) }).where(eq(emailLog.id, logId));
-        continue;
-      }
-      emailSent++;
-      if (logId) await db.update(emailLog).set({ status: "sent", sentAt: invitedAt }).where(eq(emailLog.id, logId));
-      await db.update(plusPilotMembers).set({ status: "invited", invitedAt, updatedAt: invitedAt }).where(eq(plusPilotMembers.id, row.member.id));
-    }
-    const phone = normalizeIsraeliMobile(String(row.single.phone || ""));
-    if (!phone) continue;
-    const [existingSms] = await db.select().from(emailLog).where(and(
-      eq(emailLog.recipientEmail, email),
-      eq(emailLog.journeyKey, PLUS_RELAUNCH_SMS_JOURNEY),
-      eq(emailLog.emailIndex, 1),
-    )).limit(1);
-    if (existingSms?.sentAt && existingSms.status === "sent") continue;
-    const content = buildPlusRelaunchSms({ email, token: String(row.single.questionnaireToken || "") });
-    const now = Date.now();
-    const inserted = existingSms ? null : await db.insert(emailLog).values({
-      recipientEmail: email,
-      recipientName: `${row.single.firstName} ${row.single.lastName || ""}`.trim(),
-      journeyKey: PLUS_RELAUNCH_SMS_JOURNEY,
-      emailIndex: 1,
-      subject: "[SMS] Database Plus — מתנת השקה ל־72 שעות",
-      htmlBody: "SMS delivery record",
-      textBody: content.message,
-      scheduledAt: now,
-      status: "processing",
-      createdAt: now,
-    });
-    const logId = existingSms?.id || Number((inserted as any)?.[0]?.insertId || 0);
-    const delivery = await sendSMSDetailed(phone, content.message);
-    const sentAt = Date.now();
-    if (!delivery.accepted) {
-      failed++;
-      if (logId) await db.update(emailLog).set({ status: "failed", sentAt, errorMessage: delivery.error || "provider_rejected" }).where(eq(emailLog.id, logId));
+    const token = String(row.single.questionnaireToken || "").trim();
+    const phone = normalizeIsraeliMobile(row.single.phone || "");
+    const suppressed = !email.includes("@")
+      || !token
+      || blockedEmails.has(email)
+      || isPermanentlyBlockedEmail(email)
+      || (await isEmailMarketingSuppressed(email)).suppressed
+      || !row.single.isPaid
+      || !row.single.isActive
+      || row.single.isSeed
+      || !row.single.consentEmailMarketing;
+    if (suppressed) {
+      skipped += 1;
       continue;
     }
-    smsSent++;
-    if (logId) await db.update(emailLog).set({ status: "sent", sentAt, errorMessage: delivery.providerRunId }).where(eq(emailLog.id, logId));
+
+    const firstName = String(row.single.firstName || "שלום").trim().split(/\s+/)[0] || "שלום";
+    const emailContent = buildPlusRelaunchEmail({ firstName, email, token });
+    const [existingEmail] = await db.select().from(emailLog).where(and(
+      eq(emailLog.recipientEmail, email),
+      eq(emailLog.journeyKey, PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY),
+      eq(emailLog.emailIndex, 1),
+    )).limit(1);
+    if (existingEmail?.sentAt && existingEmail.status === "sent") {
+      emailAccepted += 1;
+    } else {
+      const now = Date.now();
+      let logId = existingEmail?.id || 0;
+      if (!logId) {
+        const inserted = await db.insert(emailLog).values({
+          recipientEmail: email,
+          recipientName: `${row.single.firstName} ${row.single.lastName || ""}`.trim(),
+          journeyKey: PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY,
+          emailIndex: 1,
+          subject: emailContent.subject,
+          htmlBody: emailContent.htmlContent,
+          textBody: emailContent.textContent,
+          scheduledAt: now,
+          status: "processing",
+          createdAt: now,
+        });
+        logId = Number((inserted as unknown as [{ insertId?: number }])[0]?.insertId || 0);
+      } else {
+        await db.update(emailLog).set({ status: "processing", errorMessage: null }).where(eq(emailLog.id, logId));
+      }
+      const htmlContent = logId ? trackedEmailContent(emailContent.htmlContent, logId, emailContent.checkoutUrl) : emailContent.htmlContent;
+      if (logId) await db.update(emailLog).set({ htmlBody: htmlContent }).where(eq(emailLog.id, logId));
+      const delivery = await sendEmail({
+        to: { email, name: `${row.single.firstName} ${row.single.lastName || ""}`.trim() },
+        subject: emailContent.subject,
+        htmlContent,
+        textContent: emailContent.textContent,
+      });
+      const sentAt = Date.now();
+      if (delivery.success && delivery.messageId !== "blocked") {
+        emailAccepted += 1;
+        if (logId) await db.update(emailLog).set({ status: "sent", sentAt }).where(eq(emailLog.id, logId));
+      } else {
+        emailFailed += 1;
+        if (logId) await db.update(emailLog).set({ status: "failed", sentAt, errorMessage: String(delivery.error || "provider_rejected").slice(0, 500) }).where(eq(emailLog.id, logId));
+      }
+    }
+
+    const invitationAt = Date.now();
+    await db.update(plusPilotMembers).set({ status: "invited", invitedAt: row.member.invitedAt || invitationAt, updatedAt: invitationAt })
+      .where(eq(plusPilotMembers.id, row.member.id));
+
+    if (!phone) {
+      smsFailed += 1;
+      continue;
+    }
+    const smsContent = buildPlusRelaunchSms({ email, token });
+    const [existingSms] = await db.select().from(emailLog).where(and(
+      eq(emailLog.recipientEmail, email),
+      eq(emailLog.journeyKey, PLUS_HOLIDAY_LAUNCH_SMS_JOURNEY),
+      eq(emailLog.emailIndex, 1),
+    )).limit(1);
+    if (existingSms?.sentAt && existingSms.status === "sent") {
+      smsAccepted += 1;
+      continue;
+    }
+    const smsResult = await sendSMSDetailed(phone, smsContent.message);
+    const sentAt = Date.now();
+    if (existingSms) {
+      await db.update(emailLog).set({
+        status: smsResult.accepted ? "sent" : "failed",
+        subject: "SMS השקת Database Plus",
+        textBody: smsContent.message,
+        sentAt,
+        errorMessage: smsResult.accepted ? null : String(smsResult.error || "provider_rejected").slice(0, 500),
+      }).where(eq(emailLog.id, existingSms.id));
+    } else {
+      await db.insert(emailLog).values({
+        recipientEmail: email,
+        recipientName: `${row.single.firstName} ${row.single.lastName || ""}`.trim(),
+        journeyKey: PLUS_HOLIDAY_LAUNCH_SMS_JOURNEY,
+        emailIndex: 1,
+        subject: "SMS השקת Database Plus",
+        htmlBody: smsContent.message,
+        textBody: smsContent.message,
+        scheduledAt: sentAt,
+        sentAt,
+        status: smsResult.accepted ? "sent" : "failed",
+        errorMessage: smsResult.accepted ? null : String(smsResult.error || "provider_rejected").slice(0, 500),
+        createdAt: sentAt,
+      });
+    }
+    if (smsResult.accepted) smsAccepted += 1;
+    else smsFailed += 1;
+
+    if ((index + 1) % 50 === 0 || index + 1 === selected.length) {
+      console.log(`[PlusLaunch] processed=${index + 1}/${selected.length} emailAccepted=${emailAccepted} emailFailed=${emailFailed} smsAccepted=${smsAccepted} smsFailed=${smsFailed} skipped=${skipped}`);
+    }
   }
-  return { total: safeRows.length, emailSent, smsSent, failed };
+
+  return { total: selected.length, emailAccepted, emailFailed, smsAccepted, smsFailed, skipped };
+}
+
+export async function retryFailedPlusRelaunchMessages() {
+  return sendPreparedPlusRelaunchCampaign();
+}
+
+export async function hasAlreadyReceivedPlusHolidayLaunch(email: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const normalized = normalizeEmail(email);
+  const [row] = await db.select({ id: emailLog.id }).from(emailLog).where(and(
+    eq(emailLog.recipientEmail, normalized),
+    or(
+      eq(emailLog.journeyKey, PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY),
+      eq(emailLog.journeyKey, PLUS_HOLIDAY_LAUNCH_SMS_JOURNEY),
+    ),
+    eq(emailLog.status, "sent"),
+  )).limit(1);
+  return Boolean(row);
 }
