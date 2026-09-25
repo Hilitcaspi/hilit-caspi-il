@@ -63,6 +63,17 @@ describe("Grow wallet SDK readiness", () => {
     expect(reportIndex).toBeGreaterThan(sdkStageIndex);
   });
 
+  it("does not report expected checkout rejections as payment failures", () => {
+    const source = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
+    const catchIndex = source.indexOf("const expectedRejection = isExpectedCheckoutRejection(technicalMessage)");
+    const guardIndex = source.indexOf("if (!expectedRejection)", catchIndex);
+    const reportIndex = source.indexOf("reportFailureMutation.mutate", guardIndex);
+
+    expect(catchIndex).toBeGreaterThan(-1);
+    expect(guardIndex).toBeGreaterThan(catchIndex);
+    expect(reportIndex).toBeGreaterThan(guardIndex);
+  });
+
   it("uses the local proxied SDK instead of the Incapsula-prone CDN runtime", () => {
     const source = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
 

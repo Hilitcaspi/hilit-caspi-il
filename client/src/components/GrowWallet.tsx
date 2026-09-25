@@ -24,6 +24,7 @@ import { track } from "@/lib/track";
 import { isGrowPaymentRendererReady, isGrowWalletVisible } from "@/lib/growSdkReadiness";
 import { normalizeIsraeliPhone } from "@shared/profileValidation";
 import { getMetaBrowserIdentifiers, rememberPurchaseTrackingToken } from "@/lib/purchaseTracking";
+import { isExpectedCheckoutRejection } from "@shared/paymentFailureClassification";
 
 // ─── Grow config from VITE env vars ──────────────────────────────────────────
 const GROW_ENV = "PRODUCTION" as string; // "DEV" for sandbox, "PRODUCTION" for live
@@ -584,7 +585,8 @@ export default function GrowWallet({
     } catch (err: any) {
       const technicalMessage = String(err?.message || "Unknown");
       const errDetail = `${technicalMessage} | stack: ${err?.stack?.slice(0, 200) || 'N/A'}`;
-      logStep("ERROR", errDetail);
+      const expectedRejection = isExpectedCheckoutRejection(technicalMessage);
+      logStep(expectedRejection ? "REJECTED" : "ERROR", errDetail);
       setWalletLoading(false);
       const isConnectivityFailure = /Grow API error|fetch failed|Failed to fetch|HTTP\s*\d+/i.test(technicalMessage);
       if (/PAYMENT_PHONE_INVALID/.test(technicalMessage)) {
@@ -596,14 +598,16 @@ export default function GrowWallet({
           ? "לא ניתן להתחבר כרגע למערכת התשלום. אפשר לנסות שוב בעוד כמה רגעים."
           : technicalMessage,
       );
-      reportFailureMutation.mutate({
-        customerName: name.trim(),
-        customerEmail: email.trim(),
-        customerPhone: userPhone,
-        product,
-        errorMessage: errDetail.slice(0, 300),
-        stage: failureStage,
-      });
+      if (!expectedRejection) {
+        reportFailureMutation.mutate({
+          customerName: name.trim(),
+          customerEmail: email.trim(),
+          customerPhone: userPhone,
+          product,
+          errorMessage: errDetail.slice(0, 300),
+          stage: failureStage,
+        });
+      }
     }
   }, [name, email, phone, product, termsPath, termsAccepted, ageConfirmed, personalToken, boostMatchId, couponApplied, plusConsents]);
 

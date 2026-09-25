@@ -53,6 +53,9 @@ describe("payment failure operational alerts", () => {
     });
 
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendEmailMock.mock.calls[0]?.[0]?.subject).toContain("דיווח ראשוני ממסך התשלום");
+    expect(sendEmailMock.mock.calls[0]?.[0]?.subject).not.toContain("תשלום נכשל");
+    expect(sendEmailMock.mock.calls[0]?.[0]?.htmlContent).toContain("Grow הוא מקור האמת");
     expect(sendSmsMock).not.toHaveBeenCalled();
   });
 
@@ -70,5 +73,19 @@ describe("payment failure operational alerts", () => {
     expect(sendSmsMock.mock.calls[0]?.[1]).toContain("Database Plus (99 ₪ לחודש)");
     expect(sendSmsMock.mock.calls[0]?.[1]).toContain("ייתכן שהלקוח ינסה שוב ויצליח");
     expect(sendSmsMock.mock.calls[0]?.[1]).not.toContain("תקלה במסלול ההצטרפות למאגר");
+  });
+
+  it("suppresses alerts for an expected Plus membership rejection", async () => {
+    await notifyPaymentFailure({
+      customerName: "בדיקת מערכת",
+      customerEmail: "monitor@example.com",
+      product: "plus",
+      amount: 99,
+      errorMessage: "Database Plus זמין רק לחברי המאגר הפעילים. יש להשלים תחילה את ההצטרפות למאגר בסך 299 ₪",
+      stage: "createProcess",
+    });
+
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(sendSmsMock).not.toHaveBeenCalled();
   });
 });

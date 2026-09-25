@@ -9,6 +9,7 @@
  */
 import { sendEmail } from "./brevo";
 import { sendSMS } from "./vibrate";
+import { isExpectedCheckoutRejection } from "../shared/paymentFailureClassification";
 
 const HILIT_EMAIL = "hilit@hilitcaspi.com";
 const HILIT_PHONE = "0544530975";
@@ -73,6 +74,11 @@ const PRODUCT_LABELS: Record<string, string> = {
 };
 
 export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<void> {
+  // A server-side eligibility or duplicate-payment guard is working as designed.
+  // Never turn that expected rejection into an operational payment alarm, even
+  // when an older cached client reports it as a createProcess failure.
+  if (isExpectedCheckoutRejection(info.errorMessage)) return;
+
   const key = `${info.customerEmail}:${info.product}:${info.stage}`;
   if (!shouldAlert(key)) return;
 
@@ -81,13 +87,23 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
     : info.stage === "createProcess" ? "יצירת תהליך תשלום"
     : info.stage === "doPayment" ? "סליקת כרטיס"
     : "כשל ב-SDK";
+  const isPreliminarySdkReport = info.stage === "sdk_failure";
+  const emailHeading = isPreliminarySdkReport
+    ? "⚠️ דיווח ראשוני ממסך התשלום"
+    : "🚨 התראת תשלום נכשל";
+  const emailSubject = isPreliminarySdkReport
+    ? `⚠️ דיווח ראשוני ממסך התשלום - ${info.customerName} (${productLabel})`
+    : `🚨 תשלום נכשל - ${info.customerName} (${productLabel})`;
+  const guidance = isPreliminarySdkReport
+    ? "זהו דיווח מהמסך בלבד ולא קביעה סופית. Grow הוא מקור האמת, ולעיתים Bit מאשר את העסקה זמן קצר לאחר הדיווח. יש לבדוק שוב ב-Grow לפני פנייה ללקוח."
+    : "ייתכן שמדובר בכרטיס שנדחה או בעיה זמנית ב-Meshulam. אם זה חוזר על עצמו, כדאי לבדוק בלוח הבקרה של Grow.";
 
   const now = new Date().toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" });
 
   // Email
   const htmlContent = `
     <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px;">
-      <h2 style="color: #e53e3e;">🚨 התראת תשלום נכשל</h2>
+      <h2 style="color: #e53e3e;">${emailHeading}</h2>
       <table style="border-collapse: collapse; width: 100%; max-width: 500px;">
         <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">שם</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${info.customerName}</td></tr>
         <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">מייל</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${info.customerEmail}</td></tr>
@@ -98,14 +114,14 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
         ${info.processToken ? `<tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">טוקן תהליך</td><td style="padding: 8px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 12px;">${info.processToken}</td></tr>` : ""}
         <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">זמן</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${now}</td></tr>
       </table>
-      <p style="margin-top: 16px; color: #666;">ייתכן שמדובר בכרטיס שנדחה או בעיה זמנית ב-Meshulam. אם זה חוזר על עצמו, כדאי לבדוק בלוח הבקרה של Grow.</p>
+      <p style="margin-top: 16px; color: #666;">${guidance}</p>
     </div>
   `;
 
   const alertTasks: Promise<unknown>[] = [
     sendEmail({
       to: { email: HILIT_EMAIL, name: "הילית כספי" },
-      subject: `🚨 תשלום נכשל - ${info.customerName} (${productLabel})`,
+      subject: emailSubject,
       htmlContent,
     }),
   ];
