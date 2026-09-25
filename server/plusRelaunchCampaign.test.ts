@@ -23,19 +23,30 @@ describe("Database Plus holiday launch", () => {
 
   it("explains the service before the holiday benefit in the email", () => {
     const content = buildPlusRelaunchEmail({ firstName: "דנה", email: "dana@example.com", token: "safe-token" });
-    expect(content.subject).toContain("Database Plus נפתח");
+    expect(content.subject).toContain("ההשקה שביקשתם נפתחה");
+    expect(content.subject).toContain("Database Plus");
     expect(content.textContent).toContain("לפחות שתי הצעות התאמה חדשות");
     expect(content.textContent).toContain("בוסט אחד נוסף");
     expect(content.textContent).toContain("קדימות באיתור");
     expect(content.textContent).toContain("מענה ועדכון העדפות בעדיפות");
     expect(content.textContent).toContain("שלוש הצעות התאמה במקום שתיים");
     expect(content.textContent).toContain("99 ₪ לחודש");
-    expect(content.textContent.indexOf("מה מקבלים בכל חודש פעיל?")).toBeLessThan(content.textContent.indexOf("לכבוד ההשקה והחגים"));
+    expect(content.textContent.indexOf("מה מקבלים בכל חודש פעיל?")).toBeLessThan(content.textContent.indexOf("לכבוד ההשקה"));
     expect(content.checkoutUrl).toContain("utm_source=email");
     expect(content.checkoutUrl).toContain("utm_medium=launch");
     expect(content.checkoutUrl).toContain("utm_campaign=plus_launch_sep26");
     expect(content.checkoutUrl).toContain("utm_content=plus_launch_email");
+    expect(content.htmlContent).toContain("plus-email-hilit-seated_52bbd335.jpg");
+    expect(content.htmlContent).toContain("plus-email-hilit-full_0acd266d.jpg");
+    expect(content.htmlContent).toContain("box-sizing: border-box !important");
+    expect(content.htmlContent.split(content.checkoutUrl)).toHaveLength(3);
     expect(content.textContent).not.toMatch(/[—–]/);
+  });
+
+  it("tracks every launch CTA instead of only the first link", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/plusRelaunchCampaign.ts"), "utf8");
+    expect(source).toContain("htmlContent.split(checkoutUrl).join(clickUrl)");
+    expect(source).not.toContain("htmlContent.replace(checkoutUrl, clickUrl)");
   });
 
   it("keeps the SMS concise, explanatory and separately attributable", () => {
