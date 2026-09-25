@@ -460,6 +460,28 @@ export function evaluateBoostEligibility(input: {
   };
 }
 
+export function evaluateLoadedBoostContext(input: {
+  single: any;
+  context: {
+    memberMatches: any[];
+    plusMember?: any | null;
+    membership?: any | null;
+    requests: any[];
+  };
+  now?: number;
+  ignoreRequestCooldown?: boolean;
+}) {
+  return evaluateBoostEligibility({
+    single: input.single,
+    memberMatches: input.context.memberMatches,
+    plusMember: input.context.plusMember,
+    membership: input.context.membership,
+    boostRequests: input.context.requests,
+    now: input.now,
+    ignoreRequestCooldown: input.ignoreRequestCooldown,
+  });
+}
+
 function hasReusablePaidBoostCredit(request: any) {
   return request?.source === "paid"
     && request?.status === "refunded"
@@ -546,7 +568,7 @@ export async function preparePaidBoostCheckout(input: {
 }) {
   const { db, single } = await getVerifiedSingle(input.email, input.token);
   const context = await loadBoostContext(db, single);
-  const eligibility = evaluateBoostEligibility({ single, ...context });
+  const eligibility = evaluateLoadedBoostContext({ single, context });
   const selectedCandidate = input.matchId
     ? eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)
     : eligibility.topCandidate;
@@ -1027,7 +1049,7 @@ export const matchBoostRouter = router({
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const context = await loadBoostContext(db, single);
       const creditCount = context.requests.filter(hasReusablePaidBoostCredit).length;
-      const eligibility = evaluateBoostEligibility({ single, ...context, ignoreRequestCooldown: creditCount > 0 });
+      const eligibility = evaluateLoadedBoostContext({ single, context, ignoreRequestCooldown: creditCount > 0 });
       const profileReadiness = getBoostProfileReadiness(single);
       const latestRequest = context.requests[0] || null;
       const latestRequestMatch = latestRequest
@@ -1092,7 +1114,7 @@ export const matchBoostRouter = router({
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const created = await ensureBoostCandidatesForSingle(db, single);
       const context = await loadBoostContext(db, single);
-      const eligibility = evaluateBoostEligibility({ single, ...context });
+      const eligibility = evaluateLoadedBoostContext({ single, context });
       return {
         created,
         candidateCount: eligibility.candidateCount,
@@ -1217,7 +1239,7 @@ export const matchBoostRouter = router({
     .mutation(async ({ input }) => {
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const context = await loadBoostContext(db, single);
-      const eligibility = evaluateBoostEligibility({ single, ...context });
+      const eligibility = evaluateLoadedBoostContext({ single, context });
       if (!eligibility.plusActive || !eligibility.plusBenefitAvailable) {
         throw new TRPCError({ code: "FORBIDDEN", message: "לא נמצאה הטבת בוסט זמינה במחזור Plus הנוכחי" });
       }

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, MIN_BOOST_SCORE, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, getBoostProfileReadiness, parseBoostCheckoutReference, selectOnDemandBoostCandidates } from "./matchBoostRouter";
+import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, MIN_BOOST_SCORE, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, evaluateLoadedBoostContext, getBoostProfileReadiness, parseBoostCheckoutReference, selectOnDemandBoostCandidates } from "./matchBoostRouter";
 
 const NOW = new Date("2026-08-25T12:00:00Z").getTime();
 
@@ -288,6 +288,31 @@ describe("match boost eligibility", () => {
     expect(retryAfterDeliveryFailure.eligible).toBe(true);
   });
 
+  it("maps loaded context requests into eligibility checks", () => {
+    const cycleStart = NOW - 5 * 24 * 60 * 60 * 1000;
+    const result = evaluateLoadedBoostContext({
+      single: completeSingle(),
+      context: {
+        memberMatches: [pendingMatch()],
+        plusMember: { status: "active", billingStatus: "active", billingCycleStartedAt: cycleStart },
+        membership: activeMembership(),
+        requests: [{
+          id: 3,
+          status: "approved",
+          source: "plus_included",
+          requestedAt: NOW - 1000,
+          plusBillingCycleStartedAt: cycleStart,
+          fulfilledAt: NOW - 900,
+        }],
+      },
+      now: NOW,
+    });
+
+    expect(result.plusBenefitAvailable).toBe(false);
+    expect(result.plusBenefitUsed).toBe(true);
+    expect(result.blockers).toContain("ניתן להפעיל בוסט אחד בכל 30 יום");
+  });
+
   it("blocks members without current explicit Boost consent", () => {
     const missing = evaluateBoostEligibility({
       single: completeSingle(),
@@ -552,7 +577,8 @@ describe("match boost privacy and payment gate", () => {
     expect(source).toContain("!latestRequestMatch?.returnedToPoolAt");
     expect(source).toContain("!(Boolean(latestRequestMatch?.approvedByA) && Boolean(latestRequestMatch?.approvedByB))");
     expect(source).toContain("awaitingRecipientResponse");
-    expect(boostCardSource).toContain("status.awaitingRecipientResponse");
+    expect(boostCardSource).toContain("if (status.awaitingRecipientResponse)");
+    expect(boostCardSource).not.toContain("status.candidateCount === 0 && !status.openRequest && status.awaitingRecipientResponse");
     expect(boostCardSource).not.toContain('status.latestRequest?.status === "approved"');
   });
 
