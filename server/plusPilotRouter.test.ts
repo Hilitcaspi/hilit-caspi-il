@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { assessPlusEligibility, calculatePlusBoostBenefit, getIsraelCalendarMonthRange, hasConfirmedProductionPlusPayment } from "./plusPilotRouter";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { assessPlusEligibility, buildPlusHolidayLaunchTracking, calculatePlusBoostBenefit, getIsraelCalendarMonthRange, hasConfirmedProductionPlusPayment } from "./plusPilotRouter";
+import { PLUS_HOLIDAY_LAUNCH_COHORT } from "./plusLaunchOffer";
 
 const now = new Date("2026-08-22T12:00:00Z").getTime();
 const completeSingle = {
@@ -83,5 +86,34 @@ describe("Plus admin visibility helpers", () => {
       .toEqual({ available: false, inProgress: false, used: true, requestStatus: "approved", requestedAt: 1500, usedAt: 1800 });
     expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "cancelled", requestedAt: 1500 }]))
       .toEqual({ available: true, inProgress: false, used: false, requestStatus: "cancelled", requestedAt: 1500, usedAt: null });
+  });
+
+  it("marks the holiday launch entitlement and preserves the exact purchase channel", () => {
+    expect(buildPlusHolidayLaunchTracking(
+      { pilotCohort: PLUS_HOLIDAY_LAUNCH_COHORT, monthlyMatchTarget: 3 },
+      { utmCampaign: PLUS_HOLIDAY_LAUNCH_COHORT, utmSource: "sms", utmMedium: "launch", paidAt: now },
+    )).toEqual({
+      entitled: true,
+      attribution: {
+        campaign: PLUS_HOLIDAY_LAUNCH_COHORT,
+        source: "sms",
+        medium: "launch",
+        content: null,
+        paidAt: now,
+      },
+    });
+
+    expect(buildPlusHolidayLaunchTracking(
+      { pilotCohort: PLUS_HOLIDAY_LAUNCH_COHORT, monthlyMatchTarget: 2 },
+      { utmCampaign: PLUS_HOLIDAY_LAUNCH_COHORT, utmSource: "email" },
+    ).entitled).toBe(false);
+  });
+
+  it("keeps the holiday entitlement and channel visible in the CRM", () => {
+    const source = readFileSync(resolve(process.cwd(), "client/src/components/PlusPilotAdminSection.tsx"), "utf8");
+    expect(source).toContain("הטבת השקה · יעד 3/3");
+    expect(source).toContain("מקור:");
+    expect(source).toContain("row.launchAttribution.source === \"sms\"");
+    expect(source).toContain("עמדו ביעד האישי");
   });
 });

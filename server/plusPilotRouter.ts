@@ -10,8 +10,11 @@ import { calculatePlusCycleProgress } from "./plusSubscription";
 import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
 import { PLUS_CHECKOUT_PUBLICLY_AVAILABLE } from "./growPayment";
 import {
+  PLUS_HOLIDAY_LAUNCH_COHORT,
+  PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY,
   PLUS_HOLIDAY_LAUNCH_EXPIRES_AT,
   PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET,
+  PLUS_HOLIDAY_LAUNCH_SMS_JOURNEY,
   PLUS_RELAUNCH_BONUS_WINDOW_MS,
   PLUS_RELAUNCH_COHORT,
   PLUS_RELAUNCH_EMAIL_JOURNEY,
@@ -68,6 +71,24 @@ export function calculatePlusBoostBenefit(member: any, requests: any[]) {
     requestStatus: request?.status || null,
     requestedAt: request?.requestedAt || null,
     usedAt: deliveredAt,
+  };
+}
+
+export function buildPlusHolidayLaunchTracking(
+  member: { pilotCohort?: string | null; monthlyMatchTarget?: number | null },
+  checkout: { utmCampaign?: string | null; utmSource?: string | null; utmMedium?: string | null; utmContent?: string | null; paidAt?: number | null } | null,
+) {
+  const entitled = member.pilotCohort === PLUS_HOLIDAY_LAUNCH_COHORT
+    && Number(member.monthlyMatchTarget || 0) === PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET;
+  return {
+    entitled,
+    attribution: checkout ? {
+      campaign: checkout.utmCampaign || null,
+      source: checkout.utmSource || null,
+      medium: checkout.utmMedium || null,
+      content: checkout.utmContent || null,
+      paidAt: checkout.paidAt || null,
+    } : null,
   };
 }
 
@@ -321,7 +342,7 @@ export const plusPilotRouter = router({
       .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
       .orderBy(desc(plusPilotMembers.updatedAt));
 
-    const [allMatches, boostRows, boostMembershipRows, paymentRows, matchSingles, pendingPaidProfiles, relaunchLogs] = await Promise.all([
+    const [allMatches, boostRows, boostMembershipRows, paymentRows, matchSingles, pendingPaidProfiles, relaunchLogs, checkoutAttributionRows, holidayLaunchLogs] = await Promise.all([
       db.select({
         id: matches.id,
         singleAId: matches.singleAId,
@@ -372,6 +393,25 @@ export const plusPilotRouter = router({
         openedAt: emailLog.openedAt,
         clickedAt: emailLog.clickedAt,
       }).from(emailLog).where(inArray(emailLog.journeyKey, [PLUS_RELAUNCH_EMAIL_JOURNEY, PLUS_RELAUNCH_SMS_JOURNEY])),
+      db.select({
+        id: plusCheckoutIntents.id,
+        email: plusCheckoutIntents.email,
+        singleId: plusCheckoutIntents.singleId,
+        plusMemberId: plusCheckoutIntents.plusMemberId,
+        utmSource: plusCheckoutIntents.utmSource,
+        utmMedium: plusCheckoutIntents.utmMedium,
+        utmCampaign: plusCheckoutIntents.utmCampaign,
+        utmContent: plusCheckoutIntents.utmContent,
+        paidAt: plusCheckoutIntents.paidAt,
+        updatedAt: plusCheckoutIntents.updatedAt,
+      }).from(plusCheckoutIntents).orderBy(desc(plusCheckoutIntents.updatedAt)),
+      db.select({
+        recipientEmail: emailLog.recipientEmail,
+        journeyKey: emailLog.journeyKey,
+        status: emailLog.status,
+        openedAt: emailLog.openedAt,
+        clickedAt: emailLog.clickedAt,
+      }).from(emailLog).where(inArray(emailLog.journeyKey, [PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY, PLUS_HOLIDAY_LAUNCH_SMS_JOURNEY])),
     ]);
     const matchById = new Map(allMatches.map(match => [match.id, match]));
     const boostMatchIds = new Set(boostRows
@@ -385,6 +425,12 @@ export const plusPilotRouter = router({
     const monthRange = getIsraelCalendarMonthRange();
     const singleById = new Map(matchSingles.map(single => [single.id, single]));
     const membershipBySingleId = new Map(boostMembershipRows.map(membership => [membership.singleId, membership]));
+    const checkoutByMemberId = new Map<number, typeof checkoutAttributionRows[number]>();
+    const checkoutBySingleId = new Map<number, typeof checkoutAttributionRows[number]>();
+    for (const checkout of checkoutAttributionRows) {
+      if (checkout.plusMemberId && !checkoutByMemberId.has(checkout.plusMemberId)) checkoutByMemberId.set(checkout.plusMemberId, checkout);
+      if (checkout.singleId && !checkoutBySingleId.has(checkout.singleId)) checkoutBySingleId.set(checkout.singleId, checkout);
+    }
     const enrichedRows = rows.map(row => {
       const memberMatches = countableMatches.filter(match => match.singleAId === row.single.id || match.singleBId === row.single.id);
       const cycleProgress = calculatePlusCycleProgress(row.pilot, memberMatches);
@@ -427,6 +473,8 @@ export const plusPilotRouter = router({
         matchProposedAt: matchById.get(Number(request.matchId || 0))?.proposedAt || null,
       }));
       const paymentEvents = paymentRows.filter(event => event.plusMemberId === row.pilot.id);
+      const checkoutAttribution = checkoutByMemberId.get(row.pilot.id) || checkoutBySingleId.get(row.single.id) || null;
+      const holidayLaunchTracking = buildPlusHolidayLaunchTracking(row.pilot, checkoutAttribution);
       return {
         ...row,
         confirmedPayment: hasConfirmedProductionPlusPayment(paymentEvents),
@@ -438,6 +486,8 @@ export const plusPilotRouter = router({
         monthLabel: monthRange.label,
         boostMembership: membershipBySingleId.get(row.single.id) || null,
         boostBenefit: calculatePlusBoostBenefit(row.pilot, memberBoostRequestsWithDelivery),
+        holidayLaunchEntitlement: holidayLaunchTracking.entitled,
+        launchAttribution: holidayLaunchTracking.attribution,
       };
     });
     const counts = Object.fromEntries(PLUS_STATUSES.map(status => [status, rows.filter(row => row.pilot.status === status).length]));
@@ -478,12 +528,26 @@ export const plusPilotRouter = router({
       uniqueOpened: new Set(relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_EMAIL_JOURNEY && row.openedAt).map(row => row.recipientEmail.toLowerCase())).size,
       uniqueClicked: new Set(relaunchLogs.filter(row => row.journeyKey === PLUS_RELAUNCH_EMAIL_JOURNEY && row.clickedAt).map(row => row.recipientEmail.toLowerCase())).size,
     };
+    const holidayLaunchMembers = enrichedRows.filter(row => row.pilot.pilotCohort === PLUS_HOLIDAY_LAUNCH_COHORT);
+    const holidayLaunchStats = {
+      cohort: holidayLaunchMembers.length,
+      invited: holidayLaunchMembers.filter(row => row.pilot.status === "invited").length,
+      active: holidayLaunchMembers.filter(row => row.pilot.status === "active").length,
+      entitledToThirdMatch: holidayLaunchMembers.filter(row => row.holidayLaunchEntitlement).length,
+      emailSent: holidayLaunchLogs.filter(row => row.journeyKey === PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY && row.status === "sent").length,
+      smsSent: holidayLaunchLogs.filter(row => row.journeyKey === PLUS_HOLIDAY_LAUNCH_SMS_JOURNEY && row.status === "sent").length,
+      emailOpened: new Set(holidayLaunchLogs.filter(row => row.journeyKey === PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY && row.openedAt).map(row => row.recipientEmail.toLowerCase())).size,
+      emailClicked: new Set(holidayLaunchLogs.filter(row => row.journeyKey === PLUS_HOLIDAY_LAUNCH_EMAIL_JOURNEY && row.clickedAt).map(row => row.recipientEmail.toLowerCase())).size,
+      fromEmail: holidayLaunchMembers.filter(row => row.launchAttribution?.source === "email").length,
+      fromSms: holidayLaunchMembers.filter(row => row.launchAttribution?.source === "sms").length,
+    };
     return {
       counts,
       commitment,
       capacity,
       capacityBreakdown,
       relaunchStats,
+      holidayLaunchStats,
       waitlistToInviteRate: rows.length > 0 ? Math.round(invitedBase / rows.length * 100) : 0,
       inviteToActiveRate: invitedBase > 0 ? Math.round((counts.active + counts.churned) / invitedBase * 100) : 0,
       retentionRate: activatedBase > 0 ? Math.round(counts.active / activatedBase * 100) : 0,

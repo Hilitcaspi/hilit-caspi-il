@@ -41,7 +41,7 @@ export default function PlusPilotAdminSection() {
 
   if (overview.isLoading) return <section className="h-44 rounded-2xl bg-white animate-pulse border border-[#e9e8e8]" />;
   if (!overview.data) return null;
-  const { counts, commitment, capacity, capacityBreakdown, pendingPaidProfiles, relaunchStats, waitlistToInviteRate, inviteToActiveRate, retentionRate } = overview.data;
+  const { counts, commitment, capacity, capacityBreakdown, pendingPaidProfiles, relaunchStats, holidayLaunchStats, waitlistToInviteRate, inviteToActiveRate, retentionRate } = overview.data;
 
   const changeStatus = (id: number, status: "waitlist" | "eligible" | "invited" | "active" | "declined" | "churned") => {
     updateStatus.mutate({
@@ -56,7 +56,7 @@ export default function PlusPilotAdminSection() {
     <section className="rounded-2xl border border-[#e4d27e] bg-gradient-to-br from-[#fffdf4] to-white p-5 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold text-[#8b7420]">מנוי פרימיום · יעד מדיד של 2 הצעות בכל מחזור</p>
+          <p className="text-[11px] font-bold text-[#8b7420]">מנוי פרימיום · יעד מדיד של 2 הצעות, או 3 במחזור ההשקה לזכאים</p>
           <h3 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h3>
           <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">ברירת המחדל מציגה מנויים ששילמו והופעלו. לכל מנוי מוצגות שתי הצעות ה־Plus לפי מחזור החיוב האישי, ההתאמות שנשלחו בפועל ומצב הבוסט: זמין, בטיפול או נשלח.</p>
         </div>
@@ -119,6 +119,21 @@ export default function PlusPilotAdminSection() {
         {relaunchStats.smsFailed > 0 && <p className="mt-2 text-[10px] text-amber-800">הודעות ה־SMS שנכשלו נשמרו וניתנות לשליחה חוזרת בטוחה לאחר חידוש יתרת Vibrate; המייל כבר נשלח אליהן.</p>}
       </div>}
 
+      {holidayLaunchStats.cohort > 0 && <div className="mt-3 rounded-xl border border-[#d8b67e] bg-[#10182f] p-3 text-[#fffaf1]">
+        <div className="flex items-center justify-between gap-2"><strong className="text-xs">השקת החגים · הצעה שלישית במחזור הראשון</strong><span className="rounded-full border border-[#d8b67e]/60 px-2 py-1 text-[10px] text-[#f0d9ad]">מעקב אוטומטי מהתשלום</span></div>
+        <div className="mt-2 grid grid-cols-3 gap-1 text-center text-[10px] sm:grid-cols-6">
+          {[
+            ["קהל", holidayLaunchStats.cohort],
+            ["מייל נשלח", holidayLaunchStats.emailSent],
+            ["SMS נשלח", holidayLaunchStats.smsSent],
+            ["רכשו", holidayLaunchStats.active],
+            ["מהמייל", holidayLaunchStats.fromEmail],
+            ["מה־SMS", holidayLaunchStats.fromSms],
+          ].map(([label, value]) => <div key={String(label)} className="rounded-lg bg-white/10 p-2"><strong className="block text-sm text-[#ffe27c]">{value}</strong>{label}</div>)}
+        </div>
+        <p className="mt-2 text-[10px] leading-5 text-white/70">לכל מצטרף דרך הקמפיין נשמרים מקור הרכישה ויעד אישי של 3 הצעות במחזור הראשון. במחזור הבא היעד חוזר אוטומטית ל־2.</p>
+      </div>}
+
       <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">
         <div className="rounded-lg bg-[#f7f6fb] p-2">המתנה ← הזמנה <strong>{waitlistToInviteRate}%</strong></div>
         <div className="rounded-lg bg-[#f7f6fb] p-2">הזמנה ← הפעלה <strong>{inviteToActiveRate}%</strong></div>
@@ -126,7 +141,7 @@ export default function PlusPilotAdminSection() {
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">
-        <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800">עמדו ב־2/2 <strong>{commitment.met}</strong></div>
+        <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800">עמדו ביעד האישי <strong>{commitment.met}</strong></div>
         <div className="rounded-lg bg-amber-50 p-2 text-amber-800">בתהליך <strong>{commitment.inProgress}</strong></div>
         <div className="rounded-lg bg-red-50 p-2 text-red-800">דורשים טיפול <strong>{commitment.atRisk}</strong></div>
       </div>
@@ -155,6 +170,8 @@ export default function PlusPilotAdminSection() {
                   <span className={`rounded-full px-2 py-1 ${row.cycleProgress.state === "green" ? "bg-emerald-100 text-emerald-800" : row.cycleProgress.state === "red" ? "bg-red-100 text-red-800" : row.cycleProgress.state === "yellow" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"}`}>{row.cycleProgress.delivered}/{row.cycleProgress.target} הצעות · {row.cycleProgress.daysRemaining} ימים</span>
                   <span className={`rounded-full px-2 py-1 ${row.pilot.billingStatus === "active" ? "bg-blue-100 text-blue-800" : row.pilot.billingStatus === "past_due" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}>חיוב: {row.pilot.billingStatus}</span>
                   {row.confirmedPayment && <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">תשלום 99 ₪ מאומת</span>}
+                  {row.holidayLaunchEntitlement && <span className="rounded-full bg-[#10182f] px-2 py-1 text-[#ffe27c]">הטבת השקה · יעד 3/3</span>}
+                  {row.holidayLaunchEntitlement && row.launchAttribution?.source && <span className="rounded-full bg-[#f3ead7] px-2 py-1 text-[#7b5d27]">מקור: {row.launchAttribution.source === "sms" ? "SMS" : row.launchAttribution.source === "email" ? "מייל" : row.launchAttribution.source}</span>}
                   {row.pilot.premiumSupportEnabled && <span className="rounded-full bg-[#191265] px-2 py-1 text-[#ffe27c]">שירות פרימיום</span>}
                   {row.pilot.socialExposureConsent === "approved" && <span className="rounded-full bg-pink-100 px-2 py-1 text-pink-800">אושר לסושיאל</span>}
                 </div>

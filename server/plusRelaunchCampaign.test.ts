@@ -34,6 +34,7 @@ describe("Database Plus holiday launch", () => {
     expect(content.checkoutUrl).toContain("utm_source=email");
     expect(content.checkoutUrl).toContain("utm_medium=launch");
     expect(content.checkoutUrl).toContain("utm_campaign=plus_launch_sep26");
+    expect(content.checkoutUrl).toContain("utm_content=plus_launch_email");
     expect(content.textContent).not.toMatch(/[—–]/);
   });
 
@@ -47,6 +48,7 @@ describe("Database Plus holiday launch", () => {
     expect(content.message).toContain("להסרה:");
     expect(content.checkoutUrl).toContain("utm_source=sms");
     expect(content.checkoutUrl).toContain("utm_campaign=plus_launch_sep26");
+    expect(content.checkoutUrl).toContain("utm_content=plus_launch_sms");
     expect(content.message).not.toMatch(/[—–]/);
   });
 
