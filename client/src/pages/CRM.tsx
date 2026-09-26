@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import CourseCompassAdminSection from "@/components/CourseCompassAdminSection";
 import { toast } from "sonner";
 import { format, formatDistanceToNow, isValid } from "date-fns";
 
@@ -886,6 +887,8 @@ export default function CRM() {
             </div>
           ))}
         </div>
+
+        <CourseCompassAdminSection />
 
         {/* WhatsApp Group Click Stats */}
         {(() => {

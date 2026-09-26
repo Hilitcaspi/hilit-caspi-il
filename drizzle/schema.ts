@@ -492,6 +492,40 @@ export type Lead = typeof leads.$inferSelect;
 export type InsertLead = typeof leads.$inferInsert;
 
 /**
+ * Course compass launch waitlist.
+ * Stores only the result category and chosen next action, never the answer trail.
+ */
+export const courseCompassLeads = mysqlTable("course_compass_leads", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("session_id", { length: 64 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  resultKey: mysqlEnum("result_key", ["information", "consistency", "pace", "boundary", "self_choice", "safety"]).notNull(),
+  secondaryResultKey: mysqlEnum("secondary_result_key", ["information", "consistency", "pace", "boundary", "self_choice"]),
+  selectedAction: varchar("selected_action", { length: 100 }),
+  waitlistConsent: boolean("waitlist_consent").default(false).notNull(),
+  marketingConsent: boolean("marketing_consent").default(false).notNull(),
+  consentVersion: varchar("consent_version", { length: 50 }).notNull(),
+  benefitVersion: varchar("benefit_version", { length: 50 }).notNull(),
+  status: mysqlEnum("status", ["waitlist", "invited", "enrolled", "declined"]).default("waitlist").notNull(),
+  utmSource: varchar("utm_source", { length: 100 }),
+  utmMedium: varchar("utm_medium", { length: 100 }),
+  utmCampaign: varchar("utm_campaign", { length: 200 }),
+  utmContent: varchar("utm_content", { length: 200 }),
+  utmTerm: varchar("utm_term", { length: 200 }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({
+  emailUnique: uniqueIndex("course_compass_leads_email_uq").on(table.email),
+  sessionUnique: uniqueIndex("course_compass_leads_session_uq").on(table.sessionId),
+  statusCreatedIdx: index("course_compass_leads_status_created_idx").on(table.status, table.createdAt),
+}));
+
+export type CourseCompassLead = typeof courseCompassLeads.$inferSelect;
+export type InsertCourseCompassLead = typeof courseCompassLeads.$inferInsert;
+
+/**
  * Blog posts - articles written by Hilit for SEO and content marketing
  */
 export const blogPosts = mysqlTable("blog_posts", {

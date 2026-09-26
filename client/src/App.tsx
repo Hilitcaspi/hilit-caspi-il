@@ -37,6 +37,7 @@ const GuideFree = lazy(() => import("@/pages/GuideFree"));
 const TermsGuide = lazy(() => import("@/pages/TermsGuide"));
 const CoachingSales = lazy(() => import("@/pages/CoachingSales"));
 const CourseSales = lazy(() => import("@/pages/CourseSales"));
+const CourseCompass = lazy(() => import("@/pages/CourseCompass"));
 const TermsCoaching = lazy(() => import("@/pages/TermsCoaching"));
 const TermsCourse = lazy(() => import("@/pages/TermsCourse"));
 const DatabaseSales = lazy(() => import("@/pages/DatabaseSales"));
@@ -257,6 +258,7 @@ function HeRouter() {
         <Switch>
           <Route path={"/"} component={Home} />
           <Route path={"/dna-quiz"} component={DnaQuiz} />
+          <Route path={"/compass"} component={CourseCompass} />
           <Route path={"/join/complete"} component={ProfileComplete} />
           <Route path={"/join/questionnaire"} component={ScientificQuestionnaire} />
           <Route path={"/join/:token"} component={Register} />

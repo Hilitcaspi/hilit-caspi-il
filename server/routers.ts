@@ -62,6 +62,7 @@ import { controlCenterRouter } from "./controlCenterRouter";
 import { contentStudioRouter } from "./contentStudioRouter";
 import { dashboardAssistantRouter } from "./dashboardAssistantRouter";
 import { usageRouter } from "./usageRouter";
+import { courseCompassRouter } from "./courseCompassRouter";
 import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivacy";
 import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYMENT_ATTRIBUTION_TTL_MS } from "./paymentAttribution";
 import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
@@ -643,6 +644,7 @@ export const appRouter = router({
   contentStudio: contentStudioRouter,
   dashboardAssistant: dashboardAssistantRouter,
   usage: usageRouter,
+  courseCompass: courseCompassRouter,
   publicProof: router({
     approvedTestimonials: publicProcedure.query(async () => {
       const db = await getDb();
