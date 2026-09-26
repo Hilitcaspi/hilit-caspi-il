@@ -19,10 +19,14 @@ describe("course compass prelaunch funnel", () => {
   });
 
   it("keeps the public experience closed-choice and reveals the result before the waitlist form", () => {
-    expect(page).toContain("8 לחיצות. בלי לכתוב דבר.");
-    expect(page).toContain("התוצאה נחשפת לפני השארת פרטים");
-    expect(page).toContain("איך הגענו לתוצאה הזאת?");
-    expect(page.indexOf("המצפן שלכם מצביע על")).toBeLessThan(page.indexOf("שמרו לי קדימות והטבת השקה"));
+    expect(page).toContain("חשבו על אדם אחד");
+    expect(page).toContain("אחרי ארבע לחיצות אנסה לנחש");
+    expect(page).toContain("בלי שם, בלי הודעות ובלי לכתוב דבר");
+    expect(page).toContain("התוצאה נחשפת לפני פרטים");
+    expect(page).toContain("זה לא קסם. זה מדע.");
+    expect(page).toContain("תראו לי את המפה שמאחורי הניחוש");
+    expect(page.indexOf("המנגנון הבולט")).toBeLessThan(page.indexOf("אני רוצה קדימות והטבת השקה"));
+    expect(page).not.toContain("answer: answerId");
   });
 
   it("is transparent that the course and physical kit are not yet for sale", () => {
@@ -42,11 +46,12 @@ describe("course compass prelaunch funnel", () => {
   });
 
   it("sends a transactional confirmation with the result and no purchase claim", () => {
-    const email = buildCourseCompassWaitlistEmail({ name: "נועה", resultKey: "pace" });
-    expect(email.subject).toContain("המצפן שלך נשמר");
-    expect(email.htmlContent).toContain("הצעד הבא הוא לכוון את הקצב");
+    const email = buildCourseCompassWaitlistEmail({ name: "נועה", resultKey: "uncertainty_loop" });
+    expect(email.subject).toContain("זה לא קסם");
+    expect(email.htmlContent).toContain("דווקא חוסר הבהירות");
+    expect(email.htmlContent).toContain("מנגנונים פסיכולוגיים");
     expect(email.htmlContent).toContain("לא בוצע חיוב ולא נפתחה הזמנה");
-    expect(email.textContent).toContain("הטבת השקה מיוחדת");
+    expect(email.textContent).toContain("הטבת ההשקה המיוחדת");
   });
 
   it("shows the separate prelaunch list in CRM", () => {

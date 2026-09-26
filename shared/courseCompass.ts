@@ -1,11 +1,11 @@
-export const COURSE_COMPASS_VERSION = "2026-09-v1";
+export const COURSE_COMPASS_VERSION = "2026-09-v2";
 
 export const CORE_COMPASS_RESULTS = [
-  "information",
-  "consistency",
-  "pace",
-  "boundary",
-  "self_choice",
+  "future_projection",
+  "uncertainty_loop",
+  "approval_chase",
+  "chemistry_confusion",
+  "novelty_pull",
 ] as const;
 
 export type CoreCompassResultKey = (typeof CORE_COMPASS_RESULTS)[number];
@@ -29,6 +29,7 @@ export type CompassQuestion = {
   hint?: string;
   answers: CompassAnswer[];
   adaptive?: boolean;
+  prediction?: boolean;
 };
 
 export type CompassResultContent = {
@@ -37,6 +38,8 @@ export type CompassResultContent = {
   summary: string;
   rationale: string;
   counterSign: string;
+  magicLine: string;
+  science: string;
   actions: Array<{ id: string; label: string }>;
   accent: string;
 };
@@ -50,82 +53,186 @@ export type CompassResult = {
   content: CompassResultContent;
 };
 
+const RESULT_CONTENT: Record<CompassResultKey, CompassResultContent> = {
+  future_projection: {
+    label: "השלמת העתיד",
+    title: "לא רק האדם מחזיק אתכם. גם העתיד שכבר התחלתם לבנות סביב האפשרות הזאת.",
+    summary: "כשיש מעט עובדות והרבה פוטנציאל, המוח יודע להשלים את החסר בתמונה של מה שעוד יכול לקרות. לפעמים קשה לשחרר לא את מה שהיה, אלא את מה שכבר דמיינתם שיהיה.",
+    rationale: "חזרתם שוב ושוב לאפשרות, לפוטנציאל ולסיפור שמאחורי הסימנים — גם כשהמציאות עצמה עדיין לא סיפקה מספיק נתונים.",
+    counterSign: "תקווה אינה טעות. אבל לפני שנותנים לעתיד משקל, כדאי לבדוק אם ההווה באמת נושא אותו.",
+    magicLine: "ניחשתי שהמוח שלכם כבר רץ כמה צעדים קדימה, עוד לפני שהקשר הספיק להגיע לשם.",
+    science: "המוח משלים מידע חסר באמצעות ציפיות וסיפור. ככל שהתמונה חלקית יותר, קל יותר לפוטנציאל להרגיש ממשי כמעט כמו עובדה.",
+    actions: [
+      { id: "separate_fact_future", label: "להפריד בין מה שקרה בפועל לבין מה שקיוויתי שיקרה" },
+      { id: "one_present_fact", label: "לבחור עובדה אחת מההווה לפני שמחליטים על העתיד" },
+    ],
+    accent: "#f1cf86",
+  },
+  uncertainty_loop: {
+    label: "לולאת אי־הוודאות",
+    title: "לא הבהירות מחזיקה אתכם. דווקא חוסר הבהירות.",
+    summary: "קרבה וריחוק לסירוגין גורמים למוח לחזור שוב ושוב אל האדם, לבדוק הודעות ולחפש את הסימן שיסגור את התמונה. המתח מרגיש כמו חשיבות, גם כשהוא בעיקר חוסר ודאות.",
+    rationale: "הבחירות שלכם חזרו לסימנים מעורבים, לפענוח ולהמתנה לאות הבא — יותר מאשר לקשר יציב שכבר ברור מה קורה בו.",
+    counterSign: "אם תשובה ישירה מורידה את עוצמת המשיכה, ייתכן שהמסתורין היה חלק גדול יותר מהחיבור ממה שנדמה.",
+    magicLine: "ניחשתי שאתם לא חושבים על האדם כל הזמן כי הכול ברור — אלא כי שום דבר עדיין לא נסגר.",
+    science: "תגמול שמגיע באופן לא צפוי מחזק ציפייה ובדיקה חוזרת. לכן סימן קטן אחרי שקט יכול להרגיש חזק יותר מנוכחות עקבית.",
+    actions: [
+      { id: "ask_one_clear_question", label: "להפסיק לאסוף רמזים ולבקש תשובה ברורה אחת" },
+      { id: "observe_without_checking", label: "להפסיק לבדוק ולראות אם מגיעה יוזמה עקבית מעצמה" },
+    ],
+    accent: "#f0a6c8",
+  },
+  approval_chase: {
+    label: "מרדף האישור",
+    title: "יכול להיות שאתם רוצים את הבחירה שלהם כמעט כמו שאתם רוצים אותם.",
+    summary: "לפעמים אדם מסוים הופך חשוב במיוחד מפני שהבחירה שלו מרגישה כמו הוכחה לערך שלנו. אז ההשקעה גדלה, הסירוב נהיה אישי, והקשר הופך למבחן שצריך לעבור.",
+    rationale: "הבחירות שלכם נתנו משקל חזק לרצון להרשים, להוכיח ולחוות את הרגע שבו דווקא האדם הזה בוחר בכם.",
+    counterSign: "שאלו שאלה אחת לא נוחה: אם כבר הייתם בטוחים בערך שלכם, האם עדיין הייתם בוחרים באדם הזה באותה עוצמה?",
+    magicLine: "ניחשתי שחלק מהמשיכה התערבב עם צורך עמוק יותר: להרגיש שנבחרתם דווקא כאן.",
+    science: "דחייה או אישור חברתי יכולים להפעיל מערכות של ערך עצמי ותגמול. כשזה קורה, הרצון להשיג את הבחירה עלול להיראות כמו התאמה.",
+    actions: [
+      { id: "reverse_choice", label: "להחליף את השאלה: לא האם יבחרו בי, אלא האם אני בוחר כאן" },
+      { id: "stop_proving", label: "לעצור פעולה אחת שנועדה להרשים ולבדוק מה נשאר" },
+    ],
+    accent: "#ffb38f",
+  },
+  chemistry_confusion: {
+    label: "בלבול הכימיה",
+    title: "העוצמה אמיתית. אבל עוצמה והתאמה אינן אותו הדבר.",
+    summary: "משיכה חזקה יכולה להרגיש כמו ידיעה עמוקה, גם כשעדיין אין מספיק מידע על זמינות, יציבות או התאמה לחיים. הגוף אומר “חשוב”, והמוח מתרגם לפעמים “נכון”.",
+    rationale: "הבחירות שלכם נתנו לעוצמה, למתח ולכימיה משקל גדול יותר מן העקביות ומהעובדות שכבר אפשר לראות.",
+    counterSign: "כימיה אינה דגל אדום. היא פשוט לא יכולה לשמש לבדה כהוכחה שהקשר מתאים או שהאדם פנוי לקשר.",
+    magicLine: "ניחשתי שהעוצמה בגוף קיבלה אצלכם משמעות של התאמה, עוד לפני שהיו מספיק ראיות.",
+    science: "עוררות, חידוש וחוסר ודאות יכולים להעצים קשב ומשיכה. המוח מרגיש את העוצמה היטב, אך אינו תמיד מפריד מיד בין ריגוש לבין יציבות.",
+    actions: [
+      { id: "chemistry_plus_consistency", label: "לתת לעקביות משקל זהה לכימיה בשלוש האינטראקציות הבאות" },
+      { id: "name_three_facts", label: "לבדוק שלוש עובדות על התאמה לפני פירוש נוסף של התחושה" },
+    ],
+    accent: "#c8b5ff",
+  },
+  novelty_pull: {
+    label: "משיכת החדש והלא מושג",
+    title: "ייתכן שהמוח שלכם נדלק על המרדף — ונרגע כשהקשר נעשה אפשרי.",
+    summary: "חדש, מפתיע או מעט לא מושג יכול לייצר קשב עוצמתי. לפעמים דווקא כשמגיע שקט, זמינות וביטחון, המתח יורד והמוח מפרש את הירידה כאילו המשיכה נעלמה.",
+    rationale: "הבחירות שלכם חזרו לחידוש, למסתורין ולירידת עניין כשהצד השני נעשה ברור וזמין יותר.",
+    counterSign: "שקט אינו בהכרח שעמום. לפעמים הוא פשוט היעדר המתח שהתרגלנו לקרוא לו כימיה.",
+    magicLine: "ניחשתי שהחלק הכי ממכר הוא לא רק האדם — אלא הרגע שבו האדם עדיין אינו מושג.",
+    science: "מערכת התגמול רגישה לחידוש ולציפייה. כשהגירוי נעשה מוכר ובטוח, העוצמה יכולה לרדת בלי שההתאמה עצמה ירדה.",
+    actions: [
+      { id: "three_calm_meetings", label: "לא לפסול שקט לפני שנותנים לו שלושה מפגשים אמיתיים" },
+      { id: "notice_chase", label: "לבדוק אם החשק עולה דווקא כשהצד השני מתרחק" },
+    ],
+    accent: "#b9e6d0",
+  },
+  safety: {
+    label: "בטיחות",
+    title: "בטיחות וגבול קודמים לכל פיצוח של משיכה.",
+    summary: "כאשר יש לחץ, איום, השפלה או תחושת חוסר ביטחון, לא צריך לנתח עוד את הדינמיקה כדי להתרחק מן הלחץ ולפנות לעזרה מתאימה.",
+    rationale: "סימנתם שאין כרגע ודאות שהסיטואציה בטוחה. החוויה עוצרת כאן בכוונה.",
+    counterSign: "החוויה אינה קובעת מי האדם שמולכם ואינה מחליפה עזרה מקצועית או שירותי חירום.",
+    magicLine: "במקום לנחש את הדפוס, המצפן בוחר קודם לשמור עליכם.",
+    science: "כשאין תחושת ביטחון, ניתוח של משיכה או תקשורת אינו הצעד הראשון. בטיחות, תמיכה וגבול קודמים לתרגיל.",
+    actions: [
+      { id: "contact_safe_person", label: "לפנות עכשיו לאדם בטוח" },
+      { id: "leave_pressure", label: "להתרחק מן הלחץ ולבקש עזרה מתאימה" },
+    ],
+    accent: "#ffd4c7",
+  },
+};
+
 const BASE_QUESTIONS: CompassQuestion[] = [
   {
-    id: "moment",
-    eyebrow: "הרגע",
-    prompt: "באיזה רגע אתם נמצאים עכשיו?",
-    hint: "בחרו מצב אחד שנמצא במחשבות שלכם היום.",
+    id: "scene",
+    eyebrow: "חשבו על אדם אחד",
+    prompt: "איזו תמונה הכי קרובה למה שקורה ביניכם?",
+    hint: "אין צורך בשם או בפרטים. רק החזיקו אדם אחד בראש.",
     answers: [
-      { id: "new_connection", label: "בתחילת היכרות", weights: { information: 1, pace: 1 } },
-      { id: "after_date", label: "אחרי דייט או שיחה", weights: { information: 1, consistency: 1 } },
-      { id: "relationship_question", label: "בתוך קשר שיש בו סימן שאלה", weights: { consistency: 1, boundary: 1 } },
-      { id: "repeating_pattern", label: "מול דפוס שחוזר בהיכרויות", weights: { self_choice: 2, boundary: 1 } },
+      { id: "after_date_replay", label: "היה דייט או מפגש, ומאז אני מריץ אותו שוב בראש", weights: { future_projection: 1, chemistry_confusion: 1 } },
+      { id: "mixed_messages", label: "יש קרבה ואז ריחוק, ואני לא מבין איפה זה עומד", weights: { uncertainty_loop: 2 } },
+      { id: "strong_attraction_little_ground", label: "יש משיכה חזקה, אבל עדיין מעט מאוד בסיס יציב", weights: { chemistry_confusion: 2 } },
+      { id: "different_person_same_story", label: "זה אדם אחר, אבל הסיפור מרגיש מוכר מדי", weights: { novelty_pull: 1, approval_chase: 1 } },
     ],
   },
   {
-    id: "decision",
-    eyebrow: "הצעד",
-    prompt: "מה הכי קרוב לצעד שעומד בפניכם?",
+    id: "fast_hook",
+    eyebrow: "מה קורה מהר",
+    prompt: "כשיש עניין, מה המוח שלכם עושה כמעט בלי לבקש רשות?",
     answers: [
-      { id: "approach", label: "להתקרב או להציע צעד", weights: { information: 1, pace: 1 } },
-      { id: "ask", label: "לשאול משהו שלא שאלתי", weights: { information: 2 } },
-      { id: "slow", label: "להאט ולראות עוד", weights: { pace: 2, consistency: 1 } },
-      { id: "stop", label: "לעצור או להציב גבול", weights: { boundary: 2, self_choice: 1 } },
+      { id: "build_future", label: "מתחיל לבנות תמונה של מה שיכול להיות", weights: { future_projection: 3 } },
+      { id: "decode_everything", label: "מנתח הודעות, זמנים ושינויים קטנים", weights: { uncertainty_loop: 3 } },
+      { id: "want_to_win", label: "רוצה לגרום לאדם הזה לראות כמה אני שווה", weights: { approval_chase: 3 } },
+      { id: "feel_intensity", label: "מרגיש את הכימיה בעוצמה וקשה לחשוב מעבר לה", weights: { chemistry_confusion: 3 } },
+      { id: "need_mystery", label: "נדלק במיוחד כשהכול חדש, מפתיע ולא מושג", weights: { novelty_pull: 3 } },
     ],
   },
   {
-    id: "fog",
-    eyebrow: "הערפל",
-    prompt: "מה מבלבל יותר מכל כרגע?",
+    id: "value_signal",
+    eyebrow: "הסימן שמגדיל ערך",
+    prompt: "מה גורם לאדם הזה להרגיש פתאום חשוב יותר בראש שלכם?",
     answers: [
-      { id: "words_actions", label: "יש מילים יפות, אבל המעשים אינם עקביים", weights: { consistency: 2 } },
-      { id: "intent", label: "יש עניין, אבל הכוונה אינה ברורה", weights: { information: 2 } },
-      { id: "speed", label: "הקצב מהיר או איטי מדי", weights: { pace: 2 } },
-      { id: "lost_voice", label: "הקול שלי כמעט לא נשמע בתוך הסיטואציה", weights: { self_choice: 2, boundary: 1 } },
+      { id: "unavailable", label: "כשיש פחות זמינות וקשה יותר לקרוא את המצב", weights: { uncertainty_loop: 2, chemistry_confusion: 1 } },
+      { id: "chooses_me", label: "כשנדמה שהצד השני עומד לבחור בי ואז נסוג מהקשר", weights: { approval_chase: 2, uncertainty_loop: 1 } },
+      { id: "potential", label: "כשאני רואה בו פוטנציאל נדיר לעתיד", weights: { future_projection: 3 } },
+      { id: "intense_moment", label: "כשיש רגע אחד חזק שקשה לשכוח", weights: { chemistry_confusion: 2, future_projection: 1 } },
+      { id: "new_unknown", label: "כשעוד יש מסתורין והרבה לא ידוע", weights: { novelty_pull: 2, uncertainty_loop: 1 } },
     ],
   },
   {
-    id: "calm",
-    eyebrow: "השקט",
-    prompt: "מה היה נותן לכם יותר שקט?",
+    id: "silence_response",
+    eyebrow: "כשאין סימן ברור",
+    prompt: "מה קורה אצלכם אחרי שקט או התרחקות קטנה?",
     answers: [
-      { id: "direct_answer", label: "תשובה ישירה", weights: { information: 2 } },
-      { id: "repeated_action", label: "מעשה שחוזר על עצמו", weights: { consistency: 2 } },
-      { id: "time", label: "זמן בלי למהר להסיק", weights: { pace: 2 } },
-      { id: "my_need", label: "הבנה של מה שחשוב לי", weights: { self_choice: 2, boundary: 1 } },
+      { id: "check_phone", label: "בודק שוב ושוב אם הגיע משהו", weights: { uncertainty_loop: 3 } },
+      { id: "invest_more", label: "משקיע יותר כדי להחזיר את העניין", weights: { approval_chase: 3 } },
+      { id: "fill_blanks", label: "מסביר לעצמי מה כנראה קורה בצד השני", weights: { future_projection: 2, uncertainty_loop: 1 } },
+      { id: "want_more", label: "מרגיש שהמשיכה דווקא מתחזקת", weights: { chemistry_confusion: 2, novelty_pull: 1 } },
+      { id: "switch_target", label: "מאבד עניין ומחפש את הריגוש הבא", weights: { novelty_pull: 3 } },
     ],
   },
 ];
 
-const REACTION_QUESTION: CompassQuestion = {
-  id: "reaction",
-  eyebrow: "מה קורה בדרך",
-  prompt: "כשיש פער, מה קורה קודם?",
-  answers: [
-    { id: "explain", label: "אני מסביר לעצמי למה זה כנראה בסדר", weights: { consistency: 1, boundary: 1 } },
-    { id: "ask_directly", label: "אני שואל ישירות", weights: { information: 1 } },
-    { id: "wait_sign", label: "אני מחכה לעוד סימן", weights: { pace: 1, consistency: 1 } },
-    { id: "withdraw", label: "אני מתרחק בלי לומר", weights: { self_choice: 1, boundary: 1 } },
-  ],
-};
-
-const ACTION_QUESTION: CompassQuestion = {
-  id: "possible_action",
-  eyebrow: "24 השעות הקרובות",
-  prompt: "איזה צעד קטן באמת אפשרי עכשיו?",
-  answers: [
-    { id: "one_question", label: "לשאול שאלה אחת", weights: { information: 1 }, actionKey: "ask" },
-    { id: "observe_action", label: "לצפות למעשה מוגדר", weights: { consistency: 1 }, actionKey: "observe" },
-    { id: "name_pace", label: "לומר מה הקצב שמתאים לי", weights: { pace: 1 }, actionKey: "pace" },
-    { id: "set_boundary", label: "להציב גבול ברור", weights: { boundary: 1 }, actionKey: "boundary" },
-    { id: "name_priority", label: "לעצור ולבחור מה חשוב לי", weights: { self_choice: 1 }, actionKey: "choose" },
-  ],
-};
+const DEEP_QUESTIONS: CompassQuestion[] = [
+  {
+    id: "hard_truth",
+    eyebrow: "האמת שקצת קשה להודות בה",
+    prompt: "איזה משפט הכי קרוב למה שכבר קרה לכם בעבר?",
+    answers: [
+      { id: "calm_boring", label: "כשיש מולי אדם יציב וברור, משהו בי מתחיל להשתעמם", weights: { novelty_pull: 3 } },
+      { id: "kind_not_enough", label: "יחס טוב לא תמיד מספיק אם אין תחושה שצריך לזכות בו", weights: { approval_chase: 2, chemistry_confusion: 1 } },
+      { id: "knew_but_stayed", label: "ידעתי מוקדם שמשהו לא מתאים, אבל נשארתי עם הפוטנציאל", weights: { future_projection: 3 } },
+      { id: "clarity_scary", label: "לפעמים אני מעדיף את הסימנים על תשובה שעלולה לאכזב", weights: { uncertainty_loop: 3 } },
+      { id: "intensity_wins", label: "גם כשאני רואה חוסר יציבות, העוצמה מנצחת", weights: { chemistry_confusion: 3 } },
+    ],
+  },
+  {
+    id: "facts_only",
+    eyebrow: "בלי הסיפור מסביב",
+    prompt: "אם מסירים לרגע תקווה ופרשנות, מה נשאר בעובדות?",
+    answers: [
+      { id: "words_more_actions", label: "יש יותר מילים או הבטחות ממעשים", weights: { future_projection: 2, uncertainty_loop: 1 } },
+      { id: "close_far_pattern", label: "יש דפוס שחוזר של קרבה ואז ריחוק", weights: { uncertainty_loop: 3 } },
+      { id: "i_carry_contact", label: "רוב התנועה בקשר מגיעה ממני", weights: { approval_chase: 3 } },
+      { id: "intensity_few_facts", label: "יש עוצמה גדולה, אבל מעט מידע אמיתי על התאמה", weights: { chemistry_confusion: 3 } },
+      { id: "interest_drops_available", label: "העניין שלי יורד כשהצד השני נעשה זמין", weights: { novelty_pull: 3 } },
+    ],
+  },
+  {
+    id: "old_solution",
+    eyebrow: "מה כבר ניסיתם",
+    prompt: "מה אתם עושים בדרך כלל כדי לפתור את הסיפור הזה?",
+    answers: [
+      { id: "wait_for_potential", label: "מחכה בסבלנות שהפוטנציאל יתממש", weights: { future_projection: 2 } },
+      { id: "look_for_sign", label: "מחפש עוד סימן קטן שיסגור לי את התמונה", weights: { uncertainty_loop: 2 } },
+      { id: "be_more", label: "מנסה להיות מעניין, נכון או מרשים יותר", weights: { approval_chase: 2 } },
+      { id: "rules_then_break", label: "מחליט להציב גבולות ואז נשאב שוב לכימיה", weights: { chemistry_confusion: 2 } },
+      { id: "move_fast", label: "עובר הלאה מהר כדי להרגיש שוב התחלה חדשה", weights: { novelty_pull: 2 } },
+    ],
+  },
+];
 
 const SAFETY_QUESTION: CompassQuestion = {
   id: "safety",
-  eyebrow: "בדיקת גבול",
+  eyebrow: "בדיקת גבול חשובה",
   prompt: "האם יש כאן לחץ, איום, השפלה או חוסר כבוד שגורמים לכם להרגיש לא בטוחים?",
   hint: "החוויה אינה מעריכה את האדם שמולכם. השאלה נועדה רק לשמור על גבול בטוח.",
   answers: [
@@ -136,223 +243,105 @@ const SAFETY_QUESTION: CompassQuestion = {
   ],
 };
 
-const RESULT_CONTENT: Record<CompassResultKey, CompassResultContent> = {
-  information: {
-    label: "מידע",
-    title: "חסר כאן מידע ישיר",
-    summary: "לפני שמפרשים עוד סימנים, כדאי לברר עובדה אחת שיכולה לשנות את התמונה.",
-    rationale: "הבחירות שלכם חזרו לצורך בתשובה ברורה יותר מאשר בעוד ניתוח של רמזים.",
-    counterSign: "תשובה יפה לבדה אינה הוכחה לעקביות. אחרי השיחה, בדקו גם מה קורה בפועל.",
-    actions: [
-      { id: "ask_intent", label: "לשאול שאלה אחת על הכוונה" },
-      { id: "ask_expectation", label: "לברר מה כל אחד מצפה מהשלב הנוכחי" },
-    ],
-    accent: "#f6d08a",
-  },
-  consistency: {
-    label: "עקביות",
-    title: "בדקו עקביות, לא רק כוונה",
-    summary: "כאן חסרה פחות פרשנות ויותר ראיה לכך שמילים הופכות למעשה שחוזר על עצמו.",
-    rationale: "הבחירות שלכם העדיפו פעולה נצפית על פני הסבר נוסף או הבטחה חד פעמית.",
-    counterSign: "אירוע אחד אינו דפוס. הגדירו מה בדיוק אתם רוצים לראות ובאיזה פרק זמן סביר.",
-    actions: [
-      { id: "observe_defined", label: "לבחור מעשה אחד ולבדוק אם הוא חוזר" },
-      { id: "compare_words_actions", label: "להפריד בין מה שנאמר לבין מה שנעשה" },
-    ],
-    accent: "#f0a6c8",
-  },
-  pace: {
-    label: "קצב",
-    title: "הצעד הבא הוא לכוון את הקצב",
-    summary: "לא חייבים להחליט על כל הקשר. אפשר קודם ליצור קצב שמאפשר לראות ולנשום.",
-    rationale: "הבחירות שלכם הראו שזמן ותנועה מדויקת חשובים כרגע יותר מתשובה סופית.",
-    counterSign: "האטה אינה היעלמות. אפשר לומר מה הקצב שמתאים ולשמור על תקשורת ברורה.",
-    actions: [
-      { id: "state_pace", label: "לומר מה הקצב שמתאים לי" },
-      { id: "one_step", label: "לבחור רק את הצעד הבא, לא את כל העתיד" },
-    ],
-    accent: "#c8b5ff",
-  },
-  boundary: {
-    label: "גבול",
-    title: "הסימן הראשון הוא לשמור על גבול",
-    summary: "לפני שמבררים את האדם האחר, כדאי להגדיר מה אינו מתאים לכם ומה יקרה אם יחזור.",
-    rationale: "הבחירות שלכם חזרו לצורך להגן על משהו חשוב, ולא רק להבין עוד מידע.",
-    counterSign: "גבול אינו איום ואינו ניסיון לשלוט. הוא משפט ברור על מה מתאים לכם ומה לא.",
-    actions: [
-      { id: "name_boundary", label: "לנסח גבול אחד במשפט קצר" },
-      { id: "step_back", label: "לקחת צעד אחורה עד שיש יחס מכבד" },
-    ],
-    accent: "#ffb38f",
-  },
-  self_choice: {
-    label: "בחירה",
-    title: "הכיוון מתחיל בחזרה לבחירה שלכם",
-    summary: "לפני השאלה אם יבחרו בכם, כדאי להחזיר למרכז את השאלה אם זה נכון גם עבורכם.",
-    rationale: "הבחירות שלכם סימנו שהצורך שלכם כמעט נעלם מאחורי הניסיון להבין את הצד השני.",
-    counterSign: "בחירה עצמית אינה ניתוק. אפשר להיות פתוחים לקשר ובו בזמן לבדוק מה באמת מתאים.",
-    actions: [
-      { id: "name_priority", label: "לכתוב לעצמי מה חשוב גם אם דבר לא ישתנה" },
-      { id: "choose_standard", label: "לבחור אמת מידה אחת שלא אוותר עליה" },
-    ],
-    accent: "#b9e6d0",
-  },
-  safety: {
-    label: "בטיחות",
-    title: "בטיחות וגבול קודמים לכל החלטה",
-    summary: "כאשר יש לחץ, איום, השפלה או תחושת חוסר ביטחון, לא צריך להשלים עוד ניתוח כדי להתרחק מן הלחץ.",
-    rationale: "סימנתם שאין כרגע ודאות שהסיטואציה בטוחה. המצפן עוצר כאן בכוונה.",
-    counterSign: "החוויה אינה קובעת מי האדם שמולכם ואינה מחליפה עזרה מקצועית או שירותי חירום.",
-    actions: [
-      { id: "contact_safe_person", label: "לפנות עכשיו לאדם בטוח" },
-      { id: "leave_pressure", label: "להתרחק מן הלחץ ולבקש עזרה מתאימה" },
-    ],
-    accent: "#ffd4c7",
-  },
-};
-
 function pairKey(a: CoreCompassResultKey, b: CoreCompassResultKey) {
   return [a, b].sort().join("__");
 }
 
+function resultAnswer(key: CoreCompassResultKey, label: string): CompassAnswer {
+  return { id: key, label, weights: { [key]: 3 } };
+}
+
 const DISCRIMINATORS: Record<string, Omit<CompassQuestion, "id">> = {
-  [pairKey("information", "consistency")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה ישנה יותר את התמונה?",
+  [pairKey("future_projection", "uncertainty_loop")]: {
+    eyebrow: "אני בין שני ניחושים",
+    prompt: "מה מחזיק את המחשבה על האדם הזה יותר?",
     answers: [
-      { id: "information", label: "לקבל תשובה ברורה", weights: { information: 3 } },
-      { id: "consistency", label: "לראות שמה שנאמר באמת קורה", weights: { consistency: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("future_projection", "העתיד שאני כבר רואה בדמיון"),
+      resultAnswer("uncertainty_loop", "הצורך להבין סוף סוף מה באמת קורה"),
+    ], adaptive: true,
   },
-  [pairKey("information", "pace")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה חסר קודם?",
+  [pairKey("future_projection", "approval_chase")]: {
+    eyebrow: "השאלה שמפרידה ביניהם",
+    prompt: "מה יכאב יותר לאבד?",
     answers: [
-      { id: "information", label: "לדעת איפה הדברים עומדים", weights: { information: 3 } },
-      { id: "pace", label: "לתת לדברים זמן בלי למהר להחליט", weights: { pace: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("future_projection", "את האפשרות של העתיד שדמיינתי"),
+      resultAnswer("approval_chase", "את התחושה שהצלחתי לגרום לאדם הזה לבחור בי"),
+    ], adaptive: true,
   },
-  [pairKey("information", "boundary")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה דחוף יותר כרגע?",
+  [pairKey("future_projection", "chemistry_confusion")]: {
+    eyebrow: "השאלה שמפרידה ביניהם",
+    prompt: "מה מרגיש לכם משכנע יותר כרגע?",
     answers: [
-      { id: "information", label: "לשאול ולשמוע תשובה ישירה", weights: { information: 3 } },
-      { id: "boundary", label: "להבהיר מה אינו מתאים גם בלי תשובה", weights: { boundary: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("future_projection", "כמה טוב זה עוד יכול להיות"),
+      resultAnswer("chemistry_confusion", "כמה חזק הגוף מגיב כבר עכשיו"),
+    ], adaptive: true,
   },
-  [pairKey("information", "self_choice")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה צריך להתבהר קודם?",
+  [pairKey("future_projection", "novelty_pull")]: {
+    eyebrow: "השאלה שמפרידה ביניהם",
+    prompt: "מה מושך אתכם קדימה יותר?",
     answers: [
-      { id: "information", label: "מה האדם האחר רוצה", weights: { information: 3 } },
-      { id: "self_choice", label: "מה אני רוצה גם אם התשובה לא תשתנה", weights: { self_choice: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("future_projection", "הסיפור שיכול להיבנות מכאן"),
+      resultAnswer("novelty_pull", "התחושה שמשהו חדש ולא צפוי קורה"),
+    ], adaptive: true,
   },
-  [pairKey("consistency", "pace")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה ייתן תמונה אמינה יותר?",
+  [pairKey("uncertainty_loop", "approval_chase")]: {
+    eyebrow: "אני בין שני ניחושים",
+    prompt: "איזו תשובה אתם באמת מחפשים?",
     answers: [
-      { id: "consistency", label: "לבדוק אם פעולה מסוימת חוזרת", weights: { consistency: 3 } },
-      { id: "pace", label: "לתת לזמן לחשוף מה קורה", weights: { pace: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("uncertainty_loop", "לדעת איפה אני עומד"),
+      resultAnswer("approval_chase", "לדעת שהאדם הזה בוחר בי"),
+    ], adaptive: true,
   },
-  [pairKey("consistency", "boundary")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה חשוב יותר לפני הצעד הבא?",
+  [pairKey("uncertainty_loop", "chemistry_confusion")]: {
+    eyebrow: "השאלה שמפרידה ביניהם",
+    prompt: "מה חזק יותר כשאתם חושבים על האדם הזה?",
     answers: [
-      { id: "consistency", label: "לראות אם יש שינוי אמיתי במעשים", weights: { consistency: 3 } },
-      { id: "boundary", label: "לומר מה לא יוכל להמשיך כך", weights: { boundary: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("uncertainty_loop", "הצורך לפענח את הסימנים"),
+      resultAnswer("chemistry_confusion", "התחושה הפיזית והכימיה"),
+    ], adaptive: true,
   },
-  [pairKey("consistency", "self_choice")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה יחזיר יותר בהירות?",
+  [pairKey("uncertainty_loop", "novelty_pull")]: {
+    eyebrow: "השאלה שמפרידה ביניהם",
+    prompt: "מה יקרה אם הכול יהפוך מחר לברור וצפוי?",
     answers: [
-      { id: "consistency", label: "להסתכל רק על המעשים", weights: { consistency: 3 } },
-      { id: "self_choice", label: "לבדוק אם זה בכלל מתאים לי", weights: { self_choice: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("uncertainty_loop", "ארגיש הקלה גדולה"),
+      resultAnswer("novelty_pull", "יכול להיות שחלק מהעניין יירד"),
+    ], adaptive: true,
   },
-  [pairKey("pace", "boundary")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה מכביד יותר כרגע?",
+  [pairKey("approval_chase", "chemistry_confusion")]: {
+    eyebrow: "אני בין שני ניחושים",
+    prompt: "מה אתם רוצים יותר ברגע הכי טעון?",
     answers: [
-      { id: "pace", label: "מהירות שאינה מתאימה לי", weights: { pace: 3 } },
-      { id: "boundary", label: "תחושה שצריך לוותר על משהו חשוב", weights: { boundary: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("approval_chase", "להרגיש שנבחרתי"),
+      resultAnswer("chemistry_confusion", "להרגיש שוב את העוצמה בינינו"),
+    ], adaptive: true,
   },
-  [pairKey("pace", "self_choice")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה נכון להשיב למרכז?",
+  [pairKey("approval_chase", "novelty_pull")]: {
+    eyebrow: "השאלה שמפרידה ביניהם",
+    prompt: "מה מחזיר את החשק כשהוא יורד?",
     answers: [
-      { id: "pace", label: "את הזמן שנדרש לי", weights: { pace: 3 } },
-      { id: "self_choice", label: "את מה שאני באמת רוצה", weights: { self_choice: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("approval_chase", "כשהאדם שוב נותן לי אישור"),
+      resultAnswer("novelty_pull", "כשמופיע אתגר חדש או אדם חדש"),
+    ], adaptive: true,
   },
-  [pairKey("boundary", "self_choice")]: {
-    eyebrow: "שאלת המצפן",
-    prompt: "מה צריך לבוא קודם?",
+  [pairKey("chemistry_confusion", "novelty_pull")]: {
+    eyebrow: "השאלה שמפרידה ביניהם",
+    prompt: "מה הכי קשה לשחרר?",
     answers: [
-      { id: "boundary", label: "להבהיר מה אינו מקובל", weights: { boundary: 3 } },
-      { id: "self_choice", label: "להחליט מה נכון עבורי", weights: { self_choice: 3 } },
-    ],
-    adaptive: true,
+      resultAnswer("chemistry_confusion", "את העוצמה שכבר הרגשתי"),
+      resultAnswer("novelty_pull", "את המרדף ואת האפשרות שעוד לא הושגה"),
+    ], adaptive: true,
   },
 };
 
-function allQuestionCandidates(responses: CompassResponses): CompassQuestion[] {
-  const scores = scoreCompassResponses(responses);
-  const [first, second] = sortScores(scores);
-  const discriminator = DISCRIMINATORS[pairKey(first.key, second.key)];
-  return [
-    ...BASE_QUESTIONS,
-    { id: `discriminate_${pairKey(first.key, second.key)}`, ...discriminator },
-    REACTION_QUESTION,
-    ACTION_QUESTION,
-    SAFETY_QUESTION,
-  ];
-}
-
-export function scoreCompassResponses(responses: CompassResponses) {
-  const scores: Record<CoreCompassResultKey, number> = {
-    information: 0,
-    consistency: 0,
-    pace: 0,
-    boundary: 0,
-    self_choice: 0,
+function emptyScores(): Record<CoreCompassResultKey, number> {
+  return {
+    future_projection: 0,
+    uncertainty_loop: 0,
+    approval_chase: 0,
+    chemistry_confusion: 0,
+    novelty_pull: 0,
   };
-
-  const questions = [
-    ...BASE_QUESTIONS,
-    REACTION_QUESTION,
-    ACTION_QUESTION,
-    SAFETY_QUESTION,
-    ...Object.entries(DISCRIMINATORS).map(([key, question]) => ({ id: `discriminate_${key}`, ...question })),
-  ];
-
-  for (const [questionId, answerId] of Object.entries(responses)) {
-    if (questionId === "tie_break") {
-      if ((CORE_COMPASS_RESULTS as readonly string[]).includes(answerId)) {
-        scores[answerId as CoreCompassResultKey] += 3;
-      }
-      continue;
-    }
-    const question = questions.find(item => item.id === questionId);
-    const answer = question?.answers.find(item => item.id === answerId);
-    if (!answer?.weights) continue;
-    for (const [key, value] of Object.entries(answer.weights)) {
-      scores[key as CoreCompassResultKey] += value || 0;
-    }
-  }
-  return scores;
 }
 
 function sortScores(scores: Record<CoreCompassResultKey, number>) {
@@ -361,7 +350,86 @@ function sortScores(scores: Record<CoreCompassResultKey, number>) {
     .sort((a, b) => b.value - a.value || CORE_COMPASS_RESULTS.indexOf(a.key) - CORE_COMPASS_RESULTS.indexOf(b.key));
 }
 
+function addAnswerWeights(scores: Record<CoreCompassResultKey, number>, question: CompassQuestion | null, answerId: string) {
+  const answer = question?.answers.find(item => item.id === answerId);
+  if (!answer?.weights) return;
+  for (const [key, value] of Object.entries(answer.weights)) scores[key as CoreCompassResultKey] += value || 0;
+}
+
+function scoreBaseResponses(responses: CompassResponses) {
+  const scores = emptyScores();
+  for (const question of BASE_QUESTIONS) {
+    if (responses[question.id]) addAnswerWeights(scores, question, responses[question.id]);
+  }
+  return scores;
+}
+
+export function getInterimPrediction(responses: CompassResponses) {
+  const ranked = sortScores(scoreBaseResponses(responses));
+  const primary = ranked[0].key;
+  const secondary = ranked[1].key;
+  return {
+    primary,
+    secondary,
+    label: RESULT_CONTENT[primary].label,
+    text: RESULT_CONTENT[primary].magicLine,
+  };
+}
+
+function getPredictionQuestion(responses: CompassResponses): CompassQuestion {
+  const prediction = getInterimPrediction(responses);
+  return {
+    id: "prediction_check",
+    eyebrow: "הניחוש הראשון שלי",
+    prompt: prediction.text,
+    hint: "ארבע לחיצות הספיקו כדי לזהות כיוון. כמה זה קרוב?",
+    adaptive: true,
+    prediction: true,
+    answers: [
+      { id: "close", label: "קרוב מאוד. זה קצת מפחיד", weights: { [prediction.primary]: 2 } },
+      { id: "partial", label: "יש בזה משהו, אבל זה לא הכול", weights: { [prediction.primary]: 1, [prediction.secondary]: 1 } },
+      { id: "miss", label: "לא. זה לא הסיפור שלי", weights: { [prediction.primary]: -2, [prediction.secondary]: 2 } },
+    ],
+  };
+}
+
+function allStaticQuestions() {
+  return [...BASE_QUESTIONS, ...DEEP_QUESTIONS, SAFETY_QUESTION];
+}
+
+export function scoreCompassResponses(responses: CompassResponses) {
+  const scores = emptyScores();
+  for (const [questionId, answerId] of Object.entries(responses)) {
+    if (questionId === "tie_break") {
+      if ((CORE_COMPASS_RESULTS as readonly string[]).includes(answerId)) scores[answerId as CoreCompassResultKey] += 3;
+      continue;
+    }
+    if (questionId === "prediction_check") {
+      addAnswerWeights(scores, getPredictionQuestion(responses), answerId);
+      continue;
+    }
+    const staticQuestion = allStaticQuestions().find(question => question.id === questionId);
+    if (staticQuestion) {
+      addAnswerWeights(scores, staticQuestion, answerId);
+      continue;
+    }
+    if (questionId.startsWith("discriminate_")) {
+      const key = questionId.slice("discriminate_".length);
+      const discriminator = DISCRIMINATORS[key];
+      addAnswerWeights(scores, discriminator ? { id: questionId, ...discriminator } : null, answerId);
+    }
+  }
+  return scores;
+}
+
+function getDiscriminator(responses: CompassResponses) {
+  const [first, second] = sortScores(scoreCompassResponses(responses));
+  const key = pairKey(first.key, second.key);
+  return { id: `discriminate_${key}`, ...DISCRIMINATORS[key] } as CompassQuestion;
+}
+
 export function getCompassQuestionById(id: string, responses: CompassResponses = {}) {
+  if (id === "prediction_check") return getPredictionQuestion(responses);
   if (id.startsWith("discriminate_")) {
     const key = id.slice("discriminate_".length);
     const discriminator = DISCRIMINATORS[key];
@@ -371,52 +439,29 @@ export function getCompassQuestionById(id: string, responses: CompassResponses =
     const scores = sortScores(scoreCompassResponses(responses));
     return {
       id: "tie_break",
-      eyebrow: "עוד לחיצה אחת",
-      prompt: "שני כיוונים עדיין קרובים. מה חסר קודם?",
-      hint: "אין תשובה נכונה. בחרו את הדבר שאם ישתנה, יזיז את התמונה.",
+      eyebrow: "הניחוש האחרון",
+      prompt: "נשארו לי שתי אפשרויות. איזה משפט קשה יותר להודות בו?",
+      hint: "התשובה הזאת מכריעה בין שני המנגנונים שהופיעו כמעט באותה עוצמה.",
       adaptive: true,
-      answers: [scores[0], scores[1]].map(item => ({
-        id: item.key,
-        label: RESULT_CONTENT[item.key].label,
-        weights: { [item.key]: 3 },
-      })),
+      answers: [scores[0], scores[1]].map(item => resultAnswer(item.key, RESULT_CONTENT[item.key].magicLine)),
     };
   }
-  return allQuestionCandidates(responses).find(question => question.id === id) || null;
+  return allStaticQuestions().find(question => question.id === id) || null;
 }
 
 export function getNextCompassQuestion(responses: CompassResponses): CompassQuestion | null {
-  for (const question of BASE_QUESTIONS) {
-    if (!responses[question.id]) return question;
-  }
+  for (const question of BASE_QUESTIONS) if (!responses[question.id]) return question;
+  if (!responses.prediction_check) return getPredictionQuestion(responses);
 
-  const scoresAfterBase = scoreCompassResponses(responses);
-  const [first, second] = sortScores(scoresAfterBase);
-  const discriminatorId = `discriminate_${pairKey(first.key, second.key)}`;
-  if (!responses[discriminatorId]) {
-    return { id: discriminatorId, ...DISCRIMINATORS[pairKey(first.key, second.key)] };
-  }
-  if (!responses[REACTION_QUESTION.id]) return REACTION_QUESTION;
-  if (!responses[ACTION_QUESTION.id]) return ACTION_QUESTION;
-  if (!responses[SAFETY_QUESTION.id]) return SAFETY_QUESTION;
+  const answeredDiscriminator = Object.keys(responses).find(questionId => questionId.startsWith("discriminate_"));
+  if (!answeredDiscriminator) return getDiscriminator(responses);
+  for (const question of DEEP_QUESTIONS) if (!responses[question.id]) return question;
+  if (!responses.safety) return SAFETY_QUESTION;
 
-  const safety = responses[SAFETY_QUESTION.id];
-  if (safety === "yes" || safety === "uncertain") return null;
-
+  if (responses.safety === "yes" || responses.safety === "uncertain") return null;
   const ranked = sortScores(scoreCompassResponses(responses));
   if (ranked[0].value - ranked[1].value < 2 && !responses.tie_break) {
-    return {
-      id: "tie_break",
-      eyebrow: "עוד לחיצה אחת",
-      prompt: "שני כיוונים עדיין קרובים. מה חסר קודם?",
-      hint: "אין תשובה נכונה. בחרו את הדבר שאם ישתנה, יזיז את התמונה.",
-      adaptive: true,
-      answers: [ranked[0], ranked[1]].map(item => ({
-        id: item.key,
-        label: RESULT_CONTENT[item.key].label,
-        weights: { [item.key]: 3 },
-      })),
-    };
+    return getCompassQuestionById("tie_break", responses);
   }
   return null;
 }
@@ -434,11 +479,7 @@ export function getCompassResult(responses: CompassResponses): CompassResult {
       secondary: null,
       clarity: "safety",
       scores,
-      evidence: [
-        safetyAnswer === "yes"
-          ? "סימנתם שיש תחושת חוסר ביטחון"
-          : "סימנתם שאין ודאות שהסיטואציה בטוחה",
-      ],
+      evidence: [safetyAnswer === "yes" ? "סימנתם שיש תחושת חוסר ביטחון" : "סימנתם שאין ודאות שהסיטואציה בטוחה"],
       content: RESULT_CONTENT.safety,
     };
   }
@@ -447,11 +488,9 @@ export function getCompassResult(responses: CompassResponses): CompassResult {
   const primary = ranked[0].key;
   const secondary = ranked[1].key;
   const evidence: string[] = [];
-  const candidates = allQuestionCandidates(responses);
-
   for (const [questionId, answerId] of Object.entries(responses)) {
-    if (questionId === "safety" || questionId === "moment" || questionId === "tie_break") continue;
-    const question = candidates.find(item => item.id === questionId);
+    if (["safety", "scene", "prediction_check", "tie_break"].includes(questionId)) continue;
+    const question = getCompassQuestionById(questionId, responses);
     const answer = question?.answers.find(item => item.id === answerId);
     if (answer && (answer.weights?.[primary] || 0) > 0) evidence.push(answer.label);
   }
@@ -473,6 +512,6 @@ export function getCompassResultContent(key: CompassResultKey) {
 export function getCompassProgress(responses: CompassResponses) {
   const answered = Object.keys(responses).length;
   const next = getNextCompassQuestion(responses);
-  const expected = next?.id === "tie_break" || responses.tie_break ? 9 : 8;
+  const expected = next?.id === "tie_break" || responses.tie_break ? 11 : 10;
   return Math.min(100, Math.round((answered / expected) * 100));
 }

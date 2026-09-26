@@ -204,6 +204,13 @@
       "when": 1790442737404,
       "tag": "0028_course_compass_waitlist",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1790444592908,
+      "tag": "0029_course_compass_pattern_results",
+      "breakpoints": true
     }
   ]
 }

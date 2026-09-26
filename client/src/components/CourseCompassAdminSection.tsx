@@ -9,6 +9,11 @@ const RESULT_LABELS: Record<string, string> = {
   pace: "קצב",
   boundary: "גבול",
   self_choice: "בחירה",
+  future_projection: "השלמת העתיד",
+  uncertainty_loop: "לולאת אי־הוודאות",
+  approval_chase: "מרדף האישור",
+  chemistry_confusion: "בלבול הכימיה",
+  novelty_pull: "משיכת החדש",
   safety: "בטיחות",
 };
 

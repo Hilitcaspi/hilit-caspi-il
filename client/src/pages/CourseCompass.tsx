@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
+  Brain,
   Check,
   ChevronDown,
   ChevronUp,
-  Compass,
   Download,
+  Eye,
+  Fingerprint,
+  FlaskConical,
   LockKeyhole,
   Mail,
   RotateCcw,
@@ -22,6 +25,7 @@ import {
   COURSE_COMPASS_VERSION,
   getCompassProgress,
   getCompassResult,
+  getCompassResultContent,
   getNextCompassQuestion,
   type CompassResponses,
 } from "../../../shared/courseCompass";
@@ -59,62 +63,58 @@ function downloadCompassCard(input: {
   context.textAlign = "right";
 
   const background = context.createLinearGradient(0, 0, 1080, 1350);
-  background.addColorStop(0, "#2b0e38");
-  background.addColorStop(0.6, "#651645");
-  background.addColorStop(1, "#9b245f");
+  background.addColorStop(0, "#17124f");
+  background.addColorStop(0.58, "#24145c");
+  background.addColorStop(1, "#651645");
   context.fillStyle = background;
   context.fillRect(0, 0, 1080, 1350);
-
-  const glow = context.createRadialGradient(170, 180, 20, 170, 180, 420);
-  glow.addColorStop(0, "rgba(241,207,134,.28)");
-  glow.addColorStop(1, "rgba(241,207,134,0)");
+  const glow = context.createRadialGradient(180, 160, 10, 180, 160, 440);
+  glow.addColorStop(0, "rgba(255,226,124,.34)");
+  glow.addColorStop(1, "rgba(255,226,124,0)");
   context.fillStyle = glow;
-  context.fillRect(0, 0, 700, 700);
+  context.fillRect(0, 0, 720, 720);
 
-  context.strokeStyle = "rgba(241,207,134,.5)";
+  context.strokeStyle = "rgba(255,226,124,.68)";
   context.lineWidth = 2;
+  context.beginPath(); context.arc(164, 158, 58, 0, Math.PI * 2); context.stroke();
   context.beginPath();
-  context.arc(158, 154, 58, 0, Math.PI * 2);
-  context.stroke();
-  context.beginPath();
-  context.moveTo(158, 104); context.lineTo(176, 154); context.lineTo(158, 204); context.lineTo(140, 154); context.closePath();
+  context.moveTo(164, 105); context.lineTo(182, 158); context.lineTo(164, 211); context.lineTo(146, 158); context.closePath();
   context.stroke();
 
-  context.fillStyle = "#f1cf86";
+  context.fillStyle = "#ffe27c";
   context.font = "700 22px Arial, sans-serif";
-  context.fillText("HILIT CASPI · THE COMPASS", 940, 105);
+  context.fillText("HILIT CASPI · THE PATTERN CODE", 940, 102);
   context.font = "700 28px Arial, sans-serif";
   const firstName = input.name?.trim().split(/\s+/)[0];
-  context.fillText(firstName ? `המצפן של ${firstName}` : "המצפן שלי", 940, 230);
+  context.fillText(firstName ? `הפיצוח של ${firstName}` : "הפיצוח שלי", 940, 228);
 
   context.fillStyle = "#ffffff";
-  context.font = "700 68px Georgia, 'Times New Roman', serif";
+  context.font = "700 62px Georgia, 'Times New Roman', serif";
   const titleLines = wrapCanvasText(context, input.result.content.title, 840);
-  titleLines.forEach((line, index) => context.fillText(line, 940, 340 + index * 86));
+  titleLines.forEach((line, index) => context.fillText(line, 940, 330 + index * 78));
 
-  let y = 340 + titleLines.length * 86 + 42;
+  let y = 330 + titleLines.length * 78 + 42;
   context.fillStyle = "rgba(255,255,255,.82)";
-  context.font = "400 34px Arial, sans-serif";
+  context.font = "400 31px Arial, sans-serif";
   const summaryLines = wrapCanvasText(context, input.result.content.summary, 840);
-  summaryLines.forEach((line, index) => context.fillText(line, 940, y + index * 52));
+  summaryLines.slice(0, 5).forEach((line, index) => context.fillText(line, 940, y + index * 48));
 
-  y += summaryLines.length * 52 + 92;
+  y += Math.min(summaryLines.length, 5) * 48 + 75;
   context.strokeStyle = "rgba(255,255,255,.18)";
   context.beginPath(); context.moveTo(140, y); context.lineTo(940, y); context.stroke();
-  context.fillStyle = "#f1cf86";
-  context.font = "700 26px Arial, sans-serif";
-  context.fillText("הצעד הבא", 940, y + 65);
+  context.fillStyle = "#ffe27c";
+  context.font = "700 25px Arial, sans-serif";
+  context.fillText("זה לא קסם. זה דפוס שאפשר לשנות.", 940, y + 62);
   context.fillStyle = "#ffffff";
-  context.font = "700 38px Arial, sans-serif";
+  context.font = "700 34px Arial, sans-serif";
   const actionLines = wrapCanvasText(context, input.action, 800);
-  actionLines.forEach((line, index) => context.fillText(line, 940, y + 125 + index * 54));
+  actionLines.slice(0, 3).forEach((line, index) => context.fillText(line, 940, y + 125 + index * 50));
 
   context.fillStyle = "rgba(255,255,255,.48)";
   context.font = "400 20px Arial, sans-serif";
-  context.fillText("תוצאה מתוך אתגר המצפן של הילית כספי", 940, 1270);
-
+  context.fillText("מתוך שיטת סוד ההתאמה המושלמת · הילית כספי", 940, 1270);
   const link = document.createElement("a");
-  link.download = `hilit-caspi-compass-${input.result.primary}.png`;
+  link.download = `hilit-caspi-pattern-${input.result.primary}.png`;
   link.href = canvas.toDataURL("image/png");
   link.click();
 }
@@ -125,18 +125,18 @@ function createSessionId() {
 }
 
 function PageFrame({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <main className={`min-h-screen bg-[#f5efe9] text-[#2b1038] font-rubik ${className}`} dir="rtl">{children}</main>;
+  return <main className={`min-h-screen overflow-x-hidden bg-[#f0eadc] text-[#191265] font-rubik ${className}`} dir="rtl">{children}</main>;
 }
 
 function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <div className={`${compact ? "h-9 w-9" : "h-11 w-11"} rounded-full border border-[#f1cf86]/60 bg-[#f1cf86]/10 flex items-center justify-center`}>
-        <Compass className="text-[#f1cf86]" size={compact ? 19 : 23} strokeWidth={1.5} />
+      <div className={`${compact ? "h-9 w-9" : "h-11 w-11"} rounded-full border border-[#ffe27c]/70 bg-[#ffe27c]/10 flex items-center justify-center`}>
+        <Fingerprint className="text-[#ffe27c]" size={compact ? 19 : 23} strokeWidth={1.6} />
       </div>
       <div>
-        <p className="text-[#f1cf86] text-[10px] tracking-[0.26em] uppercase">Hilit Caspi</p>
-        <p className="text-white font-serif text-base leading-tight">The Compass</p>
+        <p className="text-[#ffe27c] text-[10px] tracking-[0.24em] uppercase">Hilit Caspi</p>
+        <p className="text-white font-serif text-base leading-tight">The Pattern Code</p>
       </div>
     </div>
   );
@@ -144,51 +144,54 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
 
 function Intro({ onStart }: { onStart: () => void }) {
   return (
-    <PageFrame className="overflow-hidden">
-      <section className="relative min-h-screen bg-[#260c35] flex items-center overflow-hidden px-5 py-10">
-        <div className="absolute inset-0 opacity-70 bg-[radial-gradient(circle_at_18%_20%,rgba(185,36,111,.42),transparent_34%),radial-gradient(circle_at_82%_75%,rgba(241,207,134,.16),transparent_30%)]" />
-        <div className="absolute -top-24 -left-20 h-72 w-72 rounded-full border border-[#f1cf86]/10" />
-        <div className="absolute -bottom-32 -right-24 h-96 w-96 rounded-full border border-[#f1cf86]/10" />
-        <div className="relative z-10 w-full max-w-6xl mx-auto">
-          <div className="flex justify-between items-center mb-12">
+    <PageFrame>
+      <section className="relative min-h-screen overflow-hidden bg-[#191265] px-5 pb-14 pt-7">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_15%,rgba(255,226,124,.18),transparent_25%),radial-gradient(circle_at_82%_65%,rgba(101,22,69,.55),transparent_34%)]" />
+        <div className="relative z-10 mx-auto max-w-5xl">
+          <div className="mb-8 flex items-center justify-between">
             <BrandMark />
-            <span className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs text-white/70">8 לחיצות. בלי לכתוב דבר.</span>
+            <span className="rounded-full bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#191265]">חינם · כ־90 שניות</span>
           </div>
 
-          <div className="grid lg:grid-cols-[1.08fr_.92fr] gap-10 items-center">
-            <motion.div initial={{ opacity: 0, y: 26 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65 }}>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#f1cf86]/35 bg-[#f1cf86]/10 px-4 py-2 text-[#f1cf86] text-sm mb-6">
-                <Sparkles size={15} /> חוויה חינמית מתוך שיטת סוד ההתאמה המושלמת
+          <div className="grid items-center gap-10 lg:grid-cols-[1.08fr_.92fr]">
+            <motion.div initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }}>
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white/85">
+                <Brain size={16} className="text-[#ffe27c]" /> ניסוי קצר מתוך סוד ההתאמה המושלמת
               </div>
-              <h1 className="font-serif text-white text-5xl sm:text-6xl lg:text-7xl leading-[1.02] mb-6">
-                מה באמת חסר לכם
-                <span className="block text-[#f1cf86]">לפני הצעד הבא?</span>
+              <h1 className="mb-6 max-w-3xl text-4xl font-black leading-[1.08] text-white sm:text-6xl lg:text-7xl">
+                חשבו על אדם אחד.
+                <span className="mt-2 block text-[#ffe27c]">אני אנסה לזהות למה דווקא האדם הזה עדיין בראש שלכם.</span>
               </h1>
-              <p className="text-white/75 text-lg sm:text-xl leading-8 max-w-2xl mb-8">
-                לא עוד שאלון אישיות ארוך. המצפן מציג בכל פעם שאלה אחת, משנה את השאלה הבאה לפי הבחירות שלכם, ומחזיר כיוון פעולה שאפשר לקחת לחיים כבר היום.
+              <p className="mb-4 max-w-2xl text-lg leading-8 text-white/78 sm:text-xl">
+                בלי שם, בלי הודעות ובלי לכתוב דבר. אחרי ארבע לחיצות אנסה לנחש איזה מנגנון מפעיל את המשיכה. אחר כך אבדוק את עצמי.
               </p>
-              <button
-                onClick={onStart}
-                className="group min-h-14 w-full sm:w-auto rounded-full bg-[#f1cf86] px-8 py-4 text-[#2b1038] font-black text-lg shadow-[0_18px_42px_rgba(241,207,134,.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#ffe3a8] active:scale-[.98]"
-              >
-                <span className="inline-flex items-center gap-3">גלו את הכיוון שלכם <ArrowLeft className="transition-transform group-hover:-translate-x-1" size={20} /></span>
+              <p className="mb-8 text-sm text-white/55">זה יכול להיות אדם חדש, קשר מהעבר או אותו סיפור שחוזר עם אנשים שונים.</p>
+              <button onClick={onStart} className="group min-h-16 w-full rounded-2xl bg-[#ffe27c] px-8 py-4 text-lg font-black text-[#191265] shadow-[0_18px_45px_rgba(255,226,124,.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-white active:scale-[.98] sm:w-auto">
+                <span className="inline-flex items-center gap-3">יש לי אדם בראש <ArrowLeft size={21} className="transition-transform group-hover:-translate-x-1" /></span>
               </button>
-              <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/55">
-                <span className="inline-flex items-center gap-2"><LockKeyhole size={14} /> התוצאה נחשפת לפני השארת פרטים</span>
-                <span className="inline-flex items-center gap-2"><ShieldCheck size={14} /> התשובות עצמן אינן נשמרות</span>
+              <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-xs text-white/55">
+                <span className="inline-flex items-center gap-2"><LockKeyhole size={14} /> התוצאה נחשפת לפני פרטים</span>
+                <span className="inline-flex items-center gap-2"><ShieldCheck size={14} /> הבחירות עצמן אינן נשמרות</span>
               </div>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.75, delay: 0.12 }} className="relative mx-auto w-full max-w-md aspect-square">
-              <div className="absolute inset-[5%] rounded-full border border-[#f1cf86]/20 animate-[spin_40s_linear_infinite]" />
-              <div className="absolute inset-[15%] rounded-full border border-dashed border-[#f1cf86]/30 animate-[spin_28s_linear_infinite_reverse]" />
-              <div className="absolute inset-[27%] rounded-full bg-gradient-to-br from-[#9b245f] via-[#651645] to-[#2b1038] shadow-[0_35px_90px_rgba(0,0,0,.36)] flex items-center justify-center">
-                <Compass size={112} strokeWidth={0.8} className="text-[#f1cf86] drop-shadow-[0_0_18px_rgba(241,207,134,.32)]" />
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.65, delay: 0.12 }} className="relative mx-auto w-full max-w-md">
+              <div className="relative mx-auto aspect-[4/5] w-[82%] overflow-hidden rounded-[42px] border border-white/15 bg-[#e7d5c7] shadow-[0_35px_90px_rgba(0,0,0,.35)]">
+                <img src={PROFILE_IMG} alt="הילית כספי" className="h-full w-full object-cover object-top" loading="eager" />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#191265] via-[#191265]/75 to-transparent px-6 pb-6 pt-24 text-white">
+                  <p className="text-lg font-black">הילית כספי</p>
+                  <p className="text-sm text-white/70">חקרתי מאות סיפורי היכרות, בחירה ומשיכה</p>
+                </div>
               </div>
-              {["מידע", "עקביות", "קצב", "גבול", "בחירה"].map((label, index) => {
-                const positions = ["top-2 left-1/2 -translate-x-1/2", "top-[26%] right-0", "bottom-[16%] right-[8%]", "bottom-[16%] left-[8%]", "top-[26%] left-0"];
-                return <span key={label} className={`absolute ${positions[index]} text-[#f1cf86]/80 text-xs tracking-wide`}>{label}</span>;
-              })}
+              <motion.div animate={{ y: [0, -7, 0] }} transition={{ duration: 3, repeat: Infinity }} className="absolute -left-1 top-[18%] rounded-2xl border border-[#ffe27c]/35 bg-[#221352]/95 p-4 text-white shadow-xl backdrop-blur sm:-left-8">
+                <Eye size={20} className="mb-2 text-[#ffe27c]" />
+                <p className="text-xs text-white/60">אחרי 4 תשובות</p>
+                <p className="font-black">מגיע הניחוש הראשון</p>
+              </motion.div>
+              <div className="absolute -right-1 bottom-[12%] rounded-2xl bg-[#ffe27c] px-4 py-3 text-[#191265] shadow-xl sm:-right-7">
+                <p className="text-xs font-black">לא קסם</p>
+                <p className="text-sm font-black">פסיכולוגיה של משיכה</p>
+              </div>
             </motion.div>
           </div>
         </div>
@@ -197,67 +200,44 @@ function Intro({ onStart }: { onStart: () => void }) {
   );
 }
 
-function QuestionFlow({
-  responses,
-  onAnswer,
-}: {
-  responses: CompassResponses;
-  onAnswer: (questionId: string, answerId: string) => void;
-}) {
+function QuestionFlow({ responses, onAnswer }: { responses: CompassResponses; onAnswer: (questionId: string, answerId: string) => void }) {
   const question = getNextCompassQuestion(responses);
   const progress = getCompassProgress(responses);
   if (!question) return null;
+  const number = Object.keys(responses).length + 1;
 
   return (
     <PageFrame>
-      <header className="bg-[#260c35] px-5 py-4">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <BrandMark compact />
-          <span className="text-white/55 text-xs">המצפן נבנה תוך כדי הבחירה</span>
-        </div>
+      <header className="bg-[#191265] px-5 py-4">
+        <div className="mx-auto flex max-w-3xl items-center justify-between"><BrandMark compact /><span className="text-xs text-white/60">שאלה {number} מתוך כ־10</span></div>
       </header>
-      <section className="max-w-3xl mx-auto px-5 py-8 sm:py-12">
-        <div className="mb-10">
-          <div className="flex items-center justify-between text-xs text-[#765f79] mb-3">
-            <span>התקדמות</span>
-            <span>{progress}%</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-[#e5d8d4] overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-            <motion.div className="h-full rounded-full bg-gradient-to-l from-[#9b245f] to-[#f1cf86]" animate={{ width: `${progress}%` }} transition={{ duration: 0.35 }} />
-          </div>
-        </div>
+      <div className="h-1.5 bg-[#191265]/15"><motion.div className="h-full bg-[#ffe27c]" animate={{ width: `${progress}%` }} transition={{ duration: 0.3 }} /></div>
 
+      <section className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <AnimatePresence mode="wait">
-          <motion.div key={question.id} initial={{ opacity: 0, x: -22 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 22 }} transition={{ duration: 0.24 }}>
-            <fieldset>
-              <legend className="w-full">
-                <p className="text-[#9b245f] text-sm font-bold tracking-wide mb-3">{question.eyebrow}</p>
-                <h1 className="font-serif text-4xl sm:text-5xl leading-tight text-[#2b1038] mb-3">{question.prompt}</h1>
-                {question.hint && <p className="text-[#765f79] leading-7 mb-2">{question.hint}</p>}
-              </legend>
-
+          <motion.div key={question.id} initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.24 }} className={`w-full min-w-0 max-w-full overflow-hidden ${question.prediction ? "rounded-[32px] bg-[#191265] p-6 text-white shadow-2xl sm:p-10" : "rounded-[32px] bg-white p-6 shadow-[0_18px_55px_rgba(25,18,101,.12)] sm:p-10"}`}>
+            {question.prediction && (
+              <div className="relative mx-auto mb-7 h-24 w-24">
+                <motion.div className="absolute inset-0 rounded-full border border-[#ffe27c]/50" animate={{ rotate: 360 }} transition={{ duration: 7, repeat: Infinity, ease: "linear" }} />
+                <motion.div className="absolute inset-3 rounded-full border border-dashed border-[#ffe27c]/35" animate={{ rotate: -360 }} transition={{ duration: 5, repeat: Infinity, ease: "linear" }} />
+                <div className="absolute inset-0 flex items-center justify-center"><Eye size={38} className="text-[#ffe27c]" /></div>
+              </div>
+            )}
+            <div role="group" aria-labelledby={`question-${question.id}`} className="min-w-0 max-w-full">
+              <div className="min-w-0 max-w-full">
+                <p className={`mb-3 text-sm font-black tracking-wide ${question.prediction ? "text-[#ffe27c] text-center" : "text-[#1800ad]"}`}>{question.eyebrow}</p>
+                <h1 id={`question-${question.id}`} className={`mb-3 max-w-full break-words font-serif text-3xl leading-tight sm:text-5xl ${question.prediction ? "text-center text-white" : "text-[#191265]"}`}>{question.prompt}</h1>
+                {question.hint && <p className={`leading-7 ${question.prediction ? "text-center text-white/65" : "text-[#727272]"}`}>{question.hint}</p>}
+              </div>
               <div className="mt-8 grid gap-3">
                 {question.answers.map((answer, index) => (
-                  <motion.button
-                    key={answer.id}
-                    type="button"
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.045 }}
-                    onClick={() => onAnswer(question.id, answer.id)}
-                    className="group min-h-[68px] w-full rounded-2xl border border-[#dfd0ce] bg-white px-5 py-4 text-right shadow-[0_8px_24px_rgba(43,16,56,.05)] transition duration-200 hover:border-[#9b245f] hover:shadow-[0_12px_30px_rgba(101,22,69,.11)] active:scale-[.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#9b245f]"
-                  >
-                    <span className="flex items-center justify-between gap-4">
-                      <span className="text-[#2b1038] text-base sm:text-lg font-semibold leading-7">{answer.label}</span>
-                      <span className="h-9 w-9 flex-shrink-0 rounded-full border border-[#ead7d1] bg-[#fbf6f2] flex items-center justify-center text-[#9b245f] group-hover:bg-[#9b245f] group-hover:text-white transition">
-                        <ArrowLeft size={17} />
-                      </span>
-                    </span>
+                  <motion.button key={answer.id} type="button" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.045 }} onClick={() => onAnswer(question.id, answer.id)} className={`group min-h-[66px] w-full rounded-2xl border px-5 py-4 text-right font-bold transition duration-200 active:scale-[.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe27c] ${question.prediction ? "border-white/15 bg-white/10 text-white hover:border-[#ffe27c] hover:bg-white/15" : "border-[#e1d8cf] bg-[#fbf8f4] text-[#191265] hover:border-[#191265] hover:bg-white hover:shadow-md"}`}>
+                    <span className="flex items-center justify-between gap-4"><span className="leading-7">{answer.label}</span><span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${question.prediction ? "bg-[#ffe27c] text-[#191265]" : "bg-[#191265] text-white"}`}><ArrowLeft size={17} /></span></span>
                   </motion.button>
                 ))}
               </div>
-            </fieldset>
-            <p className="mt-8 text-center text-xs text-[#8d7b90]">אין תשובה נכונה. הבחירה הבאה משתנה לפי מה שסימנתם עד עכשיו.</p>
+            </div>
+            {!question.prediction && <p className="mt-7 text-center text-xs text-[#8a8291]">בחרו מהר. התשובה הראשונה בדרך כלל מספרת יותר.</p>}
           </motion.div>
         </AnimatePresence>
       </section>
@@ -266,37 +246,33 @@ function QuestionFlow({
 }
 
 function Revealing({ onComplete }: { onComplete: () => void }) {
+  const [step, setStep] = useState(0);
+  const messages = ["מחברת בין הסימנים...", "בודקת מה גרם לערך לעלות...", "מפרידה בין האדם לבין המנגנון...", "מצאתי את הדפוס הבולט."];
   useEffect(() => {
-    const timer = window.setTimeout(onComplete, 1800);
-    return () => window.clearTimeout(timer);
-  }, [onComplete]);
+    const interval = window.setInterval(() => setStep(current => Math.min(current + 1, messages.length - 1)), 520);
+    const timer = window.setTimeout(onComplete, 2350);
+    return () => { window.clearInterval(interval); window.clearTimeout(timer); };
+  }, [onComplete, messages.length]);
   return (
     <PageFrame>
-      <section className="min-h-screen bg-[#260c35] flex items-center justify-center px-6 text-center">
-        <div>
-          <div className="relative mx-auto h-44 w-44 mb-8">
-            <motion.div className="absolute inset-0 rounded-full border border-[#f1cf86]/30" animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: "linear" }} />
-            <motion.div className="absolute inset-5 rounded-full border border-dashed border-[#f1cf86]/45" animate={{ rotate: -360 }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} />
-            <div className="absolute inset-0 flex items-center justify-center"><Compass size={70} strokeWidth={0.9} className="text-[#f1cf86]" /></div>
+      <section className="flex min-h-screen items-center justify-center bg-[#191265] px-6 text-center">
+        <div className="max-w-lg">
+          <div className="relative mx-auto mb-8 h-44 w-44">
+            <motion.div className="absolute inset-0 rounded-full border border-[#ffe27c]/35" animate={{ rotate: 360 }} transition={{ duration: 4.5, repeat: Infinity, ease: "linear" }} />
+            <motion.div className="absolute inset-5 rounded-full border border-dashed border-[#ffe27c]/55" animate={{ rotate: -360 }} transition={{ duration: 3.2, repeat: Infinity, ease: "linear" }} />
+            <div className="absolute inset-0 flex items-center justify-center"><Fingerprint size={72} strokeWidth={0.9} className="text-[#ffe27c]" /></div>
           </div>
-          <motion.h1 initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="font-serif text-white text-4xl mb-3">המצפן קושר את הסימנים</motion.h1>
-          <p className="text-white/55">מפריד בין מידע, עקביות, קצב, גבול ובחירה...</p>
+          <AnimatePresence mode="wait"><motion.h1 key={step} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-4 font-serif text-3xl text-white sm:text-4xl">{messages[step]}</motion.h1></AnimatePresence>
+          <div className="mx-auto mt-7 h-1.5 max-w-xs overflow-hidden rounded-full bg-white/15"><motion.div className="h-full rounded-full bg-[#ffe27c]" initial={{ width: 0 }} animate={{ width: "100%" }} transition={{ duration: 2.2, ease: "linear" }} /></div>
         </div>
       </section>
     </PageFrame>
   );
 }
 
-function ResultView({
-  responses,
-  sessionId,
-  onRestart,
-}: {
-  responses: CompassResponses;
-  sessionId: string;
-  onRestart: () => void;
-}) {
+function ResultView({ responses, sessionId, onRestart }: { responses: CompassResponses; sessionId: string; onRestart: () => void }) {
   const result = useMemo(() => getCompassResult(responses), [responses]);
+  const secondaryContent = result.secondary ? getCompassResultContent(result.secondary) : null;
   const [selectedAction, setSelectedAction] = useState(result.content.actions[0].id);
   const [showMethod, setShowMethod] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
@@ -309,10 +285,10 @@ function ResultView({
   const selectedActionLabel = result.content.actions.find(action => action.id === selectedAction)?.label || result.content.actions[0].label;
 
   useEffect(() => {
-    track({ eventType: "section_view", metadata: { feature: "course_compass", section: "result", result: result.primary } });
+    track({ eventType: "section_view", metadata: { feature: "course_compass", section: "result", result: result.primary, version: COURSE_COMPASS_VERSION } });
   }, [result.primary]);
 
-  const downloadResult = async () => {
+  const downloadResult = () => {
     try {
       downloadCompassCard({ name: form.name, result, action: selectedActionLabel });
       track({ eventType: "button_click", metadata: { feature: "course_compass", action: "download_result", result: result.primary } });
@@ -352,122 +328,116 @@ function ResultView({
   };
 
   const scoreEntries = Object.entries(result.scores).sort((a, b) => b[1] - a[1]);
-  const scoreLabels: Record<string, string> = { information: "מידע", consistency: "עקביות", pace: "קצב", boundary: "גבול", self_choice: "בחירה" };
+  const scoreLabels: Record<string, string> = {
+    future_projection: "השלמת העתיד",
+    uncertainty_loop: "לולאת אי־הוודאות",
+    approval_chase: "מרדף האישור",
+    chemistry_confusion: "בלבול הכימיה",
+    novelty_pull: "משיכת החדש",
+  };
   const maxScore = Math.max(...scoreEntries.map(([, value]) => value), 1);
 
   return (
     <PageFrame>
-      <header className="bg-[#260c35] px-5 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between"><BrandMark compact /><span className="text-white/55 text-xs">התוצאה שלכם מוכנה</span></div>
-      </header>
+      <header className="bg-[#191265] px-5 py-4"><div className="mx-auto flex max-w-5xl items-center justify-between"><BrandMark compact /><span className="text-xs text-white/55">הפיצוח הושלם</span></div></header>
 
-      <section className="relative overflow-hidden bg-[#260c35] px-5 pt-10 pb-20">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(185,36,111,.42),transparent_32%),radial-gradient(circle_at_82%_80%,rgba(241,207,134,.15),transparent_28%)]" />
-        <motion.div initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 max-w-4xl mx-auto text-center">
-          <div className="mx-auto h-16 w-16 rounded-full border border-[#f1cf86]/40 bg-[#f1cf86]/10 flex items-center justify-center mb-6"><Compass className="text-[#f1cf86]" size={32} strokeWidth={1.2} /></div>
-          <p className="text-[#f1cf86] font-bold mb-3">המצפן שלכם מצביע על {result.content.label}</p>
-          <h1 className="font-serif text-white text-4xl sm:text-6xl leading-tight mb-6">{result.content.title}</h1>
-          <p className="text-white/75 text-lg sm:text-xl leading-8 max-w-2xl mx-auto">{result.content.summary}</p>
+      <section className="relative overflow-hidden bg-[#191265] px-5 pb-20 pt-10">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,226,124,.18),transparent_28%),radial-gradient(circle_at_82%_78%,rgba(101,22,69,.62),transparent_32%)]" />
+        <motion.div initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 mx-auto max-w-4xl text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-[#ffe27c]/50 bg-[#ffe27c]/10"><Fingerprint className="text-[#ffe27c]" size={32} /></div>
+          <p className="mb-3 font-black text-[#ffe27c]">המנגנון הבולט: {result.content.label}</p>
+          <h1 className="mb-6 font-serif text-4xl leading-tight text-white sm:text-6xl">{result.content.title}</h1>
+          <p className="mx-auto max-w-2xl text-lg leading-8 text-white/76 sm:text-xl">{result.content.summary}</p>
+          <div className="mx-auto mt-7 max-w-2xl rounded-2xl border border-white/15 bg-white/8 px-5 py-4 text-white/90"><Eye size={18} className="mx-auto mb-2 text-[#ffe27c]" /><p className="font-bold leading-7">{result.content.magicLine}</p></div>
         </motion.div>
       </section>
 
-      <section className="max-w-4xl mx-auto px-5 -mt-10 relative z-10 pb-20 space-y-5">
-        <div className="rounded-[28px] bg-white p-6 sm:p-8 shadow-[0_22px_60px_rgba(43,16,56,.12)] border border-[#eadbd4]">
-          <p className="text-[#9b245f] text-sm font-bold mb-3">למה המצפן הגיע לכאן</p>
-          <p className="text-[#5d4965] leading-8 mb-5">{result.content.rationale}</p>
-          {result.evidence.length > 0 && (
-            <div className="grid sm:grid-cols-2 gap-3">
-              {result.evidence.map(evidence => <div key={evidence} className="rounded-2xl bg-[#faf5f2] border border-[#eadbd4] px-4 py-3 text-sm text-[#4b3653]">“{evidence}”</div>)}
-            </div>
-          )}
+      <section className="relative z-10 mx-auto -mt-10 max-w-4xl space-y-5 px-4 pb-20">
+        <div className="overflow-hidden rounded-[30px] bg-white shadow-[0_22px_60px_rgba(25,18,101,.13)]">
+          <div className="bg-[#ffe27c] px-6 py-5 sm:px-8"><p className="text-sm font-black text-[#191265]">אתם תוהים איך ידעתי את כל זה?</p><h2 className="mt-1 font-serif text-4xl text-[#191265]">זה לא קסם. זה מדע.</h2></div>
+          <div className="p-6 sm:p-8">
+            <p className="text-lg font-bold leading-8 text-[#191265]">מאחורי הרבה מהמשיכה, הבחירות והדינמיקות הזוגיות שלנו יש מנגנונים פסיכולוגיים שחוזרים על עצמם.</p>
+            <p className="mt-4 leading-8 text-[#5d5571]">ברגע שמזהים איזה מנגנון פועל, אפשר להפסיק לפעול על אוטומט. לא חייבים להמשיך לבחור באותו אדם מסוג אחר, להתבלבל בין מתח להתאמה או לתת לפחד מדחייה לנהל את הצעד הבא.</p>
+            <div className="mt-6 rounded-2xl bg-[#f5f1e9] p-5"><div className="mb-2 flex items-center gap-2 font-black text-[#651645]"><FlaskConical size={19} /> המנגנון אצלכם</div><p className="leading-7 text-[#4f4660]">{result.content.science}</p></div>
+          </div>
         </div>
 
-        <div className="rounded-[28px] bg-[#fff8ee] p-6 sm:p-8 border border-[#efd8a9]">
-          <p className="text-[#8a5a18] text-sm font-bold mb-2">הבדיקה הנגדית</p>
-          <p className="text-[#5b4931] leading-8">{result.content.counterSign}</p>
+        <div className="rounded-[28px] bg-white p-6 shadow-sm sm:p-8">
+          <p className="mb-3 text-sm font-black text-[#1800ad]">שלושת הרמזים שנתנו לי את התשובה</p>
+          <p className="mb-5 leading-8 text-[#5d5571]">{result.content.rationale}</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {result.evidence.map((evidence, index) => <div key={evidence} className="rounded-2xl border border-[#e6dfd5] bg-[#fbf8f4] p-4 text-sm leading-6 text-[#191265]"><span className="mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#191265] text-xs font-black text-white">{index + 1}</span>“{evidence}”</div>)}
+          </div>
         </div>
 
-        <div className="rounded-[28px] bg-white p-6 sm:p-8 border border-[#eadbd4] shadow-sm">
-          <p className="text-[#9b245f] text-sm font-bold mb-2">בחרו פעולה אחת</p>
-          <h2 className="font-serif text-3xl text-[#2b1038] mb-5">מה לקחת ל־24 השעות הקרובות?</h2>
-          <div className="grid sm:grid-cols-2 gap-3">
+        {secondaryContent && result.primary !== "safety" && (
+          <div className="rounded-[28px] border border-[#d8d1ea] bg-[#eeebf7] p-6 sm:p-8">
+            <p className="mb-2 text-sm font-black text-[#1800ad]">הניחוש השני שלי היה: {secondaryContent.label}</p>
+            <p className="leading-8 text-[#514a67]">גם המנגנון הזה הופיע, אבל הבחירות שלכם חזרו בעוצמה גדולה יותר אל {result.content.label}. שינוי של תשובה מרכזית אחת היה יכול להפוך את הסדר — ולכן זו מפת דפוס, לא גזירת גורל.</p>
+          </div>
+        )}
+
+        <div className="rounded-[28px] border border-[#efd8a9] bg-[#fff8e7] p-6 sm:p-8">
+          <p className="mb-2 text-sm font-black text-[#8a5a18]">הנקודה שהמנגנון מסתיר</p>
+          <p className="leading-8 text-[#5b4931]">{result.content.counterSign}</p>
+        </div>
+
+        <div className="rounded-[28px] bg-white p-6 shadow-sm sm:p-8">
+          <p className="mb-2 text-sm font-black text-[#1800ad]">אל תשאירו את הפיצוח רק בראש</p>
+          <h2 className="mb-5 font-serif text-3xl text-[#191265]">בחרו ניסוי אחד ל־24 השעות הקרובות</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
             {result.content.actions.map(action => {
               const selected = selectedAction === action.id;
-              return (
-                <button key={action.id} onClick={() => setSelectedAction(action.id)} className={`min-h-16 rounded-2xl border px-5 py-4 text-right font-semibold transition active:scale-[.99] ${selected ? "border-[#9b245f] bg-[#9b245f] text-white shadow-lg" : "border-[#dfd0ce] bg-[#fbf7f4] text-[#2b1038] hover:border-[#9b245f]"}`}>
-                  <span className="flex items-center justify-between gap-3">{action.label}{selected && <Check size={18} />}</span>
-                </button>
-              );
+              return <button key={action.id} onClick={() => setSelectedAction(action.id)} className={`min-h-16 rounded-2xl border px-5 py-4 text-right font-bold transition active:scale-[.99] ${selected ? "border-[#191265] bg-[#191265] text-white shadow-lg" : "border-[#dfd8ce] bg-[#fbf8f4] text-[#191265] hover:border-[#191265]"}`}><span className="flex items-center justify-between gap-3">{action.label}{selected && <Check size={18} />}</span></button>;
             })}
           </div>
         </div>
 
-        <button onClick={() => setShowMethod(value => !value)} className="w-full rounded-2xl border border-[#dfd0ce] bg-transparent px-5 py-4 text-[#5d4965] text-sm font-semibold flex items-center justify-between">
-          איך הגענו לתוצאה הזאת? {showMethod ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </button>
+        <button onClick={() => setShowMethod(value => !value)} className="flex w-full items-center justify-between rounded-2xl border border-[#d8d1e0] bg-transparent px-5 py-4 text-sm font-bold text-[#514a67]">תראו לי את המפה שמאחורי הניחוש {showMethod ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
         <AnimatePresence>
-          {showMethod && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-              <div className="rounded-[28px] bg-[#eee5f2] p-6 sm:p-8">
-                <p className="text-sm text-[#5d4965] leading-7 mb-5">המצפן אינו קורא מחשבות ואינו מאבחן את האדם שמולכם. הוא נותן משקל לבחירות הסגורות שלכם, מפצל שאלה אחת לפי שני הכיוונים המובילים, ומחזיר את הכיוון שקיבל את התמיכה החזקה ביותר.</p>
-                <div className="space-y-3">
-                  {scoreEntries.map(([key, value]) => <div key={key}><div className="flex justify-between text-xs mb-1"><span>{scoreLabels[key]}</span><span>{value}</span></div><div className="h-2 rounded-full bg-white/70 overflow-hidden"><div className="h-full bg-gradient-to-l from-[#9b245f] to-[#f1cf86] rounded-full" style={{ width: `${Math.round((value / maxScore) * 100)}%` }} /></div></div>)}
-                </div>
-              </div>
-            </motion.div>
-          )}
+          {showMethod && <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden"><div className="rounded-[28px] bg-[#e8e5f2] p-6 sm:p-8"><p className="mb-5 text-sm leading-7 text-[#514a67]">כל תשובה הוסיפה או הורידה משקל מחמישה מנגנונים אפשריים. אחרי ארבע לחיצות הצגתי ניחוש ראשון; התגובה שלכם שינתה את השאלה הבאה. לא השתמשתי בשם, בהודעות או במידע על האדם שמולכם.</p><div className="space-y-3">{scoreEntries.map(([key, value], index) => <div key={key}><div className="mb-1 flex justify-between text-xs"><span>{scoreLabels[key]} {index === 0 && "· בולט"}</span></div><div className="h-2 overflow-hidden rounded-full bg-white/75"><div className="h-full rounded-full bg-gradient-to-l from-[#191265] to-[#b92776]" style={{ width: `${Math.max(4, Math.round((value / maxScore) * 100))}%` }} /></div></div>)}</div></div></motion.div>}
         </AnimatePresence>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button onClick={downloadResult} className="min-h-13 flex-1 rounded-full border border-[#9b245f] bg-white px-6 py-3.5 text-[#9b245f] font-bold inline-flex items-center justify-center gap-2 hover:bg-[#fff5f8] active:scale-[.99]"><Download size={18} /> שמירת התוצאה כתמונה</button>
-          <button onClick={onRestart} className="min-h-13 rounded-full px-6 py-3.5 text-[#765f79] font-semibold inline-flex items-center justify-center gap-2 hover:bg-white"><RotateCcw size={17} /> להתחיל מחדש</button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button onClick={downloadResult} className="inline-flex min-h-13 flex-1 items-center justify-center gap-2 rounded-full border border-[#191265] bg-white px-6 py-3.5 font-bold text-[#191265] hover:bg-[#f8f6ff]"><Download size={18} /> שמירת הפיצוח כתמונה</button>
+          <button onClick={onRestart} className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full px-6 py-3.5 font-semibold text-[#716a7d] hover:bg-white"><RotateCcw size={17} /> לחשוב על אדם אחר</button>
         </div>
 
-        <div className="rounded-[32px] overflow-hidden bg-gradient-to-br from-[#2b1038] via-[#651645] to-[#9b245f] text-white shadow-[0_24px_70px_rgba(101,22,69,.2)]">
+        <div className="overflow-hidden rounded-[34px] bg-gradient-to-br from-[#191265] via-[#25145d] to-[#651645] text-white shadow-[0_24px_70px_rgba(25,18,101,.22)]">
           <div className="grid lg:grid-cols-[.72fr_1.28fr]">
-            <div className="relative min-h-64 bg-[#ead4c8] overflow-hidden">
-              <img src={PROFILE_IMG} alt="הילית כספי" className="absolute inset-0 h-full w-full object-cover object-top" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#2b1038]/45 to-transparent" />
-            </div>
+            <div className="relative min-h-72 overflow-hidden bg-[#ead4c8]"><img src={PROFILE_IMG} alt="הילית כספי" className="absolute inset-0 h-full w-full object-cover object-top" /><div className="absolute inset-0 bg-gradient-to-t from-[#191265]/50 to-transparent" /></div>
             <div className="p-7 sm:p-10">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#f1cf86]/40 bg-[#f1cf86]/10 px-4 py-2 text-[#f1cf86] text-xs font-bold mb-5"><Sparkles size={14} /> הטבת השקה למי שמצטרפים עכשיו</div>
-              <h2 className="font-serif text-4xl leading-tight mb-4">זה היה רק המצפן הראשון.</h2>
-              <p className="text-white/78 leading-8 mb-6">קורס הדגל החדש נבנה כדי להפוך דפוסים, משיכה, בחירה ודייטים למפה מעשית. הוא יכלול קורס דיגיטלי ומארז פיזי שנשלח הביתה. המכירה עדיין לא נפתחה.</p>
-              <div className="grid gap-2 mb-7 text-sm text-white/85">
-                <p className="rounded-xl bg-white/8 px-4 py-3">קדימות לקבלת כל פרטי הקורס לפני הפתיחה לקהל הרחב</p>
-                <p className="rounded-xl bg-white/8 px-4 py-3">הטבת השקה ייעודית לחברי הרשימה</p>
-                <p className="rounded-xl bg-white/8 px-4 py-3">קדימות למארז המצפן, שיופק בכמות מוגבלת בהשקה</p>
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#191265]"><Sparkles size={14} /> קורס הדגל והמארז החדש</div>
+              <h2 className="mb-4 font-serif text-4xl leading-tight">לדעת למה זה קורה זו רק ההתחלה. השלב הבא הוא לשנות את זה.</h2>
+              <p className="mb-5 leading-8 text-white/80">בשנים האחרונות פירקתי את מנגנוני המשיכה, הבחירה והדינמיקה הזוגית והפכתי אותם לשיטה מעשית. עכשיו אני בונה ממנה קורס אחד שילמד איך לזהות את ההרגל בזמן אמת, לשנות פעולה ולא לחזור שוב לאותה תוצאה.</p>
+              <div className="mb-7 grid gap-2 text-sm text-white/88">
+                <p className="rounded-xl bg-white/9 px-4 py-3">להפריד בין כימיה, פנטזיה והתאמה אמיתית</p>
+                <p className="rounded-xl bg-white/9 px-4 py-3">לשנות הרגלים בדייטים, בהודעות ובבחירת אנשים</p>
+                <p className="rounded-xl bg-white/9 px-4 py-3">לקבל הביתה את מארז המצפן ולתרגל את השיטה בעולם האמיתי</p>
               </div>
 
               {joined ? (
-                <div className="rounded-2xl border border-[#f1cf86]/35 bg-[#f1cf86]/12 p-6 text-center" aria-live="polite">
-                  <div className="mx-auto h-11 w-11 rounded-full bg-[#f1cf86] text-[#2b1038] flex items-center justify-center mb-3"><Check size={23} /></div>
-                  <h3 className="font-bold text-xl mb-2">המקום ברשימת ההשקה נשמר</h3>
-                  <p className="text-white/72 text-sm leading-6">{confirmationSent ? "שלחנו גם אישור למייל." : "המקום נשמר. אם אישור המייל יתעכב, אין צורך להירשם שוב."} אין חיוב ואין הזמנה בשלב הזה.</p>
-                </div>
+                <div className="rounded-2xl border border-[#ffe27c]/35 bg-[#ffe27c]/12 p-6 text-center" aria-live="polite"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#ffe27c] text-[#191265]"><Check size={23} /></div><h3 className="mb-2 text-xl font-bold">המקום ברשימת ההשקה נשמר</h3><p className="text-sm leading-6 text-white/72">{confirmationSent ? "שלחנו גם אישור למייל." : "המקום נשמר. אם אישור המייל יתעכב, אין צורך להירשם שוב."} אין חיוב ואין הזמנה בשלב הזה.</p></div>
               ) : (
                 <form onSubmit={handleJoin} className="space-y-3" noValidate>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <label className="block"><span className="sr-only">שם</span><input value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="שם" autoComplete="name" className="min-h-13 w-full rounded-xl border border-white/15 bg-white/10 px-4 text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#f1cf86]" /></label>
-                    <label className="block"><span className="sr-only">מייל</span><input type="email" value={form.email} onChange={event => setForm(current => ({ ...current, email: event.target.value }))} placeholder="מייל" autoComplete="email" className="min-h-13 w-full rounded-xl border border-white/15 bg-white/10 px-4 text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#f1cf86]" /></label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block"><span className="sr-only">שם</span><input value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="שם" autoComplete="name" className="min-h-13 w-full rounded-xl border border-white/15 bg-white/10 px-4 text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#ffe27c]" /></label>
+                    <label className="block"><span className="sr-only">מייל</span><input type="email" value={form.email} onChange={event => setForm(current => ({ ...current, email: event.target.value }))} placeholder="מייל" autoComplete="email" className="min-h-13 w-full rounded-xl border border-white/15 bg-white/10 px-4 text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#ffe27c]" /></label>
                   </div>
-                  <label className="block"><span className="sr-only">טלפון, לא חובה</span><input type="tel" value={form.phone} onChange={event => setForm(current => ({ ...current, phone: event.target.value }))} placeholder="טלפון, לא חובה" autoComplete="tel" className="min-h-13 w-full rounded-xl border border-white/15 bg-white/10 px-4 text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#f1cf86]" /></label>
-                  <label className="flex items-start gap-3 cursor-pointer text-sm text-white/82 leading-6"><input type="checkbox" checked={waitlistConsent} onChange={event => setWaitlistConsent(event.target.checked)} className="mt-1 h-4 w-4 accent-[#f1cf86]" /><span>אני רוצה לקבל את הודעת פתיחת הקורס והטבת ההשקה במייל. אפשר לבטל בכל עת.</span></label>
-                  <label className="flex items-start gap-3 cursor-pointer text-xs text-white/58 leading-5"><input type="checkbox" checked={marketingConsent} onChange={event => setMarketingConsent(event.target.checked)} className="mt-1 h-4 w-4 accent-[#f1cf86]" /><span>אשמח לקבל גם תוכן ועדכונים נוספים מהילית כספי.</span></label>
-                  {formError && <p className="rounded-xl bg-red-950/35 border border-red-200/20 px-4 py-3 text-sm text-red-100" role="alert">{formError}</p>}
-                  <button type="submit" disabled={joinWaitlist.isPending} className="min-h-14 w-full rounded-full bg-[#f1cf86] px-7 py-4 text-[#2b1038] font-black text-lg hover:bg-[#ffe3a8] active:scale-[.99] disabled:opacity-60 inline-flex items-center justify-center gap-2">
-                    {joinWaitlist.isPending ? "שומרים את המקום..." : <><Mail size={19} /> שמרו לי קדימות והטבת השקה</>}
-                  </button>
-                  <p className="text-center text-[11px] text-white/45">הקורס והמארז עדיין בבנייה. לא יתבצע חיוב ולא תיפתח הזמנה.</p>
+                  <label className="block"><span className="sr-only">טלפון, לא חובה</span><input type="tel" value={form.phone} onChange={event => setForm(current => ({ ...current, phone: event.target.value }))} placeholder="טלפון, לא חובה" autoComplete="tel" className="min-h-13 w-full rounded-xl border border-white/15 bg-white/10 px-4 text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#ffe27c]" /></label>
+                  <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-white/82"><input type="checkbox" checked={waitlistConsent} onChange={event => setWaitlistConsent(event.target.checked)} className="mt-1 h-4 w-4 accent-[#ffe27c]" /><span>אני רוצה לקבל את הודעת פתיחת הקורס והטבת ההשקה במייל. אפשר לבטל בכל עת.</span></label>
+                  <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-white/58"><input type="checkbox" checked={marketingConsent} onChange={event => setMarketingConsent(event.target.checked)} className="mt-1 h-4 w-4 accent-[#ffe27c]" /><span>אשמח לקבל גם תוכן ועדכונים נוספים מהילית כספי.</span></label>
+                  {formError && <p className="rounded-xl border border-red-200/20 bg-red-950/35 px-4 py-3 text-sm text-red-100" role="alert">{formError}</p>}
+                  <button type="submit" disabled={joinWaitlist.isPending} className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#ffe27c] px-7 py-4 text-lg font-black text-[#191265] hover:bg-white disabled:opacity-60">{joinWaitlist.isPending ? "שומרים את המקום..." : <><Mail size={19} /> אני רוצה קדימות והטבת השקה</>}</button>
+                  <p className="text-center text-[11px] text-white/45">המכירה עדיין לא נפתחה. הקורס והמארז עדיין בבנייה, לא יתבצע חיוב ולא תיפתח הזמנה.</p>
                 </form>
               )}
             </div>
           </div>
         </div>
 
-        <p className="text-center text-xs text-[#8d7b90] leading-6 px-4">המצפן הוא כלי להתבוננות וקבלת החלטה. הוא אינו אבחון פסיכולוגי, אינו מעריך את האדם שמולכם ואינו מחליף עזרה מקצועית במצב של חוסר ביטחון.</p>
+        <p className="px-4 text-center text-xs leading-6 text-[#8a8291]">הפיצוח הוא כלי להתבוננות ואינו אבחון פסיכולוגי, אינו קורא מחשבות, אינו מעריך את האדם שמולכם ואינו מחליף עזרה מקצועית במצב של חוסר ביטחון.</p>
       </section>
-
     </PageFrame>
   );
 }
@@ -478,20 +448,20 @@ export default function CourseCompass() {
   const [sessionId, setSessionId] = useState(() => createSessionId());
 
   useEffect(() => {
-    document.title = "אתגר המצפן | הילית כספי";
-    trackViewContent({ content_name: "אתגר המצפן", content_category: "course_lead_magnet" });
-    track({ eventType: "page_view", page: "/compass", metadata: { feature: "course_compass" } });
+    document.title = "אתגר הפיצוח הזוגי | הילית כספי";
+    trackViewContent({ content_name: "אתגר הפיצוח הזוגי", content_category: "course_lead_magnet" });
+    track({ eventType: "page_view", page: "/compass", metadata: { feature: "course_compass", version: COURSE_COMPASS_VERSION } });
   }, []);
 
   const start = () => {
     setPhase("questions");
-    track({ eventType: "button_click", metadata: { feature: "course_compass", action: "start" } });
+    track({ eventType: "button_click", metadata: { feature: "course_compass", action: "start", version: COURSE_COMPASS_VERSION } });
   };
 
   const answer = (questionId: string, answerId: string) => {
     const next = { ...responses, [questionId]: answerId };
     setResponses(next);
-    track({ eventType: "button_click", metadata: { feature: "course_compass", action: "answer", question: questionId, answer: answerId } });
+    track({ eventType: "button_click", metadata: { feature: "course_compass", action: "step_complete", step: Object.keys(next).length, adaptive: questionId.startsWith("discriminate_") || questionId === "prediction_check" } });
     if (!getNextCompassQuestion(next)) setPhase("reveal");
   };
 

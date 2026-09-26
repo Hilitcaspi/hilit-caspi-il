@@ -16,11 +16,11 @@ export const COURSE_COMPASS_BENEFIT_VERSION = "launch-priority-v1";
 export const COURSE_COMPASS_EMAIL_JOURNEY = "course_compass_waitlist";
 
 const resultKeySchema = z.enum([
-  "information",
-  "consistency",
-  "pace",
-  "boundary",
-  "self_choice",
+  "future_projection",
+  "uncertainty_loop",
+  "approval_chase",
+  "chemistry_confusion",
+  "novelty_pull",
   "safety",
 ]);
 const secondaryResultSchema = z.enum(CORE_COMPASS_RESULTS);
@@ -40,8 +40,8 @@ export function buildCourseCompassWaitlistEmail(input: {
 }) {
   const safeName = escapeHtml(input.name.trim().split(/\s+/)[0] || "");
   const result = getCompassResultContent(input.resultKey);
-  const subject = "המצפן שלך נשמר, ואתם ברשימת ההשקה";
-  const preheader = "הכיוון שקיבלתם והקדימות לקורס הדגל נשמרו";
+  const subject = "זה לא קסם. זה מנגנון שאפשר ללמוד לשנות";
+  const preheader = "הפיצוח האישי והקדימות לקורס הדגל נשמרו";
   const greeting = safeName ? `היי ${safeName},` : "היי,";
   const htmlContent = `<!doctype html>
 <html lang="he" dir="rtl">
@@ -52,18 +52,19 @@ export function buildCourseCompassWaitlistEmail(input: {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#fffaf6;border-radius:28px;overflow:hidden;box-shadow:0 18px 50px rgba(49,14,53,.16);">
       <tr><td align="center" style="padding:34px 26px;background:linear-gradient(135deg,#2b0e38 0%,#641449 58%,#9b245f 100%);">
         <p style="margin:0;color:#f6d08a;font-size:13px;letter-spacing:2px;font-weight:700;">THE COMPASS</p>
-        <h1 style="margin:12px 0 0;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:1.2;">הכיוון שלך נשמר</h1>
-        <p style="margin:12px 0 0;color:rgba(255,255,255,.78);font-size:15px;">אתגר קצר מתוך שיטת סוד ההתאמה המושלמת</p>
+        <h1 style="margin:12px 0 0;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:1.2;">הפיצוח שלך נשמר</h1>
+        <p style="margin:12px 0 0;color:rgba(255,255,255,.78);font-size:15px;">זה לא קסם. זו הפסיכולוגיה שמאחורי הבחירות שלנו.</p>
       </td></tr>
       <tr><td style="padding:30px 28px 14px;text-align:right;">
         <p style="margin:0 0 16px;font-size:18px;font-weight:700;">${greeting}</p>
-        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;">השלמתם את אתגר המצפן. הכיוון שעלה אצלכם הוא:</p>
+        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;">השלמתם את אתגר הפיצוח. המנגנון שבלט אצלכם הוא:</p>
         <div style="border:1px solid #e7d3cc;background:#ffffff;border-radius:22px;padding:22px;margin:0 0 18px;">
           <p style="margin:0 0 6px;color:#9b245f;font-size:13px;font-weight:800;">${escapeHtml(result.label)}</p>
           <p style="margin:0 0 10px;color:#2a123c;font-size:23px;font-weight:800;">${escapeHtml(result.title)}</p>
           <p style="margin:0;color:#66546d;font-size:15px;line-height:1.75;">${escapeHtml(result.summary)}</p>
         </div>
-        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;">נכנסתם לרשימת ההשקה של קורס הדגל החדש. כשהקורס ייפתח, תקבלו לפני כולם את פרטי הקורס, קדימות והטבת השקה מיוחדת.</p>
+        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;"><strong>אתם תוהים איך ידעתי?</strong> זה לא קסם. מאחורי הרבה מהדינמיקות הזוגיות שלנו יש מנגנונים פסיכולוגיים שאפשר לזהות, לפרק ולתרגל אחרת.</p>
+        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;">נכנסתם לרשימת ההשקה של קורס הדגל החדש. בקורס אלמד איך לזהות את המנגנונים בזמן אמת, לשנות הרגלים מעשיים ולבנות דרך ברורה יותר לזוגיות. כשהקורס ייפתח, תקבלו לפני כולם את הפרטים, הקדימות והטבת ההשקה.</p>
         <div style="background:#2b0e38;border-radius:18px;padding:18px 20px;margin:22px 0;color:#ffffff;">
           <p style="margin:0;color:#f6d08a;font-weight:800;font-size:14px;">חשוב לדעת</p>
           <p style="margin:8px 0 0;color:rgba(255,255,255,.82);font-size:14px;line-height:1.7;">הקורס והמארז עדיין בבנייה. לא בוצע חיוב ולא נפתחה הזמנה. הודעה מסודרת תישלח לפני הפתיחה.</p>
@@ -74,7 +75,7 @@ export function buildCourseCompassWaitlistEmail(input: {
     </table>
   </td></tr></table>
 </body></html>`;
-  const textContent = `${greeting}\n\nהשלמתם את אתגר המצפן. הכיוון שעלה אצלכם הוא: ${result.label} — ${result.title}.\n${result.summary}\n\nנכנסתם לרשימת ההשקה של קורס הדגל החדש. כשהקורס ייפתח, תקבלו לפני כולם את פרטי הקורס, קדימות והטבת השקה מיוחדת.\n\nהקורס והמארז עדיין בבנייה. לא בוצע חיוב ולא נפתחה הזמנה.\n\nבאהבה,\nהילית כספי\n\nהתוצאה היא כלי להתבוננות ולבחירת צעד, לא אבחון של אדם אחר ולא תחליף לייעוץ מקצועי.`;
+  const textContent = `${greeting}\n\nהשלמתם את אתגר הפיצוח. המנגנון שבלט אצלכם הוא: ${result.label} — ${result.title}.\n${result.summary}\n\nאתם תוהים איך ידעתי? זה לא קסם. מאחורי הרבה מהדינמיקות הזוגיות שלנו יש מנגנונים פסיכולוגיים שאפשר לזהות, לפרק ולתרגל אחרת.\n\nנכנסתם לרשימת ההשקה של קורס הדגל החדש. בקורס אלמד איך לזהות את המנגנונים בזמן אמת, לשנות הרגלים מעשיים ולבנות דרך ברורה יותר לזוגיות. כשהקורס ייפתח, תקבלו לפני כולם את הפרטים, הקדימות והטבת ההשקה המיוחדת.\n\nהקורס והמארז עדיין בבנייה. לא בוצע חיוב ולא נפתחה הזמנה.\n\nבאהבה,\nהילית כספי\n\nהתוצאה היא כלי להתבוננות ולבחירת צעד, לא אבחון של אדם אחר ולא תחליף לייעוץ מקצועי.`;
   return { subject, preheader, htmlContent, textContent };
 }
 

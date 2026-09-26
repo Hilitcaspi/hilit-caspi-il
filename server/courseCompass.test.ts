@@ -3,71 +3,94 @@ import {
   getCompassProgress,
   getCompassQuestionById,
   getCompassResult,
+  getInterimPrediction,
   getNextCompassQuestion,
   scoreCompassResponses,
   type CompassResponses,
 } from "../shared/courseCompass";
 
-describe("course compass adaptive engine", () => {
-  it("starts with a closed-choice question and never requires free text", () => {
+describe("course compass adaptive pattern engine", () => {
+  it("starts by asking the visitor to hold one person in mind without free text", () => {
     const question = getNextCompassQuestion({});
-    expect(question?.id).toBe("moment");
-    expect(question?.answers).toHaveLength(4);
+    expect(question?.id).toBe("scene");
+    expect(question?.prompt).toContain("ביניכם");
+    expect(question?.answers.length).toBeGreaterThanOrEqual(4);
     expect(question?.answers.every(answer => Boolean(answer.id && answer.label))).toBe(true);
   });
 
-  it("selects the information-versus-consistency discriminator from the first four answers", () => {
+  it("makes a visible interim prediction after four clicks", () => {
     const responses: CompassResponses = {
-      moment: "after_date",
-      decision: "ask",
-      fog: "words_actions",
-      calm: "direct_answer",
+      scene: "mixed_messages",
+      fast_hook: "decode_everything",
+      value_signal: "unavailable",
+      silence_response: "check_phone",
     };
+    const prediction = getInterimPrediction(responses);
     const question = getNextCompassQuestion(responses);
-    expect(question?.id).toBe("discriminate_consistency__information");
-    expect(question?.prompt).toBe("מה ישנה יותר את התמונה?");
-    expect(question?.answers.map(answer => answer.id)).toEqual(["information", "consistency"]);
+    expect(prediction.primary).toBe("uncertainty_loop");
+    expect(prediction.text).toContain("שום דבר עדיין לא נסגר");
+    expect(question?.id).toBe("prediction_check");
+    expect(question?.prediction).toBe(true);
+    expect(question?.prompt).toBe(prediction.text);
   });
 
-  it("changes the fifth question when the leading pair changes", () => {
+  it("uses the reaction to the first guess before choosing the discriminating question", () => {
     const responses: CompassResponses = {
-      moment: "relationship_question",
-      decision: "stop",
-      fog: "speed",
-      calm: "time",
+      scene: "mixed_messages",
+      fast_hook: "decode_everything",
+      value_signal: "unavailable",
+      silence_response: "check_phone",
+      prediction_check: "close",
     };
     const question = getNextCompassQuestion(responses);
-    expect(question?.id).toBe("discriminate_boundary__pace");
-    expect(question?.answers.map(answer => answer.id)).toEqual(["pace", "boundary"]);
+    expect(question?.id).toBe("discriminate_chemistry_confusion__uncertainty_loop");
+    expect(question?.prompt).toContain("מה חזק יותר");
   });
 
-  it("explains a consistency result with evidence from choices", () => {
+  it("asks exactly one adaptive discriminator before moving deeper", () => {
     const responses: CompassResponses = {
-      moment: "after_date",
-      decision: "slow",
-      fog: "words_actions",
-      calm: "repeated_action",
-      discriminate_consistency__pace: "consistency",
-      reaction: "wait_sign",
-      possible_action: "observe_action",
+      scene: "mixed_messages",
+      fast_hook: "decode_everything",
+      value_signal: "unavailable",
+      silence_response: "check_phone",
+      prediction_check: "close",
+      discriminate_chemistry_confusion__uncertainty_loop: "uncertainty_loop",
+    };
+    expect(getNextCompassQuestion(responses)?.id).toBe("hard_truth");
+  });
+
+  it("reveals the uncertainty loop with evidence copied from actual choices", () => {
+    const responses: CompassResponses = {
+      scene: "mixed_messages",
+      fast_hook: "decode_everything",
+      value_signal: "unavailable",
+      silence_response: "check_phone",
+      discriminate_chemistry_confusion__uncertainty_loop: "uncertainty_loop",
+      prediction_check: "close",
+      hard_truth: "clarity_scary",
+      facts_only: "close_far_pattern",
+      old_solution: "look_for_sign",
       safety: "no",
     };
     const result = getCompassResult(responses);
-    expect(result.primary).toBe("consistency");
-    expect(result.content.title).toBe("בדקו עקביות, לא רק כוונה");
-    expect(result.evidence).toContain("יש מילים יפות, אבל המעשים אינם עקביים");
-    expect(result.content.actions.length).toBeGreaterThanOrEqual(2);
+    expect(result.primary).toBe("uncertainty_loop");
+    expect(result.content.title).toContain("חוסר הבהירות");
+    expect(result.content.science).toContain("תגמול");
+    expect(result.evidence).toContain("מנתח הודעות, זמנים ושינויים קטנים");
+    expect(result.content.actions.length).toBe(2);
   });
 
-  it("overrides ordinary scoring when safety is uncertain", () => {
+  it("overrides the attraction pattern when safety is uncertain", () => {
     const responses: CompassResponses = {
-      moment: "new_connection",
-      decision: "approach",
-      fog: "intent",
-      calm: "direct_answer",
-      discriminate_information__pace: "information",
-      reaction: "ask_directly",
-      possible_action: "one_question",
+      scene: "strong_attraction_little_ground",
+      fast_hook: "feel_intensity",
+      value_signal: "intense_moment",
+      silence_response: "want_more",
+      prediction_check: "close",
+      discriminate_chemistry_confusion__future_projection: "chemistry_confusion",
+      hard_truth: "intensity_wins",
+      facts_only: "intensity_few_facts",
+      old_solution: "rules_then_break",
       safety: "uncertain",
     };
     const result = getCompassResult(responses);
@@ -76,35 +99,38 @@ describe("course compass adaptive engine", () => {
     expect(getNextCompassQuestion(responses)).toBeNull();
   });
 
-  it("uses a transparent tie-break when the two leading directions remain close", () => {
+  it("uses a final transparent guess when two mechanisms remain close", () => {
     const responses: CompassResponses = {
-      moment: "new_connection",
-      decision: "approach",
-      fog: "speed",
-      calm: "direct_answer",
-      discriminate_information__pace: "pace",
-      reaction: "ask_directly",
-      possible_action: "one_question",
+      scene: "after_date_replay",
+      fast_hook: "build_future",
+      value_signal: "intense_moment",
+      silence_response: "want_more",
+      prediction_check: "partial",
+      discriminate_chemistry_confusion__future_projection: "chemistry_confusion",
+      hard_truth: "knew_but_stayed",
+      facts_only: "intensity_few_facts",
+      old_solution: "wait_for_potential",
       safety: "no",
     };
     const scores = scoreCompassResponses(responses);
-    expect(Math.abs(scores.information - scores.pace)).toBeLessThan(2);
+    expect(Math.abs(scores.chemistry_confusion - scores.future_projection)).toBeLessThan(2);
     expect(getNextCompassQuestion(responses)?.id).toBe("tie_break");
   });
 
-  it("calculates progress without exceeding one hundred percent", () => {
+  it("calculates progress across ten clicks and never exceeds one hundred percent", () => {
     const responses: CompassResponses = {
-      moment: "after_date",
-      decision: "ask",
-      fog: "intent",
-      calm: "direct_answer",
-      discriminate_information__self_choice: "information",
-      reaction: "ask_directly",
-      possible_action: "one_question",
+      scene: "mixed_messages",
+      fast_hook: "decode_everything",
+      value_signal: "unavailable",
+      silence_response: "check_phone",
+      prediction_check: "close",
+      discriminate_chemistry_confusion__uncertainty_loop: "uncertainty_loop",
+      hard_truth: "clarity_scary",
+      facts_only: "close_far_pattern",
+      old_solution: "look_for_sign",
       safety: "no",
-      tie_break: "information",
     };
     expect(getCompassProgress(responses)).toBe(100);
-    expect(getCompassQuestionById("possible_action", responses)?.answers).toHaveLength(5);
+    expect(getCompassQuestionById("hard_truth", responses)?.answers).toHaveLength(5);
   });
 });

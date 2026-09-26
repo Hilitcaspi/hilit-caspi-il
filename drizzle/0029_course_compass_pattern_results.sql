@@ -1,0 +1,2 @@
+ALTER TABLE `course_compass_leads` MODIFY COLUMN `result_key` enum('information','consistency','pace','boundary','self_choice','future_projection','uncertainty_loop','approval_chase','chemistry_confusion','novelty_pull','safety') NOT NULL;--> statement-breakpoint
+ALTER TABLE `course_compass_leads` MODIFY COLUMN `secondary_result_key` enum('information','consistency','pace','boundary','self_choice','future_projection','uncertainty_loop','approval_chase','chemistry_confusion','novelty_pull');

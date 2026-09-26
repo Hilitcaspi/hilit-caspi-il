@@ -51,9 +51,9 @@ const validInput = {
   name: "בדיקת מערכת",
   email: "compass-test@example.com",
   phone: "0500000000",
-  resultKey: "consistency" as const,
-  secondaryResultKey: "information" as const,
-  selectedAction: "observe_defined",
+  resultKey: "uncertainty_loop" as const,
+  secondaryResultKey: "chemistry_confusion" as const,
+  selectedAction: "ask_one_clear_question",
   waitlistConsent: true as const,
   marketingConsent: false,
   utmSource: "qa",
@@ -87,12 +87,12 @@ describe("course compass waitlist API", () => {
     expect(waitlistUpsert).toHaveBeenCalledOnce();
     expect(insertConfirmation).toHaveBeenCalledOnce();
     expect(mocks.sendEmail).toHaveBeenCalledOnce();
-    expect(mocks.sendEmail.mock.calls[0][0].subject).toContain("המצפן שלך נשמר");
+    expect(mocks.sendEmail.mock.calls[0][0].subject).toContain("זה לא קסם");
     expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ status: "sent" }));
     const storedValues = db.insert.mock.results[0].value.values.mock.calls[0][0];
     expect(storedValues).toMatchObject({
-      resultKey: "consistency",
-      selectedAction: "observe_defined",
+      resultKey: "uncertainty_loop",
+      selectedAction: "ask_one_clear_question",
       waitlistConsent: true,
       marketingConsent: false,
     });
