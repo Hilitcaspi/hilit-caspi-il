@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const publicSalesPages = [
   "client/src/pages/Home.tsx",
   "client/src/pages/CoachingSales.tsx",
+  "client/src/pages/CourseCompass.tsx",
   "client/src/pages/CourseSales.tsx",
   "client/src/pages/DatabaseLanding.tsx",
   "client/src/pages/DatabaseSales.tsx",

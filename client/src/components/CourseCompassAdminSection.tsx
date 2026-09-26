@@ -50,9 +50,10 @@ export default function CourseCompassAdminSection() {
           </div>
           {expanded ? <ChevronUp size={19} className="text-[#651645]" /> : <ChevronDown size={19} className="text-[#651645]" />}
         </div>
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
           <div className="rounded-lg bg-[#f7f1f6] p-3 text-center"><div className="text-xl font-black text-[#651645]">{data.total}</div><div className="text-[11px] text-[#727272]">ברשימת ההשקה</div></div>
           <div className="rounded-lg bg-[#fff7e9] p-3 text-center"><div className="text-xl font-black text-[#8a5a18]">{data.marketingConsent}</div><div className="text-[11px] text-[#727272]">אישרו גם תוכן נוסף</div></div>
+          <div className="rounded-lg bg-[#e9f7ee] p-3 text-center"><div className="text-xl font-black text-[#24663b]">{data.courseInterest}</div><div className="text-[11px] text-[#727272]">רוצים מחיר השקה</div></div>
           {Object.entries(data.byResult).slice(0, 2).map(([key, count]) => (
             <div key={key} className="rounded-lg bg-[#f8f6f0] p-3 text-center"><div className="text-xl font-black text-[#191265]">{count}</div><div className="text-[11px] text-[#727272]">{RESULT_LABELS[key] ?? key}</div></div>
           ))}
@@ -74,6 +75,7 @@ export default function CourseCompassAdminSection() {
                   <div>
                     <p className="font-bold text-sm text-[#191265]">{row.name}</p>
                     <p className="text-xs text-[#727272] mt-0.5">{row.gender === "female" ? "אישה" : row.gender === "male" ? "גבר" : "מגדר לא נשמר"} · כיוון: {RESULT_LABELS[row.resultKey] ?? row.resultKey}</p>
+                    {row.selectedAction === "course_launch_interest" && <span className="mt-1.5 inline-flex rounded-full bg-[#e3f5e9] px-2.5 py-1 text-[11px] font-black text-[#24663b]">עניין גבוה בקורס</span>}
                     <p className="text-[11px] text-[#9a8b9c] mt-1">{new Date(row.createdAt).toLocaleString("he-IL")}{row.utmSource ? ` · ${row.utmSource}${row.utmCampaign ? ` / ${row.utmCampaign}` : ""}` : ""}</p>
                   </div>
                   <div className="flex gap-1.5">

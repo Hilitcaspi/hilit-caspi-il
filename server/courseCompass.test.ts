@@ -49,6 +49,9 @@ describe("course compass simple gendered engine", () => {
     expect(result.content.actions).toHaveLength(1);
     expect(result.content.deeperInsight).toContain("חוסר הוודאות");
     expect(result.content.relationshipCost).toContain("סימנים");
+    expect(result.content.recommendationTitle).toContain("בהירות");
+    expect(result.content.recommendationBody).toContain("ערפל");
+    expect(result.content.next72Hours).toContain("הודעה אחת ברורה");
     expect(result.content.courseBridge).toContain("בקורס תלמדי");
   });
 
@@ -60,6 +63,8 @@ describe("course compass simple gendered engine", () => {
     expect(male.content.title).toContain("שהיא רוצה אותך");
     expect(male.evidence).toContain("בודק שוב ושוב אם היא כתבה");
     expect(male.content.courseBridge).toContain("בקורס תלמד");
+    expect(male.content.recommendationTitle).toContain("בקש בהירות");
+    expect(male.content.next72Hours).toContain("שלח הודעה אחת ברורה");
   });
 
   it("calculates simple progress across eight clicks", () => {

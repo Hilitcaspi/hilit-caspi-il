@@ -206,9 +206,27 @@ export const courseCompassRouter = router({
       };
     }),
 
+  markCourseInterest: publicProcedure
+    .input(z.object({
+      sessionId: z.string().trim().min(16).max(64),
+      email: z.string().trim().email().max(320),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      await db.update(courseCompassLeads).set({
+        selectedAction: "course_launch_interest",
+        updatedAt: Date.now(),
+      }).where(and(
+        eq(courseCompassLeads.sessionId, input.sessionId),
+        eq(courseCompassLeads.email, input.email.toLowerCase()),
+      ));
+      return { ok: true };
+    }),
+
   adminList: teamProcedure.query(async () => {
     const db = await getDb();
-    if (!db) return { total: 0, marketingConsent: 0, byResult: {}, rows: [] };
+    if (!db) return { total: 0, marketingConsent: 0, courseInterest: 0, byResult: {}, rows: [] };
     const rows = await db.select({
       id: courseCompassLeads.id,
       name: courseCompassLeads.name,
@@ -233,6 +251,7 @@ export const courseCompassRouter = router({
     return {
       total: rows.length,
       marketingConsent: rows.filter(row => row.marketingConsent).length,
+      courseInterest: rows.filter(row => row.selectedAction === "course_launch_interest").length,
       byResult,
       rows,
     };

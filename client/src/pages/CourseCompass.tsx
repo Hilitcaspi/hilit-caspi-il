@@ -38,6 +38,46 @@ const COURSE_BOX_IMG = "/manus-storage/course-compass-box-web_c20d2d02.jpg";
 
 type LeadDetails = { name: string; email: string; phone: string };
 
+const COURSE_MODULES = [
+  { number: "01", title: "לגלות את המצפן הישן", text: "למפות את האנשים שמושכים אותך, את הסיפור שחוזר ואת הרגע שבו הבחירה מתחילה להתעקם." },
+  { number: "02", title: "איך המוח בוחר עוד לפני הראש", text: "להבין רושם ראשוני, משיכה, השלמת מידע ופער בין מה שנדמה שמתאים לבין מה שבאמת מתאים." },
+  { number: "03", title: "כימיה, עוררות וחוסר ודאות", text: "להפריד בין פרפרים, מתח, אתגר והתאמה שאפשר לבנות עליה חיים." },
+  { number: "04", title: "זמינות רגשית ודפוסים חוזרים", text: "לזהות מרדף, הימנעות, בחירה באנשים לא פנויים והסימנים שמופיעים הרבה לפני האכזבה." },
+  { number: "05", title: "סטנדרטים שלא נעלמים כשמתאהבים", text: "להגדיר מה באמת חשוב, מה גמיש ומה אסור למחוק רק כדי שמישהו יבחר בך." },
+  { number: "06", title: "לקרוא התנהגות במקום לנחש", text: "לבדוק יוזמה, עקביות, כוונה, קצב ויחס בלי לפרש כל הודעה ובלי להישען על מילים יפות." },
+  { number: "07", title: "דייטים והודעות בזמן אמת", text: "לקבל כלים מעשיים לרגעים שמבלבלים: מתי לכתוב, מה לשאול, איך להציב גבול ומתי לתת עוד הזדמנות." },
+  { number: "08", title: "לבנות קשר הדדי שנשאר", text: "ללמוד תקשורת, ביטחון, תיקון אחרי קושי ובחירה שמתבססת על שני אנשים ולא על מאמץ של צד אחד." },
+  { number: "09", title: "מפת הדרך ל־30 הימים הבאים", text: "לצאת מהקורס עם תוכנית אישית, ניסויים שבועיים וכללי החלטה שאפשר להפעיל בכל היכרות חדשה." },
+] as const;
+
+const COURSE_DIFFERENTIATORS = [
+  { title: "לא ספריית ידע. מערכת החלטה", text: "כל מודל הופך לשאלה, בדיקה או פעולה שאפשר להפעיל מול הודעה, דייט או קשר אמיתי." },
+  { title: "לא טיפ אחד לכולם. מצפן אישי", text: "הקורס מתחיל בזיהוי הדרך שבה דווקא אצלך משיכה, פחד ובחירה מתחברים זה לזה." },
+  { title: "לא נשארים מול המסך", text: "הקורס הדיגיטלי מחובר לחוברת, לקלפים ולמפת עבודה שמכריחים להפוך הבנה להרגל חדש." },
+  { title: "לא רק למצוא. גם לדעת לבחור", text: "המטרה אינה להשיג כל אדם שמוצא חן בעינייך, אלא לזהות מהר יותר מי מתאים ולבנות קשר הדדי ובריא." },
+] as const;
+
+function CourseInterestBand({
+  saved,
+  loading,
+  onInterest,
+  title,
+}: {
+  saved: boolean;
+  loading: boolean;
+  onInterest: () => void;
+  title: string;
+}) {
+  return (
+    <div className="rounded-[28px] bg-gradient-to-l from-[#ffe27c] to-[#fff3b6] p-5 text-center shadow-[0_15px_45px_rgba(25,18,101,.10)] sm:flex sm:items-center sm:justify-between sm:gap-6 sm:text-right">
+      <div><p className="text-xs font-black text-[#b92776]">קורס דיגיטלי חדש + ערכת עבודה שמגיעה הביתה</p><h3 className="mt-1 text-xl font-black leading-7 text-[#191265]">{title}</h3></div>
+      <button type="button" onClick={onInterest} disabled={loading || saved} className="mt-4 w-full rounded-full bg-[#191265] px-6 py-4 font-black text-white shadow-lg transition hover:bg-[#2c2288] disabled:cursor-default disabled:bg-[#35714a] sm:mt-0 sm:w-auto sm:min-w-64">
+        {saved ? "סימנתי לך עניין בקורס" : loading ? "נשמר..." : "אני רוצה לקבל את מחיר ההשקה"}
+      </button>
+    </div>
+  );
+}
+
 function createSessionId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `compass-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -272,16 +312,23 @@ function ResultView({
   gender,
   responses,
   lead,
+  sessionId,
   onRestart,
 }: {
   gender: CompassGender;
   responses: CompassResponses;
   lead: LeadDetails;
+  sessionId: string;
   onRestart: () => void;
 }) {
   const result = useMemo(() => getCompassResult(responses, gender), [responses, gender]);
   const [accuracyFeedback, setAccuracyFeedback] = useState<string | null>(null);
+  const [courseInterestSaved, setCourseInterestSaved] = useState(false);
+  const courseInterest = trpc.courseCompass.markCourseInterest.useMutation({
+    onSuccess: () => setCourseInterestSaved(true),
+  });
   const { data: testimonials = [] } = trpc.publicProof.approvedTestimonials.useQuery();
+  const { data: successStoryPost } = trpc.blog.getBySlug.useQuery({ slug: "sipurei-hatzlacha" }, { retry: false });
   const female = gender === "female";
   const firstName = lead.name.split(/\s+/)[0];
   const highestScore = Math.max(...Object.values(result.scores), 1);
@@ -295,10 +342,26 @@ function ResultView({
     .sort((left, right) => right.score - left.score)
     .slice(0, 3);
   const secondaryLabel = result.secondary ? getCompassResultContent(result.secondary, gender).label : null;
+  const publicStoryQuotes = useMemo(() => {
+    const content = successStoryPost?.content || "";
+    const allQuotes: string[] = [];
+    const quotePattern = /["“]([^"”]{20,220})["”]/g;
+    let match: RegExpExecArray | null;
+    while ((match = quotePattern.exec(content))) allQuotes.push(match[1].trim());
+    const positiveQuotes = allQuotes.filter(quote => /שינית|הביתה|אהבה.*מתחילה|אפשרי/.test(quote));
+    return Array.from(new Set(positiveQuotes.length >= 2 ? positiveQuotes : allQuotes)).slice(0, 3);
+  }, [successStoryPost?.content]);
 
   const registerAccuracy = (value: string) => {
     setAccuracyFeedback(value);
     track({ eventType: "button_click", metadata: { feature: "course_compass", action: "result_accuracy", value, result: result.primary, gender } });
+  };
+
+  const registerCourseInterest = (placement: string) => {
+    track({ eventType: "button_click", metadata: { feature: "course_compass", action: "course_launch_interest", placement, result: result.primary, gender } });
+    if (!courseInterestSaved && !courseInterest.isPending) {
+      courseInterest.mutate({ sessionId, email: lead.email });
+    }
   };
 
   useEffect(() => {
@@ -320,6 +383,20 @@ function ResultView({
       </section>
 
       <section className="relative z-10 mx-auto -mt-8 max-w-4xl space-y-5 px-4 pb-20">
+        <div className="overflow-hidden rounded-[32px] bg-white shadow-[0_24px_70px_rgba(25,18,101,.16)]">
+          <div className="bg-[#ffe27c] px-6 py-5 text-center"><p className="text-sm font-black text-[#651645]">יש אדם מסוים בראש. זו ההמלצה שלי כרגע.</p></div>
+          <div className="p-6 sm:p-9">
+            <h2 className="mb-4 text-3xl font-black leading-tight text-[#191265]">{result.content.recommendationTitle}</h2>
+            <p className="text-lg leading-8 text-[#514a67]">{result.content.recommendationBody}</p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-[1.1fr_.9fr]">
+              <div className="rounded-[22px] bg-[#f6f0eb] p-5"><p className="mb-2 text-sm font-black text-[#b92776]">מה לעשות ב־72 השעות הקרובות</p><p className="font-bold leading-7 text-[#191265]">{result.content.next72Hours}</p></div>
+              <div className="rounded-[22px] border border-[#191265]/12 p-5"><p className="mb-2 text-sm font-black text-[#191265]">מה המצפן לא יכול לדעת</p><p className="text-sm leading-7 text-[#5d5571]">הוא אינו קורא את המחשבות של האדם שמולך. הוא מזהה מה מפעיל את הבחירה שלך ומחזיר את ההחלטה לעובדות, למעשים ולהדדיות.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <CourseInterestBand saved={courseInterestSaved} loading={courseInterest.isPending} onInterest={() => registerCourseInterest("after_recommendation")} title={female ? "רוצה לדעת לא רק מה לעשות מולו עכשיו, אלא איך לא לחזור שוב לאותו דפוס?" : "רוצה לדעת לא רק מה לעשות מולה עכשיו, אלא איך לא לחזור שוב לאותו דפוס?"} />
+
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-[24px] bg-white p-5 shadow-sm"><p className="mb-2 text-sm font-black text-[#b92776]">מה זיהיתי</p><p className="leading-7 text-[#514a67]">{result.content.rationale}</p></div>
           <div className="rounded-[24px] bg-white p-5 shadow-sm"><p className="mb-2 text-sm font-black text-[#b92776]">למה זה קורה</p><p className="leading-7 text-[#514a67]">{result.content.science}</p></div>
@@ -378,16 +455,44 @@ function ResultView({
           </div>
         </div>
 
+        <div className="rounded-[34px] bg-white p-6 shadow-[0_22px_60px_rgba(25,18,101,.11)] sm:p-10">
+          <div className="mx-auto mb-9 max-w-3xl text-center">
+            <p className="mb-2 text-sm font-black text-[#b92776]">מה מיוחד בקורס הזה?</p>
+            <h2 className="mb-4 text-3xl font-black leading-tight text-[#191265] sm:text-4xl">זה קורס דיגיטלי מלא. המארז הביתי הופך את הידע לשינוי שעובד גם מחוץ למסך.</h2>
+            <p className="leading-8 text-[#5d5571]">הרבה קורסים מסבירים למה דברים קורים. הקורס הזה נבנה כדי לעזור לקבל החלטה אחרת ברגע האמיתי: כשלא עונים, כשיש כימיה מסחררת, כשלא ברור אם להמשיך, כשצריך להציב גבול וכשמופיע אדם יציב שלא מרגיש כמו הדפוס המוכר.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {COURSE_DIFFERENTIATORS.map((item, index) => <article key={item.title} className="rounded-[24px] border border-[#191265]/8 bg-[#fbf8f4] p-6"><span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-[#191265] text-sm font-black text-[#ffe27c]">0{index + 1}</span><h3 className="mb-2 text-xl font-black text-[#191265]">{item.title}</h3><p className="leading-7 text-[#5d5571]">{item.text}</p></article>)}
+          </div>
+          <div className="mt-7 rounded-[24px] border border-[#d7bd65]/45 bg-[#fff8dc] p-6 text-center"><p className="text-sm font-black text-[#b92776]">ההבדל החשוב ביותר</p><p className="mx-auto mt-2 max-w-3xl text-lg font-bold leading-8 text-[#191265]">לא יוצאים רק עם תובנה על העבר. יוצאים עם שיטת בחירה שאפשר להפעיל מול האדם שנמצא עכשיו בראש וגם מול כל היכרות שתגיע אחריו.</p></div>
+        </div>
+
         <div className="overflow-hidden rounded-[34px] bg-gradient-to-br from-[#191265] via-[#25145d] to-[#651645] text-white shadow-[0_24px_70px_rgba(25,18,101,.22)]">
           <div className="p-7 text-center sm:p-10">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#191265]"><Sparkles size={14} /> קורס הדגל החדש</div>
             <p className="mb-2 text-sm font-black uppercase tracking-[.18em] text-[#ffe27c]">מהניצוץ למצפן</p>
             <h2 className="mb-4 text-4xl font-black leading-tight sm:text-5xl">סוד ההתאמה המושלמת</h2>
             <p className="mx-auto mb-8 max-w-3xl text-lg font-bold leading-8 text-white/90">{female ? "קורס מעשי שנועד לעזור לך להבין מי באמת מתאים לך, לשנות את ההרגלים שמחזירים אותך לאותם קשרים ולבנות דרך חדשה אל הזוגיות שאת מחפשת." : "קורס מעשי שנועד לעזור לך להבין מי באמת מתאימה לך, לשנות את ההרגלים שמחזירים אותך לאותם קשרים ולבנות דרך חדשה אל הזוגיות שאתה מחפש."}</p>
-            <div className="grid gap-3 sm:grid-cols-4"><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">9</p><p className="mt-1 text-sm font-bold">מודולים</p></div><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">27</p><p className="mt-1 text-sm font-bold">שיעורים</p></div><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">9</p><p className="mt-1 text-sm font-bold">תרגילי עומק</p></div><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">30</p><p className="mt-1 text-sm font-bold">ימי יישום</p></div></div>
+            <div className="mx-auto mb-7 max-w-3xl rounded-[24px] border border-[#ffe27c]/30 bg-white/8 p-6 text-right"><p className="mb-2 text-sm font-black text-[#ffe27c]">שנים של עבודה, מרוכזות למסע דיגיטלי אחד</p><p className="leading-8 text-white/82">כתב היד שכבר נבנה לקורס כולל כ־38 אלף מילים. בקצב הוראה מקובל זה מגלם כ־5 שעות של הסבר ממוקד ממני, עוד לפני תרגילי העומק, הניסויים השבועיים והיישום בבית. מבחינת זמן ההסבר בלבד, מדובר בהיקף שדומה לכחמש פגישות של שעה, אך הקורס אינו מחליף ליווי אישי ואינו מתיימר לעשות זאת.</p></div>
+            <div className="grid gap-3 sm:grid-cols-4"><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">9</p><p className="mt-1 text-sm font-bold">מודולים שבונים שיטה</p></div><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">27</p><p className="mt-1 text-sm font-bold">שיעורים קצרים וממוקדים</p></div><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">18</p><p className="mt-1 text-sm font-bold">תרגילי עומק וניסויים</p></div><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">30</p><p className="mt-1 text-sm font-bold">ימי יישום עם מפה אישית</p></div></div>
           </div>
           <div className="grid border-t border-white/12 sm:grid-cols-2">
             {[{ icon: BrainCircuit, title: "לפצח את הדפוס", text: "להבין למה אותם אנשים ואותם תסריטים חוזרים." }, { icon: Compass, title: "לבנות מצפן חדש", text: "להפריד בין משיכה, פוטנציאל והתאמה אמיתית." }, { icon: HeartHandshake, title: "לפעול אחרת", text: "לתרגל בחירה, תקשורת, גבולות וזמינות רגשית." }, { icon: Map, title: "לצאת עם מפה", text: "תוכנית ברורה לדייטים, להיכרויות ולהחלטות בזמן אמת." }].map(({ icon: Icon, title, text }) => <div key={title} className="flex gap-4 border-b border-white/10 p-6 text-right sm:border-l"><div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#ffe27c] text-[#191265]"><Icon size={21} /></div><div><h3 className="mb-1 font-black">{title}</h3><p className="text-sm leading-6 text-white/70">{text}</p></div></div>)}
+          </div>
+        </div>
+
+        <div className="rounded-[34px] bg-white p-6 shadow-[0_22px_60px_rgba(25,18,101,.11)] sm:p-10">
+          <div className="mx-auto mb-8 max-w-3xl text-center"><p className="mb-2 text-sm font-black text-[#b92776]">מה לומדים בפועל</p><h2 className="mb-4 text-3xl font-black leading-tight text-[#191265] sm:text-4xl">תשעה מודולים שעוברים מהבנה לבחירה חדשה</h2><p className="leading-8 text-[#5d5571]">לא צופים ברצף של סרטונים ומקווים שמשהו ישתנה. בכל שלב לומדים עיקרון, רואים איך הוא נראה בחיים, מפעילים אותו על הסיפור האישי ומסיימים בהחלטה או פעולה.</p></div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{COURSE_MODULES.map(module => <article key={module.number} className="rounded-[24px] border border-[#191265]/8 bg-[#fbf8f4] p-5"><div className="mb-4 flex items-center justify-between"><span className="font-serif text-3xl text-[#b92776]">{module.number}</span><Compass size={19} className="text-[#d0af58]" /></div><h3 className="mb-2 text-lg font-black text-[#191265]">{module.title}</h3><p className="text-sm leading-7 text-[#5d5571]">{module.text}</p></article>)}</div>
+        </div>
+
+        <CourseInterestBand saved={courseInterestSaved} loading={courseInterest.isPending} onInterest={() => registerCourseInterest("after_curriculum")} title="אם זה בדיוק התהליך שחיפשתם, אפשר לסמן לי כבר עכשיו שאתם רוצים להיות הראשונים לדעת." />
+
+        <div className="overflow-hidden rounded-[34px] bg-[#f7eef3] shadow-[0_22px_60px_rgba(25,18,101,.10)]">
+          <div className="p-7 text-center sm:p-10"><p className="mb-2 text-sm font-black text-[#b92776]">מה אמור להשתנות בסוף הקורס</p><h2 className="mx-auto mb-4 max-w-3xl text-3xl font-black leading-tight text-[#191265] sm:text-4xl">לא לדעת יותר על אהבה. להתנהל אחרת בתוכה.</h2><p className="mx-auto max-w-3xl leading-8 text-[#5d5571]">המטרה היא לא לצאת עם עוד אבחון יפה. המטרה היא לזהות מוקדם יותר מה נכון, לפעול בלי לאבד את עצמכם ולהתקדם לזוגיות במקום להישאר שנים באותם מסלולים.</p></div>
+          <div className="grid border-t border-[#191265]/8 md:grid-cols-2">
+            <div className="border-b border-[#191265]/8 p-7 md:border-b-0 md:border-l"><p className="mb-5 text-sm font-black text-[#8a8291]">לפני הקורס</p><div className="space-y-4 text-[#5d5571]">{["מנסים להבין אם האדם שמולכם בעניין דרך הודעות ורמזים", "נמשכים שוב לאותו טיפוס גם כשהסוף כבר מוכר", "לא יודעים אם לתת עוד הזדמנות או לשחרר", "מוותרים על סטנדרטים ברגע שמופיעה כימיה", "יודעים מה לא עובד אבל לא מצליחים לשנות בזמן אמת"].map(item => <p key={item} className="flex gap-3 leading-7"><span className="mt-1 text-[#b92776]">×</span>{item}</p>)}</div></div>
+            <div className="p-7"><p className="mb-5 text-sm font-black text-[#b92776]">אחרי הקורס</p><div className="space-y-4 font-bold text-[#191265]">{["יודעים לבקש בהירות ולקרוא מעשים בלי לנתח כל הודעה", "מזהים את הדפוס מוקדם ועוצרים לפני שנשאבים אליו", "משתמשים במפת החלטה ברורה להמשך, גבול או שחרור", "מחזיקים משיכה וסטנדרטים באותו זמן", "יוצאים עם תוכנית אישית ל־30 יום וכלים לכל היכרות חדשה"].map(item => <p key={item} className="flex gap-3 leading-7"><Check size={18} className="mt-1 flex-shrink-0 text-[#2e7b4d]" />{item}</p>)}</div></div>
           </div>
         </div>
 
@@ -403,16 +508,26 @@ function ResultView({
           </div>
         </div>
 
+        <CourseInterestBand saved={courseInterestSaved} loading={courseInterest.isPending} onInterest={() => registerCourseInterest("after_home_kit")} title="הקורס הוא דיגיטלי. הערכה שבבית מחזירה את השיטה לידיים בדיוק ברגעים שבהם צריך לבחור." />
+
+        {publicStoryQuotes.length > 0 && <div className="rounded-[34px] bg-[#191265] p-6 text-white shadow-[0_24px_70px_rgba(25,18,101,.18)] sm:p-9">
+          <div className="mb-7 text-center"><p className="mb-2 text-sm font-black text-[#ffe27c]">אנשים אמיתיים. שינוי אמיתי.</p><h2 className="text-3xl font-black sm:text-4xl">מה אנשים מספרים אחרי תהליכים איתי</h2><p className="mx-auto mt-3 max-w-2xl leading-7 text-white/68">הציטוטים הבאים פורסמו בסיפורי ההצלחה של הליווי והמאגר. הם אינם עדויות על הקורס החדש, שטרם הושק.</p></div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {publicStoryQuotes.map(quote => <article key={quote} className="rounded-[24px] border border-white/12 bg-white/8 p-6"><Quote className="mb-4 text-[#ffe27c]" size={27} /><p className="text-lg font-bold leading-8">“{quote}”</p></article>)}
+          </div>
+          <a href="/blog/sipurei-hatzlacha" className="mx-auto mt-7 flex w-fit items-center gap-2 rounded-full border border-[#ffe27c]/50 px-5 py-3 text-sm font-black text-[#ffe27c] transition hover:bg-[#ffe27c] hover:text-[#191265]">לקריאת סיפורי ההצלחה שפורסמו <ArrowLeft size={16} /></a>
+        </div>}
+
         {testimonials.length > 0 && <div className="rounded-[34px] bg-[#f7eef3] p-6 sm:p-9"><div className="mb-6 text-center"><p className="mb-2 text-sm font-black text-[#b92776]">סיפורי הצלחה אמיתיים</p><h2 className="text-3xl font-black text-[#191265]">מה קורה כשמשנים את הדרך</h2></div><div className="grid gap-4 md:grid-cols-3">{testimonials.slice(0, 3).map(testimonial => <article key={testimonial.id} className="rounded-[24px] bg-white p-5 shadow-sm"><Quote className="mb-3 text-[#b92776]" size={24} /><p className="mb-4 leading-7 text-[#514a67]">{testimonial.text}</p><p className="text-sm font-black text-[#191265]">{testimonial.displayName}</p></article>)}</div></div>}
 
-        <div className="overflow-hidden rounded-[34px] border border-[#d9c78b] bg-[#fff8dc] shadow-[0_22px_60px_rgba(25,18,101,.10)]">
+        <div id="course-launch-offer" className="overflow-hidden rounded-[34px] border border-[#d9c78b] bg-[#fff8dc] shadow-[0_22px_60px_rgba(25,18,101,.10)]">
           <div className="p-7 text-center sm:p-10">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#191265] text-[#ffe27c]"><Gift size={27} /></div>
             <p className="mb-2 text-sm font-black text-[#b92776]">מחזור המייסדים הראשון</p>
             <h2 className="mb-4 text-3xl font-black text-[#191265] sm:text-4xl">הקורס עדיין בבנייה. המקום שלך כבר שמור.</h2>
             <p className="mx-auto mb-7 max-w-2xl leading-8 text-[#5d5571]">חברי רשימת ההשקה יקבלו את המחיר המיוחד ואת ההטבה לפני פתיחת ההרשמה לקהל. כמות ערכות המצפן במחזור הראשון תהיה מוגבלת למספר המארזים שיופקו בפועל.</p>
             <div className="mx-auto grid max-w-2xl gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-white p-5"><p className="text-xs font-black text-[#8a8291]">המחיר המלא</p><p className="mt-1 text-xl font-black text-[#191265]">ייחשף עם פתיחת ההרשמה</p></div><div className="rounded-2xl bg-[#191265] p-5 text-white"><p className="text-xs font-black text-[#ffe27c]">לחברי הרשימה</p><p className="mt-1 text-xl font-black">מחיר מייסדים והטבה מיוחדת</p></div></div>
-            <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-[#d9c78b] bg-white p-5" aria-live="polite"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#e6f7e9] text-[#21683a]"><Check size={23} /></div><h3 className="mb-1 text-xl font-black text-[#191265]">{female ? "את כבר ברשימת ההשקה" : "אתה כבר ברשימת ההשקה"}</h3><p className="text-sm leading-6 text-[#5d5571]">{female ? "אין צורך להירשם שוב. אעדכן אותך לפני כולם כשהמחיר, התאריך והכמות יאושרו." : "אין צורך להירשם שוב. אעדכן אותך לפני כולם כשהמחיר, התאריך והכמות יאושרו."}</p></div>
+            <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-[#d9c78b] bg-white p-5" aria-live="polite"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#e6f7e9] text-[#21683a]"><Check size={23} /></div><h3 className="mb-1 text-xl font-black text-[#191265]">{female ? "את כבר ברשימת ההשקה" : "אתה כבר ברשימת ההשקה"}</h3><p className="text-sm leading-6 text-[#5d5571]">אין צורך להירשם שוב. אעדכן אותך לפני כולם כשהמחיר, התאריך והכמות יאושרו.</p>{courseInterestSaved ? <p className="mt-4 rounded-xl bg-[#e6f7e9] px-4 py-3 font-black text-[#21683a]">{female ? "סימנתי שתרצי לקבל עדיפות כשנפתח." : "סימנתי שתרצה לקבל עדיפות כשנפתח."}</p> : <button type="button" onClick={() => registerCourseInterest("final_offer")} disabled={courseInterest.isPending} className="mt-5 w-full rounded-full bg-[#191265] px-6 py-4 font-black text-white transition hover:bg-[#2c2288] disabled:opacity-60">{courseInterest.isPending ? "נשמר..." : "כן, אני רוצה עדיפות ומחיר השקה"}</button>}</div>
             <p className="mt-4 text-xs leading-5 text-[#8a8291]">אין כרגע תשלום או הזמנה. לא נגבה סכום ולא נשמר אמצעי תשלום.</p>
           </div>
         </div>
@@ -465,5 +580,5 @@ export default function CourseCompass() {
   if (phase === "questions") return <QuestionFlow gender={gender} responses={responses} onAnswer={answer} />;
   if (phase === "capture") return <Capture gender={gender} responses={responses} sessionId={sessionId} onComplete={details => { setLead(details); setPhase("reveal"); }} />;
   if (phase === "reveal") return <Revealing onComplete={() => setPhase("result")} />;
-  return <ResultView gender={gender} responses={responses} lead={lead} onRestart={restart} />;
+  return <ResultView gender={gender} responses={responses} lead={lead} sessionId={sessionId} onRestart={restart} />;
 }

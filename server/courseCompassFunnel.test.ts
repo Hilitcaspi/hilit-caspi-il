@@ -9,6 +9,7 @@ const app = readFileSync(resolve(root, "client/src/App.tsx"), "utf8");
 const router = readFileSync(resolve(root, "server/courseCompassRouter.ts"), "utf8");
 const schema = readFileSync(resolve(root, "drizzle/schema.ts"), "utf8");
 const crm = readFileSync(resolve(root, "client/src/pages/CRM.tsx"), "utf8");
+const compassAdmin = readFileSync(resolve(root, "client/src/components/CourseCompassAdminSection.tsx"), "utf8");
 
 describe("course compass simple prelaunch funnel", () => {
   it("keeps a standalone route without replacing the DNA or existing course routes", () => {
@@ -37,6 +38,13 @@ describe("course compass simple prelaunch funnel", () => {
   it("connects the result directly to the course while keeping sales closed", () => {
     expect(page).toContain("סוד ההתאמה המושלמת");
     expect(page).toContain("מהניצוץ למצפן");
+    expect(page).toContain("זה קורס דיגיטלי מלא");
+    expect(page).toContain("לא ספריית ידע. מערכת החלטה");
+    expect(page).toContain("כ־38 אלף מילים");
+    expect(page).toContain("כ־5 שעות של הסבר ממוקד ממני");
+    expect(page).toContain("תשעה מודולים שעוברים מהבנה לבחירה חדשה");
+    expect(page).toContain("דייטים והודעות בזמן אמת");
+    expect(page).toContain("לא לדעת יותר על אהבה. להתנהל אחרת בתוכה");
     expect(page).toContain("9");
     expect(page).toContain("27");
     expect(page).toContain("30");
@@ -48,12 +56,32 @@ describe("course compass simple prelaunch funnel", () => {
     expect(page).not.toContain("GrowWallet");
   });
 
+  it("starts the result with a concrete recommendation about the person in mind", () => {
+    expect(page).toContain("יש אדם מסוים בראש. זו ההמלצה שלי כרגע.");
+    expect(page).toContain("מה לעשות ב־72 השעות הקרובות");
+    expect(page).toContain("מה המצפן לא יכול לדעת");
+    expect(page).toContain("recommendationTitle");
+    expect(page).toContain("next72Hours");
+  });
+
+  it("repeats real interest actions and stores a hot-course signal without opening checkout", () => {
+    expect(page).toContain("אני רוצה לקבל את מחיר ההשקה");
+    expect(page).toContain("כן, אני רוצה עדיפות ומחיר השקה");
+    expect(page).toContain("course_launch_interest");
+    expect(page).toContain("markCourseInterest.useMutation");
+    expect(router).toContain("markCourseInterest: publicProcedure");
+    expect(router).toContain('selectedAction: "course_launch_interest"');
+    expect(page).not.toContain("createProcess");
+  });
+
   it("adds a richer result without inventing testimonials or storing poll answers", () => {
     expect(page).toContain("מפת המצפן שלך");
     expect(page).toContain("עד כמה המצפן קלע?");
     expect(page).toContain("בול. זה אני.");
     expect(page).toContain("result_accuracy");
     expect(page).toContain("approvedTestimonials.useQuery");
+    expect(page).toContain('blog.getBySlug.useQuery({ slug: "sipurei-hatzlacha" }');
+    expect(page).toContain("הם אינם עדויות על הקורס החדש");
     expect(page).toContain("אחרי יותר מ־200 זוגות שנוצרו");
     expect(page).toContain("הקורס החדש עדיין לא הושק ואינו מבטיח תוצאה אישית");
     expect(page).not.toContain("הכסף הכי טוב שהשקעתי");
@@ -83,5 +111,8 @@ describe("course compass simple prelaunch funnel", () => {
   it("shows the separate prelaunch list in CRM", () => {
     expect(crm).toContain("CourseCompassAdminSection");
     expect(router).toContain("adminList: teamProcedure.query");
+    expect(router).toContain('courseInterest: rows.filter(row => row.selectedAction === "course_launch_interest").length');
+    expect(compassAdmin).toContain("רוצים מחיר השקה");
+    expect(compassAdmin).toContain("עניין גבוה בקורס");
   });
 });

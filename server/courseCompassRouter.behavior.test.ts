@@ -112,4 +112,19 @@ describe("course compass waitlist API", () => {
     expect(insertConfirmation).not.toHaveBeenCalled();
     expect(mocks.sendEmail).not.toHaveBeenCalled();
   });
+
+  it("marks explicit course interest on the existing waitlist record", async () => {
+    const { db, updateSet, updateWhere } = createDbHarness();
+    mocks.getDb.mockResolvedValue(db);
+
+    const result = await courseCompassRouter.createCaller(createPublicContext()).markCourseInterest({
+      sessionId: validInput.sessionId,
+      email: validInput.email,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ selectedAction: "course_launch_interest" }));
+    expect(updateWhere).toHaveBeenCalledOnce();
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
 });
