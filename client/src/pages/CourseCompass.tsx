@@ -2,10 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
+  BarChart3,
+  BrainCircuit,
   Check,
   Compass,
+  Gift,
+  HeartHandshake,
   LockKeyhole,
   Mail,
+  Map,
+  PackageOpen,
+  Quote,
   RotateCcw,
   ShieldCheck,
   Sparkles,
@@ -17,14 +24,17 @@ import { gaGenerateLead } from "@/lib/ga";
 import { getUtmParams } from "@/lib/utils";
 import {
   COURSE_COMPASS_VERSION,
+  CORE_COMPASS_RESULTS,
   getCompassProgress,
   getCompassResult,
+  getCompassResultContent,
   getNextCompassQuestion,
   type CompassGender,
   type CompassResponses,
 } from "../../../shared/courseCompass";
 
 const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
+const COURSE_BOX_IMG = "/manus-storage/course-compass-box-web_c20d2d02.jpg";
 
 type LeadDetails = { name: string; email: string; phone: string };
 
@@ -270,8 +280,26 @@ function ResultView({
   onRestart: () => void;
 }) {
   const result = useMemo(() => getCompassResult(responses, gender), [responses, gender]);
+  const [accuracyFeedback, setAccuracyFeedback] = useState<string | null>(null);
+  const { data: testimonials = [] } = trpc.publicProof.approvedTestimonials.useQuery();
   const female = gender === "female";
   const firstName = lead.name.split(/\s+/)[0];
+  const highestScore = Math.max(...Object.values(result.scores), 1);
+  const resultMap = CORE_COMPASS_RESULTS
+    .map(key => ({
+      key,
+      score: result.scores[key],
+      label: getCompassResultContent(key, gender).label,
+    }))
+    .filter(item => item.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 3);
+  const secondaryLabel = result.secondary ? getCompassResultContent(result.secondary, gender).label : null;
+
+  const registerAccuracy = (value: string) => {
+    setAccuracyFeedback(value);
+    track({ eventType: "button_click", metadata: { feature: "course_compass", action: "result_accuracy", value, result: result.primary, gender } });
+  };
 
   useEffect(() => {
     track({ eventType: "section_view", metadata: { feature: "course_compass", section: "result", result: result.primary, version: COURSE_COMPASS_VERSION, gender } });
@@ -298,28 +326,94 @@ function ResultView({
           <div className="rounded-[24px] bg-[#ffe27c] p-5 shadow-sm"><p className="mb-2 text-sm font-black text-[#651645]">הכיוון של המצפן</p><p className="font-bold leading-7 text-[#191265]">{result.content.actions[0].label}</p></div>
         </div>
 
+        <div className="grid gap-5 lg:grid-cols-[1.05fr_.95fr]">
+          <div className="rounded-[30px] bg-white p-6 shadow-[0_18px_55px_rgba(25,18,101,.10)] sm:p-8">
+            <div className="mb-6 flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#191265] text-[#ffe27c]"><BarChart3 size={22} /></div><div><p className="text-xs font-black uppercase tracking-[.18em] text-[#b92776]">מפת המצפן שלך</p><h2 className="text-2xl font-black text-[#191265]">מה הפעיל אותך בתשובות</h2></div></div>
+            <div className="space-y-5">
+              {resultMap.map((item, index) => {
+                const width = Math.max(18, Math.round((item.score / highestScore) * 100));
+                return <div key={item.key}><div className="mb-2 flex items-center justify-between gap-3 text-sm"><span className="font-black text-[#191265]">{index + 1}. {item.label}</span><span className="text-xs font-bold text-[#8a8291]">{index === 0 ? "הכיוון המוביל" : index === 1 ? "כיוון נוסף" : "ברקע"}</span></div><div className="h-3 overflow-hidden rounded-full bg-[#eee7df]"><motion.div initial={{ width: 0 }} animate={{ width: `${width}%` }} transition={{ duration: 0.8, delay: index * 0.12 }} className={`h-full rounded-full ${index === 0 ? "bg-gradient-to-l from-[#651645] to-[#b92776]" : index === 1 ? "bg-[#8f80c8]" : "bg-[#d4b76d]"}`} /></div></div>;
+              })}
+            </div>
+            <p className="mt-6 text-xs leading-6 text-[#8a8291]">המפה משווה בין הנטיות שעלו בשמונה הבחירות שלך. היא כלי להתבוננות ולא אבחון קליני.</p>
+          </div>
+
+          <div className="rounded-[30px] bg-[#fff8e4] p-6 shadow-[0_18px_55px_rgba(25,18,101,.08)] sm:p-8">
+            <p className="mb-2 text-sm font-black text-[#b92776]">המצפן לא ראה רק דבר אחד</p>
+            <h2 className="mb-4 text-2xl font-black leading-tight text-[#191265]">{secondaryLabel ? `גם ${secondaryLabel} הופיע בתשובות שלך` : "הכיוון שלך יצא חד וברור"}</h2>
+            <p className="mb-4 leading-7 text-[#514a67]">{result.content.deeperInsight}</p>
+            <div className="rounded-2xl border border-[#d7bd65]/45 bg-white/80 p-4"><p className="mb-1 text-sm font-black text-[#651645]">מה זה עלול לעלות בקשר</p><p className="leading-7 text-[#514a67]">{result.content.relationshipCost}</p></div>
+          </div>
+        </div>
+
+        <div className="rounded-[30px] bg-white p-6 text-center shadow-[0_18px_55px_rgba(25,18,101,.10)] sm:p-8">
+          <p className="mb-2 text-sm font-black text-[#b92776]">רגע של אמת</p>
+          <h2 className="mb-5 text-2xl font-black text-[#191265]">עד כמה המצפן קלע?</h2>
+          {accuracyFeedback ? <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl bg-[#f4f0ff] px-5 py-4 font-bold text-[#191265]">תודה. התשובה נשמרה כדי לעזור לי לדייק את החוויה.</motion.div> : <div className="grid gap-3 sm:grid-cols-3"><button onClick={() => registerAccuracy("exact")} className="rounded-2xl bg-[#191265] px-5 py-4 font-black text-white transition hover:bg-[#2b2089]">בול. זה אני.</button><button onClick={() => registerAccuracy("mostly")} className="rounded-2xl border border-[#191265]/15 bg-[#fbf8f4] px-5 py-4 font-black text-[#191265] transition hover:border-[#191265]">קלע ברובו</button><button onClick={() => registerAccuracy("not_yet")} className="rounded-2xl border border-[#191265]/15 bg-[#fbf8f4] px-5 py-4 font-black text-[#191265] transition hover:border-[#191265]">עוד לא בטוח</button></div>}
+        </div>
+
         <div className="overflow-hidden rounded-[30px] bg-white shadow-[0_22px_60px_rgba(25,18,101,.13)]">
           <div className="bg-[#ffe27c] px-6 py-6 text-center"><p className="text-sm font-black text-[#191265]">{female ? "את תוהה איך ידעתי את כל זה?" : "אתה תוהה איך ידעתי את כל זה?"}</p><h2 className="mt-1 font-serif text-4xl text-[#191265]">זה לא קסם. זה מדע.</h2></div>
           <div className="p-6 text-center sm:p-9">
             <p className="mx-auto max-w-2xl text-lg font-bold leading-8 text-[#191265]">
-              רוב הדינמיקות הזוגיות, המשיכה והדרך שבה אנחנו בוחרים את מי שאנחנו רוצים פועלות לפי דפוסים שאפשר לזהות.
+              רוב הדינמיקות הזוגיות, המשיכה והדרך שבה אנחנו בוחרים את מי שאנחנו רוצים פועלות לפי דפוסים שאפשר לזהות, לפרק ולשנות.
             </p>
             <p className="mx-auto mt-4 max-w-2xl leading-8 text-[#5d5571]">
-              {female ? "בשנים האחרונות פירקתי את הדפוסים האלה לשיטה מעשית. כשאת מבינה מה מפעיל אותך, את יכולה לשנות הרגלים, לפעול אחרת ולהתקדם לזוגיות שאת באמת רוצה." : "בשנים האחרונות פירקתי את הדפוסים האלה לשיטה מעשית. כשאתה מבין מה מפעיל אותך, אתה יכול לשנות הרגלים, לפעול אחרת ולהתקדם לזוגיות שאתה באמת רוצה."}
+              {female ? "במשך שנים למדתי, חקרתי, ליוויתי נשים וגברים ובחנתי שוב ושוב מה באמת עוזר לאנשים למצוא קשר טוב. פירקתי את הדפוסים, ההרגלים והבחירות הקטנות לשיטה מעשית שמחברת בין מדע האהבה, מודלים של מערכות יחסים, פסיכולוגיה חיובית והניסיון שלי מהשטח." : "במשך שנים למדתי, חקרתי, ליוויתי נשים וגברים ובחנתי שוב ושוב מה באמת עוזר לאנשים למצוא קשר טוב. פירקתי את הדפוסים, ההרגלים והבחירות הקטנות לשיטה מעשית שמחברת בין מדע האהבה, מודלים של מערכות יחסים, פסיכולוגיה חיובית והניסיון שלי מהשטח."}
             </p>
+            <div className="mx-auto mt-7 max-w-2xl rounded-2xl bg-[#f6f0eb] p-5 text-right"><p className="mb-2 text-sm font-black text-[#b92776]">הפיצוח שלך הוא רק ההתחלה</p><p className="font-bold leading-7 text-[#191265]">{result.content.courseBridge}</p></div>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[34px] bg-[#fbf8f4] shadow-[0_22px_60px_rgba(25,18,101,.11)]">
+          <div className="grid items-stretch lg:grid-cols-[.86fr_1.14fr]">
+            <div className="relative min-h-80 overflow-hidden bg-[#ead4c8]"><img src={PROFILE_IMG} alt="הילית כספי" className="absolute inset-0 h-full w-full object-cover object-top" /><div className="absolute inset-0 bg-gradient-to-t from-[#191265]/75 via-transparent to-transparent" /><div className="absolute inset-x-0 bottom-0 p-6 text-white"><p className="font-serif text-3xl">הילית כספי</p><p className="mt-1 text-sm text-white/75">שדכנית ומאמנת למציאת זוגיות</p></div></div>
+            <div className="p-7 sm:p-10">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-[#191265] px-4 py-2 text-xs font-black text-[#ffe27c]"><BrainCircuit size={15} /> השיטה מאחורי המצפן</div>
+              <h2 className="mb-4 text-3xl font-black leading-tight text-[#191265]">אחרי יותר מ־200 זוגות שנוצרו, ראיתי שוב ושוב את אותו הדבר</h2>
+              <p className="mb-4 leading-8 text-[#5d5571]">אנשים חכמים, מצליחים ומלאי רצון לא נשארים לבד כי אין להם מזל. פעמים רבות הם פשוט פועלים לפי מצפן ישן: נמשכים למה שלא זמין, מתעלמים ממה שכן מתאים או מנסים להשיג אישור במקום לבחור.</p>
+              <p className="font-bold leading-8 text-[#191265]">הקורס החדש נבנה כדי להפוך את הידע הזה למפה ברורה ולצעדים שאפשר ליישם בחיים האמיתיים.</p>
+              <p className="mt-4 text-xs leading-5 text-[#8a8291]">הנתון מתייחס לעבודת השידוכים והליווי של הילית. הקורס החדש עדיין לא הושק ואינו מבטיח תוצאה אישית.</p>
+            </div>
           </div>
         </div>
 
         <div className="overflow-hidden rounded-[34px] bg-gradient-to-br from-[#191265] via-[#25145d] to-[#651645] text-white shadow-[0_24px_70px_rgba(25,18,101,.22)]">
-          <div className="grid lg:grid-cols-[.72fr_1.28fr]">
-            <div className="relative min-h-72 overflow-hidden bg-[#ead4c8]"><img src={PROFILE_IMG} alt="הילית כספי" className="absolute inset-0 h-full w-full object-cover object-top" /><div className="absolute inset-0 bg-gradient-to-t from-[#191265]/55 to-transparent" /></div>
-            <div className="p-7 sm:p-10">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#191265]"><Sparkles size={14} /> קורס הדגל והמארז החדש</div>
-              <h2 className="mb-4 text-4xl font-black leading-tight">סוד ההתאמה המושלמת</h2>
-              <p className="mb-5 text-lg font-bold leading-8 text-white/90">{female ? "הקורס שילמד אותך להבין מי באמת מתאים לך, איך לפעול מול מי שמוצא חן בעינייך ואיך לשנות את ההרגלים שמרחיקים אותך מהזוגיות שאת רוצה." : "הקורס שילמד אותך להבין מי באמת מתאימה לך, איך לפעול מול מי שמוצאת חן בעיניך ואיך לשנות את ההרגלים שמרחיקים אותך מהזוגיות שאתה רוצה."}</p>
-              <p className="mb-6 leading-7 text-white/72">הקורס והמארז עדיין בבנייה. אין כרגע תשלום או הזמנה.</p>
-              <div className="rounded-2xl border border-[#ffe27c]/35 bg-[#ffe27c]/12 p-5 text-center" aria-live="polite"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#ffe27c] text-[#191265]"><Check size={23} /></div><h3 className="mb-1 text-xl font-bold">{female ? "את כבר ברשימת ההשקה" : "אתה כבר ברשימת ההשקה"}</h3><p className="text-sm leading-6 text-white/74">{female ? "הקדימות והטבת ההשקה נשמרו לך. אעדכן אותך לפני כולם." : "הקדימות והטבת ההשקה נשמרו לך. אעדכן אותך לפני כולם."}</p></div>
+          <div className="p-7 text-center sm:p-10">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#191265]"><Sparkles size={14} /> קורס הדגל החדש</div>
+            <p className="mb-2 text-sm font-black uppercase tracking-[.18em] text-[#ffe27c]">מהניצוץ למצפן</p>
+            <h2 className="mb-4 text-4xl font-black leading-tight sm:text-5xl">סוד ההתאמה המושלמת</h2>
+            <p className="mx-auto mb-8 max-w-3xl text-lg font-bold leading-8 text-white/90">{female ? "קורס מעשי שנועד לעזור לך להבין מי באמת מתאים לך, לשנות את ההרגלים שמחזירים אותך לאותם קשרים ולבנות דרך חדשה אל הזוגיות שאת מחפשת." : "קורס מעשי שנועד לעזור לך להבין מי באמת מתאימה לך, לשנות את ההרגלים שמחזירים אותך לאותם קשרים ולבנות דרך חדשה אל הזוגיות שאתה מחפש."}</p>
+            <div className="grid gap-3 sm:grid-cols-4"><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">9</p><p className="mt-1 text-sm font-bold">מודולים</p></div><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">27</p><p className="mt-1 text-sm font-bold">שיעורים</p></div><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">9</p><p className="mt-1 text-sm font-bold">תרגילי עומק</p></div><div className="rounded-2xl border border-white/15 bg-white/8 p-5"><p className="text-3xl font-black text-[#ffe27c]">30</p><p className="mt-1 text-sm font-bold">ימי יישום</p></div></div>
+          </div>
+          <div className="grid border-t border-white/12 sm:grid-cols-2">
+            {[{ icon: BrainCircuit, title: "לפצח את הדפוס", text: "להבין למה אותם אנשים ואותם תסריטים חוזרים." }, { icon: Compass, title: "לבנות מצפן חדש", text: "להפריד בין משיכה, פוטנציאל והתאמה אמיתית." }, { icon: HeartHandshake, title: "לפעול אחרת", text: "לתרגל בחירה, תקשורת, גבולות וזמינות רגשית." }, { icon: Map, title: "לצאת עם מפה", text: "תוכנית ברורה לדייטים, להיכרויות ולהחלטות בזמן אמת." }].map(({ icon: Icon, title, text }) => <div key={title} className="flex gap-4 border-b border-white/10 p-6 text-right sm:border-l"><div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#ffe27c] text-[#191265]"><Icon size={21} /></div><div><h3 className="mb-1 font-black">{title}</h3><p className="text-sm leading-6 text-white/70">{text}</p></div></div>)}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[34px] bg-white shadow-[0_24px_70px_rgba(25,18,101,.13)]">
+          <div className="grid lg:grid-cols-[1.08fr_.92fr]">
+            <div className="relative min-h-80 overflow-hidden bg-[#2a1425]"><img src={COURSE_BOX_IMG} alt="הדמיה של ערכת המצפן שתישלח הביתה" className="absolute inset-0 h-full w-full object-cover" loading="lazy" /><div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#25121f]/80 to-transparent p-5 text-white"><p className="text-xs font-bold">הדמיית קונספט. העיצוב הסופי עשוי להשתנות.</p></div></div>
+            <div className="p-7 sm:p-9">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-[#f6e9f0] px-4 py-2 text-xs font-black text-[#651645]"><PackageOpen size={15} /> לא רק קורס דיגיטלי</div>
+              <h2 className="mb-4 text-3xl font-black leading-tight text-[#191265]">ערכת המצפן מגיעה אליכם הביתה</h2>
+              <p className="mb-6 leading-7 text-[#5d5571]">כל פריט במארז מחובר לשיעור ולפעולה. לא מתנות מדף, אלא מערכת שממשיכה את הקורס גם כשהמסך נסגר.</p>
+              <div className="grid gap-3 sm:grid-cols-2">{["הספר הקצר: למה זה עדיין לא קרה?", "מחברת המצפן לתרגול אישי", "45 קלפי רגע האמת", "מפת ההתאמה המתקפלת", "כרטיס הכיוון לארנק", "צמיד מצפן יוניסקס", "מכתב מהצד שאחרי"].map(item => <div key={item} className="flex items-start gap-2 rounded-xl bg-[#fbf8f4] px-3 py-3 text-sm font-bold leading-6 text-[#191265]"><Check size={17} className="mt-1 flex-shrink-0 text-[#b92776]" />{item}</div>)}</div>
             </div>
+          </div>
+        </div>
+
+        {testimonials.length > 0 && <div className="rounded-[34px] bg-[#f7eef3] p-6 sm:p-9"><div className="mb-6 text-center"><p className="mb-2 text-sm font-black text-[#b92776]">סיפורי הצלחה אמיתיים</p><h2 className="text-3xl font-black text-[#191265]">מה קורה כשמשנים את הדרך</h2></div><div className="grid gap-4 md:grid-cols-3">{testimonials.slice(0, 3).map(testimonial => <article key={testimonial.id} className="rounded-[24px] bg-white p-5 shadow-sm"><Quote className="mb-3 text-[#b92776]" size={24} /><p className="mb-4 leading-7 text-[#514a67]">{testimonial.text}</p><p className="text-sm font-black text-[#191265]">{testimonial.displayName}</p></article>)}</div></div>}
+
+        <div className="overflow-hidden rounded-[34px] border border-[#d9c78b] bg-[#fff8dc] shadow-[0_22px_60px_rgba(25,18,101,.10)]">
+          <div className="p-7 text-center sm:p-10">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#191265] text-[#ffe27c]"><Gift size={27} /></div>
+            <p className="mb-2 text-sm font-black text-[#b92776]">מחזור המייסדים הראשון</p>
+            <h2 className="mb-4 text-3xl font-black text-[#191265] sm:text-4xl">הקורס עדיין בבנייה. המקום שלך כבר שמור.</h2>
+            <p className="mx-auto mb-7 max-w-2xl leading-8 text-[#5d5571]">חברי רשימת ההשקה יקבלו את המחיר המיוחד ואת ההטבה לפני פתיחת ההרשמה לקהל. כמות ערכות המצפן במחזור הראשון תהיה מוגבלת למספר המארזים שיופקו בפועל.</p>
+            <div className="mx-auto grid max-w-2xl gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-white p-5"><p className="text-xs font-black text-[#8a8291]">המחיר המלא</p><p className="mt-1 text-xl font-black text-[#191265]">ייחשף עם פתיחת ההרשמה</p></div><div className="rounded-2xl bg-[#191265] p-5 text-white"><p className="text-xs font-black text-[#ffe27c]">לחברי הרשימה</p><p className="mt-1 text-xl font-black">מחיר מייסדים והטבה מיוחדת</p></div></div>
+            <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-[#d9c78b] bg-white p-5" aria-live="polite"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#e6f7e9] text-[#21683a]"><Check size={23} /></div><h3 className="mb-1 text-xl font-black text-[#191265]">{female ? "את כבר ברשימת ההשקה" : "אתה כבר ברשימת ההשקה"}</h3><p className="text-sm leading-6 text-[#5d5571]">{female ? "אין צורך להירשם שוב. אעדכן אותך לפני כולם כשהמחיר, התאריך והכמות יאושרו." : "אין צורך להירשם שוב. אעדכן אותך לפני כולם כשהמחיר, התאריך והכמות יאושרו."}</p></div>
+            <p className="mt-4 text-xs leading-5 text-[#8a8291]">אין כרגע תשלום או הזמנה. לא נגבה סכום ולא נשמר אמצעי תשלום.</p>
           </div>
         </div>
 

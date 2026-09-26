@@ -47,6 +47,9 @@ describe("course compass simple gendered engine", () => {
     expect(result.content.magicLine).toContain("המצפן שלך");
     expect(result.evidence).toContain("בודקת שוב ושוב אם הוא כתב");
     expect(result.content.actions).toHaveLength(1);
+    expect(result.content.deeperInsight).toContain("חוסר הוודאות");
+    expect(result.content.relationshipCost).toContain("סימנים");
+    expect(result.content.courseBridge).toContain("בקורס תלמדי");
   });
 
   it("uses the same scoring with copy addressed to a man", () => {
@@ -56,6 +59,7 @@ describe("course compass simple gendered engine", () => {
     expect(male.scores).toEqual(female.scores);
     expect(male.content.title).toContain("שהיא רוצה אותך");
     expect(male.evidence).toContain("בודק שוב ושוב אם היא כתבה");
+    expect(male.content.courseBridge).toContain("בקורס תלמד");
   });
 
   it("calculates simple progress across eight clicks", () => {

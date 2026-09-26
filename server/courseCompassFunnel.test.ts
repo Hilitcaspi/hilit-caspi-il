@@ -36,9 +36,28 @@ describe("course compass simple prelaunch funnel", () => {
 
   it("connects the result directly to the course while keeping sales closed", () => {
     expect(page).toContain("סוד ההתאמה המושלמת");
-    expect(page).toContain("הקורס שילמד אותך להבין");
+    expect(page).toContain("מהניצוץ למצפן");
+    expect(page).toContain("9");
+    expect(page).toContain("27");
+    expect(page).toContain("30");
+    expect(page).toContain("ערכת המצפן מגיעה אליכם הביתה");
+    expect(page).toContain("45 קלפי רגע האמת");
+    expect(page).toContain("מחיר מייסדים והטבה מיוחדת");
+    expect(page).toContain("המחיר, התאריך והכמות יאושרו");
     expect(page).toContain("אין כרגע תשלום או הזמנה");
     expect(page).not.toContain("GrowWallet");
+  });
+
+  it("adds a richer result without inventing testimonials or storing poll answers", () => {
+    expect(page).toContain("מפת המצפן שלך");
+    expect(page).toContain("עד כמה המצפן קלע?");
+    expect(page).toContain("בול. זה אני.");
+    expect(page).toContain("result_accuracy");
+    expect(page).toContain("approvedTestimonials.useQuery");
+    expect(page).toContain("אחרי יותר מ־200 זוגות שנוצרו");
+    expect(page).toContain("הקורס החדש עדיין לא הושק ואינו מבטיח תוצאה אישית");
+    expect(page).not.toContain("הכסף הכי טוב שהשקעתי");
+    expect(page).not.toContain("price: 1497");
   });
 
   it("stores gender and result metadata but no answer trail", () => {
