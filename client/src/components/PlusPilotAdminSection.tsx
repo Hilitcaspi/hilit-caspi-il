@@ -27,7 +27,10 @@ export default function PlusPilotAdminSection() {
   const [statusFilter, setStatusFilter] = useState("active");
   const [cohort, setCohort] = useState("pilot-01");
   const [price, setPrice] = useState("99");
-  const overview = trpc.plusPilot.adminOverview.useQuery(undefined, { refetchInterval: 30000 });
+  const overview = trpc.plusPilot.adminOverview.useQuery(undefined, {
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+  });
   const updateStatus = trpc.plusPilot.adminUpdateStatus.useMutation({ onSuccess: () => overview.refetch() });
 
   const rows = useMemo(() => {
@@ -38,6 +41,28 @@ export default function PlusPilotAdminSection() {
       return matchesStatus && (!query || haystack.includes(query));
     });
   }, [overview.data?.rows, search, statusFilter]);
+
+  const verifiedPurchases = useMemo(() => {
+    const active = (overview.data?.rows || [])
+      .filter((row: any) => row.confirmedPayment)
+      .map((row: any) => ({
+        key: `active-${row.pilot.id}`,
+        fullName: `${row.single.firstName || ""} ${row.single.lastName || ""}`.trim(),
+        amountAgorot: row.pilot.pilotPriceAgorot || 9900,
+        paidAt: row.pilot.lastPaymentAt,
+        state: "active" as const,
+      }));
+    const pending = (overview.data?.pendingPaidProfiles || []).map((row: any) => ({
+      key: `pending-${row.id}`,
+      fullName: row.fullName,
+      amountAgorot: row.amountAgorot || 9900,
+      paidAt: row.paidAt,
+      state: "pending_database" as const,
+    }));
+    return [...active, ...pending]
+      .sort((a, b) => Number(b.paidAt || 0) - Number(a.paidAt || 0))
+      .slice(0, 12);
+  }, [overview.data?.rows, overview.data?.pendingPaidProfiles]);
 
   if (overview.isLoading) return <section className="h-44 rounded-2xl bg-white animate-pulse border border-[#e9e8e8]" />;
   if (!overview.data) return null;
@@ -61,6 +86,9 @@ export default function PlusPilotAdminSection() {
           <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">ברירת המחדל מציגה מנויים ששילמו והופעלו. לכל מנוי מוצגות שתי הצעות ה־Plus לפי מחזור החיוב האישי, ההתאמות שנשלחו בפועל ומצב הבוסט: זמין, בטיפול או נשלח.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
+          <button type="button" onClick={() => overview.refetch()} disabled={overview.isFetching} className="rounded-xl border border-[#d8b67e] bg-white px-3 py-2 font-bold text-[#6f541d] disabled:opacity-50">
+            {overview.isFetching ? "מרענן…" : "רענון עכשיו"}
+          </button>
           <label className="rounded-xl border bg-white px-3 py-2">קוהורט <input value={cohort} onChange={event => setCohort(event.target.value)} className="mr-2 w-24 outline-none" /></label>
           <label className="rounded-xl border bg-white px-3 py-2">מחיר פיילוט ₪ <input type="number" min="0" value={price} onChange={event => setPrice(event.target.value)} className="mr-2 w-16 outline-none" /></label>
         </div>
@@ -81,6 +109,27 @@ export default function PlusPilotAdminSection() {
         ))}
       </div>
 
+      {verifiedPurchases.length > 0 && <div className="mt-4 rounded-2xl border border-[#d8b67e] bg-[#fffaf0] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <strong className="text-sm text-[#191265]">רכישות Plus מאומתות ב־Grow</strong>
+            <p className="mt-1 text-[10px] leading-5 text-[#75674f]">כל רכישה מופיעה כאן מיד עם הסטטוס המדויק שלה, גם לפני שניתן להפעיל את המנוי.</p>
+          </div>
+          <span className="rounded-full bg-[#191265] px-3 py-1 text-[10px] font-black text-[#ffe27c]">{verifiedPurchases.length} אחרונות</span>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {verifiedPurchases.map(purchase => <div key={purchase.key} className="flex items-center justify-between gap-3 rounded-xl border border-[#eadfc8] bg-white px-3 py-2.5">
+            <div className="min-w-0">
+              <strong className="block truncate text-xs text-[#191265]">{purchase.fullName}</strong>
+              <span className="text-[10px] text-[#8a7d70]">שולם {Math.round(purchase.amountAgorot / 100)} ₪ · {formatDate(purchase.paidAt)}</span>
+            </div>
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black ${purchase.state === "active" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>
+              {purchase.state === "active" ? "פעיל/ה במערכת" : "שולם · ממתין/ה להצטרפות למאגר"}
+            </span>
+          </div>)}
+        </div>
+      </div>}
+
       <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
         <div className={`rounded-xl border p-3 ${capacity.female.remaining === 0 ? "border-red-200 bg-red-50 text-red-800" : "border-pink-200 bg-pink-50 text-pink-800"}`}>
           <strong className="text-lg">{capacity.female.reserved}/{capacity.female.limit}</strong>
@@ -93,14 +142,6 @@ export default function PlusPilotAdminSection() {
           <div className="text-[10px]">{capacityBreakdown.male.active} פעילים · {capacityBreakdown.male.invited} הזמנות פתוחות · נותרו {capacity.male.remaining}</div>
         </div>
       </div>
-
-      {pendingPaidProfiles.length > 0 && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-        <div className="flex items-center justify-between gap-2"><strong className="text-xs text-amber-900">שילמו 99 ₪ וממתינים להשלמת פרופיל</strong><span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-900">{pendingPaidProfiles.length}</span></div>
-        <p className="mt-1 text-[10px] leading-5 text-amber-800">אלו רכישות Grow מאומתות. הן אינן נספרות כמנוי פעיל עד להשלמת הפרופיל, ואז ההפעלה מתבצעת אוטומטית.</p>
-        <div className="mt-2 grid gap-1 text-[10px] text-amber-950 sm:grid-cols-2">
-          {pendingPaidProfiles.map((profile: any) => <div key={profile.id} className="rounded-lg bg-white/70 px-2 py-1.5"><strong>{profile.fullName}</strong> · {profile.email} · שולם {formatDate(profile.paidAt)}</div>)}
-        </div>
-      </div>}
 
       {relaunchStats.cohort > 0 && <div className="mt-3 rounded-xl border border-pink-200 bg-pink-50 p-3">
         <div className="flex items-center justify-between gap-2"><strong className="text-xs text-pink-950">גל ההשקה עם מתנת המדריך</strong><span className="text-[10px] text-pink-800">חלון אישי של 72 שעות</span></div>

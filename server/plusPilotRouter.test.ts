@@ -116,4 +116,16 @@ describe("Plus admin visibility helpers", () => {
     expect(source).toContain("row.launchAttribution.source === \"sms\"");
     expect(source).toContain("עמדו ביעד האישי");
   });
+
+  it("shows verified Grow purchases before and after Plus activation", () => {
+    const source = readFileSync(resolve(process.cwd(), "client/src/components/PlusPilotAdminSection.tsx"), "utf8");
+
+    expect(source).toContain("רכישות Plus מאומתות ב־Grow");
+    expect(source).toContain("row.confirmedPayment");
+    expect(source).toContain("overview.data?.pendingPaidProfiles");
+    expect(source).toContain("פעיל/ה במערכת");
+    expect(source).toContain("שולם · ממתין/ה להצטרפות למאגר");
+    expect(source).toContain("refetchOnWindowFocus: true");
+    expect(source).toContain("רענון עכשיו");
+  });
 });
