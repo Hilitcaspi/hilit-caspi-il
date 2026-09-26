@@ -10,33 +10,40 @@ const router = readFileSync(resolve(root, "server/courseCompassRouter.ts"), "utf
 const schema = readFileSync(resolve(root, "drizzle/schema.ts"), "utf8");
 const crm = readFileSync(resolve(root, "client/src/pages/CRM.tsx"), "utf8");
 
-describe("course compass prelaunch funnel", () => {
-  it("publishes a standalone route without replacing the existing DNA or course routes", () => {
+describe("course compass simple prelaunch funnel", () => {
+  it("keeps a standalone route without replacing the DNA or existing course routes", () => {
     expect(app).toContain('const CourseCompass = lazy(() => import("@/pages/CourseCompass"))');
     expect(app).toContain('<Route path={"/compass"} component={CourseCompass} />');
     expect(app).toContain('<Route path={"/dna-quiz"} component={DnaQuiz} />');
     expect(app).toContain('<Route path={"/course"} component={CourseSales} />');
   });
 
-  it("keeps the public experience closed-choice and reveals the result before the waitlist form", () => {
-    expect(page).toContain("חשבו על אדם אחד");
-    expect(page).toContain("אחרי ארבע לחיצות אנסה לנחש");
-    expect(page).toContain("בלי שם, בלי הודעות ובלי לכתוב דבר");
-    expect(page).toContain("התוצאה נחשפת לפני פרטים");
+  it("follows the DNA structure: gender, short choices, details, reveal, result", () => {
+    expect(page).toContain("כמה לחיצות שיכולות לשנות את הכיוון");
+    expect(page).toContain("אישה");
+    expect(page).toContain("גבר");
+    expect(page).toContain("שאלה {number} מתוך 8");
+    expect(page).toContain('setPhase("capture")');
+    expect(page).toContain('setPhase("reveal")');
+    expect(page).toContain('setPhase("result")');
+    expect(page).toContain("לאן לשלוח את הפיצוח שלך?");
     expect(page).toContain("זה לא קסם. זה מדע.");
-    expect(page).toContain("תראו לי את המפה שמאחורי הניחוש");
-    expect(page.indexOf("המנגנון הבולט")).toBeLessThan(page.indexOf("אני רוצה קדימות והטבת השקה"));
-    expect(page).not.toContain("answer: answerId");
+    expect(page).not.toContain("The Pattern Code");
+    expect(page).not.toContain("Fingerprint");
+    expect(page).not.toContain("ניחוש הראשון");
+    expect(page).not.toContain("ניסוי אחד");
   });
 
-  it("is transparent that the course and physical kit are not yet for sale", () => {
-    expect(page).toContain("המכירה עדיין לא נפתחה");
-    expect(page).toContain("לא יתבצע חיוב ולא תיפתח הזמנה");
+  it("connects the result directly to the course while keeping sales closed", () => {
+    expect(page).toContain("סוד ההתאמה המושלמת");
+    expect(page).toContain("הקורס שילמד אותך להבין");
+    expect(page).toContain("אין כרגע תשלום או הזמנה");
     expect(page).not.toContain("GrowWallet");
   });
 
-  it("stores result metadata but no answer trail", () => {
+  it("stores gender and result metadata but no answer trail", () => {
     expect(schema).toContain('mysqlTable("course_compass_leads"');
+    expect(schema).toContain('gender: mysqlEnum("gender", ["female", "male"])');
     expect(schema).toContain('resultKey: mysqlEnum("result_key"');
     const tableSource = schema.slice(schema.indexOf('mysqlTable("course_compass_leads"'), schema.indexOf("export type CourseCompassLead"));
     expect(tableSource).not.toContain("answers");
@@ -45,11 +52,11 @@ describe("course compass prelaunch funnel", () => {
     expect(router).not.toMatch(/joinWaitlist:[\s\S]*?responses:/);
   });
 
-  it("sends a transactional confirmation with the result and no purchase claim", () => {
-    const email = buildCourseCompassWaitlistEmail({ name: "נועה", resultKey: "uncertainty_loop" });
-    expect(email.subject).toContain("זה לא קסם");
-    expect(email.htmlContent).toContain("דווקא חוסר הבהירות");
-    expect(email.htmlContent).toContain("מנגנונים פסיכולוגיים");
+  it("sends a gendered confirmation with the result and no purchase claim", () => {
+    const email = buildCourseCompassWaitlistEmail({ name: "נועה", gender: "female", resultKey: "uncertainty_loop" });
+    expect(email.subject).toContain("המצפן שלך מוכן");
+    expect(email.htmlContent).toContain("שהוא רוצה אותך");
+    expect(email.htmlContent).toContain("זה לא קסם. זה מדע");
     expect(email.htmlContent).toContain("לא בוצע חיוב ולא נפתחה הזמנה");
     expect(email.textContent).toContain("הטבת ההשקה המיוחדת");
   });

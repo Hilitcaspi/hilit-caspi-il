@@ -51,9 +51,10 @@ const validInput = {
   name: "בדיקת מערכת",
   email: "compass-test@example.com",
   phone: "0500000000",
+  gender: "female" as const,
   resultKey: "uncertainty_loop" as const,
   secondaryResultKey: "chemistry_confusion" as const,
-  selectedAction: "ask_one_clear_question",
+  selectedAction: "clear_answer",
   waitlistConsent: true as const,
   marketingConsent: false,
   utmSource: "qa",
@@ -92,7 +93,8 @@ describe("course compass waitlist API", () => {
     const storedValues = db.insert.mock.results[0].value.values.mock.calls[0][0];
     expect(storedValues).toMatchObject({
       resultKey: "uncertainty_loop",
-      selectedAction: "ask_one_clear_question",
+      gender: "female",
+      selectedAction: "clear_answer",
       waitlistConsent: true,
       marketingConsent: false,
     });

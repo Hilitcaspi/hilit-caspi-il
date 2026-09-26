@@ -5,13 +5,14 @@ import {
   CORE_COMPASS_RESULTS,
   COURSE_COMPASS_VERSION,
   getCompassResultContent,
+  type CompassGender,
   type CompassResultKey,
 } from "../shared/courseCompass";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { sendEmail } from "./brevo";
 import { getDb } from "./db";
 
-export const COURSE_COMPASS_CONSENT_VERSION = "2026-09-launch-v1";
+export const COURSE_COMPASS_CONSENT_VERSION = "2026-09-result-gate-v2";
 export const COURSE_COMPASS_BENEFIT_VERSION = "launch-priority-v1";
 export const COURSE_COMPASS_EMAIL_JOURNEY = "course_compass_waitlist";
 
@@ -36,12 +37,14 @@ function escapeHtml(value: string) {
 
 export function buildCourseCompassWaitlistEmail(input: {
   name: string;
+  gender: CompassGender;
   resultKey: CompassResultKey;
 }) {
   const safeName = escapeHtml(input.name.trim().split(/\s+/)[0] || "");
-  const result = getCompassResultContent(input.resultKey);
-  const subject = "זה לא קסם. זה מנגנון שאפשר ללמוד לשנות";
-  const preheader = "הפיצוח האישי והקדימות לקורס הדגל נשמרו";
+  const result = getCompassResultContent(input.resultKey, input.gender);
+  const female = input.gender === "female";
+  const subject = "המצפן שלך מוכן — וזה לא קסם";
+  const preheader = "התוצאה האישית והקדימות לקורס הדגל נשמרו";
   const greeting = safeName ? `היי ${safeName},` : "היי,";
   const htmlContent = `<!doctype html>
 <html lang="he" dir="rtl">
@@ -51,20 +54,20 @@ export function buildCourseCompassWaitlistEmail(input: {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4eee8;"><tr><td align="center" style="padding:24px 12px;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#fffaf6;border-radius:28px;overflow:hidden;box-shadow:0 18px 50px rgba(49,14,53,.16);">
       <tr><td align="center" style="padding:34px 26px;background:linear-gradient(135deg,#2b0e38 0%,#641449 58%,#9b245f 100%);">
-        <p style="margin:0;color:#f6d08a;font-size:13px;letter-spacing:2px;font-weight:700;">THE COMPASS</p>
-        <h1 style="margin:12px 0 0;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:1.2;">הפיצוח שלך נשמר</h1>
-        <p style="margin:12px 0 0;color:rgba(255,255,255,.78);font-size:15px;">זה לא קסם. זו הפסיכולוגיה שמאחורי הבחירות שלנו.</p>
+        <p style="margin:0;color:#f6d08a;font-size:13px;letter-spacing:2px;font-weight:700;">המצפן הזוגי</p>
+        <h1 style="margin:12px 0 0;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:1.2;">המצפן שלך מוכן</h1>
+        <p style="margin:12px 0 0;color:rgba(255,255,255,.78);font-size:15px;">זה לא קסם. זה מדע.</p>
       </td></tr>
       <tr><td style="padding:30px 28px 14px;text-align:right;">
         <p style="margin:0 0 16px;font-size:18px;font-weight:700;">${greeting}</p>
-        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;">השלמתם את אתגר הפיצוח. המנגנון שבלט אצלכם הוא:</p>
+        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;">${female ? "השלמת את המצפן הזוגי. הכיוון שבלט אצלך הוא:" : "השלמת את המצפן הזוגי. הכיוון שבלט אצלך הוא:"}</p>
         <div style="border:1px solid #e7d3cc;background:#ffffff;border-radius:22px;padding:22px;margin:0 0 18px;">
           <p style="margin:0 0 6px;color:#9b245f;font-size:13px;font-weight:800;">${escapeHtml(result.label)}</p>
           <p style="margin:0 0 10px;color:#2a123c;font-size:23px;font-weight:800;">${escapeHtml(result.title)}</p>
           <p style="margin:0;color:#66546d;font-size:15px;line-height:1.75;">${escapeHtml(result.summary)}</p>
         </div>
-        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;"><strong>אתם תוהים איך ידעתי?</strong> זה לא קסם. מאחורי הרבה מהדינמיקות הזוגיות שלנו יש מנגנונים פסיכולוגיים שאפשר לזהות, לפרק ולתרגל אחרת.</p>
-        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;">נכנסתם לרשימת ההשקה של קורס הדגל החדש. בקורס אלמד איך לזהות את המנגנונים בזמן אמת, לשנות הרגלים מעשיים ולבנות דרך ברורה יותר לזוגיות. כשהקורס ייפתח, תקבלו לפני כולם את הפרטים, הקדימות והטבת ההשקה.</p>
+        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;"><strong>${female ? "את תוהה איך ידעתי את כל זה?" : "אתה תוהה איך ידעתי את כל זה?"}</strong> זה לא קסם. רוב הדינמיקות הזוגיות והדרך שבה אנחנו בוחרים את מי שאנחנו רוצים פועלות לפי דפוסים שאפשר לזהות.</p>
+        <p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#59485f;">בשנים האחרונות פירקתי את הדפוסים האלה לקורס אחד מעשי. הוא ילמד ${female ? "אותך להבין מי מתאים לך, לשנות הרגלים ולהתקדם לזוגיות שאת רוצה" : "אותך להבין מי מתאימה לך, לשנות הרגלים ולהתקדם לזוגיות שאתה רוצה"}. כשהקורס ייפתח, תקבלו לפני כולם את הפרטים ואת הטבת ההשקה.</p>
         <div style="background:#2b0e38;border-radius:18px;padding:18px 20px;margin:22px 0;color:#ffffff;">
           <p style="margin:0;color:#f6d08a;font-weight:800;font-size:14px;">חשוב לדעת</p>
           <p style="margin:8px 0 0;color:rgba(255,255,255,.82);font-size:14px;line-height:1.7;">הקורס והמארז עדיין בבנייה. לא בוצע חיוב ולא נפתחה הזמנה. הודעה מסודרת תישלח לפני הפתיחה.</p>
@@ -75,7 +78,7 @@ export function buildCourseCompassWaitlistEmail(input: {
     </table>
   </td></tr></table>
 </body></html>`;
-  const textContent = `${greeting}\n\nהשלמתם את אתגר הפיצוח. המנגנון שבלט אצלכם הוא: ${result.label} — ${result.title}.\n${result.summary}\n\nאתם תוהים איך ידעתי? זה לא קסם. מאחורי הרבה מהדינמיקות הזוגיות שלנו יש מנגנונים פסיכולוגיים שאפשר לזהות, לפרק ולתרגל אחרת.\n\nנכנסתם לרשימת ההשקה של קורס הדגל החדש. בקורס אלמד איך לזהות את המנגנונים בזמן אמת, לשנות הרגלים מעשיים ולבנות דרך ברורה יותר לזוגיות. כשהקורס ייפתח, תקבלו לפני כולם את הפרטים, הקדימות והטבת ההשקה המיוחדת.\n\nהקורס והמארז עדיין בבנייה. לא בוצע חיוב ולא נפתחה הזמנה.\n\nבאהבה,\nהילית כספי\n\nהתוצאה היא כלי להתבוננות ולבחירת צעד, לא אבחון של אדם אחר ולא תחליף לייעוץ מקצועי.`;
+  const textContent = `${greeting}\n\nהשלמת את המצפן הזוגי. הכיוון שבלט אצלך הוא: ${result.label} — ${result.title}.\n${result.summary}\n\n${female ? "את תוהה איך ידעתי את כל זה?" : "אתה תוהה איך ידעתי את כל זה?"} זה לא קסם. רוב הדינמיקות הזוגיות והדרך שבה אנחנו בוחרים את מי שאנחנו רוצים פועלות לפי דפוסים שאפשר לזהות.\n\nבשנים האחרונות פירקתי את הדפוסים האלה לקורס אחד מעשי שילמד איך לשנות הרגלים ולהתקדם לזוגיות שרוצים באמת. כשהקורס ייפתח, יישלחו לפני כולם הפרטים והטבת ההשקה המיוחדת.\n\nהקורס והמארז עדיין בבנייה. לא בוצע חיוב ולא נפתחה הזמנה.\n\nבאהבה,\nהילית כספי\n\nהתוצאה היא כלי להתבוננות ולבחירת צעד, לא אבחון של אדם אחר ולא תחליף לייעוץ מקצועי.`;
   return { subject, preheader, htmlContent, textContent };
 }
 
@@ -86,6 +89,7 @@ export const courseCompassRouter = router({
       name: z.string().trim().min(2).max(100),
       email: z.string().trim().email().max(320),
       phone: z.string().trim().max(20).optional(),
+      gender: z.enum(["female", "male"]),
       resultKey: resultKeySchema,
       secondaryResultKey: secondaryResultSchema.nullable().optional(),
       selectedAction: z.string().trim().max(100).optional(),
@@ -107,6 +111,7 @@ export const courseCompassRouter = router({
         name: input.name,
         email,
         phone: input.phone || null,
+        gender: input.gender,
         resultKey: input.resultKey,
         secondaryResultKey: input.secondaryResultKey || null,
         selectedAction: input.selectedAction || null,
@@ -130,6 +135,7 @@ export const courseCompassRouter = router({
           name: values.name,
           email: values.email,
           phone: values.phone,
+          gender: values.gender,
           resultKey: values.resultKey,
           secondaryResultKey: values.secondaryResultKey,
           selectedAction: values.selectedAction,
@@ -160,6 +166,7 @@ export const courseCompassRouter = router({
       if (!existingConfirmation) {
         const emailContent = buildCourseCompassWaitlistEmail({
           name: input.name,
+          gender: input.gender,
           resultKey: input.resultKey,
         });
         const insertResult = await db.insert(emailLog).values({
@@ -207,6 +214,7 @@ export const courseCompassRouter = router({
       name: courseCompassLeads.name,
       email: courseCompassLeads.email,
       phone: courseCompassLeads.phone,
+      gender: courseCompassLeads.gender,
       resultKey: courseCompassLeads.resultKey,
       selectedAction: courseCompassLeads.selectedAction,
       marketingConsent: courseCompassLeads.marketingConsent,

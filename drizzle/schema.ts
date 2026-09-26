@@ -501,6 +501,7 @@ export const courseCompassLeads = mysqlTable("course_compass_leads", {
   name: varchar("name", { length: 100 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   phone: varchar("phone", { length: 20 }),
+  gender: mysqlEnum("gender", ["female", "male"]),
   resultKey: mysqlEnum("result_key", ["information", "consistency", "pace", "boundary", "self_choice", "future_projection", "uncertainty_loop", "approval_chase", "chemistry_confusion", "novelty_pull", "safety"]).notNull(),
   secondaryResultKey: mysqlEnum("secondary_result_key", ["information", "consistency", "pace", "boundary", "self_choice", "future_projection", "uncertainty_loop", "approval_chase", "chemistry_confusion", "novelty_pull"]),
   selectedAction: varchar("selected_action", { length: 100 }),

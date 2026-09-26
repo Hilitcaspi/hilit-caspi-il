@@ -9,11 +9,11 @@ const RESULT_LABELS: Record<string, string> = {
   pace: "קצב",
   boundary: "גבול",
   self_choice: "בחירה",
-  future_projection: "השלמת העתיד",
-  uncertainty_loop: "לולאת אי־הוודאות",
-  approval_chase: "מרדף האישור",
-  chemistry_confusion: "בלבול הכימיה",
-  novelty_pull: "משיכת החדש",
+  future_projection: "העתיד שכבר דמיינת",
+  uncertainty_loop: "חוסר הוודאות",
+  approval_chase: "הרצון שיבחרו בך",
+  chemistry_confusion: "הכימיה החזקה",
+  novelty_pull: "המרדף",
   safety: "בטיחות",
 };
 
@@ -73,7 +73,7 @@ export default function CourseCompassAdminSection() {
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <p className="font-bold text-sm text-[#191265]">{row.name}</p>
-                    <p className="text-xs text-[#727272] mt-0.5">כיוון: {RESULT_LABELS[row.resultKey] ?? row.resultKey}{row.selectedAction ? `, פעולה: ${row.selectedAction}` : ""}</p>
+                    <p className="text-xs text-[#727272] mt-0.5">{row.gender === "female" ? "אישה" : row.gender === "male" ? "גבר" : "מגדר לא נשמר"} · כיוון: {RESULT_LABELS[row.resultKey] ?? row.resultKey}</p>
                     <p className="text-[11px] text-[#9a8b9c] mt-1">{new Date(row.createdAt).toLocaleString("he-IL")}{row.utmSource ? ` · ${row.utmSource}${row.utmCampaign ? ` / ${row.utmCampaign}` : ""}` : ""}</p>
                   </div>
                   <div className="flex gap-1.5">

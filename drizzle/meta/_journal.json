@@ -211,6 +211,13 @@
       "when": 1790444592908,
       "tag": "0029_course_compass_pattern_results",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1790446444490,
+      "tag": "0030_course_compass_gender",
+      "breakpoints": true
     }
   ]
 }

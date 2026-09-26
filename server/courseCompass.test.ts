@@ -3,134 +3,73 @@ import {
   getCompassProgress,
   getCompassQuestionById,
   getCompassResult,
-  getInterimPrediction,
   getNextCompassQuestion,
   scoreCompassResponses,
   type CompassResponses,
 } from "../shared/courseCompass";
 
-describe("course compass adaptive pattern engine", () => {
-  it("starts by asking the visitor to hold one person in mind without free text", () => {
-    const question = getNextCompassQuestion({});
-    expect(question?.id).toBe("scene");
-    expect(question?.prompt).toContain("ביניכם");
-    expect(question?.answers.length).toBeGreaterThanOrEqual(4);
-    expect(question?.answers.every(answer => Boolean(answer.id && answer.label))).toBe(true);
+const uncertaintyResponses: CompassResponses = {
+  want_now: "is_interested",
+  no_message: "check_phone",
+  most_attractive: "unknown",
+  clear_tomorrow: "relief",
+  familiar_pattern: "attach_unclear",
+  distance: "read_signs",
+  hard_to_release: "missing_answer",
+  wish_now: "clear_answer",
+};
+
+describe("course compass simple gendered engine", () => {
+  it("starts with a direct female or male question and no free text", () => {
+    const female = getNextCompassQuestion({}, "female");
+    const male = getNextCompassQuestion({}, "male");
+
+    expect(female?.id).toBe("want_now");
+    expect(female?.prompt).toBe("מה את הכי רוצה לדעת עליו עכשיו?");
+    expect(male?.prompt).toBe("מה אתה הכי רוצה לדעת עליה עכשיו?");
+    expect(female?.answers).toHaveLength(5);
+    expect(female?.answers.every(answer => Boolean(answer.id && answer.label))).toBe(true);
   });
 
-  it("makes a visible interim prediction after four clicks", () => {
-    const responses: CompassResponses = {
-      scene: "mixed_messages",
-      fast_hook: "decode_everything",
-      value_signal: "unavailable",
-      silence_response: "check_phone",
-    };
-    const prediction = getInterimPrediction(responses);
-    const question = getNextCompassQuestion(responses);
-    expect(prediction.primary).toBe("uncertainty_loop");
-    expect(prediction.text).toContain("שום דבר עדיין לא נסגר");
-    expect(question?.id).toBe("prediction_check");
-    expect(question?.prediction).toBe(true);
-    expect(question?.prompt).toBe(prediction.text);
+  it("moves through exactly eight simple questions without prediction or tie-break screens", () => {
+    const partial = { ...uncertaintyResponses };
+    delete partial.wish_now;
+    expect(getNextCompassQuestion(partial, "female")?.id).toBe("wish_now");
+    expect(getNextCompassQuestion(uncertaintyResponses, "female")).toBeNull();
+    expect(Object.keys(uncertaintyResponses)).toHaveLength(8);
   });
 
-  it("uses the reaction to the first guess before choosing the discriminating question", () => {
-    const responses: CompassResponses = {
-      scene: "mixed_messages",
-      fast_hook: "decode_everything",
-      value_signal: "unavailable",
-      silence_response: "check_phone",
-      prediction_check: "close",
-    };
-    const question = getNextCompassQuestion(responses);
-    expect(question?.id).toBe("discriminate_chemistry_confusion__uncertainty_loop");
-    expect(question?.prompt).toContain("מה חזק יותר");
-  });
-
-  it("asks exactly one adaptive discriminator before moving deeper", () => {
-    const responses: CompassResponses = {
-      scene: "mixed_messages",
-      fast_hook: "decode_everything",
-      value_signal: "unavailable",
-      silence_response: "check_phone",
-      prediction_check: "close",
-      discriminate_chemistry_confusion__uncertainty_loop: "uncertainty_loop",
-    };
-    expect(getNextCompassQuestion(responses)?.id).toBe("hard_truth");
-  });
-
-  it("reveals the uncertainty loop with evidence copied from actual choices", () => {
-    const responses: CompassResponses = {
-      scene: "mixed_messages",
-      fast_hook: "decode_everything",
-      value_signal: "unavailable",
-      silence_response: "check_phone",
-      discriminate_chemistry_confusion__uncertainty_loop: "uncertainty_loop",
-      prediction_check: "close",
-      hard_truth: "clarity_scary",
-      facts_only: "close_far_pattern",
-      old_solution: "look_for_sign",
-      safety: "no",
-    };
-    const result = getCompassResult(responses);
+  it("reveals a clear uncertainty result from direct everyday choices", () => {
+    const result = getCompassResult(uncertaintyResponses, "female");
     expect(result.primary).toBe("uncertainty_loop");
-    expect(result.content.title).toContain("חוסר הבהירות");
-    expect(result.content.science).toContain("תגמול");
-    expect(result.evidence).toContain("מנתח הודעות, זמנים ושינויים קטנים");
-    expect(result.content.actions.length).toBe(2);
+    expect(result.content.label).toBe("חוסר הוודאות");
+    expect(result.content.title).toContain("שהוא רוצה אותך");
+    expect(result.content.magicLine).toContain("המצפן שלך");
+    expect(result.evidence).toContain("בודקת שוב ושוב אם הוא כתב");
+    expect(result.content.actions).toHaveLength(1);
   });
 
-  it("overrides the attraction pattern when safety is uncertain", () => {
-    const responses: CompassResponses = {
-      scene: "strong_attraction_little_ground",
-      fast_hook: "feel_intensity",
-      value_signal: "intense_moment",
-      silence_response: "want_more",
-      prediction_check: "close",
-      discriminate_chemistry_confusion__future_projection: "chemistry_confusion",
-      hard_truth: "intensity_wins",
-      facts_only: "intensity_few_facts",
-      old_solution: "rules_then_break",
-      safety: "uncertain",
-    };
-    const result = getCompassResult(responses);
-    expect(result.primary).toBe("safety");
-    expect(result.clarity).toBe("safety");
-    expect(getNextCompassQuestion(responses)).toBeNull();
+  it("uses the same scoring with copy addressed to a man", () => {
+    const female = getCompassResult(uncertaintyResponses, "female");
+    const male = getCompassResult(uncertaintyResponses, "male");
+    expect(male.primary).toBe(female.primary);
+    expect(male.scores).toEqual(female.scores);
+    expect(male.content.title).toContain("שהיא רוצה אותך");
+    expect(male.evidence).toContain("בודק שוב ושוב אם היא כתבה");
   });
 
-  it("uses a final transparent guess when two mechanisms remain close", () => {
-    const responses: CompassResponses = {
-      scene: "after_date_replay",
-      fast_hook: "build_future",
-      value_signal: "intense_moment",
-      silence_response: "want_more",
-      prediction_check: "partial",
-      discriminate_chemistry_confusion__future_projection: "chemistry_confusion",
-      hard_truth: "knew_but_stayed",
-      facts_only: "intensity_few_facts",
-      old_solution: "wait_for_potential",
-      safety: "no",
-    };
-    const scores = scoreCompassResponses(responses);
-    expect(Math.abs(scores.chemistry_confusion - scores.future_projection)).toBeLessThan(2);
-    expect(getNextCompassQuestion(responses)?.id).toBe("tie_break");
+  it("calculates simple progress across eight clicks", () => {
+    expect(getCompassProgress({})).toBe(0);
+    expect(getCompassProgress({ want_now: "is_interested" })).toBe(13);
+    expect(getCompassProgress(uncertaintyResponses)).toBe(100);
+    expect(getCompassQuestionById("distance", uncertaintyResponses, "male")?.prompt).toContain("כשהיא מתרחקת");
   });
 
-  it("calculates progress across ten clicks and never exceeds one hundred percent", () => {
-    const responses: CompassResponses = {
-      scene: "mixed_messages",
-      fast_hook: "decode_everything",
-      value_signal: "unavailable",
-      silence_response: "check_phone",
-      prediction_check: "close",
-      discriminate_chemistry_confusion__uncertainty_loop: "uncertainty_loop",
-      hard_truth: "clarity_scary",
-      facts_only: "close_far_pattern",
-      old_solution: "look_for_sign",
-      safety: "no",
-    };
-    expect(getCompassProgress(responses)).toBe(100);
-    expect(getCompassQuestionById("hard_truth", responses)?.answers).toHaveLength(5);
+  it("scores only the saved answer ids and never requires personal text", () => {
+    const scores = scoreCompassResponses(uncertaintyResponses);
+    expect(scores.uncertainty_loop).toBeGreaterThan(scores.future_projection);
+    const question = getCompassQuestionById("most_attractive", {}, "female");
+    expect(question).not.toHaveProperty("input");
+    expect(question?.answers.every(answer => typeof answer.label === "string")).toBe(true);
   });
 });
