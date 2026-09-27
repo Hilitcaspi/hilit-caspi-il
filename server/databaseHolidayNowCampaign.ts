@@ -55,7 +55,7 @@ export function buildDatabaseHolidayNowSms(input: { firstName?: string | null; e
   const firstName = String(input.firstName || "").trim().split(/\s+/)[0];
   const greeting = firstName ? `היי ${firstName}, כאן הילית 💛` : "היי, כאן הילית 💛";
   const offerUrl = databaseNowOfferUrl("sms");
-  const message = `${greeting} לכבוד החג: הצטרפות למאגר ב־${DATABASE_NOW_PRICE_ILS} ₪ במקום 499 ₪, בתשלום חד־פעמי. ל־${DATABASE_NOW_MAX_USES} הראשונים הצעת התאמה בתוך 3 ימים מסיום הפרופיל והשאלון ✨ קוד ${DATABASE_NOW_COUPON}: ${offerUrl} להסרה: hilitcaspi.com/unsubscribe`;
+  const message = `${greeting} הבשורה לחג: ל־${DATABASE_NOW_MAX_USES} הראשונים הצעת התאמה ראשונה בתוך 3 ימים מסיום הפרופיל והשאלון ✨ מחכה לך גם הטבת הצטרפות מיוחדת, בתשלום חד־פעמי. קוד ${DATABASE_NOW_COUPON}: ${offerUrl} להסרה: hilitcaspi.com/unsubscribe`;
   return { message, offerUrl, units: Math.ceil(message.trim().length / 256) };
 }
 

@@ -23,8 +23,9 @@ describe("database holiday NOW campaign", () => {
       unsubscribeUrl: "https://hilitcaspi.com/unsubscribe?token=test",
     });
 
-    expect(DATABASE_NOW_SUBJECT).toContain("היום");
-    expect(DATABASE_NOW_PREHEADER).toContain("299 ₪ במקום 499 ₪");
+    expect(DATABASE_NOW_SUBJECT).toContain("הבשורה לחג");
+    expect(DATABASE_NOW_SUBJECT).toContain("ההתאמה הראשונה");
+    expect(DATABASE_NOW_PREHEADER).toContain("הטבת הצטרפות מיוחדת");
     expect(DATABASE_NOW_PREHEADER).toContain("3 ימים");
     expect(result.htmlContent).toContain("הצעת התאמה ראשונה");
     expect(result.htmlContent).toContain("מהשלמת הפרופיל והשאלון");
@@ -43,8 +44,8 @@ describe("database holiday NOW campaign", () => {
 
   it("keeps the SMS within one Vibrate unit even with a long first name", () => {
     const result = buildDatabaseHolidayNowSms({ firstName: "אביגילאביטל", email: "example.person@gmail.com" });
-    expect(result.message).toContain("299 ₪ במקום 499 ₪");
-    expect(result.message).toContain("3 ימים מסיום הפרופיל והשאלון");
+    expect(result.message).toContain("הצעת התאמה ראשונה בתוך 3 ימים מסיום הפרופיל והשאלון");
+    expect(result.message).toContain("הטבת הצטרפות מיוחדת");
     expect(result.message).toContain("💛");
     expect(result.message).toContain("✨");
     expect(result.message).toContain("100 הראשונים");
