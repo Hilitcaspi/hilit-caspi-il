@@ -9,6 +9,7 @@ import BoostMembersAdminSection from "@/components/BoostMembersAdminSection";
 import TestimonialManagementSection from "@/components/TestimonialManagementSection";
 import DailyReportManagementSection from "@/components/DailyReportManagementSection";
 import SelfServiceControlCenter from "@/components/SelfServiceControlCenter";
+import ProfileClosureDialog from "@/components/ProfileClosureDialog";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -536,11 +537,6 @@ export default function CRMMatchmaking() {
     onError: (err: any) => toast.error('שגיאה בהעלאת התמונה: ' + err.message),
   });
 
-  const deactivateSingle = (trpc.matchmaking as any).deactivateSingle.useMutation({
-    onSuccess: () => { refetchSingles(); refetchMatches(); toast.success('הרווק/ה הוסר/ה מהמאגר'); },
-    onError: (err: any) => toast.error(err?.message || 'שגיאה בהסרה'),
-  });
-
   const updateSingleInline = (trpc.matchmaking as any).updateSingleInline.useMutation({
     onSuccess: () => { refetchSingles(); refetchMatches(); toast.success('פרטים עודכנו!'); },
     onError: (err: any) => toast.error(err?.message || 'שגיאה בעדכון'),
@@ -553,6 +549,16 @@ export default function CRMMatchmaking() {
     onSuccess: () => { refetchSingles(); refetchMatches(); refetchUnmatched(); toast.success('עודכן!'); },
     onError: () => toast.error('שגיאה'),
   });
+
+  const refreshAfterProfileClosure = async () => {
+    setSelectedSingle(null);
+    await Promise.all([
+      refetchSingles(),
+      refetchMatches(),
+      refetchUnmatched(),
+      refetchInactive(),
+    ]);
+  };
 
   // Non-response counts for serial non-responder badge
   const { data: nonResponseCounts = {} } = (trpc.matchmaking as any).getNonResponseCounts.useQuery(undefined, {
@@ -1056,16 +1062,19 @@ export default function CRMMatchmaking() {
                     >
                       {(single as any).isNotBasic ? "⭐ דורש תשומת לב" : "⭐"}
                     </button>
-                    <button
-                      onClick={() => toggleActive.mutate({ singleId: single.id, isActive: !single.isActive })}
-                      className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${
-                        single.isActive
-                          ? "bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700"
-                          : "bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700"
-                      }`}
-                    >
-                      {single.isActive ? "✅ פעיל" : "⏸ לא פעיל"}
-                    </button>
+                    {single.isActive ? (
+                      <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700">✅ פעיל</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => toggleActive.mutate({ singleId: single.id, isActive: true })}
+                        disabled={toggleActive.isPending}
+                        className="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-green-100 hover:text-green-700 disabled:opacity-50"
+                      >
+                        הפעל מחדש
+                      </button>
+                    )}
+                    <ProfileClosureDialog profile={single} onClosed={refreshAfterProfileClosure} />
                     <button
                       onClick={() => setSelectedSingle(selectedSingle === single.id ? null : single.id)}
                       className="text-xs text-[#191265] underline"
@@ -1799,12 +1808,10 @@ export default function CRMMatchmaking() {
                                   ✉️ {s.email}
                                 </a>
                               )}
-                              <button
-                                onClick={(e) => { e.stopPropagation(); if (window.confirm(`להסיר את ${s.name} מהמאגר לחלוטין?`)) deactivateSingle.mutate({ singleId: s.id }); }}
-                                className="inline-flex items-center gap-0.5 bg-red-50 text-red-600 text-[10px] px-2 py-1 rounded hover:bg-red-100 transition-colors"
-                              >
-                                🚫 הסר ממאגר
-                              </button>
+                              <ProfileClosureDialog
+                                profile={{ id: s.id, firstName: s.name || "פרופיל", isActive: true }}
+                                onClosed={refreshAfterProfileClosure}
+                              />
                             </div>
                             {/* WhatsApp — contact this person with the other's phone number */}
                             {s.phone && (() => {
@@ -2326,12 +2333,10 @@ export default function CRMMatchmaking() {
                               ✉️ {s.email}
                             </a>
                           )}
-                          <button
-                            onClick={() => { if (window.confirm(`להסיר את ${s.firstName} ${s.lastName || ''} מהמאגר?`)) deactivateSingle.mutate({ singleId: s.id }); }}
-                            className="inline-flex items-center gap-0.5 bg-red-50 text-red-600 text-[10px] px-2 py-1 rounded hover:bg-red-100 transition-colors"
-                          >
-                            🚫 הסר
-                          </button>
+                          <ProfileClosureDialog
+                            profile={{ id: s.id, firstName: s.firstName, lastName: s.lastName, isActive: true }}
+                            onClosed={refreshAfterProfileClosure}
+                          />
                         </div>
                       </div>
                     </div>
@@ -3017,6 +3022,10 @@ export default function CRMMatchmaking() {
                         </div>
                       </div>
                       <div className="flex gap-2">
+                        <ProfileClosureDialog
+                          profile={{ id: s.id, firstName: s.firstName, lastName: s.lastName, isActive: false }}
+                          onClosed={refreshAfterProfileClosure}
+                        />
                         <button
                           onClick={() => {
                             toggleActive.mutate({ singleId: s.id, isActive: true });

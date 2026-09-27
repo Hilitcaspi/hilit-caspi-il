@@ -22,7 +22,7 @@ const operations = [
   { tab: "daily_report", label: "דוח יומי", description: "תמונת מצב לצוות", icon: RefreshCw },
 ] as const;
 const actions = [
-  { value: "close_profile", label: "סגירת פרופיל", icon: UserX, hint: "מוציא את הפרופיל ממאגר ההתאמות" },
+  { value: "close_profile", label: "סגירה מלאה של פרופיל", icon: UserX, hint: "מוציא מהמאגר, סוגר התאמות וקישורים ועוצר מיילים, SMS ופניות" },
   { value: "activate_profile", label: "הפעלת פרופיל", icon: UserCheck, hint: "מחזיר פרופיל לא פעיל למאגר" },
   { value: "correct_email", label: "תיקון כתובת מייל", icon: UserRoundCog, hint: "מעדכן את כתובת הכניסה בפרופיל" },
   { value: "unsubscribe_marketing", label: "הסרה מדיוור", icon: MailX, hint: "מסמן הסרה מדיוור שיווקי בלבד" },
