@@ -15,6 +15,7 @@ describe("course compass simple prelaunch funnel", () => {
   it("keeps a standalone route without replacing the DNA or existing course routes", () => {
     expect(app).toContain('const CourseCompass = lazy(() => import("@/pages/CourseCompass"))');
     expect(app).toContain('<Route path={"/compass"} component={CourseCompass} />');
+    expect(app).toContain('<Route path={"/dna"} component={DnaQuiz} />');
     expect(app).toContain('<Route path={"/dna-quiz"} component={DnaQuiz} />');
     expect(app).toContain('<Route path={"/course"} component={CourseSales} />');
   });

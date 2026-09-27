@@ -11,6 +11,7 @@ describe("smart upsell policy", () => {
   it("keeps the complete database funnel free of upsells", () => {
     expect(selectSmartUpsell("/database", {})).toBeNull();
     expect(selectSmartUpsell("/maagar", {})).toBeNull();
+    expect(selectSmartUpsell("/dna", {})).toBeNull();
     expect(selectSmartUpsell("/dna-quiz", {})).toBeNull();
     expect(selectSmartUpsell("/join", {})).toBeNull();
     expect(selectSmartUpsell("/join/questionnaire", {})).toBeNull();

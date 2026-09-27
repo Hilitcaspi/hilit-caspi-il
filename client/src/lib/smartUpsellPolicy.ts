@@ -64,7 +64,7 @@ const COACHING: UpsellOffer = {
 const EXCLUDED_PREFIXES = [
   "/crm", "/admin", "/team", "/terms", "/match", "/my-profile", "/unsubscribe",
   "/join", "/upload-photo", "/course/view", "/guide/view", "/guide/access",
-  "/database", "/maagar", "/dna-quiz", "/thank-you/database",
+  "/database", "/maagar", "/dna", "/dna-quiz", "/thank-you/database",
   "/database-plus", "/thank-you/plus", "/lead",
 ];
 

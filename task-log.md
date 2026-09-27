@@ -939,3 +939,13 @@
 **Cost:** unavailable
 **Notes:** הקורס עדיין אינו פתוח לרכישה. לא הומצאו מחיר או מכסת מארזים, ולא בוצעו חיובים או משלוחים. לפני פתיחת המכירה יש לאשר מחיר מלא, מחיר השקה, כמות מארזים, תנאי משלוח ומועד פתיחה. ההשוואה לכחמש פגישות מתייחסת לזמן הוראה בלבד ומסומנת בעמוד ככזו, בלי לטעון שהקורס מחליף ליווי אישי.
 ---
+## Task: תיקון 404 בנתיב /dna
+**Category:** infrastructure/QA
+**Trigger:** reactive/production issue
+**Continuation of:** new
+**Before:** גישה ישירה ל־`/dna` מחזירה 404 במקום לפתוח את שאלון ה־DNA. יש לבדוק את ניתוב הלקוח והשרת, לשמר query ו־UTM, ולהוסיף מסלול תאימות בלי לשנות את פאנל השאלון הקיים.
+**After (completed 2026-09-27 11:41 Asia/Jerusalem, duration 3m):** שורש התקלה היה ש־`/dna` הוגדר רק ב־US Router עבור האתר האנגלי, בעוד שב־He Router של `hilitcaspi.com` הוגדר רק `/dna-quiz`; לכן השרת החזיר את מעטפת ה-SPA ב־200 אבל הלקוח הציג 404. נוסף alias ישיר `/dna` לאותו רכיב עברי `DnaQuiz`, כך שפרמטרי query, UTM ו־return flow נשמרים ללא הפניה ביניים. נוסף `/dna` גם לרשימת דפי הפאנל שבהם upsell מושבת, ונוספו בדיקות רגרסיה שמפרידות בין הנתיב העברי לבין `/dna` האנגלי בדומיין האמריקאי. בדיקת דפדפן מקומית אישרה שאלון עברי, UTM שמור, ללא 404, ללא שגיאות console וללא גלישה אופקית. 590 בדיקות עברו, בדיקה חיה אחת דולגה כמתוכנן, TypeScript, build ו־diff check עברו. קבצים: `client/src/App.tsx`, `client/src/lib/smartUpsellPolicy.ts`, `server/dnaRouteAlias.test.ts`, `server/smartUpsellPolicy.test.ts`, `server/courseCompassFunnel.test.ts`, `task-log.md`.
+**Status:** resolved
+**Cost:** unavailable
+**Notes:** `/dna-quiz` נשאר הנתיב הקנוני והקיים; `/dna` הוא alias תואם עבור קישורים קצרים או ישנים. לא בוצעה פעולה מול לקוחות.
+---

@@ -257,6 +257,7 @@ function HeRouter() {
       <Suspense fallback={<div className="min-h-screen bg-[#191265] flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#ffe27c] border-t-transparent rounded-full animate-spin"></div></div>}>
         <Switch>
           <Route path={"/"} component={Home} />
+          <Route path={"/dna"} component={DnaQuiz} />
           <Route path={"/dna-quiz"} component={DnaQuiz} />
           <Route path={"/compass"} component={CourseCompass} />
           <Route path={"/join/complete"} component={ProfileComplete} />
