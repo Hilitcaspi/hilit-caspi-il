@@ -1,7 +1,7 @@
 /**
  * Register - Full profile form for joining the matchmaking database
  * Route: /join?dna=leader&gender=female&session=xxx
- * Flow: Profile form → Payment placeholder (₪149) → Confirmation
+ * Flow: Profile form → Payment (₪299) → Confirmation
  */
 import { useState, useRef, useEffect } from "react";
 import React from "react";
@@ -1543,7 +1543,7 @@ export default function Register() {
               {isNowHolidayOffer && (
                 <div className="mb-5 rounded-2xl border border-[#d8b96d] bg-[#f7dce2] p-5 text-center shadow-sm">
                   <p className="text-xs font-black tracking-[0.16em] text-[#8b3152]">הטבת החג למצטרפים היום · עד 100 מימושים</p>
-                  <p className="mt-2 text-2xl font-black text-[#191265]">149 ₪ במקום 299 ₪</p>
+                  <p className="mt-2 text-2xl font-black text-[#191265]">299 ₪ במקום 499 ₪</p>
                   <p className="mt-2 text-sm font-bold text-[#5f5262]">קוד NOW יחכה באזור התשלום ויופעל לאחר הזנת המייל.</p>
                   <p className="mt-2 text-xs leading-5 text-[#71656f]">הצעת התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון.</p>
                 </div>
@@ -1567,8 +1567,8 @@ export default function Register() {
                 <div className="border-t border-white/20 mt-5 pt-5 flex justify-between items-center">
                   <span className="text-white/70">תשלום חד-פעמי</span>
                   <span className="text-[#ffe27c] font-black text-3xl">
-                    {isNowHolidayOffer ? "₪149" : "₪299"}{" "}
-                    <span className="text-white/40 line-through text-xl font-normal">{isNowHolidayOffer ? "₪299" : "₪499"}</span>
+                    ₪299{" "}
+                    <span className="text-white/40 line-through text-xl font-normal">₪499</span>
                   </span>
                 </div>
               </div>

@@ -4,12 +4,13 @@ import { DATABASE_NOW_CAMPAIGN, DATABASE_NOW_COUPON } from "@shared/databaseHoli
 export default function DatabaseNowRedirect() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const source = params.get("s") === "sms" ? "sms" : "email";
+    const requestedSource = params.get("s");
+    const source = requestedSource === "sms" || requestedSource === "whatsapp" ? requestedSource : "email";
     const target = new URL("/database", window.location.origin);
     target.searchParams.set("utm_source", source);
-    target.searchParams.set("utm_medium", "holiday_launch");
+    target.searchParams.set("utm_medium", source === "whatsapp" ? "group" : "holiday_launch");
     target.searchParams.set("utm_campaign", DATABASE_NOW_CAMPAIGN);
-    target.searchParams.set("utm_content", `database_now_${source}`);
+    target.searchParams.set("utm_content", source === "whatsapp" ? "database_now_whatsapp_group" : `database_now_${source}`);
     target.searchParams.set("coupon", DATABASE_NOW_COUPON);
     window.location.replace(target.toString());
   }, []);

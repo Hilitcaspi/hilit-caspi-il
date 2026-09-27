@@ -5,11 +5,14 @@ import {
   DATABASE_REGULAR_PRICE_ILS,
 } from "../shared/databaseHolidayNow";
 
-const HERO_IMAGE = "https://hilitcaspi.com/manus-storage/database-now-hero_c48e5ac3.jpg";
-const PORTRAIT_IMAGE = "https://hilitcaspi.com/manus-storage/plus-email-hilit-full_0acd266d.jpg";
+const HILIT_HERO = "https://hilitcaspi.com/manus-storage/database-now-hilit-hero_cde5a6ed.jpg";
+const HILIT_PHONE = "https://hilitcaspi.com/manus-storage/database-now-hilit-phone_26a5256f.jpg";
+const HILIT_AUTHORITY = "https://hilitcaspi.com/manus-storage/database-now-hilit-authority_ce858975.jpg";
+const COUPLE_CAFE = "https://hilitcaspi.com/manus-storage/database-now-couple-cafe_648c4aaf.jpg";
+const COUPLE_WALK = "https://hilitcaspi.com/manus-storage/database-now-couple-walk_609920bc.jpg";
 
-export const DATABASE_NOW_SUBJECT = "נרשמת בעבר. היום אני פותחת לך את המאגר ב־149 ₪";
-export const DATABASE_NOW_PREHEADER = "וגם: התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון. קוד NOW, היום בלבד.";
+export const DATABASE_NOW_SUBJECT = "נרשמת בעבר. היום אני נותנת גז על ההתאמה הראשונה שלך";
+export const DATABASE_NOW_PREHEADER = "299 ₪ במקום 499 ₪, תשלום חד־פעמי, והצעת התאמה ראשונה בתוך 3 ימים. קוד NOW, היום בלבד.";
 
 function escapeHtml(value: string) {
   return value
@@ -47,83 +50,123 @@ export function buildDatabaseHolidayNowNewsletter(input: {
   <meta name="x-apple-disable-message-reformatting" />
   <title>${DATABASE_NOW_SUBJECT}</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap');
+    body, table, td, p, a, span, h1, h2, h3 { font-family:'Rubik',Arial,'Helvetica Neue',sans-serif !important; }
     @media only screen and (max-width:640px) {
       .shell { width:100% !important; border-radius:0 !important; }
       .pad { padding-right:22px !important; padding-left:22px !important; }
-      .hero-title { font-size:38px !important; line-height:1.05 !important; }
-      .offer-price { font-size:70px !important; }
-      .stack, .stack-cell { display:block !important; width:100% !important; }
+      .hero-title { font-size:39px !important; line-height:1.06 !important; }
+      .section-title { font-size:28px !important; line-height:1.18 !important; }
+      .price { font-size:73px !important; }
+      .stack-cell { display:block !important; width:100% !important; box-sizing:border-box !important; }
+      .stack-image { display:block !important; width:100% !important; }
       .cta { display:block !important; width:auto !important; }
+      .quote-cell { display:block !important; width:100% !important; box-sizing:border-box !important; }
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background:#eee6df;font-family:Arial,'Helvetica Neue',sans-serif;color:#241f2f;direction:rtl;">
+<body style="margin:0;padding:0;background:#f3eee9;color:#241d2b;direction:rtl;">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${DATABASE_NOW_PREHEADER}&#847;&zwnj;&#847;&zwnj;&#847;&zwnj;</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#eee6df;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f3eee9;">
     <tr><td align="center" style="padding:24px 10px;">
-      <table role="presentation" class="shell" width="680" cellspacing="0" cellpadding="0" border="0" style="width:680px;max-width:680px;background:#fffdf9;border-radius:28px;overflow:hidden;box-shadow:0 24px 70px rgba(37,25,45,.16);">
-        <tr><td style="background:#18132e;padding:13px 24px;text-align:center;color:#ead49d;font-size:11px;letter-spacing:2.2px;font-weight:800;">HILIT CASPI · HOLIDAY EDIT</td></tr>
-        <tr><td style="padding:0;background:#d6d2ca;">
-          <img src="${HERO_IMAGE}" width="680" alt="הילית כספי" style="display:block;width:100%;height:auto;border:0;" />
-        </td></tr>
-        <tr><td class="pad" style="padding:34px 42px 38px;text-align:center;background:#f5d9de;">
-          <p style="margin:0;color:#8a3150;font-size:12px;letter-spacing:1.8px;font-weight:900;">A HOLIDAY GIFT FOR LOVE</p>
-          <h1 class="hero-title" style="margin:13px auto 0;max-width:580px;color:#18132e;font-family:Georgia,'Times New Roman',serif;font-size:48px;line-height:1.04;font-weight:500;">השנה מתחילים<br />לא רק בהחלטה.</h1>
-          <p style="margin:18px auto 0;max-width:530px;color:#493f4d;font-size:18px;line-height:1.75;">נרשמת בעבר והתעניינת. היום אני פותחת עבורך את הדרך הקצרה להיכנס למאגר ולהתחיל לקבל הזדמנויות אמיתיות להיכרות.</p>
-          <div style="margin-top:24px;"><a class="cta" href="${offerUrl}" style="display:inline-block;background:#18132e;color:#fff;text-decoration:none;padding:17px 34px;border-radius:4px;font-size:17px;font-weight:900;">אני רוצה להתחיל עכשיו</a></div>
+      <table role="presentation" class="shell" width="680" cellspacing="0" cellpadding="0" border="0" style="width:680px;max-width:680px;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 24px 68px rgba(82,48,65,.16);">
+        <tr><td style="background:#fff;padding:14px 24px;text-align:center;color:#672541;font-size:11px;letter-spacing:2px;font-weight:800;border-bottom:1px solid #f1e7e9;">HILIT CASPI · LOVE CLUB HOLIDAY EDIT</td></tr>
+
+        <tr><td style="padding:0;background:#eaded8;">
+          <img src="${HILIT_HERO}" width="680" alt="הילית כספי" style="display:block;width:100%;height:auto;border:0;" />
         </td></tr>
 
-        <tr><td class="pad" style="padding:34px 42px 10px;background:#fffdf9;text-align:right;">
-          <p style="margin:0 0 13px;font-size:19px;font-weight:900;color:#18132e;">${greeting}</p>
-          <p style="margin:0;color:#5c5361;font-size:16px;line-height:1.85;">אם שאלון ה־DNA, עמוד המאגר או אחת המודעות שלי גרמו לך לעצור ולחשוב שאולי הגיע הזמן לנסות דרך אחרת, זה בדיוק הרגע שחיכיתי לו.</p>
-          <p style="margin:13px 0 0;color:#5c5361;font-size:16px;line-height:1.85;">המאגר שלי הוא לא אפליקציה שבה ממשיכים לגלול לבד. ממלאים פרופיל ושאלון מדעי, המערכת מחברת בין עשרות פרמטרים, ואני עוברת על האפשרויות ובודקת למי באמת יש סיבה להכיר.</p>
+        <tr><td class="pad" style="padding:36px 46px 42px;text-align:center;background:#f7dfe5;">
+          <p style="margin:0;color:#a34366;font-size:12px;letter-spacing:1.6px;font-weight:900;">HOLIDAY LOVE DROP</p>
+          <h1 class="hero-title" style="margin:13px auto 0;max-width:570px;color:#2b1830;font-size:49px;line-height:1.04;font-weight:900;letter-spacing:-1.3px;">הפעם לא רק חושבים<br />על אהבה. מתחילים.</h1>
+          <p style="margin:19px auto 0;max-width:540px;color:#594753;font-size:18px;line-height:1.72;">נרשמת בעבר והתעניינת במאגר. לכבוד החג אני פותחת עבורך הצעה חדשה, עם התחייבות שלי לתת גז על ההתאמה הראשונה.</p>
+          <div style="margin-top:25px;"><a class="cta" href="${offerUrl}" style="display:inline-block;background:#6f2345;color:#fff;text-decoration:none;padding:18px 35px;border-radius:999px;font-size:17px;font-weight:900;box-shadow:0 12px 28px rgba(111,35,69,.22);">אני רוצה להיכנס למאגר</a></div>
         </td></tr>
 
-        <tr><td class="pad" style="padding:22px 42px 12px;background:#fffdf9;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#18132e;border-radius:24px;overflow:hidden;">
-            <tr><td style="padding:29px 25px;text-align:center;">
-              <p style="margin:0;color:#e8cf95;font-size:12px;letter-spacing:1.4px;font-weight:900;">ההבטחה שלי למצטרפים היום</p>
-              <h2 style="margin:10px auto 0;max-width:500px;color:#fff;font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:1.25;font-weight:500;">הצעת התאמה ראשונה<br />בתוך 3 ימים</h2>
-              <p style="margin:13px auto 0;max-width:510px;color:#ded9e3;font-size:15px;line-height:1.75;">הספירה מתחילה מרגע שהפרופיל והשאלון הושלמו במלואם. אני נותנת גז, עוברת על הפרופיל ומכניסה אותו מיד לסבב ההתאמות.</p>
-            </td></tr>
-          </table>
+        <tr><td class="pad" style="padding:38px 46px 18px;background:#fff;text-align:right;">
+          <p style="margin:0 0 13px;font-size:20px;font-weight:900;color:#2b1830;">${greeting}</p>
+          <p style="margin:0;color:#615561;font-size:16px;line-height:1.9;">אם מילאת את שאלון ה־DNA, השארת פרטים או כמעט הצטרפת ואז עצרת, אני רוצה להגיד לך משהו פשוט: לא צריך לחזור לאפליקציות ולעשות הכול לבד.</p>
+          <p style="margin:14px 0 0;color:#615561;font-size:16px;line-height:1.9;">במאגר שלי יש יותר מאלף חברים פעילים, ואלפי נרשמים כבר עברו דרך שאלון ה־DNA והמערכת. אני משלבת בין הנתונים, ההעדפות וה־DNA הזוגי לבין בדיקה אנושית שלי, כדי לחפש חיבור שיש לו סיבה אמיתית להתחיל.</p>
         </td></tr>
 
-        <tr><td class="pad" style="padding:24px 42px 8px;background:#fffdf9;text-align:center;">
-          <p style="margin:0;color:#9a6b2f;font-size:12px;letter-spacing:1.4px;font-weight:900;">מה קורה אחרי ההצטרפות?</p>
-          <h2 style="margin:9px 0 22px;color:#18132e;font-family:Georgia,'Times New Roman',serif;font-size:31px;font-weight:500;">פשוט. אישי. בלי לגלול.</h2>
+        <tr><td style="padding:18px 0 8px;background:#fff;">
+          <img src="${COUPLE_WALK}" width="680" alt="זוג הולך יחד" style="display:block;width:100%;height:auto;border:0;" />
+        </td></tr>
+
+        <tr><td class="pad" style="padding:35px 46px 12px;background:#fff;text-align:center;">
+          <p style="margin:0;color:#a34366;font-size:12px;letter-spacing:1.5px;font-weight:900;">מה מחכה בפנים?</p>
+          <h2 class="section-title" style="margin:9px auto 22px;max-width:520px;color:#2b1830;font-size:34px;line-height:1.18;font-weight:900;">הרבה יותר מעוד רשימת פרופילים</h2>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
             <tr>
-              <td class="stack-cell" width="33.33%" valign="top" style="padding:5px;"><div style="background:#f7f0ec;border:1px solid #eadbd1;border-radius:17px;padding:19px 13px;min-height:135px;"><div style="color:#b4476d;font-size:25px;font-weight:900;">01</div><strong style="display:block;margin-top:7px;color:#282035;font-size:16px;">משלימים פרופיל</strong><span style="display:block;margin-top:7px;color:#6a5f69;font-size:13px;line-height:1.6;">כמה דקות של פרטים ושאלון מדעי.</span></div></td>
-              <td class="stack-cell" width="33.33%" valign="top" style="padding:5px;"><div style="background:#f7f0ec;border:1px solid #eadbd1;border-radius:17px;padding:19px 13px;min-height:135px;"><div style="color:#b4476d;font-size:25px;font-weight:900;">02</div><strong style="display:block;margin-top:7px;color:#282035;font-size:16px;">אני בודקת</strong><span style="display:block;margin-top:7px;color:#6a5f69;font-size:13px;line-height:1.6;">המערכת מסננת ואני עוברת על ההתאמות.</span></div></td>
-              <td class="stack-cell" width="33.33%" valign="top" style="padding:5px;"><div style="background:#f7f0ec;border:1px solid #eadbd1;border-radius:17px;padding:19px 13px;min-height:135px;"><div style="color:#b4476d;font-size:25px;font-weight:900;">03</div><strong style="display:block;margin-top:7px;color:#282035;font-size:16px;">מקבלים הצעה</strong><span style="display:block;margin-top:7px;color:#6a5f69;font-size:13px;line-height:1.6;">רק אם שני הצדדים מאשרים, הפרטים נפתחים.</span></div></td>
+              <td class="stack-cell" width="50%" valign="top" style="padding:6px;"><div style="background:#fff7f8;border:1px solid #f0dfe4;border-radius:19px;padding:22px 18px;min-height:142px;text-align:right;"><div style="font-size:25px;">🧬</div><strong style="display:block;margin-top:9px;color:#2b1830;font-size:16px;">התאמות על בסיס DNA זוגי</strong><span style="display:block;margin-top:7px;color:#6d5e66;font-size:13px;line-height:1.65;">לא רק תמונה וגיל. המערכת מחברת בין עשרות פרמטרים ואני עוברת על האפשרויות בעצמי.</span></div></td>
+              <td class="stack-cell" width="50%" valign="top" style="padding:6px;"><div style="background:#fff7f8;border:1px solid #f0dfe4;border-radius:19px;padding:22px 18px;min-height:142px;text-align:right;"><div style="font-size:25px;">💌</div><strong style="display:block;margin-top:9px;color:#2b1830;font-size:16px;">Boost לחברי המאגר</strong><span style="display:block;margin-top:7px;color:#6d5e66;font-size:13px;line-height:1.65;">רואים ומקבלים הצעות Boost בחינם. שולחים באופן יזום רק אם רוצים, בעלות 19.90 ₪.</span></div></td>
+            </tr>
+            <tr>
+              <td class="stack-cell" width="50%" valign="top" style="padding:6px;"><div style="background:#fff7f8;border:1px solid #f0dfe4;border-radius:19px;padding:22px 18px;min-height:142px;text-align:right;"><div style="font-size:25px;">✨</div><strong style="display:block;margin-top:9px;color:#2b1830;font-size:16px;">אפשרות להופיע ברווק השבוע</strong><span style="display:block;margin-top:7px;color:#6d5e66;font-size:13px;line-height:1.65;">פינת החשיפה מיועדת לחברי המאגר ופותחת עוד דרך איכותית להכיר.</span></div></td>
+              <td class="stack-cell" width="50%" valign="top" style="padding:6px;"><div style="background:#fff7f8;border:1px solid #f0dfe4;border-radius:19px;padding:22px 18px;min-height:142px;text-align:right;"><div style="font-size:25px;">🤍</div><strong style="display:block;margin-top:9px;color:#2b1830;font-size:16px;">פרטיות ואישור הדדי</strong><span style="display:block;margin-top:7px;color:#6d5e66;font-size:13px;line-height:1.65;">הפרטים נפתחים רק אחרי ששני הצדדים רוצים להמשיך. אין חשיפה אוטומטית.</span></div></td>
             </tr>
           </table>
         </td></tr>
 
-        <tr><td class="pad" style="padding:28px 42px 16px;background:#fffdf9;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f3d4da;border-radius:24px;overflow:hidden;">
-            <tr><td style="padding:30px 24px;text-align:center;">
-              <span style="display:inline-block;background:#18132e;color:#ead49d;border-radius:999px;padding:7px 13px;font-size:11px;font-weight:900;">רק היום ול־${DATABASE_NOW_MAX_USES} הראשונים</span>
-              <p style="margin:15px 0 0;color:#6b3247;font-size:14px;font-weight:900;">מחיר מיוחד עם הקוד ${DATABASE_NOW_COUPON}</p>
-              <div class="offer-price" style="margin-top:2px;color:#18132e;font-family:Georgia,'Times New Roman',serif;font-size:84px;line-height:1;font-weight:700;">${DATABASE_NOW_PRICE_ILS}<span style="font-size:29px;"> ₪</span></div>
-              <p style="margin:8px 0 0;color:#6d5d64;font-size:15px;"><span style="text-decoration:line-through;">${DATABASE_REGULAR_PRICE_ILS} ₪</span> · תשלום חד־פעמי · ללא מנוי</p>
-              <div style="margin-top:23px;"><a class="cta" href="${offerUrl}" style="display:inline-block;background:#18132e;color:#fff;text-decoration:none;padding:18px 37px;border-radius:4px;font-size:18px;font-weight:900;">להצטרפות עם קוד NOW</a></div>
-              <p style="margin:11px 0 0;color:#7f626d;font-size:12px;line-height:1.6;">הקוד יחכה בקישור ויופעל לאחר הזנת כתובת המייל. עד ${DATABASE_NOW_MAX_USES} מימושים.</p>
+        <tr><td class="pad" style="padding:25px 46px 12px;background:#fff;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#6f2345;border-radius:24px;overflow:hidden;">
+            <tr><td style="padding:31px 25px;text-align:center;">
+              <p style="margin:0;color:#ffd9e5;font-size:12px;letter-spacing:1.4px;font-weight:900;">ההבטחה שלי ל־${DATABASE_NOW_MAX_USES} הראשונים</p>
+              <h2 class="section-title" style="margin:10px auto 0;max-width:520px;color:#fff;font-size:36px;line-height:1.22;font-weight:900;">הצעת התאמה ראשונה<br />בתוך 3 ימים</h2>
+              <p style="margin:14px auto 0;max-width:520px;color:#f8eaf0;font-size:15px;line-height:1.75;">הספירה מתחילה ברגע שהפרופיל והשאלון הושלמו במלואם. אני עוברת על הפרופיל ומכניסה אותו מיד לסבב ההתאמות.</p>
             </td></tr>
           </table>
         </td></tr>
 
-        <tr><td class="pad" style="padding:25px 42px 36px;background:#fffdf9;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid #eaded6;padding-top:22px;">
+        <tr><td class="pad" style="padding:29px 46px 16px;background:#fff;text-align:center;">
+          <p style="margin:0;color:#a34366;font-size:12px;letter-spacing:1.4px;font-weight:900;">מה אומרים אחרי התאמות?</p>
+          <h2 class="section-title" style="margin:8px 0 20px;color:#2b1830;font-size:31px;font-weight:900;">משובים אמיתיים של 5/5</h2>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
             <tr>
-              <td width="86" valign="middle"><img src="${PORTRAIT_IMAGE}" width="72" height="72" alt="הילית כספי" style="display:block;width:72px;height:72px;object-fit:cover;object-position:50% 18%;border-radius:50%;border:3px solid #d6b36d;" /></td>
-              <td valign="middle" style="padding-right:12px;color:#5c5361;font-size:15px;line-height:1.72;">אני פותחת את ההטבה לזמן קצר כדי שאוכל באמת לעמוד מאחורי הקצב שהבטחתי. אם חיכית לרגע להתחיל, זה הרגע.<br /><strong style="color:#8b3152;">באהבה, הילית</strong></td>
+              <td class="quote-cell" width="50%" valign="top" style="padding:6px;"><div style="background:#f4ecf4;border-radius:19px;padding:21px 18px;text-align:right;min-height:125px;"><div style="color:#c18a2f;font-size:18px;letter-spacing:2px;">★★★★★</div><p style="margin:10px 0 0;color:#493b49;font-size:14px;line-height:1.75;">״היה ערב מהמם! נהנינו מאוד והרגשתי שיש חיבור טוב.״</p><p style="margin:9px 0 0;color:#9a6f82;font-size:11px;font-weight:800;">משוב אנונימי לאחר התאמה</p></div></td>
+              <td class="quote-cell" width="50%" valign="top" style="padding:6px;"><div style="background:#f4ecf4;border-radius:19px;padding:21px 18px;text-align:right;min-height:125px;"><div style="color:#c18a2f;font-size:18px;letter-spacing:2px;">★★★★★</div><p style="margin:10px 0 0;color:#493b49;font-size:14px;line-height:1.75;">״היה מעולה. אפילו קבענו להיפגש שוב. תודה רבה!״</p><p style="margin:9px 0 0;color:#9a6f82;font-size:11px;font-weight:800;">משוב אנונימי לאחר התאמה</p></div></td>
+            </tr>
+            <tr><td colspan="2" style="padding:6px;"><div style="background:#fff7f8;border:1px solid #f0dfe4;border-radius:19px;padding:20px;text-align:center;"><div style="color:#c18a2f;font-size:18px;letter-spacing:2px;">★★★★★</div><p style="margin:9px auto 0;max-width:500px;color:#493b49;font-size:14px;line-height:1.75;">״הופתעתי לטובה. השיחה זרמה והייתה תחושה נעימה ומדויקת.״</p><p style="margin:8px 0 0;color:#9a6f82;font-size:11px;font-weight:800;">משוב אנונימי לאחר התאמה</p></div></td></tr>
+          </table>
+        </td></tr>
+
+        <tr><td style="padding:19px 0 8px;background:#fff;">
+          <img src="${COUPLE_CAFE}" width="680" alt="זוג בדייט" style="display:block;width:100%;height:auto;border:0;" />
+        </td></tr>
+
+        <tr><td class="pad" style="padding:34px 46px 13px;background:#fff;text-align:center;">
+          <p style="margin:0;color:#a34366;font-size:12px;letter-spacing:1.5px;font-weight:900;">הטבת חג · היום בלבד</p>
+          <h2 class="section-title" style="margin:9px auto 13px;max-width:520px;color:#2b1830;font-size:33px;line-height:1.2;font-weight:900;">כניסה מלאה למאגר.<br />תשלום אחד. בלי מנוי.</h2>
+          <div class="price" style="margin-top:4px;color:#6f2345;font-size:86px;line-height:1;font-weight:900;letter-spacing:-3px;">${DATABASE_NOW_PRICE_ILS}<span style="font-size:29px;letter-spacing:0;"> ₪</span></div>
+          <p style="margin:9px 0 0;color:#786a73;font-size:15px;"><span style="text-decoration:line-through;">${DATABASE_REGULAR_PRICE_ILS} ₪</span> · תשלום חד־פעמי</p>
+          <p style="margin:15px auto 0;max-width:520px;color:#5f515c;font-size:14px;line-height:1.72;">קוד ההטבה <strong style="color:#6f2345;">${DATABASE_NOW_COUPON}</strong> כבר מחכה בקישור. כך גם אדע שהצטרפת דרך הטבת שלושת הימים ואוכל לעקוב אחר ההבטחה במערכת.</p>
+          <div style="margin-top:22px;"><a class="cta" href="${offerUrl}" style="display:inline-block;background:#6f2345;color:#fff;text-decoration:none;padding:18px 37px;border-radius:999px;font-size:18px;font-weight:900;box-shadow:0 12px 30px rgba(111,35,69,.2);">להצטרפות ב־299 ₪</a></div>
+          <p style="margin:11px 0 0;color:#9c7c89;font-size:12px;line-height:1.6;">ל־${DATABASE_NOW_MAX_USES} המימושים הראשונים או עד סוף היום, המוקדם מביניהם.</p>
+        </td></tr>
+
+        <tr><td class="pad" style="padding:28px 46px 14px;background:#fff;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f7dfe5;border-radius:22px;overflow:hidden;">
+            <tr>
+              <td class="stack-image" width="44%" valign="middle"><img src="${HILIT_PHONE}" width="260" alt="הילית כספי" style="display:block;width:100%;height:auto;border:0;" /></td>
+              <td class="stack-cell" width="56%" valign="middle" style="padding:25px 24px;text-align:right;">
+                <p style="margin:0;color:#6f2345;font-size:12px;font-weight:900;letter-spacing:1px;">למה דווקא עכשיו?</p>
+                <p style="margin:9px 0 0;color:#3f3040;font-size:15px;line-height:1.78;">כי החגים מזכירים לנו מה אנחנו באמת רוצים לידנו. אני מגבילה את ההטבה כדי שאוכל לתת לכל מצטרף ומצטרפת את הדחיפה האישית שהבטחתי, ולא להפוך את זה לעוד קמפיין המוני.</p>
+              </td>
             </tr>
           </table>
-          <p style="margin:21px 0 0;color:#827881;font-size:11px;line-height:1.7;">ההבטחה היא להצעת התאמה ראשונה שנבדקה ונשלחה בתוך שלושה ימים מהשלמת הפרופיל והשאלון. אישור הדדי, פגישה או זוגיות אינם מובטחים.</p>
         </td></tr>
-        <tr><td align="center" style="background:#18132e;padding:20px 24px;color:#cfc7d0;font-size:11px;line-height:1.6;">המייל נשלח בעקבות התעניינות קודמת בשאלון או במאגר.<br /><a href="${unsubscribeUrl}" style="color:#d9c58e;text-decoration:underline;">הסרה מרשימת הדיוור</a></td></tr>
+
+        <tr><td class="pad" style="padding:20px 46px 35px;background:#fff;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid #eadfe3;padding-top:22px;">
+            <tr>
+              <td width="92" valign="middle"><img src="${HILIT_AUTHORITY}" width="78" height="78" alt="הילית כספי" style="display:block;width:78px;height:78px;object-fit:cover;border-radius:50%;border:3px solid #d8a64b;" /></td>
+              <td valign="middle" style="padding-right:13px;color:#5f515c;font-size:15px;line-height:1.72;">אני כאן כדי להפוך את החיפוש ממסע מתיש לתהליך מדויק, אנושי ומלא אפשרויות חדשות.<br /><strong style="color:#6f2345;">באהבה, הילית</strong></td>
+            </tr>
+          </table>
+          <p style="margin:20px 0 0;color:#8d8188;font-size:11px;line-height:1.72;">ההבטחה היא להצעת התאמה ראשונה שנבדקה ונשלחה בתוך שלושה ימים מהשלמת הפרופיל והשאלון. אישור הדדי, פגישה או זוגיות אינם מובטחים.</p>
+        </td></tr>
+
+        <tr><td align="center" style="background:#2b1830;padding:21px 24px;color:#d6cbd2;font-size:11px;line-height:1.65;">המייל נשלח בעקבות התעניינות קודמת בשאלון או במאגר.<br /><a href="${unsubscribeUrl}" style="color:#f4c7d7;text-decoration:underline;">הסרה מרשימת הדיוור</a></td></tr>
       </table>
     </td></tr>
   </table>
@@ -132,14 +175,16 @@ export function buildDatabaseHolidayNowNewsletter(input: {
 
   const textContent = `${greeting}
 
-נרשמת בעבר והתעניינת במאגר. היום אני פותחת עבורך הטבת חג מיוחדת.
+נרשמת בעבר והתעניינת במאגר. לכבוד החג אני פותחת עבורך הצעה חדשה.
 
-המאגר שלי אינו אפליקציה שבה ממשיכים לגלול לבד. ממלאים פרופיל ושאלון מדעי, המערכת מחברת בין עשרות פרמטרים, ואני עוברת על האפשרויות ובודקת למי באמת יש סיבה להכיר.
+המאגר שלי אינו אפליקציה שבה ממשיכים לגלול לבד. יש בו יותר מאלף חברים פעילים, שאלון DNA זוגי, בדיקה אנושית שלי, פרטיות ואישור הדדי.
 
-ההבטחה שלי למצטרפים היום:
+חברי המאגר יכולים לראות ולקבל הצעות Boost בחינם, לבחור אם לשלוח Boost בעלות 19.90 ₪ ולהשתתף בפינת רווק השבוע.
+
+ההבטחה שלי ל־${DATABASE_NOW_MAX_USES} המצטרפים הראשונים:
 הצעת התאמה ראשונה בתוך 3 ימים מרגע שהפרופיל והשאלון הושלמו במלואם.
 
-המחיר היום ל־${DATABASE_NOW_MAX_USES} הראשונים: ${DATABASE_NOW_PRICE_ILS} ₪ במקום ${DATABASE_REGULAR_PRICE_ILS} ₪.
+המחיר: ${DATABASE_NOW_PRICE_ILS} ₪ במקום ${DATABASE_REGULAR_PRICE_ILS} ₪.
 תשלום חד־פעמי, ללא מנוי.
 קוד ההטבה: ${DATABASE_NOW_COUPON}
 

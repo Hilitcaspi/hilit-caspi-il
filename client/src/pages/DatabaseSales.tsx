@@ -127,7 +127,7 @@ export default function DatabaseSales() {
             {isNowHolidayOffer && (
               <div className="mb-7 rounded-2xl border border-[#ffe27c]/45 bg-white/10 p-4 text-white shadow-lg backdrop-blur-sm">
                 <p className="text-sm font-bold text-[#ffe27c]">היום עם קוד NOW · ל־100 הראשונים</p>
-                <p className="mt-1 text-3xl font-black">149 ₪ <span className="text-base font-normal text-white/50 line-through">299 ₪</span></p>
+                <p className="mt-1 text-3xl font-black">299 ₪ <span className="text-base font-normal text-white/50 line-through">499 ₪</span></p>
                 <p className="mt-2 text-sm leading-6 text-white/85">תשלום חד-פעמי וגם הצעת התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון.</p>
               </div>
             )}

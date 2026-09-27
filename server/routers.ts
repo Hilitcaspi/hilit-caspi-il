@@ -2750,6 +2750,13 @@ export const appRouter = router({
           })
           .where(eq(singles.id, profile.id));
 
+        const { ensureDatabaseNowMatchTask } = await import("./databaseNowFulfillment");
+        await ensureDatabaseNowMatchTask({
+          singleId: profile.id,
+          email: profile.email!,
+          eligibleAt: now,
+        }).catch(error => console.error("[completeQuestionnaire] Failed to create NOW SLA task:", error));
+
         // Merge input values with profile, input may have patched age/gender/city for skeleton records (Grow payments)
         const finalAge = (input.age && input.age > 0) ? input.age : profile.age;
         const finalGender = input.gender || profile.gender;
@@ -7958,10 +7965,6 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             const basePrice = PRODUCT_CONFIGS[input.product]?.sum ?? 0;
             const { computeCouponPrice } = await import("./couponPolicy");
             finalSum = computeCouponPrice(basePrice, code);
-            // Increment usage counter
-            await db.update(discountCodes)
-              .set({ usedCount: (code.usedCount ?? 0) + 1 })
-              .where(eq(discountCodes.id, code.id));
           }
         }
 
@@ -8035,6 +8038,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               email: normalizedCheckoutEmail,
               phone: input.phone || "",
               product: input.product,
+              couponCode: input.couponCode?.trim().toUpperCase() || null,
+              utmSource: input.utmSource?.trim() || null,
+              utmMedium: input.utmMedium?.trim() || null,
+              utmCampaign: input.utmCampaign?.trim() || null,
+              utmContent: input.utmContent?.trim() || null,
               trackingToken: paymentTracking.trackingToken,
               purchaseEventId: paymentTracking.purchaseEventId,
               fbp: normalizeMetaCookie(input.fbp),
@@ -8050,6 +8058,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             }).onDuplicateKeyUpdate({ set: {
               name: input.fullName.trim(),
               phone: input.phone || "",
+              couponCode: input.couponCode?.trim().toUpperCase() || null,
+              utmSource: input.utmSource?.trim() || null,
+              utmMedium: input.utmMedium?.trim() || null,
+              utmCampaign: input.utmCampaign?.trim() || null,
+              utmContent: input.utmContent?.trim() || null,
               trackingToken: paymentTracking.trackingToken,
               providerProcessToken: null,
               purchaseEventId: paymentTracking.purchaseEventId,

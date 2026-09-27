@@ -53,17 +53,16 @@ function injectTracking(html: string, logId: number) {
 
 export function buildDatabaseHolidayNowSms(input: { firstName?: string | null; email: string }) {
   const firstName = String(input.firstName || "").trim().split(/\s+/)[0];
-  const greeting = firstName ? `היי ${firstName}, כאן הילית.` : "היי, כאן הילית.";
+  const greeting = firstName ? `היי ${firstName}, כאן הילית 💛` : "היי, כאן הילית 💛";
   const offerUrl = databaseNowOfferUrl("sms");
-  const unsubscribeUrl = `https://hilitcaspi.com/unsubscribe?email=${encodeURIComponent(normalizeEmail(input.email))}`;
-  const message = `${greeting}\n\nלכבוד החג: הצטרפות למאגר ב־${DATABASE_NOW_PRICE_ILS} ₪ במקום 299 ₪ עם קוד ${DATABASE_NOW_COUPON}. תשלום חד־פעמי.\n\nל־${DATABASE_NOW_MAX_USES} הראשונים היום: הצעת התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון.\n\nלהצטרפות: ${offerUrl}\nלהסרה: ${unsubscribeUrl}`;
+  const message = `${greeting} לכבוד החג: הצטרפות למאגר ב־${DATABASE_NOW_PRICE_ILS} ₪ במקום 499 ₪, בתשלום חד־פעמי. ל־${DATABASE_NOW_MAX_USES} הראשונים הצעת התאמה בתוך 3 ימים מסיום הפרופיל והשאלון ✨ קוד ${DATABASE_NOW_COUPON}: ${offerUrl} להסרה: hilitcaspi.com/unsubscribe`;
   return { message, offerUrl, units: Math.ceil(message.trim().length / 256) };
 }
 
 export async function loadDatabaseHolidayNowAudience(): Promise<DatabaseNowAudienceMember[]> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const recentLeadCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const recentLeadCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
   const recentClickCutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
   const restWindowCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const [rows] = await db.execute(sql`

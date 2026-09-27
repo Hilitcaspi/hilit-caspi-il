@@ -33,7 +33,7 @@
 import crypto from "crypto";
 import { and, desc as orderDesc, eq, gt, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusCheckoutIntents, paymentLeads } from "../drizzle/schema";
+import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusCheckoutIntents, paymentLeads, discountCodes } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
 import { queueProductFeedbackAfterPurchase } from "./feedbackAutomation";
@@ -43,6 +43,7 @@ import { capiPurchase } from "./_core/metaCapi";
 import { buildNewYearBundleAccessEmail } from "./newYearBundleEmail";
 import { activatePendingPlusAfterRegistration, activatePlusForSingle } from "./plusFulfillment";
 import { verifyPlusCheckoutReference } from "./plusCheckoutReference";
+import { ensureDatabaseNowMatchTask } from "./databaseNowFulfillment";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -315,7 +316,7 @@ async function handleSession(email: string, name: string) {
   }).catch(err => console.error("[GrowWebhook][Session] Email failed:", err));
 }
 
-export async function handleDatabase(email: string, name: string, phone: string, transactionId: string = "") {
+export async function handleDatabase(email: string, name: string, phone: string, transactionId: string = "", couponCode?: string | null) {
   const db = await getDb();
   if (!db) return;
   const firstName = name.trim().split(" ")[0];
@@ -347,7 +348,11 @@ export async function handleDatabase(email: string, name: string, phone: string,
       .limit(1)
       .then(r => r[0]?.gender === "female" || r[0]?.gender === "male" ? r[0].gender : null);
   }
-  let singleRecord = await db.select({ id: singles.id, questionnaireToken: singles.questionnaireToken })
+  let singleRecord = await db.select({
+    id: singles.id,
+    questionnaireToken: singles.questionnaireToken,
+    questionnaireCompletedAt: singles.questionnaireCompletedAt,
+  })
     .from(singles)
     .where(
       or(
@@ -395,7 +400,7 @@ export async function handleDatabase(email: string, name: string, phone: string,
       updatedAt: now,
     });
     const singleId = (inserted as any)[0].insertId as number;
-    singleRecord = { id: singleId, questionnaireToken: token };
+    singleRecord = { id: singleId, questionnaireToken: token, questionnaireCompletedAt: null };
 
   }
 
@@ -426,6 +431,15 @@ export async function handleDatabase(email: string, name: string, phone: string,
     isPaid: true,
     isActive: true,
   });
+
+  if (singleRecord.questionnaireCompletedAt) {
+    await ensureDatabaseNowMatchTask({
+      singleId: singleRecord.id,
+      email: normalizedEmail,
+      eligibleAt: now,
+      couponCode,
+    });
+  }
 
   const joinUrl = `${SITE_BASE}/join/questionnaire?token=${singleRecord.questionnaireToken}`;
 
@@ -765,6 +779,12 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
 
   let purchaseTracking: {
     id: number;
+    couponCode: string | null;
+    utmSource: string | null;
+    utmMedium: string | null;
+    utmCampaign: string | null;
+    utmContent: string | null;
+    confirmedAt: number | null;
     purchaseEventId: string | null;
     fbp: string | null;
     fbc: string | null;
@@ -784,6 +804,12 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
           : and(eq(paymentLeads.email, email), eq(paymentLeads.product, product));
         const [row] = await db.select({
           id: paymentLeads.id,
+          couponCode: paymentLeads.couponCode,
+          utmSource: paymentLeads.utmSource,
+          utmMedium: paymentLeads.utmMedium,
+          utmCampaign: paymentLeads.utmCampaign,
+          utmContent: paymentLeads.utmContent,
+          confirmedAt: paymentLeads.confirmedAt,
           purchaseEventId: paymentLeads.purchaseEventId,
           fbp: paymentLeads.fbp,
           fbc: paymentLeads.fbc,
@@ -889,7 +915,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       case "coaching":     await handleCoaching(email, name); break;
       case "coaching_mas": await handleCoachingMas(email, name); break;
       case "session":  await handleSession(email, name); break;
-      case "database": await handleDatabase(email, name, phone, transactionId); break;
+      case "database": await handleDatabase(email, name, phone, transactionId, purchaseTracking?.couponCode); break;
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId, sum); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
@@ -928,11 +954,21 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
             dedupeKey,
             email,
             product,
+            couponCode: purchaseTracking?.couponCode || null,
+            utmSource: purchaseTracking?.utmSource || null,
+            utmMedium: purchaseTracking?.utmMedium || null,
+            utmCampaign: purchaseTracking?.utmCampaign || null,
+            utmContent: purchaseTracking?.utmContent || null,
             amountAgorot: Math.round(sum * 100),
             amountSource: "grow",
             paidAt: Date.now(),
             createdAt: Date.now(),
           }).onDuplicateKeyUpdate({ set: {
+            couponCode: purchaseTracking?.couponCode || null,
+            utmSource: purchaseTracking?.utmSource || null,
+            utmMedium: purchaseTracking?.utmMedium || null,
+            utmCampaign: purchaseTracking?.utmCampaign || null,
+            utmContent: purchaseTracking?.utmContent || null,
             amountAgorot: Math.round(sum * 100),
             amountSource: "grow",
           }});
@@ -951,6 +987,11 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
             confirmedAmountAgorot: Math.round(sum * 100),
             confirmedAt: Date.now(),
           }).where(eq(paymentLeads.id, purchaseTracking.id));
+          if (purchaseTracking.couponCode && !purchaseTracking.confirmedAt) {
+            await db.update(discountCodes)
+              .set({ usedCount: sql`${discountCodes.usedCount} + 1` })
+              .where(eq(discountCodes.code, purchaseTracking.couponCode));
+          }
         }
       } catch (error) {
         console.error("[PurchaseTracking] Failed to mark checkout confirmed", error);
