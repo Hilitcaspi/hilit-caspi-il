@@ -1069,3 +1069,13 @@
 **Cost:** unavailable
 **Notes:** לא בוצע שינוי באתר ולא פורסם סטורי בפועל.
 ---
+## Task: טאב תפעולי לרוכשי NOW והארכת תוקף הקוד
+**Category:** CRM
+**Trigger:** reactive/production issue
+**Continuation of:** שליחת קמפיין NOW המאושר במייל וב-SMS
+**Before:** המשתמשת מבקשת לראות בדשבורד רשימה מרוכזת של כל מי שרכש עם קוד NOW וצריך לקבל הצעת התאמה בתוך שלושה ימים, וליצור טאב כזה אם אינו קיים. בנוסף יש להאריך את תוקף קוד NOW עד 1.10.2026 כדי שאפשר יהיה להפעיל אותו שוב לפי צורך. יש לבדוק את מנגנון ה־fulfillment, מקור האמת של Grow, תצוגות ה־CRM והגדרת הקופון, להימנע מספירת ניסיונות תשלום, ולוודא שאין שליחה חיצונית. הקבצים והזרימות הצפויים: `shared/databaseHolidayNow.ts`, `server/databaseNowFulfillment.ts`, ראוטרי CRM/דשבורד ורכיבי ה־UI.
+**After (completed 2026-09-27 23:38 Asia/Jerusalem, duration 20m):** נבנה טאב `רוכשי NOW` בתוך דשבורד המאגר וקיצור דרך במרכז השליטה. הטאב נשען רק על `completed_payments` של Grow עם הקופון NOW, מציג את כל הרוכשים, השלמת פרופיל ושאלון, תחילת חלון ה־SLA, דדליין, משלוח הצעת התאמה בפועל, הקצאת משימת CRM ומצבי ממתין/פעיל/פחות מ־24 שעות/איחור/הושלם. נכון לבדיקה המצרפית: 5 רוכשים, 3 בתוך חלון שלושת הימים, 2 ממתינים להשלמת פרופיל, 0 באיחור ו־0 משימות חסרות. תוקף NOW הוארך עד סוף 1.10.2026 בשני מסדי האתר ונשאר פעיל במחיר 299 ₪ ועד 100 מימושים. עודכנו `client/src/components/DatabaseNowSlaSection.tsx`, `client/src/components/DatabaseOperationsSection.tsx`, `client/src/pages/CRMMatchmaking.tsx`, `client/src/pages/DatabaseSales.tsx`, `client/src/pages/Register.tsx`, `server/operationsRouter.ts`, `server/databaseNowFulfillment.ts`, `server/databaseNowFulfillment.test.ts`, `server/databaseHolidayNowNewsletter.ts` ו־`shared/databaseHolidayNow.ts`. עברו `pnpm check`, בניית production, 125 קובצי בדיקה ו־607 בדיקות; בוצע QA חזותי במחשב ובמובייל עם נתוני קשר מוסתרים.
+**Status:** resolved
+**Cost:** unavailable
+**Notes:** אין משימת Manus מתוזמנת או שירות רקע חדש. Grow completed payments נשאר מקור האמת לרוכשי NOW, והספירה מתחילה רק לאחר השלמת הפרופיל והשאלון. לא נשלחו הודעות חיצוניות במסגרת המשימה.
+---

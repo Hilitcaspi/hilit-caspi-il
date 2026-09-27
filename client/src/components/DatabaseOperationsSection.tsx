@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, CircleDot, FileCheck2, HeartHandshake, KeyRound, ListFilter, Loader2, MailX, MessageSquareText, RefreshCw, Search, ShieldCheck, Sparkles, UserCheck, UserRoundCog, UserX, Users, Zap } from "lucide-react";
+import { AlarmClock, AlertTriangle, ArrowLeft, CheckCircle2, CircleDot, FileCheck2, HeartHandshake, KeyRound, ListFilter, Loader2, MailX, MessageSquareText, RefreshCw, Search, ShieldCheck, Sparkles, UserCheck, UserRoundCog, UserX, Users, Zap } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ const operations = [
   { tab: "singles", label: "מאגר הפנויים והפנויות", description: "חיפוש, צפייה ועדכון פרופילים", icon: Users },
   { tab: "matches", label: "התאמות פעילות", description: "מעקב וניהול התאמות", icon: HeartHandshake },
   { tab: "unmatched", label: "התאמות לטיפול", description: "פרופילים שממתינים להצעה", icon: CircleDot },
+  { tab: "now", label: "רוכשי NOW", description: "מעקב אחר התחייבות ההתאמה בתוך 3 ימים", icon: AlarmClock },
   { tab: "inactive", label: "לא פעילים", description: "טיפול בפרופילים לא פעילים", icon: ListFilter },
   { tab: "update_requests", label: "בקשות עדכון", description: "אישור וטיוב פרטי פרופיל", icon: FileCheck2 },
   { tab: "compatibility", label: "תאימות", description: "כלי התאמה וסינון", icon: Search },

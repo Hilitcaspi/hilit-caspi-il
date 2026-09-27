@@ -8,6 +8,7 @@ import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
 import BoostMembersAdminSection from "@/components/BoostMembersAdminSection";
 import TestimonialManagementSection from "@/components/TestimonialManagementSection";
 import DailyReportManagementSection from "@/components/DailyReportManagementSection";
+import DatabaseNowSlaSection from "@/components/DatabaseNowSlaSection";
 import SelfServiceControlCenter from "@/components/SelfServiceControlCenter";
 import ProfileClosureDialog from "@/components/ProfileClosureDialog";
 import { trpc } from "@/lib/trpc";
@@ -16,7 +17,7 @@ import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles, MessageSquareText, Command } from "lucide-react";
+import { AlarmClock, Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles, MessageSquareText, Command } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getMatchTrackingSummary, hasMutualYes, isUnsuccessfulMatch, isWaitingForMatchResponses } from "@shared/matchLifecycle";
 import { wasMatchProposalSent } from "@shared/matchDelivery";
@@ -303,11 +304,11 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"self_service" | "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report">(() => {
+  const [activeTab, setActiveTab] = useState<"self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report">(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    const allowedTabs = new Set(["self_service", "singles", "matches", "unmatched", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "testimonials", "daily_report"]);
+    const allowedTabs = new Set(["self_service", "singles", "matches", "unmatched", "now", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "testimonials", "daily_report"]);
     return allowedTabs.has(requestedTab || "")
-      ? requestedTab as "self_service" | "singles" | "matches" | "unmatched" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report"
+      ? requestedTab as "self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report"
       : "singles";
   });
   // Filter-search tab state
@@ -333,7 +334,10 @@ export default function CRMMatchmaking() {
       setFilterCompatResult(prev => ({ ...prev, [vars.idB]: data }));
     },
   });
-  const [selectedSingle, setSelectedSingle] = useState<number | null>(null);
+  const [selectedSingle, setSelectedSingle] = useState<number | null>(() => {
+    const requestedSingle = Number(new URLSearchParams(window.location.search).get("singleId"));
+    return Number.isInteger(requestedSingle) && requestedSingle > 0 ? requestedSingle : null;
+  });
   const [inviteNote, setInviteNote] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [hilitsNotes, setHilitsNotes] = useState<Record<number, string>>({}); // matchId -> personal note
@@ -888,6 +892,7 @@ export default function CRMMatchmaking() {
             { id: "singles" as const, label: "חברי המאגר", icon: <Users size={14} /> },
             { id: "matches" as const, label: `התאמות (${pendingCount} ממתינות)`, icon: <Heart size={14} /> },
             { id: "unmatched" as const, label: "התאמות לטיפול", icon: <Clock size={14} /> },
+            { id: "now" as const, label: "רוכשי NOW", icon: <AlarmClock size={14} /> },
             { id: "inactive_leads" as const, label: "לידים מאגר", icon: <span>💰</span> },
             { id: "tokens" as const, label: "טוקנים חינמיים", icon: <Gift size={14} /> },
             { id: "missing_data" as const, label: "חסרי נתונים ⚠️", icon: <span>🔧</span> },
@@ -917,6 +922,10 @@ export default function CRMMatchmaking() {
 
         {activeTab === "self_service" && (
           <SelfServiceControlCenter />
+        )}
+
+        {activeTab === "now" && (
+          <DatabaseNowSlaSection />
         )}
 
         {/* Singles Tab */}

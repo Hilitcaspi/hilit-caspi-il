@@ -6,9 +6,23 @@ import { getDb } from "./db";
 const DAY = 24 * 60 * 60 * 1000;
 export const DATABASE_NOW_TASK_CREATED_BY = "automation:database_now";
 export const DATABASE_NOW_TASK_TITLE = "NOW · התאמה ראשונה בתוך 3 ימים";
+export type DatabaseNowSlaState = "awaiting_profile" | "active" | "due_soon" | "overdue" | "fulfilled";
 
 export function databaseNowDueAt(eligibleAt: number) {
   return eligibleAt + 3 * DAY;
+}
+
+export function databaseNowSlaState(input: {
+  eligibleAt?: number | null;
+  dueAt?: number | null;
+  firstMatchSentAt?: number | null;
+}, now = Date.now()): DatabaseNowSlaState {
+  if (input.firstMatchSentAt) return "fulfilled";
+  if (!input.eligibleAt) return "awaiting_profile";
+  const dueAt = input.dueAt || databaseNowDueAt(input.eligibleAt);
+  if (dueAt <= now) return "overdue";
+  if (dueAt - now <= DAY) return "due_soon";
+  return "active";
 }
 
 export async function ensureDatabaseNowMatchTask(input: {

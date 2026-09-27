@@ -114,7 +114,7 @@ export default function DatabaseSales() {
         <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center relative z-10">
           <motion.div initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.85 }} className="text-right">
             <div className="inline-block bg-[#ffe27c]/15 border border-[#ffe27c]/35 text-[#ffe27c] text-sm font-medium px-4 py-2 rounded-full mb-6">
-              {isNowHolidayOffer ? "✦ הטבת חג למצטרפים היום" : "✦ הדור הבא של matchmaking"}
+              {isNowHolidayOffer ? "✦ הטבת חג עד 1.10" : "✦ הדור הבא של matchmaking"}
             </div>
             <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-5">
               לא שידוך.<br />
@@ -126,7 +126,7 @@ export default function DatabaseSales() {
             </p>
             {isNowHolidayOffer && (
               <div className="mb-7 rounded-2xl border border-[#ffe27c]/45 bg-white/10 p-4 text-white shadow-lg backdrop-blur-sm">
-                <p className="text-sm font-bold text-[#ffe27c]">היום עם קוד NOW · ל־100 הראשונים</p>
+                <p className="text-sm font-bold text-[#ffe27c]">קוד NOW בתוקף עד 1.10 · ל־100 הראשונים</p>
                 <p className="mt-1 text-3xl font-black">299 ₪ <span className="text-base font-normal text-white/50 line-through">499 ₪</span></p>
                 <p className="mt-2 text-sm leading-6 text-white/85">תשלום חד-פעמי וגם הצעת התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון.</p>
               </div>

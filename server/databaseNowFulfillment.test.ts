@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { databaseNowDueAt, DATABASE_NOW_TASK_CREATED_BY, DATABASE_NOW_TASK_TITLE } from "./databaseNowFulfillment";
+import { DATABASE_NOW_EXPIRES_AT } from "../shared/databaseHolidayNow";
+import { databaseNowDueAt, databaseNowSlaState, DATABASE_NOW_TASK_CREATED_BY, DATABASE_NOW_TASK_TITLE } from "./databaseNowFulfillment";
 
 const root = process.cwd();
 
@@ -11,6 +12,21 @@ describe("database NOW fulfillment", () => {
     expect(databaseNowDueAt(eligibleAt)).toBe(eligibleAt + 3 * 24 * 60 * 60 * 1000);
     expect(DATABASE_NOW_TASK_TITLE).toContain("3 ימים");
     expect(DATABASE_NOW_TASK_CREATED_BY).toContain("database_now");
+  });
+
+  it("keeps NOW active through the end of 1 October in Israel", () => {
+    expect(DATABASE_NOW_EXPIRES_AT).toBe(Date.parse("2026-10-01T20:59:59.000Z"));
+  });
+
+  it("classifies every operational SLA stage deterministically", () => {
+    const now = Date.UTC(2026, 8, 28, 8, 0, 0);
+    const eligibleAt = now - 24 * 60 * 60 * 1000;
+    const dueAt = databaseNowDueAt(eligibleAt);
+    expect(databaseNowSlaState({}, now)).toBe("awaiting_profile");
+    expect(databaseNowSlaState({ eligibleAt, dueAt }, now)).toBe("active");
+    expect(databaseNowSlaState({ eligibleAt, dueAt: now + 12 * 60 * 60 * 1000 }, now)).toBe("due_soon");
+    expect(databaseNowSlaState({ eligibleAt, dueAt: now - 1 }, now)).toBe("overdue");
+    expect(databaseNowSlaState({ eligibleAt, dueAt: now - 1, firstMatchSentAt: now - 2 }, now)).toBe("fulfilled");
   });
 
   it("creates the urgent task both for an already complete buyer and after questionnaire completion", () => {
@@ -33,5 +49,18 @@ describe("database NOW fulfillment", () => {
     expect(webhook).toContain("couponCode: purchaseTracking?.couponCode || null");
     expect(webhook).toContain("usedCount: sql`${discountCodes.usedCount} + 1`");
     expect(webhook).toContain("purchaseTracking.couponCode && !purchaseTracking.confirmedAt");
+  });
+
+  it("exposes a dedicated NOW dashboard tab sourced from verified payments", () => {
+    const operations = readFileSync(resolve(root, "server/operationsRouter.ts"), "utf8");
+    const crm = readFileSync(resolve(root, "client/src/pages/CRMMatchmaking.tsx"), "utf8");
+    const section = readFileSync(resolve(root, "client/src/components/DatabaseNowSlaSection.tsx"), "utf8");
+    expect(operations).toContain("nowSlaDashboard");
+    expect(operations).toContain("FROM completed_payments");
+    expect(operations).toContain("coupon_code");
+    expect(operations).toContain("match_delivery_events");
+    expect(crm).toContain('id: "now"');
+    expect(crm).toContain("<DatabaseNowSlaSection />");
+    expect(section).toContain("רוכשי NOW · התחייבות 3 ימים");
   });
 });

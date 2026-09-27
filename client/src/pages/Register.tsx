@@ -1542,7 +1542,7 @@ export default function Register() {
 
               {isNowHolidayOffer && (
                 <div className="mb-5 rounded-2xl border border-[#d8b96d] bg-[#f7dce2] p-5 text-center shadow-sm">
-                  <p className="text-xs font-black tracking-[0.16em] text-[#8b3152]">הטבת החג למצטרפים היום · עד 100 מימושים</p>
+                  <p className="text-xs font-black tracking-[0.16em] text-[#8b3152]">הטבת החג עד 1.10 · עד 100 מימושים</p>
                   <p className="mt-2 text-2xl font-black text-[#191265]">299 ₪ במקום 499 ₪</p>
                   <p className="mt-2 text-sm font-bold text-[#5f5262]">קוד NOW יחכה באזור התשלום ויופעל לאחר הזנת המייל.</p>
                   <p className="mt-2 text-xs leading-5 text-[#71656f]">הצעת התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון.</p>

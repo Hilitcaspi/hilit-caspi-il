@@ -138,13 +138,13 @@ export function buildDatabaseHolidayNowNewsletter(input: {
         </td></tr>
 
         <tr><td class="pad" style="padding:34px 46px 13px;background:#fff;text-align:center;">
-          <p style="margin:0;color:#a34366;font-size:12px;letter-spacing:1.5px;font-weight:700;">הטבת חג · היום בלבד</p>
+          <p style="margin:0;color:#a34366;font-size:12px;letter-spacing:1.5px;font-weight:700;">הטבת חג · עד 1.10</p>
           <h2 class="section-title" style="margin:9px auto 13px;max-width:520px;color:#2b1830;font-size:33px;line-height:1.2;font-weight:700;">כניסה מלאה למאגר.<br />תשלום אחד. בלי מנוי.</h2>
           <div class="price" style="margin-top:4px;color:#6f2345;font-size:86px;line-height:1;font-weight:700;letter-spacing:-3px;">${DATABASE_NOW_PRICE_ILS}<span style="font-size:29px;letter-spacing:0;"> ₪</span></div>
           <p style="margin:9px 0 0;color:#786a73;font-size:15px;"><span style="text-decoration:line-through;">${DATABASE_REGULAR_PRICE_ILS} ₪</span> · תשלום חד־פעמי</p>
           <p style="margin:15px auto 0;max-width:520px;color:#5f515c;font-size:14px;line-height:1.72;">קוד ההטבה <strong style="color:#6f2345;">${DATABASE_NOW_COUPON}</strong> כבר מחכה בקישור. כך גם אדע שהצטרפת דרך הטבת שלושת הימים ואוכל לעקוב אחר ההבטחה במערכת.</p>
           <div style="margin-top:22px;"><a class="cta" href="${offerUrl}" style="display:inline-block;background:#6f2345;color:#fff;text-decoration:none;padding:18px 37px;border-radius:999px;font-size:18px;font-weight:700;box-shadow:0 12px 30px rgba(111,35,69,.2);">להצטרפות ב־299 ₪</a></div>
-          <p style="margin:11px 0 0;color:#9c7c89;font-size:12px;line-height:1.6;">ל־${DATABASE_NOW_MAX_USES} המימושים הראשונים או עד סוף היום, המוקדם מביניהם.</p>
+          <p style="margin:11px 0 0;color:#9c7c89;font-size:12px;line-height:1.6;">ל־${DATABASE_NOW_MAX_USES} המימושים הראשונים או עד 1.10, המוקדם מביניהם.</p>
         </td></tr>
 
         <tr><td class="pad" style="padding:28px 46px 14px;background:#fff;">
