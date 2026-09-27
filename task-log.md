@@ -1059,3 +1059,13 @@
 **Cost:** unavailable
 **Notes:** לא פורסם סטורי ולא נשלחה הודעה. הקישור המודפס בכל קובץ הוא `https://hilitcaspi.com/now?s=story`.
 ---
+## Task: מסירת קישור UTM לקמפיין NOW בסטורי
+**Category:** marketing
+**Trigger:** reactive/production issue
+**Continuation of:** התאמת סטוריז NOW לנראות ניוזלטר ביוטי ורוד
+**Before:** המשתמשת מבקשת את הקישור הייעודי לפרסום הסטוריז, כך שהכניסות והרכישות ייוחסו לערוץ story. יש למסור את נתיב `/now` עם פרמטר המקור הקיים, ללא שינוי באתר וללא פרסום בפועל.
+**After (completed 2026-09-27 20:48 Asia/Jerusalem, duration <1m):** נמסר הקישור הקצר `https://hilitcaspi.com/now?s=story`, שממופה באתר לקופון NOW ולייחוס UTM של ערוץ הסטורי.
+**Status:** resolved
+**Cost:** unavailable
+**Notes:** לא בוצע שינוי באתר ולא פורסם סטורי בפועל.
+---
