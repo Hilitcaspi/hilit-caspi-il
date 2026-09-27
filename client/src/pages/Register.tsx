@@ -67,6 +67,8 @@ export default function Register() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const params = new URLSearchParams(search);
+  const promotionalCoupon = (params.get("coupon") || "").trim().toUpperCase();
+  const isNowHolidayOffer = promotionalCoupon === "NOW";
   // Capture UTM params from URL and persist in BOTH sessionStorage AND localStorage
   // localStorage survives cross-domain redirects (Grow payment page → back to site)
   const utmKeysToCapture = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
@@ -1538,6 +1540,15 @@ export default function Register() {
                 <p className="text-[#727272] text-sm">תשלום חד-פעמי. אין חידוש אוטומטי.</p>
               </div>
 
+              {isNowHolidayOffer && (
+                <div className="mb-5 rounded-2xl border border-[#d8b96d] bg-[#f7dce2] p-5 text-center shadow-sm">
+                  <p className="text-xs font-black tracking-[0.16em] text-[#8b3152]">הטבת החג למצטרפים היום · עד 100 מימושים</p>
+                  <p className="mt-2 text-2xl font-black text-[#191265]">149 ₪ במקום 299 ₪</p>
+                  <p className="mt-2 text-sm font-bold text-[#5f5262]">קוד NOW יחכה באזור התשלום ויופעל לאחר הזנת המייל.</p>
+                  <p className="mt-2 text-xs leading-5 text-[#71656f]">הצעת התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון.</p>
+                </div>
+              )}
+
               <div className="bg-[#191265] rounded-2xl p-6 text-white mb-6">
                 <h3 className="font-bold text-[#ffe27c] mb-4">מה כלול:</h3>
                 <div className="space-y-2.5">
@@ -1555,7 +1566,10 @@ export default function Register() {
                 </div>
                 <div className="border-t border-white/20 mt-5 pt-5 flex justify-between items-center">
                   <span className="text-white/70">תשלום חד-פעמי</span>
-                  <span className="text-[#ffe27c] font-black text-3xl">₪299 <span className="text-white/40 line-through text-xl font-normal">₪499</span></span>
+                  <span className="text-[#ffe27c] font-black text-3xl">
+                    {isNowHolidayOffer ? "₪149" : "₪299"}{" "}
+                    <span className="text-white/40 line-through text-xl font-normal">{isNowHolidayOffer ? "₪299" : "₪499"}</span>
+                  </span>
                 </div>
               </div>
 
@@ -1617,6 +1631,7 @@ export default function Register() {
                           prefillName={firstName && lastName ? `${firstName} ${lastName}` : firstName || undefined}
                           prefillEmail={email || undefined}
                           prefillPhone={phone || undefined}
+                          prefillCoupon={promotionalCoupon || undefined}
                           customerGender={gender === "male" ? "male" : "female"}
                           onFreeAccessCode={validateManualFreeAccessCode}
                           onSuccess={handlePaymentSuccess}

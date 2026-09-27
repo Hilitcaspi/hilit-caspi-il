@@ -48,6 +48,14 @@ describe("landing page experiment attribution", () => {
     expect(params.get("utm_content")).toBe("מודעת מאגר");
   });
 
+  it("preserves a promotional coupon through the database page", () => {
+    const href = buildDatabaseJoinHref("utm_source=email&utm_campaign=database_holiday_now_sep27&coupon=NOW");
+    const params = new URLSearchParams(href.split("?")[1]);
+
+    expect(params.get("coupon")).toBe("NOW");
+    expect(params.get("utm_campaign")).toBe("database_holiday_now_sep27");
+  });
+
   it("tracks database_cta on real database-page clicks, not on join page load", () => {
     const databaseSource = readFileSync(resolve(process.cwd(), "client/src/pages/DatabaseSales.tsx"), "utf8");
     const registerSource = readFileSync(resolve(process.cwd(), "client/src/pages/Register.tsx"), "utf8");

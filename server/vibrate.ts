@@ -10,6 +10,8 @@
 
 const VIBRATE_API_KEY = process.env.VIBRATE_API_KEY ?? "";
 const VIBRATE_API_URL = "https://api.vibrate.co.il/v1/sms/send";
+const VIBRATE_BULK_API_URL = "https://api.vibrate.co.il/v1/sms/sendBulk";
+const VIBRATE_USER_INFO_URL = "https://api.vibrate.co.il/v1/user/info";
 const SENDER_NAME = "HilitCaspi";
 
 /**
@@ -72,7 +74,9 @@ export async function sendSMSDetailed(phone: string, message: string): Promise<S
       console.log(`[Vibrate] SMS accepted by provider for ${normalizedPhone.slice(0, 4)}****${normalizedPhone.slice(-2)}, runId: ${data.runId ?? "unknown"}`);
       return {
         accepted: true,
-        providerRunId: typeof data.runId === "string" && data.runId ? data.runId : null,
+        providerRunId: typeof data?.data?.runId === "string" && data.data.runId
+          ? data.data.runId
+          : (typeof data.runId === "string" && data.runId ? data.runId : null),
         error: null,
       };
     }
@@ -88,4 +92,60 @@ export async function sendSMSDetailed(phone: string, message: string): Promise<S
 
 export async function sendSMS(phone: string, message: string): Promise<boolean> {
   return (await sendSMSDetailed(phone, message)).accepted;
+}
+
+export type BulkSmsMessage = { phone: string; message: string };
+
+export async function getVibrateSmsBalance(): Promise<number | null> {
+  if (!VIBRATE_API_KEY) return null;
+  try {
+    const res = await fetch(VIBRATE_USER_INFO_URL, {
+      headers: {
+        Authorization: `Bearer ${VIBRATE_API_KEY}`,
+        "User-Agent": "Mozilla/5.0 HilitCaspiCampaign/1.0",
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => ({}));
+    const amount = Number(data?.data?.smsAmount);
+    return Number.isFinite(amount) ? amount : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function sendSMSBulkDetailed(
+  input: { messages: BulkSmsMessage[]; idempotencyKey: string; campaignId?: string },
+): Promise<SmsDeliveryResult> {
+  if (!VIBRATE_API_KEY) return { accepted: false, providerRunId: null, error: "missing_api_key" };
+  const messages = input.messages
+    .map(item => ({ recipient: normalizeIsraeliMobile(item.phone), message: item.message.trim() }))
+    .filter((item): item is { recipient: string; message: string } => Boolean(item.recipient && item.message));
+  if (messages.length === 0) return { accepted: false, providerRunId: null, error: "no_valid_recipients" };
+
+  try {
+    const res = await fetch(VIBRATE_BULK_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${VIBRATE_API_KEY}`,
+        "Idempotency-Key": input.idempotencyKey,
+      },
+      body: JSON.stringify({
+        sender: SENDER_NAME,
+        messages,
+        ...(input.campaignId ? { campaignId: input.campaignId } : {}),
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 202) {
+      const runId = typeof data?.data?.runId === "string" ? data.data.runId : null;
+      return { accepted: true, providerRunId: runId, error: null };
+    }
+    return { accepted: false, providerRunId: null, error: String(data?.code || `http_${res.status}`) };
+  } catch {
+    return { accepted: false, providerRunId: null, error: "network_error" };
+  }
 }

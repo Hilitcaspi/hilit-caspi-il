@@ -4,6 +4,7 @@ export const EXPERIMENT_ATTRIBUTION_KEYS = [
   "utm_campaign",
   "utm_content",
   "utm_term",
+  "coupon",
   "meta_campaign_id",
   "meta_adset_id",
   "meta_ad_id",

@@ -57,6 +57,7 @@ export default function DatabaseSales() {
   }, []);
   const [scrolled, setScrolled] = useState(false);
   const search = useSearch();
+  const isNowHolidayOffer = new URLSearchParams(search).get("coupon")?.toUpperCase() === "NOW";
   const joinHref = useMemo(
     () => buildDatabaseJoinHref(search, window.sessionStorage, window.localStorage),
     [search],
@@ -113,7 +114,7 @@ export default function DatabaseSales() {
         <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center relative z-10">
           <motion.div initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.85 }} className="text-right">
             <div className="inline-block bg-[#ffe27c]/15 border border-[#ffe27c]/35 text-[#ffe27c] text-sm font-medium px-4 py-2 rounded-full mb-6">
-              ✦ הדור הבא של matchmaking
+              {isNowHolidayOffer ? "✦ הטבת חג למצטרפים היום" : "✦ הדור הבא של matchmaking"}
             </div>
             <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-5">
               לא שידוך.<br />
@@ -123,10 +124,17 @@ export default function DatabaseSales() {
             <p className="text-white/75 text-lg leading-relaxed mb-8">
               בניתי שיטה שלוקחת את כל מה שטוב בכל אחד מהעולמות: גם המראה חשוב, גם הפרמטרים הבסיסיים, וגם הדפוסים הפנימיים שמנבאים אהבה שתחזיק לאורך שנים. לא בחרתי בין הגישות. שילבתי את כולן.
             </p>
+            {isNowHolidayOffer && (
+              <div className="mb-7 rounded-2xl border border-[#ffe27c]/45 bg-white/10 p-4 text-white shadow-lg backdrop-blur-sm">
+                <p className="text-sm font-bold text-[#ffe27c]">היום עם קוד NOW · ל־100 הראשונים</p>
+                <p className="mt-1 text-3xl font-black">149 ₪ <span className="text-base font-normal text-white/50 line-through">299 ₪</span></p>
+                <p className="mt-2 text-sm leading-6 text-white/85">תשלום חד-פעמי וגם הצעת התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון.</p>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href={joinHref} onClick={() => trackJoinClick("hero")}>
                 <span className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl text-center cursor-pointer block">
-                  ♡ הצטרפות למאגר
+                  {isNowHolidayOffer ? "♡ הצטרפות עם קוד NOW" : "♡ הצטרפות למאגר"}
                 </span>
               </Link>
               <Link href={DNA_QUIZ_URL}>

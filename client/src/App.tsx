@@ -41,6 +41,7 @@ const CourseCompass = lazy(() => import("@/pages/CourseCompass"));
 const TermsCoaching = lazy(() => import("@/pages/TermsCoaching"));
 const TermsCourse = lazy(() => import("@/pages/TermsCourse"));
 const DatabaseSales = lazy(() => import("@/pages/DatabaseSales"));
+const DatabaseNowRedirect = lazy(() => import("@/pages/DatabaseNowRedirect"));
 const DatabaseLanding = lazy(() => import("@/pages/DatabaseLanding"));
 const TermsDatabase = lazy(() => import("@/pages/TermsDatabase"));
 const ThankYouCourse = lazy(() => import("@/pages/ThankYouCourse"));
@@ -290,6 +291,7 @@ function HeRouter() {
           <Route path={"/terms/coaching"} component={TermsCoaching} />
           <Route path={"/terms/course"} component={TermsCourse} />
           <Route path={"/database"} component={DatabaseSales} />
+          <Route path={"/now"} component={DatabaseNowRedirect} />
           <Route path={"/maagar"} component={DatabaseLanding} />
           <Route path={"/terms/database"} component={TermsDatabase} />
           <Route path={"/database-plus"} component={DatabasePlusSales} />
