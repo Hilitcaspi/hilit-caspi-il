@@ -79,6 +79,7 @@ describe("database holiday NOW campaign", () => {
     expect(source).toContain("sendPreparedDatabaseHolidayNowEmail");
     expect(source).toContain("sendDatabaseHolidayNowSms");
     expect(source).toContain('audience: "high_intent" | "all"');
+    expect(source).toContain("recent.journeyKey <> ${DATABASE_NOW_EMAIL_JOURNEY}");
     expect(source).toContain("maxUses: DATABASE_NOW_MAX_USES");
     expect(source).not.toContain("void sendPreparedDatabaseHolidayNowEmail()");
     expect(source).not.toContain("void sendDatabaseHolidayNowSms(");

@@ -120,6 +120,7 @@ export async function loadDatabaseHolidayNowAudience(): Promise<DatabaseNowAudie
         WHERE LOWER(TRIM(recent.recipientEmail)) = LOWER(TRIM(cl.email))
           AND recent.status = 'sent'
           AND recent.sentAt >= ${restWindowCutoff}
+          AND recent.journeyKey <> ${DATABASE_NOW_EMAIL_JOURNEY}
       )
   `) as any;
 
