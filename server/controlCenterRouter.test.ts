@@ -25,11 +25,32 @@ describe("control center profile safeguards", () => {
     expect(source).toContain("buildProfileActionPreview(input)");
     expect(source).toContain("expectedUpdatedAt");
     expect(source).toContain("db.transaction(async tx =>");
-    expect(source).toContain("יש התאמה פעילה; יש לשחרר אותה קודם");
+    expect(source).toContain("שחרור התאמות פתוחות וביטול קישורי אישור");
     expect(source).toContain("קיים מנוי PLUS פעיל או בתהליך");
     expect(source).toContain("existingEvent");
     expect(source).toContain("duplicate: true");
     expect(source).toContain("input.expectedUpdatedAt !== undefined");
+  });
+
+  it("allows an inactive profile to finish the remaining closure layers", () => {
+    expect(source).toContain("הפרופיל כבר אינו פעיל; הפעולה תשלים את שאר שכבות הסגירה");
+    expect(source).not.toContain('blockers.push("הפרופיל כבר לא פעיל")');
+  });
+
+  it("closes matching, access, messaging, Boost, Plus and follow-up surfaces together", () => {
+    expect(source).toContain("questionnaireToken: null");
+    expect(source).toContain("approvalTokenA: null");
+    expect(source).toContain('matchDetailStatus: "ended"');
+    expect(source).toContain('status: "removed"');
+    expect(source).toContain('decisionReason: "profile_closed_by_owner"');
+    expect(source).toContain('billingStatus: "ended"');
+    expect(source).toContain('status: "not_relevant"');
+    expect(source).toContain("emailUnsubscribed: true");
+    expect(source).toContain('status: "archived"');
+    expect(source).toContain('status: "cancelled"');
+    expect(source).toContain("matchBoostPilotInterests");
+    expect(source).toContain("courseCompassLeads");
+    expect(source).toContain("crmTeamTasks");
   });
 
   it("uses the production seed flag name in aggregate profile counts", () => {

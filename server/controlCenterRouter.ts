@@ -3,14 +3,21 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
+  courseCompassLeads,
   crmLeads,
+  crmTeamTasks,
   emailLog,
+  feedbackFollowups,
   matchBoostMemberships,
+  matchBoostPilotInterests,
+  matchBoostRequests,
   matches,
+  plusCheckoutIntents,
   plusPilotMembers,
   profileUpdateRequests,
   selfServiceEvents,
   singles,
+  testimonialRecords,
 } from "../drizzle/schema";
 import { router, teamProcedure } from "./_core/trpc";
 import { getDb } from "./db";
@@ -88,12 +95,16 @@ export async function buildProfileActionPreview(input: {
   const boost = boostRows[0] || null;
 
   if (input.action === "close_profile") {
-    if (!profile.isActive) blockers.push("הפרופיל כבר לא פעיל");
-    if (activeMatchRows.length > 0) blockers.push("יש התאמה פעילה; יש לשחרר אותה קודם במסך ההתאמות");
+    if (!profile.isActive) warnings.push("הפרופיל כבר אינו פעיל; הפעולה תשלים את שאר שכבות הסגירה");
     if (plus && ["active", "pending", "past_due"].includes(plus.billingStatus)) {
       blockers.push("קיים מנוי PLUS פעיל או בתהליך; יש לטפל בחיוב בנפרד לפני הסגירה");
     }
-    plannedChanges.push("הוצאת הפרופיל ממאגר ההתאמות", "כיבוי הסכמות מאגר ושיתוף", "עצירת דיוור שיווקי ממתין");
+    plannedChanges.push(
+      "הוצאת הפרופיל ממאגר ההתאמות",
+      "שחרור התאמות פתוחות וביטול קישורי אישור",
+      "כיבוי כל ההסכמות וקישורי הכניסה",
+      "עצירת דיוור, Boost, הזמנות Plus ופניות עתידיות",
+    );
     if (boost?.status === "active") plannedChanges.push("הסרת הפרופיל ממאגר Boost");
   }
 
@@ -255,21 +266,150 @@ export const controlCenterRouter = router({
       } else {
         await db.transaction(async tx => {
           if (input.action === "close_profile") {
+            const normalizedEmail = normalizeEmail(preview.profile.email || "");
             await tx.update(singles).set({
               isActive: false,
               consentMatchmaking: false,
               consentDataSharing: false,
               consentEmailMarketing: false,
+              subscriptionStatus: "cancelled",
+              subscriptionCancelledAt: now,
+              questionnaireToken: null,
+              photoUploadToken: null,
+              photoUploadTokenExpiresAt: null,
               updatedAt: now,
             }).where(eq(singles.id, input.singleId));
+
+            await tx.update(matches).set({
+              status: "rejected",
+              matchDetailStatus: "ended",
+              returnedToPoolAt: now,
+              singleAToken: null,
+              singleBToken: null,
+              approvalTokenA: null,
+              approvalTokenB: null,
+              ownerApprovalToken: null,
+              approvalExpiresAt: now,
+              updatedAt: now,
+            }).where(and(
+              or(
+                eq(matches.singleAId, input.singleId),
+                eq(matches.singleBId, input.singleId),
+                eq(matches.singleId, input.singleId),
+                eq(matches.matchedSingleId, input.singleId),
+              ),
+              or(
+                isNull(matches.returnedToPoolAt),
+                inArray(matches.status, ["pending", "proposed", "matched"]),
+              ),
+            ));
+
             await tx.update(matchBoostMemberships).set({ status: "removed", optedOutAt: now, updatedAt: now })
               .where(eq(matchBoostMemberships.singleId, input.singleId));
-            await tx.update(crmLeads).set({ emailUnsubscribed: true, emailUnsubscribedAt: now, updatedAt: now })
-              .where(eq(crmLeads.singleId, input.singleId));
-            if (preview.profile.email) {
+
+            await tx.update(matchBoostRequests).set({
+              status: "cancelled",
+              decidedAt: now,
+              decisionReason: "profile_closed_by_owner",
+              updatedAt: now,
+            }).where(and(
+              eq(matchBoostRequests.singleId, input.singleId),
+              inArray(matchBoostRequests.status, ["awaiting_payment", "paid", "queued", "reviewing", "approved"]),
+              isNull(matchBoostRequests.fulfilledAt),
+            ));
+
+            await tx.update(plusPilotMembers).set({
+              status: "declined",
+              billingStatus: "ended",
+              cancelledAt: now,
+              endedAt: now,
+              premiumSupportEnabled: false,
+              updatedAt: now,
+            }).where(eq(plusPilotMembers.singleId, input.singleId));
+
+            await tx.update(profileUpdateRequests).set({
+              status: "rejected",
+              adminNote: "הפרופיל נסגר לבקשת בעלת העסק",
+              reviewedAt: now,
+            }).where(and(
+              eq(profileUpdateRequests.singleId, input.singleId),
+              eq(profileUpdateRequests.status, "pending"),
+            ));
+
+            await tx.update(feedbackFollowups).set({
+              status: "dismissed",
+              nextActionAt: null,
+              resolvedAt: now,
+              updatedAt: now,
+            }).where(and(
+              eq(feedbackFollowups.singleId, input.singleId),
+              inArray(feedbackFollowups.status, ["open", "in_progress", "waiting_customer"]),
+            ));
+
+            await tx.update(crmTeamTasks).set({
+              status: "cancelled",
+              completedAt: now,
+              updatedAt: now,
+            }).where(and(
+              eq(crmTeamTasks.singleId, input.singleId),
+              inArray(crmTeamTasks.status, ["todo", "in_progress"]),
+            ));
+
+            const crmIdentity = normalizedEmail
+              ? or(eq(crmLeads.singleId, input.singleId), sql`LOWER(TRIM(${crmLeads.email})) = ${normalizedEmail}`)
+              : eq(crmLeads.singleId, input.singleId);
+            await tx.update(crmLeads).set({
+              status: "not_relevant",
+              emailUnsubscribed: true,
+              emailUnsubscribedAt: now,
+              updatedAt: now,
+            }).where(crmIdentity);
+
+            if (normalizedEmail) {
+              await tx.update(matchBoostPilotInterests).set({
+                status: "declined",
+                contactConsent: false,
+                updatedAt: now,
+              }).where(sql`LOWER(TRIM(${matchBoostPilotInterests.email})) = ${normalizedEmail}`);
+
+              await tx.update(courseCompassLeads).set({
+                status: "declined",
+                waitlistConsent: false,
+                marketingConsent: false,
+                selectedAction: null,
+                updatedAt: now,
+              }).where(sql`LOWER(TRIM(${courseCompassLeads.email})) = ${normalizedEmail}`);
+
+              await tx.update(plusCheckoutIntents).set({ status: "cancelled", updatedAt: now })
+                .where(and(
+                  sql`LOWER(TRIM(${plusCheckoutIntents.email})) = ${normalizedEmail}`,
+                  inArray(plusCheckoutIntents.status, ["pending", "paid_pending_profile"]),
+                ));
+
+              await tx.update(testimonialRecords).set({
+                status: "archived",
+                archivedAt: now,
+                scheduledAt: null,
+                reminderDueAt: null,
+                updatedAt: now,
+              }).where(and(
+                or(
+                  eq(testimonialRecords.singleId, input.singleId),
+                  sql`LOWER(TRIM(${testimonialRecords.contactEmail})) = ${normalizedEmail}`,
+                ),
+                inArray(testimonialRecords.status, [
+                  "draft",
+                  "candidate",
+                  "approved_to_contact",
+                  "sent",
+                  "awaiting_consent",
+                  "awaiting_verification",
+                ]),
+              ));
+
               await tx.update(emailLog).set({ status: "cancelled", sentAt: now, errorMessage: "suppressed:control_center_profile_close" })
                 .where(and(
-                  sql`LOWER(TRIM(${emailLog.recipientEmail})) = ${normalizeEmail(preview.profile.email)}`,
+                  sql`LOWER(TRIM(${emailLog.recipientEmail})) = ${normalizedEmail}`,
                   inArray(emailLog.status, ["pending", "processing"]),
                 ));
             }
