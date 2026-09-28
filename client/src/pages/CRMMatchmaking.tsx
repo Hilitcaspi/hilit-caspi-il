@@ -17,7 +17,7 @@ import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { AlarmClock, Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles, MessageSquareText, Command } from "lucide-react";
+import { AlarmClock, AlertTriangle, Users, Heart, Zap, Copy, RefreshCw, CheckCircle, Clock, XCircle, Send, Gift, Search, X, ChevronDown, BarChart3, Sparkles, MessageSquareText, Command } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getMatchTrackingSummary, hasMutualYes, isUnsuccessfulMatch, isWaitingForMatchResponses } from "@shared/matchLifecycle";
 import { wasMatchProposalSent } from "@shared/matchDelivery";
@@ -2678,7 +2678,7 @@ export default function CRMMatchmaking() {
             onSendMatch={(allowCriteriaOverride = false) => {
               if (compatResult?.matchId) {
                 // Match record already exists — use approveMatch
-                approveMatch.mutate({ matchId: compatResult.matchId, hilitsNote: "" }, {
+                approveMatch.mutate({ matchId: compatResult.matchId, hilitsNote: "", allowCriteriaOverride }, {
                   onSuccess: () => {
                     setCompatResult((prev: any) => prev ? { ...prev, matchStatus: 'proposed' } : prev);
                   }
@@ -2965,6 +2965,9 @@ export default function CRMMatchmaking() {
               ) : (
                 filteredResults.map(single => {
                   const compatData = filterCompatResult[single.id];
+                  const compatibilityWarnings = getCompatibilityWarnings(compatData);
+                  const canOverrideCriteria = compatData?.hasHardBlock === true && compatData?.canOverrideCriteria === true;
+                  const hasNonOverridableBlock = compatData?.hasHardBlock === true && compatData?.canOverrideCriteria !== true;
                   const scoreColor = compatData ? (compatData.score >= 75 ? "border-green-500" : compatData.score >= 60 ? "border-amber-500" : compatData.score >= 45 ? "border-orange-400" : "border-red-300") : "border-[#191265]/20";
                   return (
                     <div key={single.id} className={`bg-white rounded-xl p-4 shadow-sm border-r-4 ${scoreColor}`}>
@@ -3030,33 +3033,35 @@ export default function CRMMatchmaking() {
                                   })}
                                 </div>
                               )}
-                              {Array.isArray(compatData.warnings) && compatData.warnings.length > 0 && (
-                                <div className="max-w-xs rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-right">
+                              {compatibilityWarnings.length > 0 && (
+                                <div className={`max-w-xs rounded-lg border px-2 py-1 text-right ${hasNonOverridableBlock ? "border-red-300 bg-red-50" : "border-amber-300 bg-amber-50"}`}>
                                   <p className="text-[10px] font-black text-amber-800">⚠️ חריגת קריטריונים</p>
-                                  {compatData.warnings.map((warning: string, index: number) => (
+                                  {compatibilityWarnings.map((warning: string, index: number) => (
                                     <p key={index} className="text-[10px] text-amber-700">{warning}</p>
                                   ))}
+                                  <p className="mt-1 text-[10px] font-bold text-amber-800">
+                                    {canOverrideCriteria ? "אפשר לשלוח לאחר אישור מפורש." : "החסימה הזו אינה ניתנת לעקיפה."}
+                                  </p>
                                 </div>
                               )}
                               {/* Send match button */}
                               {filterCompatTarget && filterCompatTarget !== single.id && !compatData.alreadySent && (
                                 <button
                                   onClick={() => {
-                                    const warnings = Array.isArray(compatData.warnings) ? compatData.warnings : [];
-                                    const warningText = warnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${warnings.join("\n")}` : "";
+                                    const warningText = compatibilityWarnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${compatibilityWarnings.join("\n")}` : "";
                                     if (window.confirm(`לשלוח התאמה בין ${typedSingles.find(s => s.id === filterCompatTarget)?.firstName} ל-${single.firstName}?${warningText}`)) {
                                       if (compatData.matchId) {
-                                        approveMatch.mutate({ matchId: compatData.matchId, hilitsNote: "" });
+                                        approveMatch.mutate({ matchId: compatData.matchId, hilitsNote: "", allowCriteriaOverride: canOverrideCriteria });
                                       } else {
-                                        createAndSendMatch.mutate({ idA: filterCompatTarget, idB: single.id, allowCriteriaOverride: warnings.length > 0 });
+                                        createAndSendMatch.mutate({ idA: filterCompatTarget, idB: single.id, allowCriteriaOverride: canOverrideCriteria });
                                       }
                                     }
                                   }}
-                                  disabled={approveMatch.isPending || createAndSendMatch.isPending}
+                                  disabled={approveMatch.isPending || createAndSendMatch.isPending || hasNonOverridableBlock}
                                   className="text-xs bg-[#191265] text-white font-bold px-3 py-1.5 rounded-full hover:bg-[#1800ad] transition-colors disabled:opacity-50 flex items-center gap-1"
                                 >
                                   <Send size={10} />
-                                  {Array.isArray(compatData.warnings) && compatData.warnings.length > 0 ? "אשר חריגה ושלח" : "שלח התאמה"}
+                                  {canOverrideCriteria ? "אשר חריגה ושלח" : hasNonOverridableBlock ? "חסימה שאינה ניתנת לעקיפה" : "שלח התאמה"}
                                 </button>
                               )}
                               {compatData.alreadySent && (
@@ -3535,6 +3540,17 @@ const BREAKDOWN_MAX: Record<string, number> = {
   cityIntelligence: 7,
 };
 
+function getCompatibilityWarnings(result: any): string[] {
+  const warnings: string[] = Array.isArray(result?.warnings)
+    ? result.warnings.filter((warning: unknown): warning is string => typeof warning === "string" && warning.trim().length > 0)
+    : [];
+  const hardBlockReason = typeof result?.hardBlockReason === "string" ? result.hardBlockReason.trim() : "";
+  if (hardBlockReason && !warnings.some(warning => warning.includes(hardBlockReason))) {
+    warnings.unshift(`⚠️ ${hardBlockReason}`);
+  }
+  return warnings;
+}
+
 function CompatibilityCheckTab({
   allSingles,
   compatPersonA,
@@ -3567,6 +3583,9 @@ function CompatibilityCheckTab({
     if (score >= 55) return "bg-yellow-50 border-yellow-200";
     return "bg-red-50 border-red-200";
   };
+  const compatibilityWarnings = getCompatibilityWarnings(compatResult);
+  const canOverrideCriteria = compatResult?.hasHardBlock === true && compatResult?.canOverrideCriteria === true;
+  const hasNonOverridableBlock = compatResult?.hasHardBlock === true && compatResult?.canOverrideCriteria !== true;
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -3625,15 +3644,19 @@ function CompatibilityCheckTab({
       {compatResult && (
         <div className="space-y-4">
           {/* Warnings Banner */}
-          {compatResult.warnings && compatResult.warnings.length > 0 && (
-            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4" dir="rtl">
-              <div className="font-black text-amber-700 text-sm mb-2">⚠️ אזהרות פילטר קשה (בדיקה ידנית)</div>
+          {compatibilityWarnings.length > 0 && (
+            <div className={`${hasNonOverridableBlock ? "bg-red-50 border-red-300" : "bg-amber-50 border-amber-300"} border-2 rounded-2xl p-4`} dir="rtl">
+              <div className={`font-black text-sm mb-2 ${hasNonOverridableBlock ? "text-red-700" : "text-amber-700"}`}>⚠️ התראת קריטריונים</div>
               <ul className="space-y-1">
-                {compatResult.warnings.map((w: string, i: number) => (
-                  <li key={i} className="text-amber-800 text-sm">{w}</li>
+                {compatibilityWarnings.map((w: string, i: number) => (
+                  <li key={i} className={hasNonOverridableBlock ? "text-red-800 text-sm" : "text-amber-800 text-sm"}>{w}</li>
                 ))}
               </ul>
-              <p className="text-xs text-amber-600 mt-2">הציון מחושב ללא הפילטרים הקשים, ההחלטה הסופית בידיים שלך.</p>
+              <p className={`text-xs mt-2 font-bold ${hasNonOverridableBlock ? "text-red-700" : "text-amber-700"}`}>
+                {canOverrideCriteria
+                  ? "זו התראה בלבד. אפשר לאשר במפורש ולשלוח את ההתאמה בכל זאת."
+                  : "החסימה הזו אינה ניתנת לעקיפה."}
+              </p>
             </div>
           )}
           {/* Score Card */}
@@ -3717,13 +3740,12 @@ function CompatibilityCheckTab({
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <button
                 onClick={() => {
-                  const warnings = Array.isArray(compatResult.warnings) ? compatResult.warnings : [];
-                  const warningText = warnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${warnings.join("\n")}` : "";
+                  const warningText = compatibilityWarnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${compatibilityWarnings.join("\n")}` : "";
                   if (window.confirm(`לשלוח התאמה בין ${compatResult.personA?.firstName || ''} ל-${compatResult.personB?.firstName || ''}?${warningText}`)) {
-                    onSendMatch(warnings.length > 0);
+                    onSendMatch(canOverrideCriteria);
                   }
                 }}
-                disabled={isSendingMatch || compatResult.matchStatus === 'proposed' || compatResult.matchStatus === 'matched'}
+                disabled={isSendingMatch || hasNonOverridableBlock || compatResult.matchStatus === 'proposed' || compatResult.matchStatus === 'matched'}
                 className="w-full bg-[#191265] text-white font-black text-base py-4 rounded-xl hover:bg-[#1800ad] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSendingMatch ? (
@@ -3732,8 +3754,10 @@ function CompatibilityCheckTab({
                   <><CheckCircle size={18} /> ההצעה כבר נשלחה</>
                 ) : compatResult.matchStatus === 'matched' ? (
                   <><CheckCircle size={18} /> התאמה מאושרת!</>
+                ) : hasNonOverridableBlock ? (
+                  <><AlertTriangle size={18} /> חסימה שאינה ניתנת לעקיפה</>
                 ) : (
-                  <><Send size={18} /> {Array.isArray(compatResult.warnings) && compatResult.warnings.length > 0 ? "אשר חריגה ושלח לשני הצדדים" : "שלח התאמה לשני הצדדים 💛"}</>
+                  <><Send size={18} /> {canOverrideCriteria ? "אשר חריגה ושלח לשני הצדדים" : "שלח התאמה לשני הצדדים 💛"}</>
                 )}
               </button>
               {(compatResult.matchStatus === 'proposed' || compatResult.matchStatus === 'matched') && (
@@ -3747,19 +3771,20 @@ function CompatibilityCheckTab({
                   <p className="text-center text-sm text-[#727272] mb-3">שליחת התאמה ישירה ללא הרצת אלגוריתם — הציון יחושב אוטומטית</p>
                   <button
                     onClick={() => {
-                      const warnings = Array.isArray(compatResult.warnings) ? compatResult.warnings : [];
-                      const warningText = warnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${warnings.join("\n")}` : "";
+                      const warningText = compatibilityWarnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${compatibilityWarnings.join("\n")}` : "";
                       if (window.confirm(`לשלוח התאמה ישירה לשני האנשים האלה?${warningText}`)) {
-                        onSendMatch(warnings.length > 0);
+                        onSendMatch(canOverrideCriteria);
                       }
                     }}
-                    disabled={isSendingMatch}
+                    disabled={isSendingMatch || hasNonOverridableBlock}
                     className="w-full bg-[#191265] text-white font-black text-base py-4 rounded-xl hover:bg-[#1800ad] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {isSendingMatch ? (
                       <><RefreshCw size={18} className="animate-spin" /> שולח...</>
+                    ) : hasNonOverridableBlock ? (
+                      <><AlertTriangle size={18} /> חסימה שאינה ניתנת לעקיפה</>
                     ) : (
-                      <><Send size={18} /> {Array.isArray(compatResult.warnings) && compatResult.warnings.length > 0 ? "אשר חריגה ושלח לשני הצדדים" : "שלח התאמה לשני הצדדים 💛"}</>
+                      <><Send size={18} /> {canOverrideCriteria ? "אשר חריגה ושלח לשני הצדדים" : "שלח התאמה לשני הצדדים 💛"}</>
                     )}
                   </button>
                 </>

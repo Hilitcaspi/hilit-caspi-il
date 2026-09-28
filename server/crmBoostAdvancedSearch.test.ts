@@ -33,7 +33,8 @@ describe("Boost and advanced-search CRM visibility", () => {
 
   it("requires explicit criteria override confirmation for a blocked direct send", () => {
     expect(crmSource).toContain("אשר חריגה ושלח");
-    expect(crmSource).toContain("allowCriteriaOverride: warnings.length > 0");
+    expect(crmSource).toContain("allowCriteriaOverride: canOverrideCriteria");
+    expect(crmSource).toContain("זו התראה בלבד. אפשר לאשר במפורש ולשלוח את ההתאמה בכל זאת.");
     expect(routerSource).toContain("allowCriteriaOverride: z.boolean().optional().default(false)");
     expect(routerSource).toContain("[CRITERIA_OVERRIDE]");
   });

@@ -3000,12 +3000,27 @@ export const appRouter = router({
         const answersB = await db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleB.id)).limit(1);
         const parsedA: MatchAnswer[] = answersA[0]?.answersJson ? (typeof answersA[0].answersJson === 'string' ? JSON.parse(answersA[0].answersJson) : answersA[0].answersJson as MatchAnswer[]) : [];
         const parsedB: MatchAnswer[] = answersB[0]?.answersJson ? (typeof answersB[0].answersJson === 'string' ? JSON.parse(answersB[0].answersJson) : answersB[0].answersJson as MatchAnswer[]) : [];
-        // Use admin variant: bypasses hard filters, returns warnings instead of 0
+        const strictBreakdown = computeFullScore(singleA as any, singleB as any, parsedA, parsedB);
+        // Use the admin variant for the preview score, while keeping the strict
+        // blocker visible so the UI can require an explicit override.
         const breakdown = computeFullScoreAdmin(singleA as any, singleB as any, parsedA, parsedB);
+        const hardBlockReason = strictBreakdown.details
+          .find(detail => detail.startsWith("פסילה מוחלטת:"))
+          ?.replace(/^פסילה מוחלטת:\s*/, "") || null;
+        const canOverrideCriteria = strictBreakdown.total === 0
+          && !!hardBlockReason
+          && !hardBlockReason.includes("מגדר המבוקש");
+        const warnings = [...(breakdown.warnings ?? [])];
+        if (hardBlockReason && !warnings.some(warning => warning.includes(hardBlockReason))) {
+          warnings.unshift(`⚠️ ${hardBlockReason}`);
+        }
         const narrative = await buildMatchExplanation(singleA as any, singleB as any, breakdown, parsedA, parsedB);
         return {
           score: breakdown.total,
-          warnings: breakdown.warnings ?? [],
+          warnings,
+          hasHardBlock: strictBreakdown.total === 0,
+          hardBlockReason,
+          canOverrideCriteria,
           breakdown: {
             questionnaire: breakdown.questionnaire,
             lifeStage: breakdown.lifeStage,
@@ -4370,6 +4385,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       .input(z.object({
         matchId: z.number(),
         hilitsNote: z.string().optional(), // Personal note from Hilit about why she believes in this match
+        allowCriteriaOverride: z.boolean().optional().default(false),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -4389,7 +4405,17 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         ]);
         const parsedA: MatchAnswer[] = answerRowA[0]?.answersJson ? (typeof answerRowA[0].answersJson === "string" ? JSON.parse(answerRowA[0].answersJson) : answerRowA[0].answersJson as MatchAnswer[]) : [];
         const parsedB: MatchAnswer[] = answerRowB[0]?.answersJson ? (typeof answerRowB[0].answersJson === "string" ? JSON.parse(answerRowB[0].answersJson) : answerRowB[0].answersJson as MatchAnswer[]) : [];
-        const verifiedBreakdown = computeFullScore(singleA as any, singleB as any, parsedA, parsedB);
+        const {
+          breakdown: verifiedBreakdown,
+          criteriaOverrideApplied,
+          warnings: criteriaWarnings,
+        } = computeFullScoreForAdminSend(
+          singleA as any,
+          singleB as any,
+          parsedA,
+          parsedB,
+          input.allowCriteriaOverride,
+        );
         if (verifiedBreakdown.total === 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: verifiedBreakdown.details.find(detail => detail.startsWith("פסילה מוחלטת:")) || "ההתאמה סותרת קו אדום ולא תישלח." });
         }
@@ -4431,6 +4457,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const expiresAt = Date.now() + 48 * 60 * 60 * 1000; // 48 hours
         const now = Date.now();
 
+        const criteriaOverrideNote = criteriaOverrideApplied
+          ? `[CRITERIA_OVERRIDE] ${criteriaWarnings.join(" | ") || "Admin-approved one-off match"}`
+          : null;
+        const existingNotes = String(match.notes || "").trim();
+        const updatedNotes = criteriaOverrideNote && !existingNotes.includes("[CRITERIA_OVERRIDE]")
+          ? [existingNotes, criteriaOverrideNote].filter(Boolean).join("\n")
+          : match.notes;
+
         await db.update(matches).set({
           status: "proposed",
           approvalTokenA: tokenA,
@@ -4439,6 +4473,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           proposedAt: now,
           ownerApprovedAt: now,
           score: verifiedBreakdown.total,
+          notes: updatedNotes,
           updatedAt: now,
         }).where(eq(matches.id, input.matchId));
 
