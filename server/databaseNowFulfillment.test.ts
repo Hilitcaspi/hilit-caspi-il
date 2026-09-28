@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DATABASE_NOW_EXPIRES_AT } from "../shared/databaseHolidayNow";
+import { DATABASE_NOW_EXPIRES_AT, isDatabaseNowAttribution } from "../shared/databaseHolidayNow";
 import { databaseNowDueAt, databaseNowSlaState, DATABASE_NOW_TASK_CREATED_BY, DATABASE_NOW_TASK_TITLE } from "./databaseNowFulfillment";
 
 const root = process.cwd();
@@ -16,6 +16,12 @@ describe("database NOW fulfillment", () => {
 
   it("keeps NOW active through the end of 1 October in Israel", () => {
     expect(DATABASE_NOW_EXPIRES_AT).toBe(Date.parse("2026-10-01T20:59:59.000Z"));
+  });
+
+  it("recognizes NOW by coupon or campaign attribution independently", () => {
+    expect(isDatabaseNowAttribution({ couponCode: "now" })).toBe(true);
+    expect(isDatabaseNowAttribution({ couponCode: "LOVE10", utmCampaign: "database_holiday_now_sep27" })).toBe(true);
+    expect(isDatabaseNowAttribution({ couponCode: "LOVE10", utmCampaign: "database_purchase" })).toBe(false);
   });
 
   it("classifies every operational SLA stage deterministically", () => {
@@ -35,6 +41,7 @@ describe("database NOW fulfillment", () => {
     expect(webhook).toContain("ensureDatabaseNowMatchTask");
     expect(webhook).toContain("questionnaireCompletedAt");
     expect(webhook).toContain("purchaseTracking?.couponCode");
+    expect(webhook).toContain("purchaseTracking?.utmCampaign");
     expect(routers).toContain('[completeQuestionnaire] Failed to create NOW SLA task:');
     expect(routers).toContain("eligibleAt: now");
   });
@@ -58,6 +65,7 @@ describe("database NOW fulfillment", () => {
     expect(operations).toContain("nowSlaDashboard");
     expect(operations).toContain("FROM completed_payments");
     expect(operations).toContain("coupon_code");
+    expect(operations).toContain("utm_campaign");
     expect(operations).toContain("match_delivery_events");
     expect(crm).toContain('id: "now"');
     expect(crm).toContain("<DatabaseNowSlaSection />");

@@ -1139,3 +1139,13 @@
 **Cost:** unavailable
 **Notes:** הספירה מאחדת כפילויות לפי מייל מנורמל ומבדילה בין אירוע הרשמה, אדם חדש, אדם חוזר ורכישה מאומתת ב־Grow. לא בוצעה שליחה או פעולה על לידים.
 ---
+## Task: שחזור שני ניסיונות תשלום והרחבת ייחוס NOW
+**Category:** payment/billing
+**Trigger:** reactive/production issue
+**Continuation of:** ניתוח כל נרשמי היום והמשך הטיפול
+**Before:** אותרו שני ניסיונות תשלום מהיום שלא הושלמו. המשתמשת אישרה לשלוח לשניהם מייל שחזור עם קוד LOVE10, וביקשה שכל רכישה שהגיעה מקמפיין NOW תיכנס אוטומטית לטאב NOW גם אם הקונה השתמש בקוד אחר או לא השתמש בקוד. יש לאמת מחדש ששני הניסיונות עדיין פתוחים, את תוקף והטבת LOVE10, הסרה מדיוור וכפילות; לבנות מייל אישי עם קישור תשלום תקין; ולעדכן את webhook, משימת ה־SLA ושאילתת הטאב להשתמש בייחוס UTM של NOW בנוסף לקופון. הקבצים הצפויים: `shared/databaseHolidayNow.ts`, `server/growWebhook.ts`, `server/databaseNowFulfillment.ts`, `server/operationsRouter.ts`, בדיקות רגרסיה ו־task-log.md.
+**After:** pending
+**Status:** stopped/restarted
+**Cost:** unavailable
+**Notes:** אין לשלוח SMS או WhatsApp. אין לחשוף פרטים אישיים או מזהי עסקה ביומן.
+---

@@ -316,7 +316,14 @@ async function handleSession(email: string, name: string) {
   }).catch(err => console.error("[GrowWebhook][Session] Email failed:", err));
 }
 
-export async function handleDatabase(email: string, name: string, phone: string, transactionId: string = "", couponCode?: string | null) {
+export async function handleDatabase(
+  email: string,
+  name: string,
+  phone: string,
+  transactionId: string = "",
+  couponCode?: string | null,
+  utmCampaign?: string | null,
+) {
   const db = await getDb();
   if (!db) return;
   const firstName = name.trim().split(" ")[0];
@@ -438,6 +445,7 @@ export async function handleDatabase(email: string, name: string, phone: string,
       email: normalizedEmail,
       eligibleAt: now,
       couponCode,
+      utmCampaign,
     });
   }
 
@@ -915,7 +923,14 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       case "coaching":     await handleCoaching(email, name); break;
       case "coaching_mas": await handleCoachingMas(email, name); break;
       case "session":  await handleSession(email, name); break;
-      case "database": await handleDatabase(email, name, phone, transactionId, purchaseTracking?.couponCode); break;
+      case "database": await handleDatabase(
+        email,
+        name,
+        phone,
+        transactionId,
+        purchaseTracking?.couponCode,
+        purchaseTracking?.utmCampaign,
+      ); break;
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId, sum); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;

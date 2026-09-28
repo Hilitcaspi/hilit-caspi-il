@@ -54,8 +54,14 @@ const SESSION_FLOW = [
 export default function SingleSessionSales() {
   const [scrolled, setScrolled] = useState(false);
   const query = new URLSearchParams(window.location.search);
-  const plusCoupon = query.get("coupon")?.toUpperCase() === "PLUS50" ? "PLUS50" : undefined;
-  const plusEmail = query.get("email") || undefined;
+  const requestedCoupon = query.get("coupon")?.toUpperCase();
+  const recoveryCoupon = requestedCoupon === "LOVE10"
+    ? "LOVE10"
+    : requestedCoupon === "PLUS50"
+      ? "PLUS50"
+      : undefined;
+  const isDiscounted = Boolean(recoveryCoupon);
+  const recoveryEmail = query.get("email") || undefined;
 
   useEffect(() => {
     gaViewItem("session");
@@ -76,7 +82,7 @@ export default function SingleSessionSales() {
           <Link href="/"><span className="text-white font-bold text-lg cursor-pointer hover:text-[#ffe27c] transition-colors">הילית כספי</span></Link>
           <button onClick={() => document.getElementById('session-wallet-hero')?.scrollIntoView({behavior:'smooth'})}
             className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105">
-            {plusCoupon ? "פגישת Plus ₪450" : "קביעת פגישה ₪500"}
+            {isDiscounted ? "פגישה בהטבה ₪450" : "קביעת פגישה ₪500"}
           </button>
         </div>
       </nav>
@@ -108,8 +114,8 @@ export default function SingleSessionSales() {
 
             {/* Pricing */}
             <div className="flex items-baseline gap-3 mb-4">
-              {plusCoupon && <span className="text-white/45 text-lg line-through">₪500</span>}
-              <span className="text-[#ffe27c] font-black text-3xl">{plusCoupon ? "₪450" : "₪500"}</span>
+              {isDiscounted && <span className="text-white/45 text-lg line-through">₪500</span>}
+              <span className="text-[#ffe27c] font-black text-3xl">{isDiscounted ? "₪450" : "₪500"}</span>
               <span className="text-white/50 text-base">לפגישה אחת של 60 דקות</span>
             </div>
 
@@ -126,17 +132,19 @@ export default function SingleSessionSales() {
             </p>
 
             <div id="session-wallet-hero" className="mt-2">
-              {plusCoupon && (
+              {recoveryCoupon && (
                 <div className="mb-3 rounded-xl border border-[#ffe27c]/60 bg-[#ffe27c]/15 px-4 py-3 text-sm font-bold text-[#ffe27c]">
-                  הטבת Plus: 50 ש״ח הנחה. הקופון יאומת לפי מייל המנוי.
+                  {recoveryCoupon === "PLUS50"
+                    ? "הטבת Plus: 50 ש״ח הנחה. הקופון יאומת לפי מייל המנוי."
+                    : "הטבת LOVE10: עשרה אחוזי הנחה. הקוד יופעל אוטומטית לאחר הזנת המייל."}
                 </div>
               )}
               <GrowWallet
                 product="session"
                 buttonLabel="קביעת פגישה עכשיו"
                 termsPath="/terms/single-session"
-                prefillEmail={plusEmail}
-                prefillCoupon={plusCoupon}
+                prefillEmail={recoveryEmail}
+                prefillCoupon={recoveryCoupon}
                 onSuccess={() => { window.location.href = "/thank-you/session"; }}
               />
             </div>
@@ -306,10 +314,10 @@ export default function SingleSessionSales() {
             <motion.div variants={fadeUp}>
               <GrowWallet
                 product="session"
-                buttonLabel={plusCoupon ? "קביעת פגישת Plus עכשיו ₪450" : "קביעת פגישה עכשיו ₪500"}
+                buttonLabel={isDiscounted ? "קביעת פגישה עכשיו ₪450" : "קביעת פגישה עכשיו ₪500"}
                 termsPath="/terms/single-session"
-                prefillEmail={plusEmail}
-                prefillCoupon={plusCoupon}
+                prefillEmail={recoveryEmail}
+                prefillCoupon={recoveryCoupon}
                 onSuccess={() => { window.location.href = "/thank-you/session"; }}
               />
             </motion.div>

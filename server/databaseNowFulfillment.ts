@@ -1,6 +1,6 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { crmTeamTasks, paymentLeads } from "../drizzle/schema";
-import { DATABASE_NOW_COUPON } from "../shared/databaseHolidayNow";
+import { isDatabaseNowAttribution } from "../shared/databaseHolidayNow";
 import { getDb } from "./db";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -30,24 +30,32 @@ export async function ensureDatabaseNowMatchTask(input: {
   email: string;
   eligibleAt: number;
   couponCode?: string | null;
+  utmCampaign?: string | null;
 }) {
   const db = await getDb();
   if (!db) return { created: false, reason: "db_unavailable" as const };
   let couponCode = input.couponCode?.trim().toUpperCase() || null;
+  let utmCampaign = input.utmCampaign?.trim() || null;
 
-  if (!couponCode) {
-    const [purchase] = await db.select({ couponCode: paymentLeads.couponCode })
+  if (!isDatabaseNowAttribution({ couponCode, utmCampaign })) {
+    const [purchase] = await db.select({
+      couponCode: paymentLeads.couponCode,
+      utmCampaign: paymentLeads.utmCampaign,
+    })
       .from(paymentLeads)
       .where(and(
         eq(paymentLeads.email, input.email.trim().toLowerCase()),
         eq(paymentLeads.product, "database"),
-        eq(paymentLeads.couponCode, DATABASE_NOW_COUPON),
       ))
+      .orderBy(desc(paymentLeads.createdAt))
       .limit(1);
     couponCode = purchase?.couponCode?.trim().toUpperCase() || null;
+    utmCampaign = purchase?.utmCampaign?.trim() || null;
   }
 
-  if (couponCode !== DATABASE_NOW_COUPON) return { created: false, reason: "not_now_purchase" as const };
+  if (!isDatabaseNowAttribution({ couponCode, utmCampaign })) {
+    return { created: false, reason: "not_now_purchase" as const };
+  }
 
   const [existing] = await db.select({ id: crmTeamTasks.id })
     .from(crmTeamTasks)
@@ -65,7 +73,7 @@ export async function ensureDatabaseNowMatchTask(input: {
     singleId: input.singleId,
     taskType: "match_review",
     title: DATABASE_NOW_TASK_TITLE,
-    description: "רכישת מאגר עם קוד NOW. יש לשלוח הצעת התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון.",
+    description: "רכישת מאגר דרך הצעת NOW. יש לשלוח הצעת התאמה ראשונה בתוך 3 ימים מהשלמת הפרופיל והשאלון.",
     priority: "urgent",
     status: "todo",
     dueAt,
