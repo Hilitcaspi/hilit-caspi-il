@@ -23,6 +23,8 @@ describe("Boost dual-approval messaging", () => {
     const email = buildMatchProposalEmail({ ...baseParams, boostRole: "recipient" });
     expect(email.subject).toContain("נשלחה אליך התאמת Boost לאישור");
     expect(email.htmlBody).toContain("נשלחה אליך התאמת Boost שמחכה לאישור שלך");
+    expect(email.htmlBody).toContain("זו התאמה שהגיעה אליך דרך שירות Boost");
+    expect(email.htmlBody).toContain("לא נבחרה ונשלחה אישית על ידי הילית");
     expect(email.htmlBody).toContain("נשלחה אליך התאמה במסגרת מסלול Boost");
     expect(email.htmlBody).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
     expect(email.htmlBody).toContain(baseParams.yesUrl);

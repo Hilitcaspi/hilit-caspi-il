@@ -1358,6 +1358,12 @@ export function buildMatchProposalEmail(params: {
       <p style="font-size:13px; color:#191265; font-weight:700; margin:0;">📌 את התגובה יש להזין בתחתית המייל</p>
     </div>
 
+    ${isBoost ? `
+    <div style="background:#f3ecff; border:2px solid #8b65c9; border-radius:14px; padding:18px 22px; margin-bottom:20px; text-align:center;">
+      <p style="font-size:17px; color:#4f287e; font-weight:900; margin:0 0 6px;">⚡ ${isBoostSender ? "זו בקשת ה־Boost שבחרת לשלוח" : "זו התאמה שהגיעה אליך דרך שירות Boost"}</p>
+      <p style="font-size:13px; color:#5f4a73; line-height:1.7; margin:0;">${isBoostSender ? "ההצעה נשלחה לשני הצדדים, וגם האישור שלך נדרש כעת." : "ההצעה נשלחה במסגרת Boost על ידי חבר או חברת המאגר, ולא נבחרה ונשלחה אישית על ידי הילית."}</p>
+    </div>` : ""}
+
     <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה ומחכה לאישור שלך" : "נשלחה אליך התאמת Boost שמחכה לאישור שלך") : "יש לך הצעה"}, ${params.firstName} 💛</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
       ${isBoost

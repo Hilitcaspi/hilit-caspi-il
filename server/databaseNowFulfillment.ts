@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { crmTeamTasks, paymentLeads } from "../drizzle/schema";
-import { isDatabaseNowAttribution } from "../shared/databaseHolidayNow";
+import { isDatabaseNowCoupon } from "../shared/databaseHolidayNow";
 import { getDb } from "./db";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -30,18 +30,13 @@ export async function ensureDatabaseNowMatchTask(input: {
   email: string;
   eligibleAt: number;
   couponCode?: string | null;
-  utmCampaign?: string | null;
 }) {
   const db = await getDb();
   if (!db) return { created: false, reason: "db_unavailable" as const };
   let couponCode = input.couponCode?.trim().toUpperCase() || null;
-  let utmCampaign = input.utmCampaign?.trim() || null;
 
-  if (!isDatabaseNowAttribution({ couponCode, utmCampaign })) {
-    const [purchase] = await db.select({
-      couponCode: paymentLeads.couponCode,
-      utmCampaign: paymentLeads.utmCampaign,
-    })
+  if (!isDatabaseNowCoupon(couponCode)) {
+    const [purchase] = await db.select({ couponCode: paymentLeads.couponCode })
       .from(paymentLeads)
       .where(and(
         eq(paymentLeads.email, input.email.trim().toLowerCase()),
@@ -50,10 +45,9 @@ export async function ensureDatabaseNowMatchTask(input: {
       .orderBy(desc(paymentLeads.createdAt))
       .limit(1);
     couponCode = purchase?.couponCode?.trim().toUpperCase() || null;
-    utmCampaign = purchase?.utmCampaign?.trim() || null;
   }
 
-  if (!isDatabaseNowAttribution({ couponCode, utmCampaign })) {
+  if (!isDatabaseNowCoupon(couponCode)) {
     return { created: false, reason: "not_now_purchase" as const };
   }
 

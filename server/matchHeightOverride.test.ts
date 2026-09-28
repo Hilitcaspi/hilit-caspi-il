@@ -33,33 +33,34 @@ const female = {
   smokingPreference: "doesnt_matter",
 } as any;
 
-describe("explicit height-only admin override", () => {
+describe("explicit admin criteria override", () => {
   it("keeps the match blocked without explicit approval", () => {
     const result = computeFullScoreForAdminSend(male, female, [], [], false);
     expect(result.breakdown.total).toBe(0);
-    expect(result.heightOverrideApplied).toBe(false);
+    expect(result.criteriaOverrideApplied).toBe(false);
   });
 
-  it("allows a one-off match when height is the only blocker", () => {
+  it("allows a one-off match when height is a blocker", () => {
     const result = computeFullScoreForAdminSend(male, female, [], [], true);
     expect(result.breakdown.total).toBeGreaterThan(0);
-    expect(result.heightOverrideApplied).toBe(true);
+    expect(result.criteriaOverrideApplied).toBe(true);
     expect(result.warnings.join(" ")).toContain("גובה");
   });
 
-  it("does not override a non-height blocker that appears before height", () => {
+  it("allows a confirmed age or other preference override", () => {
     const result = computeFullScoreForAdminSend(
-      { ...male, religiosity: "orthodox" },
-      female,
+      { ...male, maxAgePreference: 35 },
+      { ...female, height: 170 },
       [],
       [],
       true,
     );
-    expect(result.breakdown.total).toBe(0);
-    expect(result.heightOverrideApplied).toBe(false);
+    expect(result.breakdown.total).toBeGreaterThan(0);
+    expect(result.criteriaOverrideApplied).toBe(true);
+    expect(result.warnings.join(" ")).toContain("גיל");
   });
 
-  it("does not hide another blocker that appears after the height check", () => {
+  it("can retain multiple manual preference warnings without weakening normal scoring", () => {
     const result = computeFullScoreForAdminSend(
       { ...male, wantsKids: "no" },
       { ...female, wantsKids: "yes" },
@@ -67,8 +68,20 @@ describe("explicit height-only admin override", () => {
       [],
       true,
     );
+    expect(result.breakdown.total).toBeGreaterThan(0);
+    expect(result.criteriaOverrideApplied).toBe(true);
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("never overrides an incompatible requested gender", () => {
+    const result = computeFullScoreForAdminSend(
+      { ...male, seekingGender: "male" },
+      female,
+      [],
+      [],
+      true,
+    );
     expect(result.breakdown.total).toBe(0);
-    expect(result.heightOverrideApplied).toBe(false);
-    expect(result.breakdown.details.join(" ")).toContain("ילדים");
+    expect(result.criteriaOverrideApplied).toBe(false);
   });
 });

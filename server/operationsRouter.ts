@@ -5,7 +5,7 @@ import { crmTeamTasks, discountCodes, partnerSources, singles } from "../drizzle
 import { getDb } from "./db";
 import { router, teamProcedure } from "./_core/trpc";
 import { buildPartnerTrackingUrl, canAssignTask, canEditTask } from "./operationsPolicy";
-import { DATABASE_NOW_CAMPAIGN, DATABASE_NOW_COUPON } from "../shared/databaseHolidayNow";
+import { DATABASE_NOW_COUPON } from "../shared/databaseHolidayNow";
 import { databaseNowDueAt, databaseNowSlaState, DATABASE_NOW_TASK_CREATED_BY } from "./databaseNowFulfillment";
 
 const TASK_TYPES = ["match_review", "followup", "call", "feedback", "profile", "plus", "partner", "event", "other"] as const;
@@ -77,10 +77,7 @@ export const operationsRouter = router({
           MAX(utm_campaign) AS utm_campaign
         FROM completed_payments
         WHERE product = 'database'
-          AND (
-            UPPER(TRIM(COALESCE(coupon_code, ''))) = ${DATABASE_NOW_COUPON}
-            OR LOWER(TRIM(COALESCE(utm_campaign, ''))) = ${DATABASE_NOW_CAMPAIGN.toLowerCase()}
-          )
+          AND UPPER(TRIM(COALESCE(coupon_code, ''))) = ${DATABASE_NOW_COUPON}
         GROUP BY LOWER(TRIM(email))
       ), ranked_singles AS (
         SELECT

@@ -2826,6 +2826,9 @@ export const appRouter = router({
             const otherId = isA ? m.singleBId : m.singleAId;
             const myConsent = isA ? m.approvedByA : m.approvedByB;
             const theirConsent = isA ? m.approvedByB : m.approvedByA;
+            const proposalSource = String(m.autoExplanation || "").startsWith("[BOOST]") || String(m.notes || "").startsWith("[BOOST_SENT]")
+              ? "boost" as const
+              : "regular" as const;
             if (m.status === 'matched' && m.approvedByA && m.approvedByB) {
              const [other] = await db.select({
                firstName: singles.firstName,
@@ -2837,7 +2840,7 @@ export const appRouter = router({
                phone: singles.phone,
                email: singles.email,
               }).from(singles).where(eq(singles.id, otherId)).limit(1);
-              return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: other || null, contactRevealed: true, returnedToPoolAt: m.returnedToPoolAt };
+              return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: other || null, contactRevealed: true, returnedToPoolAt: m.returnedToPoolAt, proposalSource };
             }
             if (m.status === 'proposed') {
              const [other] = await db.select({
@@ -2847,15 +2850,19 @@ export const appRouter = router({
                dnaType: singles.dnaType,
                photoUrl: singles.photoUrl,
               }).from(singles).where(eq(singles.id, otherId)).limit(1);
-              return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: other || null, contactRevealed: false, returnedToPoolAt: m.returnedToPoolAt };
+              return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: other || null, contactRevealed: false, returnedToPoolAt: m.returnedToPoolAt, proposalSource };
             }
-            return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: null, contactRevealed: false, returnedToPoolAt: m.returnedToPoolAt };
+            return { matchId: m.id, status: m.status, score: m.score, proposedAt: m.proposedAt, myConsent, theirConsent, approvalExpiresAt: m.approvalExpiresAt, other: null, contactRevealed: false, returnedToPoolAt: m.returnedToPoolAt, proposalSource };
           })
         );
         const [dnaResult] = await db.select().from(dnaQuizResults)
           .where(eq(dnaQuizResults.singleId, profile.id))
           .orderBy(desc(dnaQuizResults.createdAt))
           .limit(1);
+        const [plusMembership] = await db.select({
+          status: plusPilotMembers.status,
+          billingStatus: plusPilotMembers.billingStatus,
+        }).from(plusPilotMembers).where(eq(plusPilotMembers.singleId, profile.id)).limit(1);
         return {
           profile: {
             id: profile.id,
@@ -2898,6 +2905,7 @@ export const appRouter = router({
             questionnaireCompletedAt: profile.questionnaireCompletedAt,
             createdAt: profile.createdAt,
             email: profile.email,
+            plusApproved: plusMembership?.status === "active" && plusMembership?.billingStatus === "active",
           },
           matches: enrichedMatches,
           dnaResult: dnaResult ? { dnaType: dnaResult.dnaType, scores: dnaResult.scores, createdAt: dnaResult.createdAt } : null,
@@ -3022,7 +3030,7 @@ export const appRouter = router({
         idA: z.number(),
         idB: z.number(),
         hilitsNote: z.string().optional(),
-        allowHeightOverride: z.boolean().optional().default(false),
+        allowCriteriaOverride: z.boolean().optional().default(false),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -3087,12 +3095,12 @@ export const appRouter = router({
         const answersB = await db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleB.id)).limit(1);
         const parsedA: MatchAnswer[] = answersA[0]?.answersJson ? (typeof answersA[0].answersJson === 'string' ? JSON.parse(answersA[0].answersJson) : answersA[0].answersJson as MatchAnswer[]) : [];
         const parsedB: MatchAnswer[] = answersB[0]?.answersJson ? (typeof answersB[0].answersJson === 'string' ? JSON.parse(answersB[0].answersJson) : answersB[0].answersJson as MatchAnswer[]) : [];
-        const { breakdown, heightOverrideApplied } = computeFullScoreForAdminSend(
+        const { breakdown, criteriaOverrideApplied, warnings } = computeFullScoreForAdminSend(
           singleA as any,
           singleB as any,
           parsedA,
           parsedB,
-          input.allowHeightOverride,
+          input.allowCriteriaOverride,
         );
         if (breakdown.total === 0) {
           throw new TRPCError({
@@ -3109,7 +3117,9 @@ export const appRouter = router({
           await db.update(matches).set({
             status: "pending",
             score,
-            notes: heightOverrideApplied ? "[HEIGHT_OVERRIDE] Admin-approved one-off match" : existingMatch[0].notes,
+            notes: criteriaOverrideApplied
+              ? `[CRITERIA_OVERRIDE] ${warnings.join(" | ") || "Admin-approved one-off match"}`
+              : existingMatch[0].notes,
             updatedAt: Date.now(),
           }).where(eq(matches.id, matchId));
         } else {
@@ -3120,7 +3130,9 @@ export const appRouter = router({
             singleBId: input.idB,
             score,
             status: "pending",
-            notes: heightOverrideApplied ? "[HEIGHT_OVERRIDE] Admin-approved one-off match" : null,
+            notes: criteriaOverrideApplied
+              ? `[CRITERIA_OVERRIDE] ${warnings.join(" | ") || "Admin-approved one-off match"}`
+              : null,
             updatedAt: Date.now(),
           }).$returningId();
           matchId = inserted.id;
@@ -3218,7 +3230,10 @@ export const appRouter = router({
           outcome: "completed",
           actorHash: hashActor(ctx),
           occurredAt: now,
-          metadata: { mode: heightOverrideApplied ? "height_override" : "standard" },
+          metadata: {
+            mode: criteriaOverrideApplied ? "criteria_override" : "standard",
+            warnings: criteriaOverrideApplied ? warnings : [],
+          },
         });
 
         return { success: true, matchId, score };
@@ -4930,7 +4945,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) return [];
-      const [singleRows, boostRows] = await Promise.all([
+      const [singleRows, boostRows, plusRows] = await Promise.all([
         db.select().from(singles)
           .where(and(eq(singles.isSeed, false), eq(singles.isActive, true)))
           .orderBy(desc(singles.createdAt)),
@@ -4940,13 +4955,21 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           consentedAt: matchBoostMemberships.consentedAt,
           consentVersion: matchBoostMemberships.consentVersion,
         }).from(matchBoostMemberships),
+        db.select({
+          singleId: plusPilotMembers.singleId,
+          status: plusPilotMembers.status,
+          billingStatus: plusPilotMembers.billingStatus,
+        }).from(plusPilotMembers),
       ]);
       const boostBySingle = new Map(boostRows.map(row => [row.singleId, row]));
+      const plusBySingle = new Map(plusRows.map(row => [row.singleId, row]));
       return singleRows.map(single => ({
         ...single,
         boostStatus: boostBySingle.get(single.id)?.status ?? null,
         boostConsentedAt: boostBySingle.get(single.id)?.consentedAt ?? null,
         boostConsentVersion: boostBySingle.get(single.id)?.consentVersion ?? null,
+        plusStatus: plusBySingle.get(single.id)?.status ?? null,
+        plusBillingStatus: plusBySingle.get(single.id)?.billingStatus ?? null,
       }));
     }),
 
@@ -5070,6 +5093,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const b = singleMap.get(m.singleBId);
         return {
           ...m,
+          proposalSource: String(m.autoExplanation || "").startsWith("[BOOST]") || String(m.notes || "").startsWith("[BOOST_SENT]") ? "boost" as const : "regular" as const,
           outcomeFeedback: parseMatchOutcomeNotes(m.notes),
           singleAName: a ? `${a.firstName} ${a.lastName || ""}`.trim() : undefined,
           singleBName: b ? `${b.firstName} ${b.lastName || ""}`.trim() : undefined,

@@ -706,10 +706,17 @@ function MatchCard({ match, email, token }: { match: any; email: string; token: 
   return (
     <div className="bg-white rounded-2xl border border-[#e9e8e8] overflow-hidden">
       <div className="p-4 flex items-center justify-between border-b border-[#f5f5f5]">
-        <span className="text-xs font-bold px-3 py-1.5 rounded-full"
-          style={{ background: statusInfo.bg, color: statusInfo.color }}>
-          {statusInfo.icon} {statusInfo.label}
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold px-3 py-1.5 rounded-full"
+            style={{ background: statusInfo.bg, color: statusInfo.color }}>
+            {statusInfo.icon} {statusInfo.label}
+          </span>
+          {match.proposalSource === "boost" && (
+            <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 text-[11px] font-black text-fuchsia-800">
+              ⚡ נשלחה ב־Boost
+            </span>
+          )}
+        </div>
         {match.score && (
           <span className="text-xs text-[#727272]">
             התאמה: <strong className="text-[#191265]">{Math.round(match.score)}%</strong>
@@ -1161,6 +1168,11 @@ export default function UserDashboard() {
             <p className="text-white/60 text-sm">
               {profile.isActive ? "הפרופיל שלך פעיל במאגר" : "ממתין/ה להשלמת הרישום"}
             </p>
+            {profile.plusApproved && (
+              <span className="mt-2 inline-flex rounded-full bg-[#ffe27c] px-3 py-1 text-xs font-black text-[#191265]">
+                ✓ מאושר Plus
+              </span>
+            )}
           </div>
         </div>
 

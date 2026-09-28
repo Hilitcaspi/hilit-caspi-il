@@ -66,6 +66,14 @@ const GENDER_LABELS: Record<string, string> = {
 // Helper: display age safely, 0 means unknown
 const displayAge = (age: number | null | undefined) => (!age || age === 0) ? "?" : age;
 
+function buildWhatsAppUrl(phone: string | null | undefined, message: string) {
+  let digits = String(phone || "").replace(/\D/g, "");
+  if (digits.startsWith("00972")) digits = digits.slice(2);
+  if (digits.startsWith("0")) digits = `972${digits.slice(1)}`;
+  if (!digits.startsWith("972") || digits.length < 11 || digits.length > 13) return null;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
 const MATCH_STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   pending:  { label: "ממתין",   color: "bg-yellow-100 text-yellow-800", icon: "⏳" },
   proposed: { label: "נשלח",    color: "bg-blue-100 text-blue-800",     icon: "📨" },
@@ -610,6 +618,7 @@ export default function CRMMatchmaking() {
     minHeightPreference?: number | null; maxHeightPreference?: number | null;
     questionnaireCompletedAt?: number | null; questionnaireToken?: string | null;
     plusStatus?: string | null; plusBillingStatus?: string | null; plusPremiumSupport?: boolean;
+    boostStatus?: string | null; isCoachingClient?: boolean; isNotBasic?: boolean;
   }>;
 
   const typedMatches = pendingMatches as Array<{
@@ -639,6 +648,8 @@ export default function CRMMatchmaking() {
     singleBMinAge?: number | null; singleBMaxAge?: number | null;
     scoreBreakdown?: string | null;
     autoExplanation?: string | null;
+    notes?: string | null;
+    proposalSource?: "regular" | "boost";
     matchedAt?: number | null;
     followUpSentAt?: number | null;
     matchDetailStatus?: string | null;
@@ -708,11 +719,11 @@ export default function CRMMatchmaking() {
     return { aBlocked: !!aBlocked, bBlocked: !!bBlocked, blockedPersons, maxHoursLeft: Math.max(...blockedPersons.map(p => p.hoursLeft)) };
   };
   // Map: singleId -> proposals that were actually delivered or exposed to a participant.
-  const matchHistoryBySingleId = new Map<number, Array<{ matchId: number; opponentName: string; status: string; score?: number | null; proposedAt?: number | null; opponentPhotoUrl?: string | null; returnedToPoolAt?: number | null }>>();
+  const matchHistoryBySingleId = new Map<number, Array<{ matchId: number; opponentName: string; status: string; score?: number | null; proposedAt?: number | null; opponentPhotoUrl?: string | null; returnedToPoolAt?: number | null; proposalSource?: "regular" | "boost" }>>();
   typedMatches.filter(wasMatchProposalSent).forEach(m => {
     const addToHistory = (singleId: number, opponentName: string, opponentPhotoUrl: string | null | undefined) => {
       const existing = matchHistoryBySingleId.get(singleId) || [];
-      existing.push({ matchId: m.id, opponentName, status: m.status, score: m.score, proposedAt: m.proposedAt as number | null, opponentPhotoUrl, returnedToPoolAt: m.returnedToPoolAt });
+      existing.push({ matchId: m.id, opponentName, status: m.status, score: m.score, proposedAt: m.proposedAt as number | null, opponentPhotoUrl, returnedToPoolAt: m.returnedToPoolAt, proposalSource: m.proposalSource });
       matchHistoryBySingleId.set(singleId, existing);
     };
     addToHistory(m.singleAId, m.singleBName || "?", m.singleBPhotoUrl);
@@ -740,6 +751,11 @@ export default function CRMMatchmaking() {
   // IDs of singles currently in a "matched" match (not just proposed)
   const matchedSingleIds = new Set<number>(
     typedMatches.filter(m => m.status === "matched" && !m.returnedToPoolAt).flatMap(m => [m.singleAId, m.singleBId])
+  );
+  const unavailableForNewMatchIds = new Set<number>(
+    typedMatches
+      .filter(m => m.status === "proposed" || (m.status === "matched" && !m.returnedToPoolAt && m.matchDetailStatus !== "ended"))
+      .flatMap(m => [m.singleAId, m.singleBId])
   );
 
   // Pending tab: only show score >= 70, hide if either person is in active match OR already matched
@@ -1213,6 +1229,28 @@ export default function CRMMatchmaking() {
                       </div>
                     </div>
 
+                    {single.plusStatus === "active" && single.plusBillingStatus === "active" && (
+                      <div className="mt-3 rounded-xl border border-[#d9c36e] bg-[#fff9df] px-3 py-2 text-xs font-bold text-[#191265]">
+                        ✓ מאושר Plus — מנוי Database Plus פעיל
+                      </div>
+                    )}
+
+                    {single.phone && single.questionnaireToken && (() => {
+                      const updateUrl = `https://hilitcaspi.com/my-profile?email=${encodeURIComponent(single.email || "")}&token=${encodeURIComponent(single.questionnaireToken)}&tab=profile`;
+                      const message = `היי ${single.firstName}, כדי שנוכל להמשיך לדייק עבורך את ההתאמות במאגר של הילית כספי, אשמח שתעבור/י על הפרטים בפרופיל ותעדכן/י כל מה שהשתנה: ${updateUrl}`;
+                      const whatsappUrl = buildWhatsAppUrl(single.phone, message);
+                      return whatsappUrl ? (
+                        <a
+                          href={whatsappUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] px-3 py-2 text-xs font-black text-white transition-colors hover:bg-[#1da851]"
+                        >
+                          💬 בקשת עדכון פרטים ב־WhatsApp
+                        </a>
+                      ) : null;
+                    })()}
+
                     {(single as any).boostStatus === "active" && (
                       <div className="mt-3 rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-3 py-2 text-xs font-bold text-fuchsia-800">
                         ✓ אישור Boost פעיל בפרופיל
@@ -1463,6 +1501,9 @@ export default function CRMMatchmaking() {
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   {h.score != null && (
                                     <span className="bg-[#ffe27c] text-[#191265] font-black text-[10px] px-1.5 py-0.5 rounded-full">{Math.round(h.score)}%</span>
+                                  )}
+                                  {h.proposalSource === "boost" && (
+                                    <span className="rounded-full bg-fuchsia-100 px-1.5 py-0.5 text-[10px] font-bold text-fuchsia-800">⚡ Boost</span>
                                   )}
                                   {h.proposedAt && (
                                     <span className="text-[#727272] text-[10px]">{new Date(h.proposedAt as number).toLocaleDateString("he-IL")}</span>
@@ -2634,7 +2675,7 @@ export default function CRMMatchmaking() {
               if (compatPersonA === compatPersonB) { toast.error("בחר/י שני אנשים שונים"); return; }
               checkCompatMutation.mutate({ idA: compatPersonA, idB: compatPersonB });
             }}
-            onSendMatch={() => {
+            onSendMatch={(allowCriteriaOverride = false) => {
               if (compatResult?.matchId) {
                 // Match record already exists — use approveMatch
                 approveMatch.mutate({ matchId: compatResult.matchId, hilitsNote: "" }, {
@@ -2644,7 +2685,7 @@ export default function CRMMatchmaking() {
                 });
               } else if (compatPersonA && compatPersonB) {
                 // No match record yet — create and send directly
-                createAndSendMatch.mutate({ idA: compatPersonA, idB: compatPersonB });
+                createAndSendMatch.mutate({ idA: compatPersonA, idB: compatPersonB, allowCriteriaOverride });
               }
             }}
             canSendDirectly={!!(compatPersonA && compatPersonB)}
@@ -2720,6 +2761,7 @@ export default function CRMMatchmaking() {
         {activeTab === "filter_search" && (() => {
           const allSinglesForFilter = typedSingles;
           const filteredResultsRaw = allSinglesForFilter.filter(s => {
+            if (filterCompatTarget && (s.id === filterCompatTarget || unavailableForNewMatchIds.has(s.id))) return false;
             if (filterGender && s.gender !== filterGender) return false;
             if (filterMinAge && s.age < parseInt(filterMinAge)) return false;
             if (filterMaxAge && s.age > parseInt(filterMaxAge)) return false;
@@ -2935,8 +2977,10 @@ export default function CRMMatchmaking() {
                               </span>
                             )}
                             {single.photoUrl && (
-                              <img src={single.photoUrl} alt={single.firstName}
-                                className="w-8 h-8 rounded-full object-cover border-2 border-[#191265]/20" />
+                              <button type="button" onClick={() => setLightboxUrl(single.photoUrl!)} title="הגדל תמונה" className="focus:outline-none">
+                                <img src={single.photoUrl} alt={single.firstName}
+                                  className="w-10 h-10 rounded-full object-cover object-[center_20%] border-2 border-[#191265]/20 hover:border-[#ffe27c] cursor-zoom-in transition-colors" />
+                              </button>
                             )}
                             <span className="font-bold text-[#191265]">{single.firstName} {single.lastName || ""}</span>
                             <Badge className="text-xs bg-[#191265]/10 text-[#191265]">{GENDER_LABELS[single.gender] || single.gender}</Badge>
@@ -2944,6 +2988,10 @@ export default function CRMMatchmaking() {
                             {single.city && <span className="text-sm text-[#727272]">📍 {single.city}</span>}
                             {single.religiosity && <Badge className="text-xs bg-[#f0eadc] text-[#191265]">{RELIGIOSITY_LABELS[single.religiosity] || single.religiosity}</Badge>}
                             {single.dnaType && <Badge className="text-xs bg-[#ffe27c]/50 text-[#191265]">{DNA_LABELS[single.dnaType] || single.dnaType}</Badge>}
+                            {single.isCoachingClient && <span className="text-[10px] rounded-full bg-pink-100 px-2 py-1 font-bold text-pink-800">💜 מלווה</span>}
+                            {single.isNotBasic && <span className="text-[10px] rounded-full bg-amber-100 px-2 py-1 font-bold text-amber-800">⭐ דורש תשומת לב</span>}
+                            {single.boostStatus === "active" && <span className="text-[10px] rounded-full bg-fuchsia-100 px-2 py-1 font-bold text-fuchsia-800">✓ מאושר Boost</span>}
+                            {single.plusStatus === "active" && single.plusBillingStatus === "active" && <span className="text-[10px] rounded-full bg-[#191265] px-2 py-1 font-black text-[#ffe27c]">PLUS</span>}
                           </div>
                           <div className="flex gap-3 mt-1 text-xs text-[#727272] flex-wrap">
                             {single.email && <span>✉️ {single.email}</span>}
@@ -2982,15 +3030,25 @@ export default function CRMMatchmaking() {
                                   })}
                                 </div>
                               )}
+                              {Array.isArray(compatData.warnings) && compatData.warnings.length > 0 && (
+                                <div className="max-w-xs rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-right">
+                                  <p className="text-[10px] font-black text-amber-800">⚠️ חריגת קריטריונים</p>
+                                  {compatData.warnings.map((warning: string, index: number) => (
+                                    <p key={index} className="text-[10px] text-amber-700">{warning}</p>
+                                  ))}
+                                </div>
+                              )}
                               {/* Send match button */}
                               {filterCompatTarget && filterCompatTarget !== single.id && !compatData.alreadySent && (
                                 <button
                                   onClick={() => {
-                                    if (window.confirm(`לשלוח התאמה בין ${typedSingles.find(s => s.id === filterCompatTarget)?.firstName} ל-${single.firstName}?`)) {
+                                    const warnings = Array.isArray(compatData.warnings) ? compatData.warnings : [];
+                                    const warningText = warnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${warnings.join("\n")}` : "";
+                                    if (window.confirm(`לשלוח התאמה בין ${typedSingles.find(s => s.id === filterCompatTarget)?.firstName} ל-${single.firstName}?${warningText}`)) {
                                       if (compatData.matchId) {
                                         approveMatch.mutate({ matchId: compatData.matchId, hilitsNote: "" });
                                       } else {
-                                        createAndSendMatch.mutate({ idA: filterCompatTarget, idB: single.id });
+                                        createAndSendMatch.mutate({ idA: filterCompatTarget, idB: single.id, allowCriteriaOverride: warnings.length > 0 });
                                       }
                                     }
                                   }}
@@ -2998,7 +3056,7 @@ export default function CRMMatchmaking() {
                                   className="text-xs bg-[#191265] text-white font-bold px-3 py-1.5 rounded-full hover:bg-[#1800ad] transition-colors disabled:opacity-50 flex items-center gap-1"
                                 >
                                   <Send size={10} />
-                                  שלח התאמה
+                                  {Array.isArray(compatData.warnings) && compatData.warnings.length > 0 ? "אשר חריגה ושלח" : "שלח התאמה"}
                                 </button>
                               )}
                               {compatData.alreadySent && (
@@ -3345,7 +3403,7 @@ interface CompatibilityCheckTabProps {
   compatResult: any;
   isLoading: boolean;
   onCheck: () => void;
-  onSendMatch: () => void;
+  onSendMatch: (allowCriteriaOverride?: boolean) => void;
   isSendingMatch: boolean;
   canSendDirectly?: boolean;
 }
@@ -3659,8 +3717,10 @@ function CompatibilityCheckTab({
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <button
                 onClick={() => {
-                  if (window.confirm(`לשלוח התאמה בין ${compatResult.personA?.firstName || ''} ל-${compatResult.personB?.firstName || ''}?`)) {
-                    onSendMatch();
+                  const warnings = Array.isArray(compatResult.warnings) ? compatResult.warnings : [];
+                  const warningText = warnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${warnings.join("\n")}` : "";
+                  if (window.confirm(`לשלוח התאמה בין ${compatResult.personA?.firstName || ''} ל-${compatResult.personB?.firstName || ''}?${warningText}`)) {
+                    onSendMatch(warnings.length > 0);
                   }
                 }}
                 disabled={isSendingMatch || compatResult.matchStatus === 'proposed' || compatResult.matchStatus === 'matched'}
@@ -3673,7 +3733,7 @@ function CompatibilityCheckTab({
                 ) : compatResult.matchStatus === 'matched' ? (
                   <><CheckCircle size={18} /> התאמה מאושרת!</>
                 ) : (
-                  <><Send size={18} /> שלח התאמה לשני הצדדים 💛</>
+                  <><Send size={18} /> {Array.isArray(compatResult.warnings) && compatResult.warnings.length > 0 ? "אשר חריגה ושלח לשני הצדדים" : "שלח התאמה לשני הצדדים 💛"}</>
                 )}
               </button>
               {(compatResult.matchStatus === 'proposed' || compatResult.matchStatus === 'matched') && (
@@ -3687,8 +3747,10 @@ function CompatibilityCheckTab({
                   <p className="text-center text-sm text-[#727272] mb-3">שליחת התאמה ישירה ללא הרצת אלגוריתם — הציון יחושב אוטומטית</p>
                   <button
                     onClick={() => {
-                      if (window.confirm('לשלוח התאמה ישירהת לשני האנשים האלה?')) {
-                        onSendMatch();
+                      const warnings = Array.isArray(compatResult.warnings) ? compatResult.warnings : [];
+                      const warningText = warnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${warnings.join("\n")}` : "";
+                      if (window.confirm(`לשלוח התאמה ישירה לשני האנשים האלה?${warningText}`)) {
+                        onSendMatch(warnings.length > 0);
                       }
                     }}
                     disabled={isSendingMatch}
@@ -3697,7 +3759,7 @@ function CompatibilityCheckTab({
                     {isSendingMatch ? (
                       <><RefreshCw size={18} className="animate-spin" /> שולח...</>
                     ) : (
-                      <><Send size={18} /> שלח התאמה לשני הצדדים 💛</>
+                      <><Send size={18} /> {Array.isArray(compatResult.warnings) && compatResult.warnings.length > 0 ? "אשר חריגה ושלח לשני הצדדים" : "שלח התאמה לשני הצדדים 💛"}</>
                     )}
                   </button>
                 </>

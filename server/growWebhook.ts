@@ -322,7 +322,6 @@ export async function handleDatabase(
   phone: string,
   transactionId: string = "",
   couponCode?: string | null,
-  utmCampaign?: string | null,
 ) {
   const db = await getDb();
   if (!db) return;
@@ -445,7 +444,6 @@ export async function handleDatabase(
       email: normalizedEmail,
       eligibleAt: now,
       couponCode,
-      utmCampaign,
     });
   }
 
@@ -929,7 +927,6 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
         phone,
         transactionId,
         purchaseTracking?.couponCode,
-        purchaseTracking?.utmCampaign,
       ); break;
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId, sum); break;
