@@ -1089,3 +1089,13 @@
 **Cost:** unavailable
 **Notes:** המספר 5 נכון לטאב הצר של התחייבות NOW; המספר 15 הוא כלל רכישות המאגר של 27.9. לא בוצע שינוי לוגיקה ולא נשלחה הודעה חיצונית.
 ---
+## Task: פירוק מקורות רכישות המאגר שאינן NOW ב־27.9
+**Category:** marketing
+**Trigger:** reactive/production issue
+**Continuation of:** בדיקת פער במספר רוכשי NOW בטאב
+**Before:** המשתמשת מבקשת לדעת מאילו מקורות הגיעו 10 רכישות המאגר של 27.9 שלא יוחסו לקוד NOW. יש להצליב completed payments, payment leads, CRM, UTM, לוגי מייל ונגיעות נוספות, להבחין בין מקור ודאי לבין מקור מסייע/לא ידוע, ולהציג רק מידע מצרפי ללא PII.
+**After (completed 2026-09-28 09:05 Asia/Jerusalem, duration 14m):** עשר הרכישות שאינן NOW פורקו כך: 6 מקורות Instagram בסך הכול — 3 מקישור הביו של המאגר, 1 מסטורי של המאגר ו־2 מקמפיין Instagram ממומן `sales_warm_audience` מודעה `ad_1`; 2 ממיילי Brevo של המאגר; 1 מקמפיין Meta ממומן `dna_cold_sep26` מודעת `ad4_coffe`; ו־1 מקבוצת WhatsApp של השקת Plus. לארבע הרכישות שבוצעו אחרי שליחת NOW יש UTM ישיר על העסקה ולכן הייחוס ודאי: Instagram Story, Instagram Bio, Meta DNA cold ומייל Database. שש הרכישות שבוצעו לפני קמפיין NOW חסרות UTM ברשומת העסקה ולכן הייחוס שלהן מבוסס על מקור ה־CRM ההיסטורי: 2 Instagram Bio, 2 Instagram paid warm, 1 מייל Database ו־1 WhatsApp Plus launch.
+**Status:** resolved
+**Cost:** unavailable
+**Notes:** אין לבצע שינוי בקמפיינים או שליחה חיצונית. חשוב להציג בדשבורד רמת ודאות: 4 עסקאות עם UTM ברכישה ו־6 עם מקור CRM היסטורי בלבד.
+---
