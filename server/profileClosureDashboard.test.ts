@@ -14,8 +14,11 @@ describe("profile closure dashboard", () => {
     expect(crm).not.toContain("deactivateSingle.mutate");
   });
 
-  it("does not allow the active badge to perform a partial deactivation", () => {
-    expect(crm).not.toContain("isActive: !single.isActive");
+  it("lets the active status control perform an explicit confirmed deactivation", () => {
+    expect(crm).toContain("להעביר את ${single.firstName} ללא פעילים?");
+    expect(crm).toContain("toggleActive.mutate({ singleId: single.id, isActive: false })");
+    expect(crm).toContain("הפרופיל הועבר ללא פעילים");
+    expect(crm).toContain("refetchInactive()");
     expect(crm).toContain('isActive: true');
     expect(crm).toContain("הפעל מחדש");
   });

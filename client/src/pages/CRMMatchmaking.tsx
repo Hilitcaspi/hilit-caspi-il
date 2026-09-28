@@ -494,7 +494,17 @@ export default function CRMMatchmaking() {
   });
 
   const toggleActive = trpc.matchmaking.toggleSingleActive.useMutation({
-    onSuccess: () => refetchSingles(),
+    onSuccess: async (_data, variables) => {
+      setSelectedSingle(null);
+      await Promise.all([
+        refetchSingles(),
+        refetchMatches(),
+        refetchUnmatched(),
+        refetchInactive(),
+      ]);
+      toast.success(variables.isActive ? "הפרופיל הופעל מחדש" : "הפרופיל הועבר ללא פעילים");
+    },
+    onError: (error) => toast.error(error?.message || "שגיאה בעדכון סטטוס הפרופיל"),
   });
 
   const releaseFromMatch = (trpc.matchmaking as any).releaseFromMatch.useMutation({
@@ -1072,7 +1082,21 @@ export default function CRMMatchmaking() {
                       {(single as any).isNotBasic ? "⭐ דורש תשומת לב" : "⭐"}
                     </button>
                     {single.isActive ? (
-                      <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700">✅ פעיל</span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (window.confirm(`להעביר את ${single.firstName} ללא פעילים? הפרופיל לא יקבל התאמות חדשות.`)) {
+                            toggleActive.mutate({ singleId: single.id, isActive: false });
+                          }
+                        }}
+                        disabled={toggleActive.isPending}
+                        className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 transition hover:bg-red-100 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-wait disabled:opacity-50"
+                        title="לחיצה מעבירה את הפרופיל ללא פעילים"
+                        aria-label={`השבתת הפרופיל של ${single.firstName}`}
+                      >
+                        {toggleActive.isPending ? "מעדכן…" : "✅ פעיל"}
+                      </button>
                     ) : (
                       <button
                         type="button"
