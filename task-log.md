@@ -1144,8 +1144,8 @@
 **Trigger:** reactive/production issue
 **Continuation of:** ניתוח כל נרשמי היום והמשך הטיפול
 **Before:** אותרו שני ניסיונות תשלום מהיום שלא הושלמו. המשתמשת אישרה לשלוח לשניהם מייל שחזור עם קוד LOVE10, וביקשה שכל רכישה שהגיעה מקמפיין NOW תיכנס אוטומטית לטאב NOW גם אם הקונה השתמש בקוד אחר או לא השתמש בקוד. יש לאמת מחדש ששני הניסיונות עדיין פתוחים, את תוקף והטבת LOVE10, הסרה מדיוור וכפילות; לבנות מייל אישי עם קישור תשלום תקין; ולעדכן את webhook, משימת ה־SLA ושאילתת הטאב להשתמש בייחוס UTM של NOW בנוסף לקופון. הקבצים הצפויים: `shared/databaseHolidayNow.ts`, `server/growWebhook.ts`, `server/databaseNowFulfillment.ts`, `server/operationsRouter.ts`, בדיקות רגרסיה ו־task-log.md.
-**After:** pending
-**Status:** stopped/restarted
+**After (completed 2026-09-28 16:55 Asia/Jerusalem, duration 13m):** בדיקת המקור הראתה ששני הניסיונות הפתוחים לא היו שתי רכישות מאגר: אחד היה ניסיון לפגישה אישית וכשיר לדיוור, והשני היה ניסיון מאגר של פרופיל לא־פעיל ולכן נחסם כחוק ממייל שיווקי. לניסיון הפגישה נשלח פעם אחת מייל שחזור עם LOVE10, מחיר 450 ₪ במקום 500 ₪ וקישור שממלא את המייל והקוד אוטומטית; ניסיון המאגר לא קיבל הודעה. קוד LOVE10 אומת כפעיל וללא תאריך תפוגה. מנגנון NOW שונה כך שרכישת מאגר נכנסת לטאב NOW ונפתחת עבורה משימת SLA אם קוד הקופון הוא NOW או אם `utm_campaign` הוא `database_holiday_now_sep27`, גם עם LOVE10 או בלי קוד. עמוד הפגישה הורחב לקליטת LOVE10 מקישור. עודכנו `shared/databaseHolidayNow.ts`, `server/databaseNowFulfillment.ts`, `server/growWebhook.ts`, `server/operationsRouter.ts`, `client/src/pages/SingleSessionSales.tsx` ובדיקות הרגרסיה. עברו 609 בדיקות, בדיקת TypeScript ובניית ייצור; הקוד נדחף ל־GitHub, נשמר ב־checkpoint ועלה לייצור.
+**Status:** resolved
 **Cost:** unavailable
-**Notes:** אין לשלוח SMS או WhatsApp. אין לחשוף פרטים אישיים או מזהי עסקה ביומן.
+**Notes:** לא נשלחו SMS או WhatsApp. המייל נרשם ב־email_log עם מפתח מסע ייחודי למניעת כפילות. לא נשמרו ביומן פרטים אישיים או מזהי עסקה.
 ---
