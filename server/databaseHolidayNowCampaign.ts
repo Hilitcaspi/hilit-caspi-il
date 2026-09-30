@@ -59,7 +59,7 @@ export function buildDatabaseHolidayNowSms(input: { firstName?: string | null; e
   return { message, offerUrl, units: Math.ceil(message.trim().length / 256) };
 }
 
-export async function loadDatabaseHolidayNowAudience(): Promise<DatabaseNowAudienceMember[]> {
+export async function loadDatabaseHolidayNowAudience(options: { allowSameCampaignReminderEmail?: boolean } = {}): Promise<DatabaseNowAudienceMember[]> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const recentLeadCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
@@ -121,7 +121,8 @@ export async function loadDatabaseHolidayNowAudience(): Promise<DatabaseNowAudie
           AND recent.status = 'sent'
           AND recent.sentAt >= ${restWindowCutoff}
           AND recent.journeyKey <> ${DATABASE_NOW_EMAIL_JOURNEY}
-      )
+          AND (${options.allowSameCampaignReminderEmail ? 1 : 0} = 0 OR recent.journeyKey <> ${`${DATABASE_NOW_CAMPAIGN}_reminder_email`})
+        )
   `) as any;
 
   const deduped = new Map<string, DatabaseNowAudienceMember>();

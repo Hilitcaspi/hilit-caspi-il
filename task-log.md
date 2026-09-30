@@ -1279,3 +1279,13 @@
 **Cost:** unavailable
 **Notes:** לא לפתוח מכסה חדשה שמתעלמת ממימושים קודמים; מדובר ב־200 מצטברים. ניסוח ״מחר״ תקף רק לשליחה/פרסום ב־30.9; לקראת כל שידור יש לבדוק מחדש זמינות הטבה, הסרות, רוכשים, מנוחת דיוור וכפילויות. עמודי האתר משתמשים בתאריך קבוע ולא במילה ״מחר״. קבצים ששונו: shared/databaseHolidayNow.ts, server/databaseHolidayNowNewsletter.ts, server/databaseHolidayNowReminder.ts, client/src/pages/DatabaseSales.tsx, client/src/pages/Register.tsx, server/databaseHolidayNowCampaign.test.ts; הסטוריז נוצרו מחוץ לריפו.
 ---
+## Task: תזמון ושידור תזכורת NOW המאושרת ל־30.9 בשעה 18:00
+**Category:** marketing
+**Trigger:** reactive/production issue
+**Continuation of:** הרחבת מכסת NOW בעוד 100 ועדכון נוסח תזכורת הסיום
+**Before:** המשתמשת אישרה את הנוסחים הסופיים מהטסט, מייל לקהל הכשיר ו־SMS לעד 1,200 בעלי כוונת רכישה, החל מ־18:00 לפי שעון ישראל. יש לבדוק סמוך לשליחה מכסה של 200 מימושים מצטברים ותוקף עד סוף 1.10, סטטוס רכישה ב־Grow, הסרות, כתובות bounced, מנוחת דיוור, מניעת כפילות ויתרת יחידות Vibrate. הטסטים בלבד נשלחו; אין לשגר WhatsApp לקבוצה אוטומטית ואין לשלוח Plus.
+**After:** pending
+**Status:** stopped/restarted
+**Cost:** unavailable
+**Notes:** תזמון חד־פעמי ובקרת תוצאה נדרשים; לא לתאר קמפיין כ״נשלח״ לפני אישור הספקים.
+---
