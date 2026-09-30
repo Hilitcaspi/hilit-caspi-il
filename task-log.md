@@ -1329,3 +1329,13 @@
 **Cost:** unavailable
 **Notes:** $750 לפני חריטה, שילוח, מסים ושחרור; 18% על ערך המוצרים לבדו הם $135 להמחשה בלבד, לפני הרחבת בסיס המס בשילוח ותלות בסיווג. לא להבטיח זהב 14 קראט או מחיר משלוח של 79 ₪ לפני מפרט ועלות נחיתה. מקורות: https://www.gov.il/en/pages/customs-personal-import-general-info ; https://www.gov.il/he/service/customs-tariff ; https://www.gov.il/BlobFolder/dynamiccollectorresultitem/represent-info-051224-2/he/vat_represent-info-051224-2.pdf ; https://help.etsy.com/hc/en-us/articles/360001987487-Information-for-Managing-International-Shipments ; https://help.etsy.com/hc/en-us/articles/115015663107-How-to-Offer-Custom-Items .
 ---
+## Task: סיכום רכישות 30.9 לפי ערוץ ומבצע
+**Category:** marketing
+**Trigger:** reactive/production issue
+**Continuation of:** פירוק עסקה־עסקה ומקורות ההגעה מ־23.9; תזמון ושידור תזכורת NOW המאושרת ל־30.9 בשעה 18:00
+**Before:** בקשה לסכם את רכישות היום ולזהות לכל עסקה ערוץ ומבצע, לאחר שידור תזכורת NOW בערב. הבקשה הגיעה ב־1.10 בשעה 00:02, ולכן ניתוח היום שהסתיים הוא 30.9 לפי שעון ישראל, עם בדיקה נפרדת של שתי הדקות הראשונות של 1.10 כדי להסיר עמימות. מקור האמת להכנסה הוא completed_payments מאושר על ידי Grow; נדרשת הבחנה בין UTM/קופון מדויק לבין מגע מסייע או מקור לא ידוע, ללא שמות/מיילים/טלפונים/מזהי עסקאות.
+**After (completed 2026-10-01 00:06 Asia/Jerusalem, duration 4m):** הופק דוח אנונימי של 15 רכישות Grow מ־30.9 בסך 3,068.60 ₪: שמונה מאגר (2,392 ₪), ארבע Boost (79.60 ₪), שתי Plus (198 ₪), מארז ראש השנה אחד (399 ₪). 14 עסקאות נושאות UTM ישיר; רכישת Boost אחת ללא UTM יוחסה למייל אפסייל רק ברמת ודאות גבוהה בעקבות קליק מתועד סמוך לתשלום. לשתי רכישות מאגר נשמר UTM של סטורי מבצע NOW (598 ₪); אחת לפני תזכורת 18:00 ואחת אחריה עם קופון NOW, אך אין ראיה לייחס אותן למייל או SMS התזכורת. לא נמצאו רכישות של 1.10 מאז חצות בעת הבדיקה. דוח מלא: /home/ubuntu/transactions-sep30-attribution.md.
+**Status:** resolved
+**Cost:** unavailable
+**Notes:** בדיקת הקונקטורים לא מצאה Grow ייעודי פעיל; נעשה שימוש במסד הייצור המקורי המחובר לאתר (LEGACY_DATABASE_URL), ולא במסד Manus החלופי הריק מרכישות היום. הייחוס הוא מגע מתועד, לא הוכחת סיבתיות. לא נשלחו מסרים ולא שונו נתוני לקוחות. העבודה הושלמה בזמן צפוי; אין נתון מאומת של קרדיטים למשימה זו.
+---
