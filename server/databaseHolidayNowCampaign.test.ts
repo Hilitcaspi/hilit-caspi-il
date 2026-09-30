@@ -3,10 +3,12 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DATABASE_NOW_COUPON,
+  DATABASE_NOW_MAX_USES,
   DATABASE_NOW_PRICE_ILS,
   databaseNowOfferUrl,
 } from "../shared/databaseHolidayNow";
 import { buildDatabaseHolidayNowSms } from "./databaseHolidayNowCampaign";
+import { buildDatabaseHolidayNowReminder, DATABASE_NOW_REMINDER_SUBJECT } from "./databaseHolidayNowReminder";
 import {
   buildDatabaseHolidayNowNewsletter,
   DATABASE_NOW_PREHEADER,
@@ -39,7 +41,8 @@ describe("database holiday NOW campaign", () => {
     expect(result.htmlContent).toContain("רווק השבוע");
     expect(result.htmlContent).toContain("יותר מאלף חברים פעילים");
     expect(result.htmlContent).toContain("משובים אמיתיים של 5/5");
-    expect(result.htmlContent).toContain("100 הראשונים");
+    expect(DATABASE_NOW_MAX_USES).toBe(200);
+    expect(result.htmlContent).toContain("200");
   });
 
   it("keeps the SMS within one Vibrate unit even with a long first name", () => {
@@ -48,7 +51,7 @@ describe("database holiday NOW campaign", () => {
     expect(result.message).toContain("הטבת הצטרפות מיוחדת");
     expect(result.message).toContain("💛");
     expect(result.message).toContain("✨");
-    expect(result.message).toContain("100 הראשונים");
+    expect(result.message).toContain("200 הראשונים");
     expect(result.message).toContain("להסרה:");
     expect(result.offerUrl).toBe("https://hilitcaspi.com/now?s=sms");
     expect(result.message.length).toBeLessThanOrEqual(256);
@@ -71,6 +74,23 @@ describe("database holiday NOW campaign", () => {
     expect(redirect).toContain('source === "whatsapp" ? "group"');
     expect(databaseNowOfferUrl("whatsapp")).toBe("https://hilitcaspi.com/now?s=whatsapp");
     expect(app).toContain('<Route path={"/now"} component={DatabaseNowRedirect} />');
+  });
+
+  it("keeps the September 30 reminder honest about the added places and tomorrow deadline", () => {
+    const result = buildDatabaseHolidayNowReminder({
+      firstName: "נועה",
+      offerUrl: databaseNowOfferUrl("email"),
+      unsubscribeUrl: "https://hilitcaspi.com/unsubscribe?token=test",
+    });
+    expect(DATABASE_NOW_REMINDER_SUBJECT).toContain("מחר זה נגמר");
+    expect(result.htmlContent).toContain("עוד 100 מקומות");
+    expect(result.textContent).toContain("עוד 100 מקומות");
+    expect(result.htmlContent).toContain("ההטבה מסתיימת מחר");
+    expect(result.textContent).toContain("המכסה המצטברת של 200 מימושים");
+    expect(result.htmlContent).toContain("הצעת התאמה ראשונה");
+    expect(result.htmlContent).not.toContain("ל־100 המצטרפים הראשונים");
+    expect(result.textContent).toContain("https://hilitcaspi.com/now?s=email");
+    expect(result.textContent).toContain("אישור הדדי, פגישה או זוגיות אינם מובטחים");
   });
 
   it("keeps sending disabled until an explicit campaign function is called", () => {

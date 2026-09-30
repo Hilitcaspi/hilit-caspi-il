@@ -12,7 +12,7 @@ const COUPLE_CAFE = "https://hilitcaspi.com/manus-storage/database-now-couple-ca
 const COUPLE_WALK = "https://hilitcaspi.com/manus-storage/database-now-couple-walk_609920bc.jpg";
 
 export const DATABASE_NOW_SUBJECT = "🎁 הבשורה לחג: ההתאמה הראשונה שלך בתוך 3 ימים";
-export const DATABASE_NOW_PREHEADER = "ל־100 הראשונים: הצעת התאמה ראשונה בתוך 3 ימים, עם הטבת הצטרפות מיוחדת ותשלום חד־פעמי.";
+export const DATABASE_NOW_PREHEADER = `עד ${DATABASE_NOW_MAX_USES} מימושים בסך הכול: הצעת התאמה ראשונה בתוך 3 ימים, עם הטבת הצטרפות מיוחדת ותשלום חד־פעמי.`;
 
 function escapeHtml(value: string) {
   return value
@@ -82,7 +82,7 @@ export function buildDatabaseHolidayNowNewsletter(input: {
         <tr><td class="pad" style="padding:36px 46px 42px;text-align:center;background:#f7dfe5;">
           <p style="margin:0;color:#a34366;font-size:12px;letter-spacing:1.6px;font-weight:700;">הבשורה הגדולה לחג</p>
           <h1 class="hero-title" style="margin:13px auto 0;max-width:590px;color:#2b1830;font-size:49px;line-height:1.04;font-weight:700;letter-spacing:-1.3px;">ההתאמה הראשונה שלך<br />בתוך 3 ימים</h1>
-          <p style="margin:19px auto 0;max-width:550px;color:#594753;font-size:18px;line-height:1.72;">ל־100 המצטרפים הראשונים אני מתחייבת להצעת התאמה ראשונה בתוך 3 ימים מסיום הפרופיל והשאלון. בנוסף מחכה לך הטבת הצטרפות מיוחדת ותשלום חד־פעמי.</p>
+          <p style="margin:19px auto 0;max-width:550px;color:#594753;font-size:18px;line-height:1.72;">לעד ${DATABASE_NOW_MAX_USES} מימושים בסך הכול אני מתחייבת להצעת התאמה ראשונה בתוך 3 ימים מסיום הפרופיל והשאלון. בנוסף מחכה לך הטבת הצטרפות מיוחדת ותשלום חד־פעמי.</p>
           <div style="margin-top:25px;"><a class="cta" href="${offerUrl}" style="display:inline-block;background:#6f2345;color:#fff;text-decoration:none;padding:18px 35px;border-radius:999px;font-size:17px;font-weight:700;box-shadow:0 12px 28px rgba(111,35,69,.22);">אני רוצה להיכנס למאגר</a></div>
         </td></tr>
 
