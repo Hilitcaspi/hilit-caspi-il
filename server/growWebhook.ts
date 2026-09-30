@@ -37,7 +37,7 @@ import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEven
 import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
 import { queueProductFeedbackAfterPurchase } from "./feedbackAutomation";
-import { startJourney } from "./automation";
+import { getJourneyKey, startJourney } from "./automation";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
 import { buildNewYearBundleAccessEmail } from "./newYearBundleEmail";
@@ -129,6 +129,19 @@ export function isPotentialPlusCharge(sum: number, sandboxConfigured = Boolean(
 
 // ─── Product handlers ─────────────────────────────────────────────────────────
 
+async function resolveLifecycleGender(email: string): Promise<"female" | "male"> {
+  const db = await getDb();
+  if (!db) return "female";
+  const normalizedEmail = email.toLowerCase().trim();
+  const [lead] = await db.select({ gender: crmLeads.gender }).from(crmLeads)
+    .where(sql`LOWER(${crmLeads.email}) = ${normalizedEmail}`).limit(1);
+  if (lead?.gender === "male") return "male";
+  if (lead?.gender === "female") return "female";
+  const [single] = await db.select({ gender: singles.gender }).from(singles)
+    .where(sql`LOWER(${singles.email}) = ${normalizedEmail}`).limit(1);
+  return single?.gender === "male" ? "male" : "female";
+}
+
 async function handleGuide(email: string, name: string, opts?: { skipJourney?: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -166,7 +179,8 @@ async function handleGuide(email: string, name: string, opts?: { skipJourney?: b
   }
   // Start nurture journey (skip when called from bundle flow to avoid duplicate emails)
   if (!opts?.skipJourney) {
-    startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender: "female", journeyKey: "women_guide" }).catch(() => {});
+    const gender = await resolveLifecycleGender(email);
+    startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender, journeyKey: getJourneyKey(gender, "guide") }).catch(() => {});
   }
 }
 
@@ -238,7 +252,8 @@ async function handleCourse(
     await db.insert(crmLeads).values({ name, email, status: "client_course", product: "course", source: "direct", createdAt: now, updatedAt: now }).catch(() => {});
   }
   if (!opts.skipJourney) {
-    startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender: "female", journeyKey: "women_course" }).catch(() => {});
+    const gender = await resolveLifecycleGender(email);
+    startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender, journeyKey: getJourneyKey(gender, "course") }).catch(() => {});
   }
 }
 async function handleCoaching(email: string, name: string) {
@@ -260,7 +275,6 @@ async function handleCoaching(email: string, name: string) {
     subject: "ברוכים הבאים לתהליך! 🌟",
     htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:40px 32px;text-align:center;"><h1 style="color:#ffe27c;font-size:26px;margin:0 0 8px;">ברוכים הבאים לתהליך! 🌟</h1></div><div style="padding:40px 32px;"><p style="font-size:18px;color:#191265;margin:0 0 16px;">שלום ${firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">שמחתי מאוד שהחלטתם להצטרף לתהליך הליווי האישי! זה צעד אמיץ ומשמעותי.</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">אני אצור קשר ביום העסקים הקרוב כדי לקבוע את הפגישה הראשונה שלנו ולהתחיל את המסע יחד.</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">בינתיים, אם יש שאלות, אני כאן:<br><a href="https://wa.me/972552442334" style="color:#191265;font-weight:bold;">וואטסאפ</a></p><p style="font-size:15px;color:#191265;font-weight:bold;margin:24px 0 8px;">באהבה,<br>הילית כספי</p></div><div style="background:#191265;padding:20px 32px;text-align:center;"><p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0;"><a href="${SITE_BASE}/unsubscribe?email=${encodeURIComponent(email)}" style="color:rgba(255,255,255,0.5);">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
   }).catch(err => console.error("[GrowWebhook][Coaching] Email failed:", err));
-  startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender: "female", journeyKey: "women_transformation" }).catch(() => {});
 }
 
 async function handleCoachingMas(email: string, name: string) {
@@ -292,7 +306,6 @@ async function handleCoachingMas(email: string, name: string) {
     subject: "ברוכים הבאים לתהליך המסע! 🌟",
     htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:40px 32px;text-align:center;"><h1 style="color:#ffe27c;font-size:26px;margin:0 0 8px;">ברוכים הבאים לתהליך המסע! 🌟</h1><p style="color:rgba(255,255,255,0.8);font-size:15px;margin:0;">12 פגישות שישנו את הכל</p></div><div style="padding:40px 32px;"><p style="font-size:18px;color:#191265;margin:0 0 16px;">שלום ${firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">שמחתי מאוד שהחלטתם להצטרף לתהליך המסע המלא! 5 חודשים שליווי אישי עמוק שיובילו אתכם מהבנה עצמית עד שינוי אמיתי באיך מתנהלים בזוגיות.</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">אני אצור קשר ביום העסקים הקרוב כדי לקבוע את הפגישה הראשונה שלנו ולהתחיל את המסע יחד.</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">בינתיים, אם יש שאלות, אני כאן:<br><a href="https://wa.me/972552442334" style="color:#191265;font-weight:bold;">וואטסאפ</a></p><p style="font-size:15px;color:#191265;font-weight:bold;margin:24px 0 8px;">באהבה,<br>הילית כספי</p></div><div style="background:#191265;padding:20px 32px;text-align:center;"><p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0;"><a href="${SITE_BASE}/unsubscribe?email=${encodeURIComponent(email)}" style="color:rgba(255,255,255,0.5);">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
   }).catch(err => console.error("[GrowWebhook][CoachingMas] Email failed:", err));
-  startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender: "female", journeyKey: "women_transformation" }).catch(() => {});
 }
 
 async function handleSession(email: string, name: string) {
@@ -911,6 +924,24 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
         console.error("[GrowWebhook] approveTransaction failed:", err)
       );
     }).catch(() => {});
+  }
+
+  // Mark the originating checkout as paid before product fulfillment. Recovery
+  // senders re-check this flag immediately before delivery, so a slow handler
+  // cannot leave a paid customer inside the abandoned-payment window.
+  if (purchaseTracking && transactionId && sum > 0) {
+    try {
+      const db = await getDb();
+      if (db) {
+        await db.update(paymentLeads).set({
+          confirmedTransactionId: transactionId,
+          confirmedAmountAgorot: Math.round(sum * 100),
+          confirmedAt: Date.now(),
+        }).where(eq(paymentLeads.id, purchaseTracking.id));
+      }
+    } catch (error) {
+      console.error("[PurchaseTracking] Failed to mark checkout confirmed before fulfillment", error);
+    }
   }
 
   try {

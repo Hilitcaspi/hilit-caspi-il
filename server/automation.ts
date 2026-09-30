@@ -11,8 +11,8 @@
  */
 
 import { getDb, resetDb } from "./db";
-import { emailLog, crmLeads, productAccessTokens, matches, singles } from "../drizzle/schema";
-import { and, eq, lt, gt, isNull, isNotNull, or, sql } from "drizzle-orm";
+import { emailLog, crmLeads, productAccessTokens, matches, singles, lifecycleMessageKeys, lifecycleRecipientLocks, lifecycleMarketingSettings, paymentLeads } from "../drizzle/schema";
+import { and, desc, eq, lt, gt, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { sendEmail, addContactToList } from "./brevo";
 import { sendSMS } from "./vibrate";
 import { buildMatchFollowUpSmsMessage } from "./matchSms";
@@ -34,6 +34,26 @@ const OPERATIONAL_FIRST_EMAIL_JOURNEYS = new Set<JourneyKey>([
 
 export function isOperationalJourneyEmail(journeyKey: string, emailIndex: number): boolean {
   return emailIndex === 1 && OPERATIONAL_FIRST_EMAIL_JOURNEYS.has(journeyKey as JourneyKey);
+}
+
+function normalizeEmail(value: string): string {
+  return value.toLowerCase().trim();
+}
+
+function hashEmail(value: string): string {
+  return crypto.createHash("sha256").update(normalizeEmail(value)).digest("hex");
+}
+
+function getAffectedRows(result: any): number {
+  return Number(result?.[0]?.affectedRows ?? result?.rowsAffected ?? result?.affectedRows ?? 0);
+}
+
+async function claimLifecycleMessage(db: any, messageKey: string, now: number): Promise<boolean> {
+  const result = await db.execute(sql`
+    INSERT IGNORE INTO lifecycle_message_keys (message_key, created_at)
+    VALUES (${messageKey}, ${now})
+  `);
+  return getAffectedRows(result) === 1;
 }
 
 /**
@@ -84,11 +104,14 @@ const EMAIL_DELAYS_HOURS_6 = [0, 24, 96, 168, 240, 336]; // 0h, 1d, 4d, 7d, 10d,
 const EMAIL_DELAYS_HOURS_4_MATCHMAKING = [0, 72, 168, 336]; // 0h, 3d, 7d, 14d
 // Delays for guide purchase 4-email sequence (with 48h reminder)
 const EMAIL_DELAYS_HOURS_4_GUIDE = [0, 48, 96, 168]; // 0h (delivery), 48h (reminder), 4d (engagement), 7d (upsell)
+const EMAIL_DELAYS_HOURS_3_RECOVERY = [0, 24, 47];
 
 function getDelaysForSequence(length: number, journeyKey?: string): number[] {
   if (length === 6) return EMAIL_DELAYS_HOURS_6;
   if (length === 4 && journeyKey && journeyKey.includes("matchmaking_welcome")) return EMAIL_DELAYS_HOURS_4_MATCHMAKING;
   if (length === 4 && journeyKey && (journeyKey === "women_guide" || journeyKey === "men_guide")) return EMAIL_DELAYS_HOURS_4_GUIDE;
+  if (length === 3 && (journeyKey === "women_course" || journeyKey === "men_course")) return [0, 24, 168];
+  if (length === 3 && journeyKey?.startsWith("abandoned_")) return EMAIL_DELAYS_HOURS_3_RECOVERY;
   return EMAIL_DELAYS_HOURS_3;
 }
 
@@ -105,6 +128,10 @@ export async function startJourney({
   dnaType,
   journeyKey,
   leadId,
+  paymentLeadId,
+  paymentAttemptCreatedAt,
+  paymentAttemptProduct,
+  sendFirstImmediately = true,
 }: {
   email: string;
   firstName: string;
@@ -114,6 +141,10 @@ export async function startJourney({
   dnaType?: string;
   journeyKey: JourneyKey;
   leadId?: number;
+  paymentLeadId?: number;
+  paymentAttemptCreatedAt?: number;
+  paymentAttemptProduct?: string;
+  sendFirstImmediately?: boolean;
 }): Promise<void> {
   const sequence = EMAIL_SEQUENCES[journeyKey];
   if (!sequence) {
@@ -142,6 +173,7 @@ export async function startJourney({
         eq(emailLog.emailIndex, 1)
       )
     )
+    .orderBy(desc(emailLog.createdAt))
     .limit(1);
 
   if (existingEntries.length > 0) {
@@ -159,12 +191,13 @@ export async function startJourney({
   // Rule 2: free_guide and first_step are mutually exclusive.
   //   If one is already active, don't start the other.
   const exclusiveJourneys: Record<string, string[]> = {
-    women_first_step:    ["women_first_step_v2", "women_free_guide"],
-    women_first_step_v2: ["women_first_step",    "women_free_guide"],
+    women_first_step:    ["women_first_step_v2", "free_guide_nurture"],
+    women_first_step_v2: ["women_first_step",    "free_guide_nurture"],
     women_free_guide:    ["women_first_step",     "women_first_step_v2"],
-    men_first_step:      ["men_first_step_v2",    "men_free_guide"],
-    men_first_step_v2:   ["men_first_step",       "men_free_guide"],
+    men_first_step:      ["men_first_step_v2",    "free_guide_nurture"],
+    men_first_step_v2:   ["men_first_step",       "free_guide_nurture"],
     men_free_guide:      ["men_first_step",        "men_first_step_v2"],
+    free_guide_nurture:  ["women_first_step", "women_first_step_v2", "men_first_step", "men_first_step_v2"],
   };
 
   const conflictKeys = exclusiveJourneys[journeyKey] ?? [];
@@ -175,11 +208,12 @@ export async function startJourney({
       .from(emailLog)
       .where(
         and(
-          eq(emailLog.recipientEmail, email),
+          sql`LOWER(${emailLog.recipientEmail}) = ${normalizeEmail(email)}`,
           eq(emailLog.emailIndex, 1),
           inArray(emailLog.journeyKey, conflictKeys)
         )
       )
+      .orderBy(desc(emailLog.createdAt))
       .limit(1);
 
     if (conflictEntries.length > 0 && conflictEntries[0].createdAt > thirtyDaysAgo) {
@@ -216,6 +250,7 @@ export async function startJourney({
     abandoned_database:        "נטישת עגלה - מאגר",
     abandoned_course:          "נטישת עגלה - קורס",
     abandoned_coaching:        "נטישת עגלה - ליווי",
+    abandoned_session:         "נטישת תשלום - פגישה",
   };
   const sourceLabel = JOURNEY_SOURCE_MAP[journeyKey] ?? journeyKey;
 
@@ -248,13 +283,16 @@ export async function startJourney({
   const dnaProfile = dnaType ? DNA_PROFILES[dnaType] : null;
   const isF = gender === "female";
 
-  // Schedule all emails in the sequence
+  // Render first, then atomically claim one journey instance and queue the full
+  // sequence. The date-scoped key only resolves concurrent starts; the 30-day
+  // guard above controls legitimate re-entry.
+  const createdAt = Date.now();
   const delays = getDelaysForSequence(sequence.length, journeyKey);
-  for (let i = 0; i < sequence.length; i++) {
+  const recoveryGraceMs = journeyKey.startsWith("abandoned_") ? 10 * 60 * 1000 : 0;
+  const renderedEntries = sequence.map((template, i) => {
     const emailIndex = i + 1;
     const suppressedMarketingEmail = initialSuppression.suppressed
       && !isOperationalJourneyEmail(journeyKey, emailIndex);
-    const template = sequence[i];
     const rendered = renderTemplate(template, {
       firstName,
       dnaType: dnaType ?? "לא ידוע",
@@ -269,40 +307,68 @@ export async function startJourney({
       guideLink,
       courseLink,
     }, email, leadId);
-
-    const scheduledAt = new Date();
-    scheduledAt.setHours(scheduledAt.getHours() + delays[i]);
-
-    const insertResult = await db.insert(emailLog).values({
-      leadId: leadId ?? null,
-      recipientEmail: email,
-      recipientName: firstName,
-      journeyKey,
+    return {
       emailIndex,
-      subject: rendered.subject,
-      htmlBody: rendered.htmlBody,
-      textBody: rendered.textBody,
-      scheduledAt: scheduledAt.getTime(),
-      sentAt: null,
-      status: suppressedMarketingEmail ? "cancelled" : "pending",
-      errorMessage: suppressedMarketingEmail ? `suppressed:${initialSuppression.reason}` : null,
-      createdAt: Date.now(),
-    });
-    const insertedId = (insertResult as any)[0]?.insertId ?? (insertResult as any).insertId;
-    // Send email 1 immediately
-    if (i === 0 && insertedId && !suppressedMarketingEmail) {
-      await sendScheduledEmail({
-        db,
-        emailLogId: insertedId,
-        email,
-        firstName,
-        subject: rendered.subject,
-        htmlBody: rendered.htmlBody,
-        textBody: rendered.textBody,
+      rendered,
+      suppressedMarketingEmail,
+      scheduledAt: createdAt + recoveryGraceMs + delays[i] * 60 * 60 * 1000,
+    };
+  });
+
+  const journeyClaimKey = `journey:${hashEmail(email)}:${journeyKey}:${new Date(createdAt).toISOString().slice(0, 10)}`;
+  const firstQueued = await db.transaction(async (tx: any): Promise<{
+    id: number; subject: string; htmlBody: string; textBody: string;
+  } | null> => {
+    if (!await claimLifecycleMessage(tx, journeyClaimKey, createdAt)) return null;
+    let firstEntry: { id: number; subject: string; htmlBody: string; textBody: string } | null = null;
+    for (const entry of renderedEntries) {
+      const insertResult = await tx.insert(emailLog).values({
+        leadId: leadId ?? null,
+        paymentLeadId: paymentLeadId ?? null,
+        paymentAttemptCreatedAt: paymentAttemptCreatedAt ?? null,
+        paymentAttemptProduct: paymentAttemptProduct ?? null,
+        recipientEmail: email,
+        recipientName: firstName,
         journeyKey,
-        emailIndex: 1,
+        emailIndex: entry.emailIndex,
+        subject: entry.rendered.subject,
+        htmlBody: entry.rendered.htmlBody,
+        textBody: entry.rendered.textBody,
+        scheduledAt: entry.scheduledAt,
+        sentAt: null,
+        status: entry.suppressedMarketingEmail ? "cancelled" : "pending",
+        errorMessage: entry.suppressedMarketingEmail ? `suppressed:${initialSuppression.reason}` : null,
+        createdAt,
       });
+      const insertedId = Number((insertResult as any)[0]?.insertId ?? (insertResult as any).insertId ?? 0);
+      if (entry.emailIndex === 1 && insertedId) {
+        firstEntry = {
+          id: insertedId,
+          subject: entry.rendered.subject,
+          htmlBody: entry.rendered.htmlBody,
+          textBody: entry.rendered.textBody,
+        };
+        await tx.update(lifecycleMessageKeys).set({ emailLogId: insertedId })
+          .where(eq(lifecycleMessageKeys.messageKey, journeyClaimKey));
+      }
     }
+    return firstEntry;
+  });
+
+  // Only transactional product delivery bypasses the marketing queue. All
+  // promotional first emails wait for the shared recipient lock and rest gap.
+  if (firstQueued && sendFirstImmediately && isOperationalJourneyEmail(journeyKey, 1)) {
+    await sendScheduledEmail({
+      db,
+      emailLogId: firstQueued.id,
+      email,
+      firstName,
+      subject: firstQueued.subject,
+      htmlBody: firstQueued.htmlBody,
+      textBody: firstQueued.textBody,
+      journeyKey,
+      emailIndex: 1,
+    });
   }
 }
 
@@ -329,8 +395,8 @@ async function sendScheduledEmail({
   textBody: string;
   journeyKey: string;
   emailIndex: number;
-}): Promise<void> {
-  if (!db) return;
+}): Promise<boolean> {
+  if (!db) return false;
   const result = await sendEmail({
     to: { email, name: firstName },
     subject,
@@ -352,6 +418,7 @@ async function sendScheduledEmail({
   } else {
     console.error(`[Automation] ✗ Failed email ${emailIndex} for journey ${journeyKey} to ${email}:`, result.error);
   }
+  return result.success;
 }
 
 /**
@@ -374,27 +441,146 @@ function injectEmailTracking(html: string, emailLogId: number): string {
   return html;
 }
 
+async function lifecycleCancellationReason(db: any, entry: any): Promise<string | null> {
+  const normalizedEmail = String(entry.recipientEmail || "").toLowerCase().trim();
+  if (entry.journeyKey.startsWith("abandoned_")) {
+    const { completedPayments } = await import("../drizzle/schema");
+    const productByJourney: Record<string, string[]> = {
+      abandoned_guide: ["guide"],
+      abandoned_database: ["database"],
+      abandoned_course: ["course"],
+      abandoned_coaching: ["coaching", "coaching_mas"],
+      abandoned_session: ["session"],
+    };
+    const products = productByJourney[entry.journeyKey] || [];
+    const [attempt] = entry.paymentLeadId ? await db.select({
+      product: paymentLeads.product,
+      createdAt: paymentLeads.createdAt,
+      confirmedAt: paymentLeads.confirmedAt,
+    }).from(paymentLeads).where(eq(paymentLeads.id, entry.paymentLeadId)).limit(1) : [];
+    if (attempt?.confirmedAt) return "payment_completed";
+    const paymentBoundary = Number(entry.paymentAttemptCreatedAt ?? attempt?.createdAt ?? entry.createdAt);
+    const paymentProducts = entry.paymentAttemptProduct
+      ? [entry.paymentAttemptProduct]
+      : attempt?.product ? [attempt.product] : products;
+    const [payment] = paymentProducts.length ? await db.select({ id: completedPayments.id })
+      .from(completedPayments)
+      .where(and(
+        sql`LOWER(${completedPayments.email}) = ${normalizedEmail}`,
+        sql`${completedPayments.product} IN (${sql.join(paymentProducts.map(product => sql`${product}`), sql`, `)})`,
+        gt(completedPayments.paidAt, paymentBoundary),
+      ))
+      .limit(1) : [];
+    if (payment) return "payment_completed";
+  }
+
+  const ladderTarget =
+    ((entry.journeyKey === "women_guide" || entry.journeyKey === "men_guide") && entry.emailIndex === 4)
+      ? "course"
+      : ((entry.journeyKey === "women_course" || entry.journeyKey === "men_course") && entry.emailIndex === 3)
+        ? "session"
+        : null;
+  if (ladderTarget) {
+    const { completedPayments } = await import("../drizzle/schema");
+    const [targetPurchase] = await db.select({ id: completedPayments.id })
+      .from(completedPayments)
+      .where(and(
+        sql`LOWER(${completedPayments.email}) = ${normalizedEmail}`,
+        eq(completedPayments.product, ladderTarget),
+      ))
+      .limit(1);
+    if (targetPurchase) return `target_product_already_purchased:${ladderTarget}`;
+  }
+
+  if (entry.journeyKey.startsWith("boost_plus_upsell_v1:")) {
+    const { plusPilotMembers } = await import("../drizzle/schema");
+    const [activePlus] = await db.select({ id: plusPilotMembers.id })
+      .from(plusPilotMembers)
+      .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
+      .where(and(
+        sql`LOWER(${singles.email}) = ${normalizedEmail}`,
+        eq(plusPilotMembers.status, "active"),
+        eq(plusPilotMembers.billingStatus, "active"),
+      ))
+      .limit(1);
+    if (activePlus) return "plus_already_active";
+  }
+
+  if (entry.journeyKey.startsWith("boost_opportunity_v1:")) {
+    const matchId = Number(entry.journeyKey.split(":")[1] || 0);
+    const [availableMatch] = matchId ? await db.select({ id: matches.id })
+      .from(matches)
+      .where(and(
+        eq(matches.id, matchId),
+        eq(matches.status, "pending"),
+        isNull(matches.returnedToPoolAt),
+      ))
+      .limit(1) : [];
+    if (!availableMatch) return "boost_option_unavailable";
+  }
+
+  return null;
+}
+
+async function acquireRecipientMarketingLock(db: any, email: string, emailLogId: number, now: number): Promise<boolean> {
+  const recipientHash = hashEmail(email);
+  await db.execute(sql`
+    INSERT IGNORE INTO lifecycle_recipient_locks (recipient_hash, locked_until, email_log_id, updated_at)
+    VALUES (${recipientHash}, 0, NULL, ${now})
+  `);
+  const result = await db.execute(sql`
+    UPDATE lifecycle_recipient_locks
+    SET locked_until = ${now + 10 * 60 * 1000}, email_log_id = ${emailLogId}, updated_at = ${now}
+    WHERE recipient_hash = ${recipientHash} AND locked_until <= ${now}
+  `);
+  return getAffectedRows(result) === 1;
+}
+
+async function releaseRecipientMarketingLock(db: any, email: string, emailLogId: number, lockedUntil: number): Promise<void> {
+  await db.execute(sql`
+    UPDATE lifecycle_recipient_locks
+    SET locked_until = ${lockedUntil}, updated_at = ${Date.now()}
+    WHERE recipient_hash = ${hashEmail(email)} AND email_log_id = ${emailLogId}
+  `);
+}
+
 /**
  * Process pending scheduled emails - called every 5 minutes by the server
  * Sends any emails where scheduledAt <= now and sentAt is null
  */
-export async function processPendingEmails(): Promise<number> {
+export async function processPendingEmails(options: { minMarketingGapHours?: number; eligibleCreatedAfter?: number } = {}): Promise<number> {
   let db = await getDb();
   if (!db) return 0;
 
   const now = Date.now();
+  const minMarketingGapMs = Math.max(1, options.minMarketingGapHours ?? 20) * 60 * 60 * 1000;
+  let eligibleCreatedAfter = options.eligibleCreatedAfter;
+  if (eligibleCreatedAfter === undefined) {
+    const [settings] = await db.select({
+      launchedAt: lifecycleMarketingSettings.launchedAt,
+      isEnabled: lifecycleMarketingSettings.isEnabled,
+    })
+      .from(lifecycleMarketingSettings)
+      .where(eq(lifecycleMarketingSettings.name, "israel-site-lifecycle"))
+      .limit(1);
+    if (settings && !settings.isEnabled) return 0;
+    eligibleCreatedAfter = settings?.launchedAt ?? undefined;
+  }
 
   let pending;
+  const pendingConditions = [
+    eq(emailLog.status, "pending"),
+    lt(emailLog.scheduledAt, now),
+    ...(eligibleCreatedAfter ? [gt(emailLog.createdAt, eligibleCreatedAfter)] : []),
+  ];
   try {
     pending = await db
       .select()
       .from(emailLog)
       .where(
-        and(
-          eq(emailLog.status, "pending"),
-          lt(emailLog.scheduledAt, now)
-        )
+        and(...pendingConditions)
       )
+      .orderBy(emailLog.scheduledAt, emailLog.id)
       .limit(50);
   } catch (err: any) {
     // On connection reset, reset pool and retry once
@@ -407,11 +593,9 @@ export async function processPendingEmails(): Promise<number> {
         .select()
         .from(emailLog)
         .where(
-          and(
-            eq(emailLog.status, "pending"),
-            lt(emailLog.scheduledAt, now)
-          )
+            and(...pendingConditions)
         )
+        .orderBy(emailLog.scheduledAt, emailLog.id)
         .limit(50);
     } else {
       throw err;
@@ -461,6 +645,50 @@ export async function processPendingEmails(): Promise<number> {
       }
     }
 
+    const cancellationReason = await lifecycleCancellationReason(db, entry);
+    if (cancellationReason) {
+      await db.update(emailLog).set({
+        status: "cancelled",
+        errorMessage: cancellationReason,
+        sentAt: Date.now(),
+      }).where(eq(emailLog.id, entry.id));
+      continue;
+    }
+
+    // Operational purchase delivery is immediate. Other lifecycle messages are
+    // delayed when this contact already received marketing during the gap.
+    const isMarketing = !isOperationalJourneyEmail(entry.journeyKey, entry.emailIndex);
+    if (isMarketing) {
+      const [recentSend] = await db.select({ sentAt: emailLog.sentAt })
+        .from(emailLog)
+        .where(and(
+          sql`LOWER(${emailLog.recipientEmail}) = ${entry.recipientEmail.toLowerCase().trim()}`,
+          eq(emailLog.status, "sent"),
+          gt(emailLog.sentAt, now - minMarketingGapMs),
+        ))
+        .orderBy(sql`${emailLog.sentAt} DESC`)
+        .limit(1);
+      if (recentSend?.sentAt) {
+        await db.update(emailLog).set({
+          scheduledAt: Number(recentSend.sentAt) + minMarketingGapMs,
+          errorMessage: "frequency_cap_rescheduled",
+        }).where(eq(emailLog.id, entry.id));
+        continue;
+      }
+      const acquired = await acquireRecipientMarketingLock(db, entry.recipientEmail, entry.id, now);
+      if (!acquired) {
+        const [lock] = await db.select({ lockedUntil: lifecycleRecipientLocks.lockedUntil })
+          .from(lifecycleRecipientLocks)
+          .where(eq(lifecycleRecipientLocks.recipientHash, hashEmail(entry.recipientEmail)))
+          .limit(1);
+        await db.update(emailLog).set({
+          scheduledAt: Math.max(now + 60_000, Number(lock?.lockedUntil || now + 60_000)),
+          errorMessage: "frequency_cap_lock_busy",
+        }).where(eq(emailLog.id, entry.id));
+        continue;
+      }
+    }
+
     // Atomic claim: mark as 'processing' BEFORE sending to prevent duplicate sends
     // This guards against race conditions when multiple server instances run in parallel
     const claimed = await db
@@ -477,22 +705,54 @@ export async function processPendingEmails(): Promise<number> {
     if (affectedRows === 0) {
       // Another instance already claimed this email
       console.log(`[Automation] Email ${entry.id} already claimed by another instance, skipping`);
+      if (isMarketing) await releaseRecipientMarketingLock(db, entry.recipientEmail, entry.id, now);
+      continue;
+    }
+
+    // Final post-claim check closes the gap between the earlier eligibility
+    // query and the provider call (notably when Grow confirms concurrently).
+    const finalCancellationReason = await lifecycleCancellationReason(db, entry);
+    if (finalCancellationReason) {
+      await db.update(emailLog).set({
+        status: "cancelled",
+        errorMessage: finalCancellationReason,
+        sentAt: Date.now(),
+      }).where(eq(emailLog.id, entry.id));
+      if (isMarketing) await releaseRecipientMarketingLock(db, entry.recipientEmail, entry.id, now);
       continue;
     }
     // Inject open pixel + click tracking before sending
     const trackedHtml = injectEmailTracking(entry.htmlBody, entry.id);
-    await sendScheduledEmail({
-      db,
-      emailLogId: entry.id,
-      email: entry.recipientEmail,
-      firstName: entry.recipientName ?? "",
-      subject: entry.subject,
-      htmlBody: trackedHtml,
-      textBody: entry.textBody ?? "",
-      journeyKey: entry.journeyKey,
-      emailIndex: entry.emailIndex,
-    });
-    sent++;
+    let delivered = false;
+    try {
+      delivered = await sendScheduledEmail({
+        db,
+        emailLogId: entry.id,
+        email: entry.recipientEmail,
+        firstName: entry.recipientName ?? "",
+        subject: entry.subject,
+        htmlBody: trackedHtml,
+        textBody: entry.textBody ?? "",
+        journeyKey: entry.journeyKey,
+        emailIndex: entry.emailIndex,
+      });
+    } catch (error) {
+      await db.update(emailLog).set({
+        status: "failed",
+        errorMessage: `provider_exception:${error instanceof Error ? error.message : String(error)}`,
+        sentAt: Date.now(),
+      }).where(eq(emailLog.id, entry.id));
+    } finally {
+      if (isMarketing) {
+        await releaseRecipientMarketingLock(
+          db,
+          entry.recipientEmail,
+          entry.id,
+          Date.now() + minMarketingGapMs,
+        );
+      }
+    }
+    if (delivered) sent++;
   }
 
   if (sent > 0) {
@@ -916,27 +1176,30 @@ export async function processMatchedPairFollowUps(): Promise<number> {
  * 3. If not paid → start the appropriate abandoned_* journey
  * 4. Only trigger once per email+product (startJourney has idempotency guard)
  */
-export async function processCartAbandonment(): Promise<number> {
+export async function processCartAbandonment(options: { eligibleAfter?: number } = {}): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
 
   const now = Date.now();
-  const oneHourAgo = now - 60 * 60 * 1000;       // 1 hour ago
-  const twoHoursAgo = now - 2 * 60 * 60 * 1000;  // 2 hours ago (window: 1-2h old leads)
+  const recoveryDelayCutoff = now - 75 * 60 * 1000;
+  const rolloutAt = options.eligibleAfter ?? Date.parse("2026-09-30T00:00:00+03:00");
+  const oldestEligible = Math.max(rolloutAt, now - 7 * 24 * 60 * 60 * 1000);
+  const { paymentLeads, completedPayments } = await import("../drizzle/schema");
 
-  // Find payment_leads created between 1-2 hours ago
-  const { paymentLeads, singles } = await import("../drizzle/schema");
-  
+  // A rolling seven-day window prevents missed attempts when one cron run fails.
+  // Journey idempotency prevents duplicates across repeated scans.
   const recentLeads = await db
     .select()
     .from(paymentLeads)
     .where(
       and(
-        lt(paymentLeads.createdAt, oneHourAgo),
-        gt(paymentLeads.createdAt, twoHoursAgo)
+        lt(paymentLeads.createdAt, recoveryDelayCutoff),
+        gt(paymentLeads.createdAt, oldestEligible),
+        isNull(paymentLeads.confirmedAt),
       )
     )
-    .limit(50);
+    .orderBy(sql`${paymentLeads.createdAt} ASC`)
+    .limit(100);
 
   if (recentLeads.length === 0) return 0;
 
@@ -946,54 +1209,18 @@ export async function processCartAbandonment(): Promise<number> {
     // Normalize email for case-insensitive comparison
     const normalizedEmail = lead.email.toLowerCase().trim();
     
-    // Check if this person already has a COMPLETED payment via webhookIdempotency
-    // (if they paid, there will be a webhook entry for their email)
-    const { webhookIdempotency } = await import("../drizzle/schema");
-    const [alreadyPaidWebhook] = await db
-      .select({ id: webhookIdempotency.id })
-      .from(webhookIdempotency)
-      .where(sql`LOWER(${webhookIdempotency.email}) = ${normalizedEmail}`)
+    // Stop only when the same product was completed after this attempt. A past
+    // purchase of a different product must not suppress a legitimate recovery.
+    const [completedSameProduct] = await db
+      .select({ id: completedPayments.id })
+      .from(completedPayments)
+      .where(and(
+        sql`LOWER(${completedPayments.email}) = ${normalizedEmail}`,
+        eq(completedPayments.product, lead.product),
+        gt(completedPayments.paidAt, lead.createdAt),
+      ))
       .limit(1);
-    if (alreadyPaidWebhook) continue;
-
-    // Check if this person already paid (has paymentRef in crmLeads) - case insensitive
-    const [crmLead] = await db
-      .select({ paymentRef: crmLeads.paymentRef, status: crmLeads.status })
-      .from(crmLeads)
-      .where(sql`LOWER(${crmLeads.email}) = ${normalizedEmail}`)
-      .limit(1);
-
-    // If they have a paymentRef or are already a client, skip
-    if (crmLead?.paymentRef) continue;
-    if (crmLead?.status && ["client_database", "client_guide", "client_course", "client_coaching"].includes(crmLead.status)) continue;
-
-    // For database product, also check if they're in the singles table with isPaid=true
-    if (lead.product === "database") {
-      const [single] = await db
-        .select({ isPaid: singles.isPaid })
-        .from(singles)
-        .where(eq(singles.email, lead.email))
-        .limit(1);
-      if (single?.isPaid) continue;
-    }
-
-    // For coaching/coaching_mas, also check leads table for paid_coaching/paid_coaching_mas source
-    // (coaching webhook doesn't always update crmLeads)
-    if (lead.product === "coaching" || lead.product === "coaching_mas" || lead.product === "session") {
-      const { leads: leadsTable } = await import("../drizzle/schema");
-      const [paidCoaching] = await db
-        .select({ id: leadsTable.id })
-        .from(leadsTable)
-        .where(and(
-          eq(leadsTable.email, lead.email),
-          or(
-            eq(leadsTable.source, "paid_coaching"),
-            eq(leadsTable.source, "paid_coaching_mas")
-          )
-        ))
-        .limit(1);
-      if (paidCoaching) continue;
-    }
+    if (completedSameProduct) continue;
 
     // Map product to abandoned journey key
     const productToJourney: Record<string, JourneyKey> = {
@@ -1002,25 +1229,50 @@ export async function processCartAbandonment(): Promise<number> {
       course: "abandoned_course",
       coaching: "abandoned_coaching",
       coaching_mas: "abandoned_coaching",
-      session: "abandoned_coaching",
+      session: "abandoned_session",
     };
 
     const journeyKey = productToJourney[lead.product];
     if (!journeyKey) continue;
 
-    // Start the abandoned cart journey (idempotency guard inside prevents duplicates)
+    // Reuse profile gender where available; do not assume every lead is a woman.
+    const [profile] = await db.select({ gender: singles.gender })
+      .from(singles)
+      .where(sql`LOWER(${singles.email}) = ${normalizedEmail}`)
+      .limit(1);
+    const gender: "female" | "male" = profile?.gender === "male" ? "male" : "female";
+
+    // Queue the first email so suppression, conversion checks and frequency caps
+    // are re-evaluated immediately before the actual send.
     const firstName = lead.name.split(" ")[0];
     const lastName = lead.name.split(" ").slice(1).join(" ") || "";
 
     try {
+      const [freshAttempt] = await db.select({ confirmedAt: paymentLeads.confirmedAt })
+        .from(paymentLeads)
+        .where(eq(paymentLeads.id, lead.id))
+        .limit(1);
+      if (freshAttempt?.confirmedAt) continue;
+      const [freshPayment] = await db.select({ id: completedPayments.id })
+        .from(completedPayments)
+        .where(and(
+          sql`LOWER(${completedPayments.email}) = ${normalizedEmail}`,
+          eq(completedPayments.product, lead.product),
+          gt(completedPayments.paidAt, lead.createdAt),
+        ))
+        .limit(1);
+      if (freshPayment) continue;
       await startJourney({
         email: lead.email,
         firstName,
         lastName,
         phone: lead.phone,
-        gender: "female", // Default to female (majority of audience)
+        gender,
         journeyKey,
-        leadId: crmLead ? undefined : undefined,
+        paymentLeadId: lead.id,
+        paymentAttemptCreatedAt: lead.createdAt,
+        paymentAttemptProduct: lead.product,
+        sendFirstImmediately: false,
       });
       triggered++;
       console.log(`[CartAbandonment] Started ${journeyKey} for ${lead.email} (product: ${lead.product})`);

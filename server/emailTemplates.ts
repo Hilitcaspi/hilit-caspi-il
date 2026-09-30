@@ -61,10 +61,12 @@ const MATCHMAKING_JOIN = "https://hilitcaspi.com/join?utm_source=email&utm_mediu
 const COACHING_PAGE = "https://hilitcaspi.com/coaching?utm_source=email&utm_medium=brevo&utm_campaign=coaching";
 const COURSE_PAGE = "https://hilitcaspi.com/course?utm_source=email&utm_medium=brevo&utm_campaign=course";
 const DATABASE_PAGE = "https://hilitcaspi.com/database?utm_source=email&utm_medium=brevo&utm_campaign=database";
-const GROW_GUIDE = "https://hilitcaspi.com/guide?utm_source=email&utm_medium=brevo&utm_campaign=guide_abandon";
-const GROW_DATABASE = "https://hilitcaspi.com/database?utm_source=email&utm_medium=brevo&utm_campaign=database_abandon";
-const GROW_COURSE = "https://hilitcaspi.com/course?utm_source=email&utm_medium=brevo&utm_campaign=course_abandon";
-const GROW_COACHING = "https://hilitcaspi.com/coaching?utm_source=email&utm_medium=brevo&utm_campaign=coaching_abandon";
+export const CART_RECOVERY_COUPON = "BACK10";
+const GROW_GUIDE = `https://hilitcaspi.com/guide?coupon=${CART_RECOVERY_COUPON}&utm_source=email&utm_medium=lifecycle&utm_campaign=payment_recovery`;
+const GROW_DATABASE = `https://hilitcaspi.com/database?coupon=${CART_RECOVERY_COUPON}&utm_source=email&utm_medium=lifecycle&utm_campaign=payment_recovery`;
+const GROW_COURSE = `https://hilitcaspi.com/course?coupon=${CART_RECOVERY_COUPON}&utm_source=email&utm_medium=lifecycle&utm_campaign=payment_recovery`;
+const GROW_COACHING = `https://hilitcaspi.com/coaching?coupon=${CART_RECOVERY_COUPON}&utm_source=email&utm_medium=lifecycle&utm_campaign=payment_recovery`;
+const GROW_SESSION = `https://hilitcaspi.com/single-session?coupon=${CART_RECOVERY_COUPON}&utm_source=email&utm_medium=lifecycle&utm_campaign=payment_recovery`;
 const HILIT_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
 const PAID_GUIDE_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/Hilit_Caspi_Paid_Guide_6518dc09.pdf";
 const UNSUBSCRIBE_BASE = "https://hilitcaspi.com/unsubscribe";
@@ -382,25 +384,17 @@ export const WOMEN_GUIDE_PURCHASE_EMAIL_2: EmailTemplate = {
 };
 
 export const WOMEN_GUIDE_PURCHASE_EMAIL_3: EmailTemplate = {
-  subject: "הצעד הבא - אם את מוכנה",
+  subject: "הצעד הבא אחרי המדריך: להפוך תובנות לתהליך",
   htmlBody: baseTemplate(`
-    <h2>{{firstName}}, יש צעד אחד שיכול לשנות הכל</h2>
-    <p>שבוע עבר מאז שרכשת את המדריך. אני מקווה שהוא נתן לך כלים שאפשר ליישם.</p>
-    <p>אבל יש משהו שמדריך לא יכול לתת - ליווי אישי שמותאם בדיוק לך.</p>
-    <p>הליווי האישי שלי הוא 8 פגישות שבהן אנחנו:</p>
-    <p>✦ מנתחות את ה-DNA הזוגי שלך לעומק<br>
-    ✦ מזהות את הדפוסים שחוזרים ושוברות אותם<br>
-    ✦ בניית פרופיל שמושך את הצד השני<br>
-    ✦ מלוות אותך עד שאת בזוגיות שמגיעה לך</p>
-    <a href="${CALENDLY_15MIN}" class="cta">♡ קביעת שיחת היכרות (15 דקות, חינם) ←</a>
-    <div class="quote">
-      "הגעתי לשיחת ההיכרות בספקנות. יצאתי עם תוכנית. 6 חודשים אחרי - אני בזוגיות." - שירה, 32
-    </div>
-    <p style="color:#727272; font-size:13px; text-align:center;">ללא עלות, ללא התחייבות. רק שיחה.</p>
+    <h2>{{firstName}}, עכשיו אפשר לקחת את זה צעד קדימה</h2>
+    <p>המדריך נותן את המפה. הקורס הדיגיטלי נותן את התהליך המלא: ללמוד בקצב שלך, לעצור, ליישם ולחזור לכל שלב.</p>
+    <p>זה הצעד הבא המתאים למי שרוצה לעבוד לעומק, אבל עדיין לא זקוקה לליווי אישי.</p>
+    <a href="${COURSE_PAGE}&utm_campaign=product_ladder_guide_to_course" class="cta">לפרטי הקורס הדיגיטלי ←</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">מוצר דיגיטלי, בקצב שלך, עם דרך ברורה ליישום</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הצעד הבא - ליווי אישי.\n\nקביעת שיחת היכרות חינמית: ${CALENDLY_15MIN}\n\nבאהבה,
+  textBody: `{{firstName}}, הצעד הבא אחרי המדריך הוא הקורס הדיגיטלי.\n\nלפרטים: ${COURSE_PAGE}&utm_campaign=product_ladder_guide_to_course\n\nבאהבה,
 הילית כספי
 מאמנת ומשדכת | Relationship Expert & Matchmaker`,
 };
@@ -459,20 +453,15 @@ export const MEN_GUIDE_PURCHASE_EMAIL_2: EmailTemplate = {
 };
 
 export const MEN_GUIDE_PURCHASE_EMAIL_3: EmailTemplate = {
-  subject: "הצעד הבא - אם אתה מוכן",
+  subject: "הצעד הבא אחרי המדריך: להפוך תובנות לתהליך",
   htmlBody: baseTemplate(`
-    <h2>{{firstName}}, יש צעד אחד שיכול לשנות הכל</h2>
-    <p>שבוע עבר. אני מקווה שהמדריך נתן לך כלים שאפשר ליישם.</p>
-    <p>אבל יש משהו שמדריך לא יכול לתת - ליווי אישי שמותאם לסיטואציה שלך.</p>
-    <p>בשיחת ההיכרות של 15 דקות נבין יחד:</p>
-    <p>✦ מה עוצר אותך עכשיו<br>
-    ✦ מה הצעד הנכון הבא<br>
-    ✦ האם הליווי האישי שלי מתאים לך</p>
-    <a href="${CALENDLY_15MIN}" class="cta">קביעת שיחת היכרות (15 דקות, חינם) ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">ללא עלות, ללא התחייבות.</p>
+    <h2>{{firstName}}, עכשיו אפשר לקחת את זה צעד קדימה</h2>
+    <p>המדריך נותן את המפה. הקורס הדיגיטלי נותן תהליך מלא שאפשר לעבור בקצב שלך, ליישם ולחזור לכל שלב.</p>
+    <p>זה הצעד הבא המתאים למי שרוצה לעבוד לעומק לפני מעבר לליווי אישי.</p>
+    <a href="${COURSE_PAGE}&utm_campaign=product_ladder_guide_to_course" class="cta">לפרטי הקורס הדיגיטלי ←</a>
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הצעד הבא - שיחת היכרות חינמית.\n\nקביעה: ${CALENDLY_15MIN}\n\nהילית`,
+  textBody: `{{firstName}}, הצעד הבא אחרי המדריך הוא הקורס הדיגיטלי.\n\nלפרטים: ${COURSE_PAGE}&utm_campaign=product_ladder_guide_to_course\n\nהילית`,
 };
 
 // ─── JOURNEY 3: Women - מאגר (אחרי הצטרפות) ─────────────────────────────────
@@ -709,61 +698,61 @@ export const ABANDONED_GUIDE_EMAIL_1: EmailTemplate = {
   subject: "{{firstName}}, שכחת משהו...",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, ראיתי שעמדת לקחת את הצעד הזה</h2>
-    <p>לפני כמה דקות ביקרת בדף המדריך שלי - ועצרת.</p>
+    <p>ראיתי שהתחלת את תהליך רכישת המדריך, אבל התשלום לא הושלם.</p>
     <p>אני מבינה. לפעמים צריך רגע לחשוב. אבל רציתי לשאול אותך ישירות:</p>
     <div class="quote">
       "מה עוצר אותך? לפעמים ההתנגדות הקטנה הזו היא בדיוק הסימן שאת מוכנה לשינוי."
     </div>
     <p>המדריך "לבחור נכון - המדריך המעשי לזוגיות" נכתב בדיוק בשביל הרגע הזה - כשאת יודעת שמשהו צריך להשתנות, אבל לא בטוחה מאיפה להתחיל.</p>
-    <p>ועכשיו, כי אני רוצה שתתחילו - יש לכם קופון מיוחד:</p>
+    <p>כדי שיהיה לך קל לחזור ולהשלים, הכנתי קוד ייעודי:</p>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
       <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלכם:</p>
-      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">HILIT10</p>
-      <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - תקף ל-48 שעות בלבד</p>
+      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
+      <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - נוצר במיוחד להשלמת התשלום</p>
     </div>
     <a href="${GROW_GUIDE}" class="cta">♡ לרכישת המדריך עם ההנחה ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">₪134 במקום ₪249 · תוכן דיגיטלי מיידי</p>
+    <p style="color:#727272; font-size:13px; text-align:center;">10% הנחה ממחיר המדריך · תוכן דיגיטלי מיידי</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, שכחת משהו...\n\nיש לך קופון 10% הנחה: HILIT10\n\nלרכישת המדריך: ${GROW_GUIDE}\n\nבאהבה,\nהילית`,
+  textBody: `{{firstName}}, שכחת משהו...\n\nיש לך קופון 10% הנחה: BACK10\n\nלרכישת המדריך: ${GROW_GUIDE}\n\nבאהבה,\nהילית`,
 };
 
 export const ABANDONED_GUIDE_EMAIL_2: EmailTemplate = {
-  subject: "הקופון שלך פג בעוד 24 שעות",
+  subject: "קוד BACK10 שלך זמין",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, הקופון שלך עדיין מחכה</h2>
     <p>שלחתי לך אתמול קוד הנחה של 10% - ועדיין לא ניצלת אותו.</p>
-    <p>אני לא רוצה להציק, אבל כן רוצה שתדעי: הקופון פג בעוד 24 שעות.</p>
+    <p>רציתי לוודא שקיבלת את קוד BACK10 ושקישור ההמשך זמין לך.</p>
     <div class="quote">
-      "נועה חיכתה שבועיים לפני שרכשה. אחרי שקראה את הסוד הרביעי, היא כתבה לי: 'הייתי צריכה את זה לפני שנים.' אל תחכי."
+      "נועה חיכתה שבועיים לפני שרכשה. אחרי שקראה את הסוד הרביעי, היא כתבה לי: 'הייתי צריכה את זה לפני שנים.'"
     </div>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
       <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלך:</p>
-      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">HILIT10</p>
-      <p style="font-size:13px; color:#e53e3e; margin:0;">פג בעוד 24 שעות</p>
+      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
+      <p style="font-size:13px; color:#e53e3e; margin:0;">מחכה לך גם היום</p>
     </div>
-    <a href="${GROW_GUIDE}" class="cta">♡ לרכישת המדריך עכשיו ←</a>
+    <a href="${GROW_GUIDE}" class="cta">♡ לרכישת המדריך ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הקופון HILIT10 פג בעוד 24 שעות.\n\nלרכישה: ${GROW_GUIDE}\n\nהילית`,
+  textBody: `{{firstName}}, הקופון BACK10 מחכה לך גם היום.\n\nלרכישה: ${GROW_GUIDE}\n\nהילית`,
 };
 
 export const ABANDONED_GUIDE_EMAIL_3: EmailTemplate = {
-  subject: "מייל אחרון - הקופון פג הלילה",
+  subject: "תזכורת אחרונה בסבב הזה",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, זה המייל האחרון</h2>
-    <p>הקופון שלך פג הלילה בחצות. לא אשלח יותר תזכורות על זה.</p>
+    <p>זו התזכורת האחרונה שלי בנושא הזה.</p>
     <p>אבל לפני שאסגור - רציתי לשאול: מה עוצר אותך?</p>
     <p>אם יש שאלה, ספק, או סתם רציתם לדבר - אני כאן:</p>
     <a href="${WHATSAPP_LINK}" class="secondary-cta">שלחו לי וואטסאפ ←</a>
-    <p>ואם אתם מוכנים - הקופון עדיין פעיל עד חצות:</p>
-    <a href="${GROW_GUIDE}" class="cta">♡ לרכישה עם קוד HILIT10 ←</a>
+    <p>אם מתאים לך להשלים את התהליך:</p>
+    <a href="${GROW_GUIDE}" class="cta">♡ לרכישה עם קוד BACK10 ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, מייל אחרון - קוד HILIT10 פג הלילה.\n\nשאלות? ${WHATSAPP_LINK}\nלרכישה: ${GROW_GUIDE}\n\nהילית`,
+  textBody: `{{firstName}}, תזכורת אחרונה בסבב הזה.\n\nשאלות? ${WHATSAPP_LINK}\nלרכישה: ${GROW_GUIDE}\n\nהילית`,
 };
 
 // ─── JOURNEY 5: נטישת עגלה - מאגר ───────────────────────────────────────────
@@ -778,11 +767,11 @@ export const ABANDONED_DATABASE_EMAIL_1: EmailTemplate = {
       "רוב הנשים שמצאו זוגיות דרך המאגר שלי היססו בדיוק כמוך. הן לא היו בטוחות אם זה 'בשבילן'. ואז הן ניסו."
     </div>
     <p>המאגר שלי שונה מאפליקציות - כל חיבור עובר דרכי אישית. אני מכירה את האנשים משני הצדדים.</p>
-    <p>ועכשיו, כי אני רוצה שתצטרפו - יש לכם קופון מיוחד:</p>
+    <p>כדי שיהיה לך קל לחזור ולהשלים, הכנתי קוד ייעודי:</p>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
       <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלך:</p>
-      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">HILIT10</p>
-      <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - תקף ל-48 שעות בלבד</p>
+      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
+      <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - נוצר במיוחד להשלמת התשלום</p>
     </div>
     ${urgencyBanner()}
     <a href="${GROW_DATABASE}" class="cta">♡ הצטרפו למאגר עם ההנחה ←</a>
@@ -790,41 +779,41 @@ export const ABANDONED_DATABASE_EMAIL_1: EmailTemplate = {
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, המקום שלך במאגר עדיין פנוי.\n\nקופון 10%: HILIT10\n\nלהצטרפות: ${GROW_DATABASE}\n\nהילית`,
+  textBody: `{{firstName}}, המקום שלך במאגר עדיין פנוי.\n\nקופון 10%: BACK10\n\nלהצטרפות: ${GROW_DATABASE}\n\nהילית`,
 };
 
 export const ABANDONED_DATABASE_EMAIL_2: EmailTemplate = {
-  subject: "הקופון שלך פג בעוד 24 שעות - המאגר מחכה",
+  subject: "קוד BACK10 שלך זמין למאגר",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, עדיין יש לך מקום</h2>
-    <p>הקופון שלך פג בעוד 24 שעות. רציתי לוודא שראית.</p>
+    <p>קוד BACK10 שלך זמין. רציתי לוודא שראית.</p>
     <div class="quote">
       "מיכל הצטרפה למאגר בספקנות. 6 שבועות אחרי, היא פגשה את בן הזוג שלה. היום הם מאורסים."
     </div>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
-      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">HILIT10</p>
-      <p style="font-size:13px; color:#e53e3e; margin:0;">פג בעוד 24 שעות</p>
+      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
+      <p style="font-size:13px; color:#e53e3e; margin:0;">מחכה לך גם היום</p>
     </div>
     ${urgencyBanner()}
-    <a href="${GROW_DATABASE}" class="cta">♡ להצטרפות למאגר עכשיו ←</a>
+    <a href="${GROW_DATABASE}" class="cta">♡ להצטרפות למאגר ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, קוד HILIT10 פג בעוד 24 שעות.\n\nלהצטרפות: ${GROW_DATABASE}\n\nהילית`,
+  textBody: `{{firstName}}, קוד BACK10 מחכה לך גם היום.\n\nלהצטרפות: ${GROW_DATABASE}\n\nהילית`,
 };
 
 export const ABANDONED_DATABASE_EMAIL_3: EmailTemplate = {
-  subject: "מייל אחרון - הקופון פג הלילה",
+  subject: "תזכורת אחרונה בסבב הזה",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, זה המייל האחרון</h2>
-    <p>הקופון פג הלילה. לא אשלח יותר תזכורות.</p>
+    <p>זו התזכורת האחרונה שלי בנושא הזה.</p>
     <p>שאלות? אני כאן:</p>
     <a href="${WHATSAPP_LINK}" class="secondary-cta">שלחו לי וואטסאפ ←</a>
     ${urgencyBanner()}
-    <a href="${GROW_DATABASE}" class="cta">להצטרפות עם קוד HILIT10 ←</a>   <hr class="divider" />
+    <a href="${GROW_DATABASE}" class="cta">להצטרפות עם קוד BACK10 ←</a>   <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, מייל אחרון - קוד HILIT10 פג הלילה.\n\nלהצטרפות: ${GROW_DATABASE}\n\nהילית`,
+  textBody: `{{firstName}}, תזכורת אחרונה בסבב הזה.\n\nלהצטרפות: ${GROW_DATABASE}\n\nהילית`,
 };
 
 // ─── JOURNEY 5: נטישת עגלה - קורס ───────────────────────────────────────────
@@ -838,50 +827,50 @@ export const ABANDONED_COURSE_EMAIL_1: EmailTemplate = {
     <div class="quote">
       "עשיתי את המודול הראשון בפיג'מה, בשעה 11 בלילה. בכיתי. הבנתי דברים שלא הבנתי אחרי שנים." - שירה, 34
     </div>
-    <p>ועכשיו, כי אני רוצה שתתחילו - יש לכם קופון מיוחד:</p>
+    <p>כדי שיהיה לך קל לחזור ולהשלים, הכנתי קוד ייעודי:</p>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
       <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלכם:</p>
-      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">HILIT10</p>
-      <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - תקף ל-48 שעות בלבד</p>
+      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
+      <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - נוצר במיוחד להשלמת התשלום</p>
     </div>
     <a href="${GROW_COURSE}" class="cta">♡ לרכישת הקורס עם ההנחה ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הקורס עדיין מחכה לך.\n\nקופון 10%: HILIT10\n\nלרכישה: ${GROW_COURSE}\n\nהילית`,
+  textBody: `{{firstName}}, הקורס עדיין מחכה לך.\n\nקופון 10%: BACK10\n\nלרכישה: ${GROW_COURSE}\n\nהילית`,
 };
 
 export const ABANDONED_COURSE_EMAIL_2: EmailTemplate = {
-  subject: "הקופון שלך פג בעוד 24 שעות",
+  subject: "קוד BACK10 שלך זמין",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, עדיין יש לך הנחה</h2>
-    <p>הקופון שלך פג בעוד 24 שעות.</p>
+    <p>קוד BACK10 שלך זמין.</p>
     <div class="quote">
       "ישבתי עם ההחלטה שלושה ימים. בסוף אמרתי לעצמי: אני משקיעה בעצמי. זו ההחלטה הכי טובה שעשיתי." - מיכל, 38
     </div>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
-      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">HILIT10</p>
-      <p style="font-size:13px; color:#e53e3e; margin:0;">פג בעוד 24 שעות</p>
+      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
+      <p style="font-size:13px; color:#e53e3e; margin:0;">מחכה לך גם היום</p>
     </div>
-    <a href="${GROW_COURSE}" class="cta">♡ לרכישת הקורס עכשיו ←</a>
+    <a href="${GROW_COURSE}" class="cta">♡ לרכישת הקורס ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, קוד HILIT10 פג בעוד 24 שעות.\n\nלרכישה: ${GROW_COURSE}\n\nהילית`,
+  textBody: `{{firstName}}, קוד BACK10 מחכה לך גם היום.\n\nלרכישה: ${GROW_COURSE}\n\nהילית`,
 };
 
 export const ABANDONED_COURSE_EMAIL_3: EmailTemplate = {
-  subject: "מייל אחרון - הקופון פג הלילה",
+  subject: "תזכורת אחרונה בסבב הזה",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, זה המייל האחרון</h2>
-    <p>הקופון פג הלילה. לא אשלח יותר תזכורות.</p>
+    <p>זו התזכורת האחרונה שלי בנושא הזה.</p>
     <p>שאלות? אני כאן:</p>
     <a href="${WHATSAPP_LINK}" class="secondary-cta">שלחו לי וואטסאפ ←</a>
-    <a href="${GROW_COURSE}" class="cta">♡ לרכישה עם קוד HILIT10 ←</a>
+    <a href="${GROW_COURSE}" class="cta">♡ לרכישה עם קוד BACK10 ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, מייל אחרון - קוד HILIT10 פג הלילה.\n\nלרכישה: ${GROW_COURSE}\n\nהילית`,
+  textBody: `{{firstName}}, תזכורת אחרונה בסבב הזה.\n\nלרכישה: ${GROW_COURSE}\n\nהילית`,
 };
 
 // ─── JOURNEY 5: נטישת עגלה - ליווי ──────────────────────────────────────────
@@ -897,50 +886,94 @@ export const ABANDONED_COACHING_EMAIL_1: EmailTemplate = {
     <p>ואם אתם מוכנים - יש לכם קופון מיוחד:</p>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
       <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלך:</p>
-      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">HILIT10</p>
-      <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - ₪2,664 במקום ₪2,960 · תקף ל-48 שעות</p>
+      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
+      <p style="font-size:13px; color:#727272; margin:0;">10% הנחה ממחיר הליווי · מיועד להשלמת התשלום</p>
     </div>
     <a href="${GROW_COACHING}" class="secondary-cta">לרכישת חבילת הליווי עם ההנחה ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, עמדת לעשות את הצעד הגדול.\n\nשיחת היכרות חינמית: ${CALENDLY_15MIN}\nקופון 10%: HILIT10 (₪2,664 במקום ₪2,960)\nלרכישה: ${GROW_COACHING}\n\nהילית`,
+  textBody: `{{firstName}}, עמדת לעשות את הצעד הגדול.\n\nשיחת היכרות חינמית: ${CALENDLY_15MIN}\nקופון 10%: BACK10\nלרכישה: ${GROW_COACHING}\n\nהילית`,
 };
 
 export const ABANDONED_COACHING_EMAIL_2: EmailTemplate = {
-  subject: "{{firstName}}, הקופון שלך פג בעוד 24 שעות",
+  subject: "{{firstName}}, קוד BACK10 שלך זמין",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, עדיין יש לך הנחה</h2>
-    <p>הקופון שלך פג בעוד 24 שעות.</p>
+    <p>קוד BACK10 שלך זמין.</p>
     <div class="quote">
       "ישבתי עם ההצעה שלה שלושה ימים. הייתי בספק. בסוף אמרתי לעצמי: אני משקיעה בעצמי. זו ההחלטה הכי טובה שעשיתי." - מיכל, 38
     </div>
     <p>ואם יש שאלה - שיחה קצרה של 15 דקות, חינם לגמרי:</p>
     <a href="${CALENDLY_15MIN}" class="secondary-cta">♡ קביעת שיחת היכרות ←</a>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
-      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">HILIT10</p>
-      <p style="font-size:13px; color:#e53e3e; margin:0;">₪2,664 במקום ₪2,960 · פג בעוד 24 שעות</p>
+      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
+      <p style="font-size:13px; color:#e53e3e; margin:0;">10% הנחה · מחכה לך גם היום</p>
     </div>
-    <a href="${GROW_COACHING}" class="cta">♡ לרכישת הליווי עכשיו ←</a>
+    <a href="${GROW_COACHING}" class="cta">♡ לרכישת הליווי ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, קוד HILIT10 פג בעוד 24 שעות.\n\nשיחה: ${CALENDLY_15MIN}\nלרכישה: ${GROW_COACHING}\n\nהילית`,
+  textBody: `{{firstName}}, קוד BACK10 מחכה לך גם היום.\n\nשיחה: ${CALENDLY_15MIN}\nלרכישה: ${GROW_COACHING}\n\nהילית`,
 };
 
 export const ABANDONED_COACHING_EMAIL_3: EmailTemplate = {
-  subject: "מייל אחרון - הקופון פג הלילה",
+  subject: "תזכורת אחרונה בסבב הזה",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, זה המייל האחרון</h2>
-    <p>הקופון פג הלילה. לא אשלח יותר תזכורות.</p>
+    <p>זו התזכורת האחרונה שלי בנושא הזה.</p>
     <p>אבל אם יש לך שאלה - אני כאן:</p>
     <a href="${WHATSAPP_LINK}" class="secondary-cta">שלחו לי וואטסאפ ←</a>
-    <a href="${GROW_COACHING}" class="cta">♡ לרכישה עם קוד HILIT10 ←</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">₪2,664 במקום ₪2,960 - עד חצות הלילה</p>
+    <a href="${GROW_COACHING}" class="cta">♡ לרכישה עם קוד BACK10 ←</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">10% הנחה עם הקוד</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, מייל אחרון - קוד HILIT10 פג הלילה.\n\nלרכישה: ${GROW_COACHING}\n\nהילית`,
+  textBody: `{{firstName}}, תזכורת אחרונה בסבב הזה.\n\nלרכישה: ${GROW_COACHING}\n\nהילית`,
+};
+
+// ─── JOURNEY 5: נטישת תשלום - פגישה אישית ───────────────────────────────────
+
+export const ABANDONED_SESSION_EMAIL_1: EmailTemplate = {
+  subject: "{{firstName}}, הפגישה האישית עדיין מחכה לך",
+  htmlBody: baseTemplate(`
+    <h2>{{firstName}}, כמעט השלמת את הצעד</h2>
+    <p>התחלת להזמין פגישה אישית ועצרת לפני סיום התשלום. שמרתי לך קוד שחזור ייעודי:</p>
+    <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
+      <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלך:</p>
+      <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
+      <p style="font-size:13px; color:#727272; margin:0;">10% הנחה · מיועד להשלמת התשלום</p>
+    </div>
+    <a href="${GROW_SESSION}" class="cta">להשלמת הזמנת הפגישה ←</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">הקוד כבר מחכה לך בקישור</p>
+    <hr class="divider" />
+    ${emailSignature()}
+  `),
+  textBody: `{{firstName}}, הפגישה האישית עדיין מחכה לך.\n\nקופון 10%: BACK10\nלהשלמת התשלום: ${GROW_SESSION}\n\nהילית`,
+};
+
+export const ABANDONED_SESSION_EMAIL_2: EmailTemplate = {
+  subject: "קוד BACK10 שלך זמין",
+  htmlBody: baseTemplate(`
+    <h2>{{firstName}}, רק תזכורת קצרה</h2>
+    <p>קוד BACK10 להשלמת הזמנת הפגישה עדיין זמין לך.</p>
+    <a href="${GROW_SESSION}" class="cta">להשלמת הזמנת הפגישה ←</a>
+    <hr class="divider" />
+    ${emailSignature()}
+  `),
+  textBody: `{{firstName}}, קוד BACK10 מחכה לך גם היום.\n\nלהשלמת התשלום: ${GROW_SESSION}\n\nהילית`,
+};
+
+export const ABANDONED_SESSION_EMAIL_3: EmailTemplate = {
+  subject: "תזכורת אחרונה בסבב הזה",
+  htmlBody: baseTemplate(`
+    <h2>{{firstName}}, זו התזכורת האחרונה</h2>
+    <p>זו התזכורת האחרונה שלי על ניסיון התשלום הזה.</p>
+    <a href="${GROW_SESSION}" class="cta">להשלמת הזמנת הפגישה ←</a>
+    <hr class="divider" />
+    ${emailSignature()}
+  `),
+  textBody: `{{firstName}}, תזכורת אחרונה בסבב הזה.\n\nלהשלמת התשלום: ${GROW_SESSION}\n\nהילית`,
 };
 
 // ─── JOURNEY 6: רכישת קורס דיגיטלי ──────────────────────────────────────────
@@ -983,21 +1016,15 @@ export const WOMEN_COURSE_PURCHASE_EMAIL_2: EmailTemplate = {
 };
 
 export const WOMEN_COURSE_PURCHASE_EMAIL_3: EmailTemplate = {
-  subject: "הצעד הבא אחרי הקורס",
+  subject: "רוצה להפוך את הקורס לתוכנית אישית עבורך?",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, שבוע לקורס - הצעד הבא</h2>
-    <p>שבוע עבר מאז שהתחלת. אני מקווה שהקורס נתן לך כלים שאפשר ליישם.</p>
-    <p>מי שמשלב את הקורס עם ליווי אישי מגיע לתוצאות הכי מהירות - כי הקורס נותן את הידע, והליווי מתרגם אותו לסיטואציה הספציפית שלכם.</p>
-    <p>אם אתם רוצים ללכת עמוק יותר - שיחה קצרה של 15 דקות, חינם לגמרי:</p>
-    <a href="${CALENDLY_15MIN}" class="cta">♡ קביעת שיחת היכרות (15 דקות, חינם) ←</a>
-    <div class="quote">
-      "עשיתי את הקורס ואחרי שבוע קבעתי שיחה עם הילית. 4 חודשים אחרי - אני בזוגיות." - ליאת, 36
-    </div>
-    <p style="color:#727272; font-size:13px; text-align:center;">ללא עלות, ללא התחייבות. רק שיחה.</p>
+    <p>הקורס נותן את המודלים והכלים. בפגישה אישית אפשר לחבר אותם לסיטואציה שלך, לזהות את הצעד המדויק הבא ולצאת עם כיוון ברור.</p>
+    <a href="${CALENDLY_15MIN}?utm_source=email&utm_medium=lifecycle&utm_campaign=product_ladder_course_to_session" class="cta">לפרטי הפגישה האישית ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הצעד הבא אחרי הקורס.\n\nשיחת היכרות חינמית: ${CALENDLY_15MIN}\n\nבאהבה,\nהילית`,
+  textBody: `{{firstName}}, הצעד הבא אחרי הקורס הוא פגישה אישית שמחברת את הכל לסיטואציה שלך.\n\nלפרטים: ${CALENDLY_15MIN}?utm_source=email&utm_medium=lifecycle&utm_campaign=product_ladder_course_to_session\n\nבאהבה,\nהילית`,
 };
 
 export const MEN_COURSE_PURCHASE_EMAIL_1: EmailTemplate = {
@@ -1029,14 +1056,14 @@ export const MEN_COURSE_PURCHASE_EMAIL_2: EmailTemplate = {
 };
 
 export const MEN_COURSE_PURCHASE_EMAIL_3: EmailTemplate = {
-  subject: "הצעד הבא אחרי הקורס",
+  subject: "רוצה להפוך את הקורס לתוכנית אישית עבורך?",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, שבוע לקורס - הצעד הבא</h2>
-    <p>שבוע עבר. אני מקווה שהקורס נתן לך כלים שאפשר ליישם.</p>    <p>אם אתם רוצים ללכת עמוק יותר - שיחה קצרה של 15 דקות, חינם לגמרי:</p>
-    <a href="${CALENDLY_15MIN}" class="cta">קביעת שיחת היכרות (15 דקות, חינם) ←</a>yle="color:#727272; font-size:13px; text-align:center;">ללא עלות, ללא התחייבות.</p>
+    <p>הקורס נותן את המודלים והכלים. בפגישה אישית אפשר לחבר אותם לסיטואציה שלך, לזהות את הצעד המדויק הבא ולצאת עם כיוון ברור.</p>
+    <a href="${CALENDLY_15MIN}?utm_source=email&utm_medium=lifecycle&utm_campaign=product_ladder_course_to_session" class="cta">לפרטי הפגישה האישית ←</a>
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הצעד הבא - שיחת היכרות חינמית.\n\nקביעה: ${CALENDLY_15MIN}\n\nהילית`,
+  textBody: `{{firstName}}, הצעד הבא אחרי הקורס הוא פגישה אישית שמחברת את הכל לסיטואציה שלך.\n\nלפרטים: ${CALENDLY_15MIN}?utm_source=email&utm_medium=lifecycle&utm_campaign=product_ladder_course_to_session\n\nהילית`,
 };
 
 // ─── Export map for easy lookup ───────────────────────────────────────────────
@@ -1056,6 +1083,7 @@ export type JourneyKey =
   | "abandoned_database"
   | "abandoned_course"
   | "abandoned_coaching"
+  | "abandoned_session"
   | "women_course"
   | "men_course"
   | "free_guide_nurture"
@@ -1238,11 +1266,12 @@ export const EMAIL_SEQUENCES: Record<JourneyKey, EmailTemplate[]> = {
   men_matchmaking: [MEN_MATCHMAKING_EMAIL_1, MEN_MATCHMAKING_EMAIL_2, MEN_MATCHMAKING_EMAIL_3],
   women_transformation: [WOMEN_TRANSFORMATION_EMAIL_1, WOMEN_TRANSFORMATION_EMAIL_2, WOMEN_TRANSFORMATION_EMAIL_3],
   men_transformation: [MEN_TRANSFORMATION_EMAIL_1, MEN_TRANSFORMATION_EMAIL_2, MEN_TRANSFORMATION_EMAIL_3],
-  // Abandoned cart sequences (with 10% coupon HILIT10)
+  // Abandoned payment sequences (with dedicated 10% coupon BACK10)
   abandoned_guide: [ABANDONED_GUIDE_EMAIL_1, ABANDONED_GUIDE_EMAIL_2, ABANDONED_GUIDE_EMAIL_3],
   abandoned_database: [ABANDONED_DATABASE_EMAIL_1, ABANDONED_DATABASE_EMAIL_2, ABANDONED_DATABASE_EMAIL_3],
   abandoned_course: [ABANDONED_COURSE_EMAIL_1, ABANDONED_COURSE_EMAIL_2, ABANDONED_COURSE_EMAIL_3],
   abandoned_coaching: [ABANDONED_COACHING_EMAIL_1, ABANDONED_COACHING_EMAIL_2, ABANDONED_COACHING_EMAIL_3],
+  abandoned_session: [ABANDONED_SESSION_EMAIL_1, ABANDONED_SESSION_EMAIL_2, ABANDONED_SESSION_EMAIL_3],
   // Course purchase sequences
   women_course: [WOMEN_COURSE_PURCHASE_EMAIL_1, WOMEN_COURSE_PURCHASE_EMAIL_2, WOMEN_COURSE_PURCHASE_EMAIL_3],
   men_course: [MEN_COURSE_PURCHASE_EMAIL_1, MEN_COURSE_PURCHASE_EMAIL_2, MEN_COURSE_PURCHASE_EMAIL_3],

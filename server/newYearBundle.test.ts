@@ -47,7 +47,7 @@ describe("New Year holiday bundle", () => {
     expect(courseHandler).toContain('opts.emailMode === "new_year_bundle"');
     expect(courseHandler).toContain("buildNewYearBundleAccessEmail");
     expect(courseHandler).toContain("if (!opts.skipJourney)");
-    expect(courseHandler).toContain('journeyKey: "women_course"');
+    expect(courseHandler).toContain('getJourneyKey(gender, "course")');
     expect(webhook).toContain('case "course":   await handleCourse(email, name); break;');
   });
 

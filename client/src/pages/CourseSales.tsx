@@ -80,6 +80,9 @@ const WHAT_YOU_GET = [
 ];
 
 export default function CourseSales() {
+  const query = new URLSearchParams(window.location.search);
+  const recoveryCoupon = query.get("coupon")?.toUpperCase() === "BACK10" ? "BACK10" : undefined;
+  const recoveryEmail = query.get("email") || undefined;
   React.useEffect(() => {
     track({ eventType: "course_view" });
     trackViewContent({ content_name: "קורס המסע", content_category: "course" });
@@ -157,6 +160,8 @@ export default function CourseSales() {
                 product="course"
                 buttonLabel="♡ הצטרפות לקורס עכשיו"
                 termsPath="/terms/course"
+                prefillEmail={recoveryEmail}
+                prefillCoupon={recoveryCoupon}
                 onSuccess={() => { window.location.href = "/thank-you/course"; }}
               />
             </div>
@@ -303,6 +308,8 @@ export default function CourseSales() {
                 product="course"
                 buttonLabel="הצטרפות לקורס ₪249"
                 termsPath="/terms/course"
+                prefillEmail={recoveryEmail}
+                prefillCoupon={recoveryCoupon}
                 onSuccess={() => { window.location.href = "/thank-you/course"; }}
               />
             </motion.div>

@@ -32,6 +32,9 @@ function AnimatedSection({ children, className = "" }: { children: React.ReactNo
 
 export default function GuideSales() {
   const [, navigate] = useLocation();
+  const query = new URLSearchParams(window.location.search);
+  const recoveryCoupon = query.get("coupon")?.toUpperCase() === "BACK10" ? "BACK10" : undefined;
+  const recoveryEmail = query.get("email") || undefined;
   React.useEffect(() => {
     track({ eventType: "guide_view" });
     trackViewContent({ content_name: "מדריך לבחור נכון", content_category: "guide" });
@@ -121,6 +124,8 @@ export default function GuideSales() {
                 product="guide"
                 buttonLabel="לרכישה המאובטחת ₪149 ←"
                 termsPath="/terms/guide"
+                prefillEmail={recoveryEmail}
+                prefillCoupon={recoveryCoupon}
                 onSuccess={() => navigate("/thank-you/digital")}
               />
             </motion.div>
@@ -337,6 +342,8 @@ export default function GuideSales() {
                 product="guide"
                 buttonLabel="לרכישה המאובטחת ₪149 ←"
                 termsPath="/terms/guide"
+                prefillEmail={recoveryEmail}
+                prefillCoupon={recoveryCoupon}
                 onSuccess={() => navigate("/thank-you/digital")}
               />
             </motion.div>

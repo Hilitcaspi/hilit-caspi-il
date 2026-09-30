@@ -53,6 +53,7 @@ export const LIST_NAMES = {
   abandoned_database: "נטישת עגלה - מאגר",
   abandoned_course: "נטישת עגלה - קורס",
   abandoned_coaching: "נטישת עגלה - ליווי",
+  abandoned_session: "נטישת תשלום - פגישה",
   // Course purchase
   women_course: "נשים - קורס",
   men_course: "גברים - קורס",

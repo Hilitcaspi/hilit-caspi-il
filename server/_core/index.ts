@@ -11,7 +11,7 @@ import { registerGrowProxy } from "./growProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { processPendingEmails, processMeetingReminders, processMatchFollowUps, retryUnsentMatchEmails, processMatchedPairFollowUps, processCartAbandonment } from "../automation";
+import { processPendingEmails, processMeetingReminders, processMatchFollowUps, retryUnsentMatchEmails, processMatchedPairFollowUps } from "../automation";
 import { notifyOwner } from "./notification";
 
 import { runWeeklyMatching, expireStaleMatches } from "../matchingScheduler";
@@ -711,6 +711,91 @@ async function startServer() {
     }
   });
 
+  // Hourly lifecycle automation. The DB feature flag is the source of truth;
+  // every queued message is rechecked for suppression, conversion and frequency.
+  app.post("/api/scheduled/lifecycle-automation", express.json(), async (req, res) => {
+    try {
+      let user: any;
+      try { user = await sdk.authenticateRequest(req as any); }
+      catch { res.status(403).json({ error: "cron-or-admin-only" }); return; }
+      const taskUid = (user as any).taskUid as string | undefined;
+      const isCron = Boolean((user as any).isCron && taskUid);
+      if (!isCron && user.role !== "admin") { res.status(403).json({ error: "cron-or-admin-only" }); return; }
+      const db = await getDb();
+      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+      const { lifecycleMarketingSettings } = await import("../../drizzle/schema");
+      const [settings] = await db.select().from(lifecycleMarketingSettings).where(
+        isCron
+          ? eq(lifecycleMarketingSettings.lifecycleCronTaskUid, taskUid!)
+          : eq(lifecycleMarketingSettings.name, "israel-site-lifecycle"),
+      ).limit(1);
+      if (!settings) { res.json({ success: true, skipped: "orphan" }); return; }
+      if (!settings?.isEnabled) {
+        res.json({ success: true, enabled: false, message: "Lifecycle automation is paused" });
+        return;
+      }
+
+      const { processCartAbandonment, processPendingEmails } = await import("../automation");
+      const recoveryQueued = await processCartAbandonment({ eligibleAfter: settings.launchedAt ?? undefined });
+      const sent = await processPendingEmails({
+        minMarketingGapHours: settings.minMarketingGapHours,
+        eligibleCreatedAfter: settings.launchedAt ?? undefined,
+      });
+      const now = Date.now();
+      await db.update(lifecycleMarketingSettings).set({ updatedAt: now })
+        .where(eq(lifecycleMarketingSettings.id, settings.id));
+      res.json({ success: true, enabled: true, recoveryQueued, sent });
+    } catch (err) {
+      console.error("[LifecycleAutomation] Error:", err);
+      void sendErrorAlert({ source: "express:lifecycle-automation", error: err, context: { route: req.path } });
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // Daily controlled Boost experiment: at most 50 newly queued opportunities.
+  app.post("/api/scheduled/boost-lifecycle", express.json(), async (req, res) => {
+    try {
+      let user: any;
+      try { user = await sdk.authenticateRequest(req as any); }
+      catch { res.status(403).json({ error: "cron-or-admin-only" }); return; }
+      const taskUid = (user as any).taskUid as string | undefined;
+      const isCron = Boolean((user as any).isCron && taskUid);
+      if (!isCron && user.role !== "admin") { res.status(403).json({ error: "cron-or-admin-only" }); return; }
+      const db = await getDb();
+      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+      const { lifecycleMarketingSettings } = await import("../../drizzle/schema");
+      const [settings] = await db.select().from(lifecycleMarketingSettings).where(
+        isCron
+          ? eq(lifecycleMarketingSettings.boostCronTaskUid, taskUid!)
+          : eq(lifecycleMarketingSettings.name, "israel-site-lifecycle"),
+      ).limit(1);
+      if (!settings) { res.json({ success: true, skipped: "orphan" }); return; }
+      if (!settings?.isEnabled) {
+        res.json({ success: true, enabled: false, message: "Boost lifecycle is paused" });
+        return;
+      }
+      if (isCron) {
+        const israelHour = Number(new Intl.DateTimeFormat("en-GB", {
+          timeZone: "Asia/Jerusalem",
+          hour: "2-digit",
+          hour12: false,
+        }).format(new Date()));
+        if (israelHour !== 19) {
+          res.json({ success: true, enabled: true, skipped: "outside_19_israel" });
+          return;
+        }
+      }
+
+      const { processBoostOpportunityEmails } = await import("../lifecycleEmailQueue");
+      const boost = await processBoostOpportunityEmails({ queueLimit: 50 });
+      res.json({ success: true, enabled: true, boost });
+    } catch (err) {
+      console.error("[BoostLifecycle] Error:", err);
+      void sendErrorAlert({ source: "express:boost-lifecycle", error: err, context: { route: req.path } });
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   app.post("/api/scheduled/incomplete-profile-alerts", express.json(), async (req, res) => {
     try {
       let isAuthorized = false;
@@ -1076,11 +1161,6 @@ async function startServer() {
       const matchedFollowUps = await processMatchedPairFollowUps();
       if (matchedFollowUps > 0) {
         console.log(`[MatchedFollowUp] Sent ${matchedFollowUps} post-match lifecycle emails`);
-      }
-      // Check for cart abandonment (people who started payment but didn't finish)
-      const abandoned = await processCartAbandonment();
-      if (abandoned > 0) {
-        console.log(`[CartAbandonment] Triggered ${abandoned} abandonment journeys`);
       }
       // Expire matches that haven't been responded to within 48 hours
       const expired = await expireStaleMatches();

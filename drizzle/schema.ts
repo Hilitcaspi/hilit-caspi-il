@@ -450,6 +450,9 @@ export type InsertCrmLead = typeof crmLeads.$inferInsert;
 export const emailLog = mysqlTable("email_log", {
   id: int("id").autoincrement().primaryKey(),
   leadId: int("leadId"),  // optional link to crm_leads
+  paymentLeadId: int("paymentLeadId"), // immutable payment attempt for recovery cancellation
+  paymentAttemptCreatedAt: bigint("paymentAttemptCreatedAt", { mode: "number" }),
+  paymentAttemptProduct: varchar("paymentAttemptProduct", { length: 50 }),
   recipientEmail: varchar("recipientEmail", { length: 320 }).notNull(),
   recipientName: varchar("recipientName", { length: 100 }),
   journeyKey: varchar("journeyKey", { length: 50 }).notNull(), // e.g. 'women_first_step'
@@ -466,7 +469,10 @@ export const emailLog = mysqlTable("email_log", {
   clickedAt: bigint("clickedAt", { mode: "number" }),      // first click timestamp
   clickCount: int("clickCount").default(0).notNull(),      // total clicks
   createdAt: bigint("createdAt", { mode: "number" }).notNull().default(0),
-});
+}, table => ({
+  statusScheduleIdx: index("email_log_status_schedule_idx").on(table.status, table.scheduledAt, table.createdAt),
+  paymentLeadIdx: index("email_log_payment_lead_idx").on(table.paymentLeadId),
+}));
 
 export type EmailLog = typeof emailLog.$inferSelect;
 export type InsertEmailLog = typeof emailLog.$inferInsert;
@@ -1396,6 +1402,52 @@ export const dailyReportSettings = mysqlTable("daily_report_settings", {
 }));
 export type DailyReportSettings = typeof dailyReportSettings.$inferSelect;
 export type InsertDailyReportSettings = typeof dailyReportSettings.$inferInsert;
+
+/** Project-level configuration for lifecycle marketing Heartbeats. */
+export const lifecycleMarketingSettings = mysqlTable("lifecycle_marketing_settings", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 100 }).notNull().default("israel-site-lifecycle"),
+  isEnabled: boolean("is_enabled").notNull().default(false),
+  lifecycleCronTaskUid: varchar("lifecycle_cron_task_uid", { length: 65 }),
+  boostCronTaskUid: varchar("boost_cron_task_uid", { length: 65 }),
+  launchedAt: bigint("launched_at", { mode: "number" }),
+  minMarketingGapHours: int("min_marketing_gap_hours").notNull().default(20),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({
+  nameIdx: uniqueIndex("lifecycle_marketing_settings_name_idx").on(table.name),
+  lifecycleTaskUidIdx: index("lifecycle_marketing_lifecycle_uid_idx").on(table.lifecycleCronTaskUid),
+  boostTaskUidIdx: index("lifecycle_marketing_boost_uid_idx").on(table.boostCronTaskUid),
+  enabledIdx: index("lifecycle_marketing_enabled_idx").on(table.isEnabled),
+}));
+export type LifecycleMarketingSettings = typeof lifecycleMarketingSettings.$inferSelect;
+export type InsertLifecycleMarketingSettings = typeof lifecycleMarketingSettings.$inferInsert;
+
+/** Atomic logical-message claims; prevents duplicate lifecycle rows on retries/races. */
+export const lifecycleMessageKeys = mysqlTable("lifecycle_message_keys", {
+  messageKey: varchar("message_key", { length: 191 }).primaryKey(),
+  emailLogId: int("email_log_id"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+
+/** One recipient-level lease enforces the global marketing rest period. */
+export const lifecycleRecipientLocks = mysqlTable("lifecycle_recipient_locks", {
+  recipientHash: varchar("recipient_hash", { length: 64 }).primaryKey(),
+  lockedUntil: bigint("locked_until", { mode: "number" }).notNull(),
+  emailLogId: int("email_log_id"),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({
+  lockedUntilIdx: index("lifecycle_recipient_locked_until_idx").on(table.lockedUntil),
+}));
+
+/** Date-scoped execution claim for bounded experiments such as 50 Boost emails/day. */
+export const lifecycleRunClaims = mysqlTable("lifecycle_run_claims", {
+  runKey: varchar("run_key", { length: 120 }).primaryKey(),
+  status: mysqlEnum("status", ["running", "completed", "failed"]).notNull().default("running"),
+  startedAt: bigint("started_at", { mode: "number" }).notNull(),
+  completedAt: bigint("completed_at", { mode: "number" }),
+  resultJson: text("result_json"),
+});
 
 /** Immutable aggregate-only audit history for preview, dry-run and sent digests. */
 export const dailyReportRuns = mysqlTable("daily_report_runs", {

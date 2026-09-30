@@ -142,7 +142,7 @@ export function selectOnDemandBoostCandidates(input: {
     .slice(0, input.limit ?? MAX_BOOST_OPTIONS);
 }
 
-async function ensureBoostCandidatesForSingle(db: any, single: any, now = Date.now()) {
+export async function ensureBoostCandidatesForSingle(db: any, single: any, now = Date.now()) {
   const [membershipRows, memberMatches, requests] = await Promise.all([
     db.select().from(matchBoostMemberships).where(eq(matchBoostMemberships.singleId, single.id)).limit(1),
     db.select().from(matches).where(or(eq(matches.singleAId, single.id), eq(matches.singleBId, single.id))),
@@ -886,6 +886,10 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     decisionReason: "algorithmic_boost_auto_dispatch",
     updatedAt: Date.now(),
   }).where(and(eq(matchBoostRequests.id, request.id), eq(matchBoostRequests.status, "reviewing")));
+  const boostSender = senderIsA ? partyA : partyB;
+  const { queuePostBoostPlusUpsell } = await import("./lifecycleEmailQueue");
+  await queuePostBoostPlusUpsell({ db, sender: boostSender, requestId: request.id, now })
+    .catch(error => console.error("[BoostPlusUpsell] Failed to queue:", error));
   return { success: true, requestId, matchId: match.id, status: "approved" as const, alreadySent: false };
 }
 

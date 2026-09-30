@@ -44,6 +44,9 @@ const PAIN_POINTS = [
 ];
 
 export default function CoachingSales() {
+  const query = new URLSearchParams(window.location.search);
+  const recoveryCoupon = query.get("coupon")?.toUpperCase() === "BACK10" ? "BACK10" : undefined;
+  const recoveryEmail = query.get("email") || undefined;
   React.useEffect(() => {
     track({ eventType: "coaching_view" });
     trackViewContent({ content_name: "ליווי אישי", content_category: "coaching" });
@@ -194,6 +197,8 @@ export default function CoachingSales() {
                   product="coaching"
                   buttonLabel='הצטרפות לתהליך "הבנה"'
                   termsPath="/terms/coaching"
+                  prefillEmail={recoveryEmail}
+                  prefillCoupon={recoveryCoupon}
                   onSuccess={() => { window.location.href = "/thank-you/coaching"; }}
                 />
                 <p className="text-[#191265]/60 text-xs text-center mt-3">מיד לאחר התשלום ניצור קשר בתוך 1-2 ימי עסקים לקביעת תאריך הפגישה</p>
@@ -239,6 +244,8 @@ export default function CoachingSales() {
                   product="coaching_mas"
                   buttonLabel='הצטרפות לתהליך "המסע"'
                   termsPath="/terms/coaching"
+                  prefillEmail={recoveryEmail}
+                  prefillCoupon={recoveryCoupon}
                   onSuccess={() => { window.location.href = "/thank-you/coaching"; }}
                 />
                 <p className="text-white/50 text-xs text-center mt-3">מיד לאחר התשלום ניצור קשר בתוך 1-2 ימי עסקים לקביעת תאריך הפגישה</p>
@@ -356,12 +363,16 @@ export default function CoachingSales() {
                 product="coaching"
                 buttonLabel='תהליך "הבנה" - ₪2,960'
                 termsPath="/terms/coaching"
+                prefillEmail={recoveryEmail}
+                prefillCoupon={recoveryCoupon}
                 onSuccess={() => { window.location.href = "/thank-you/coaching"; }}
               />
               <GrowWallet
                 product="coaching_mas"
                 buttonLabel='תהליך "המסע" - ₪4,200'
                 termsPath="/terms/coaching"
+                prefillEmail={recoveryEmail}
+                prefillCoupon={recoveryCoupon}
                 onSuccess={() => { window.location.href = "/thank-you/coaching"; }}
               />
             </motion.div>

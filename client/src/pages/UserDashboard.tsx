@@ -364,6 +364,7 @@ function MatchBoostCard({
   const [algorithmicConsent, setAlgorithmicConsent] = useState(false);
   const [anonymousProfileConsent, setAnonymousProfileConsent] = useState(false);
   const [termsConsent, setTermsConsent] = useState(false);
+  const requestedBoostMatchId = new URLSearchParams(window.location.search).get("boostMatch");
   const didAutoFocusRef = useRef(false);
   const didRefreshOptionsRef = useRef(false);
   const statusQuery = trpc.matchBoost.getMyStatus.useQuery(
@@ -376,10 +377,11 @@ function MatchBoostCard({
     if (params.get("tab") !== "boost" && params.get("tab") !== "matches" && window.location.hash !== "#boost-card") return;
     didAutoFocusRef.current = true;
     const timeout = window.setTimeout(() => {
-      document.getElementById("boost-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const requestedCard = requestedBoostMatchId ? document.getElementById(`boost-option-${requestedBoostMatchId}`) : null;
+      (requestedCard || document.getElementById("boost-card"))?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 80);
     return () => window.clearTimeout(timeout);
-  }, [statusQuery.data]);
+  }, [requestedBoostMatchId, statusQuery.data]);
   const redeemPlus = trpc.matchBoost.redeemPlusBoost.useMutation({
     onSuccess: () => {
       setResultMessage("התאמת ה־Boost נשלחה לשני הצדדים. עכשיו חשוב לפתוח את המייל ולאשר או לדחות את ההתאמה.");
@@ -597,7 +599,12 @@ function MatchBoostCard({
           {options.map((option: any, index: number) => {
             const card = option.card;
             return (
-              <details key={option.matchId || index} className="group overflow-hidden rounded-[1.75rem] border border-white/25 bg-[linear-gradient(145deg,rgba(49,20,91,.98),rgba(115,36,123,.98))] shadow-[0_18px_45px_rgba(17,5,45,.28)] [&>summary::-webkit-details-marker]:hidden">
+              <details
+                key={option.matchId || index}
+                id={option.matchId ? `boost-option-${option.matchId}` : undefined}
+                {...(option.matchId && String(option.matchId) === requestedBoostMatchId ? { open: true } : {})}
+                className="group overflow-hidden rounded-[1.75rem] border border-white/25 bg-[linear-gradient(145deg,rgba(49,20,91,.98),rgba(115,36,123,.98))] shadow-[0_18px_45px_rgba(17,5,45,.28)] [&>summary::-webkit-details-marker]:hidden"
+              >
                 <summary className="cursor-pointer list-none p-4 outline-none transition-colors hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ffe27c] sm:p-5">
                   <div className="flex items-center gap-4">
                     <AnonymousBoostSilhouette className="h-24 w-20 shrink-0 sm:h-28 sm:w-24" />

@@ -55,8 +55,8 @@ export default function SingleSessionSales() {
   const [scrolled, setScrolled] = useState(false);
   const query = new URLSearchParams(window.location.search);
   const requestedCoupon = query.get("coupon")?.toUpperCase();
-  const recoveryCoupon = requestedCoupon === "LOVE10"
-    ? "LOVE10"
+  const recoveryCoupon = requestedCoupon === "LOVE10" || requestedCoupon === "BACK10"
+    ? requestedCoupon
     : requestedCoupon === "PLUS50"
       ? "PLUS50"
       : undefined;
@@ -136,7 +136,7 @@ export default function SingleSessionSales() {
                 <div className="mb-3 rounded-xl border border-[#ffe27c]/60 bg-[#ffe27c]/15 px-4 py-3 text-sm font-bold text-[#ffe27c]">
                   {recoveryCoupon === "PLUS50"
                     ? "הטבת Plus: 50 ש״ח הנחה. הקופון יאומת לפי מייל המנוי."
-                    : "הטבת LOVE10: עשרה אחוזי הנחה. הקוד יופעל אוטומטית לאחר הזנת המייל."}
+                    : `הטבת ${recoveryCoupon}: עשרה אחוזי הנחה. הקוד יופעל אוטומטית לאחר הזנת המייל.`}
                 </div>
               )}
               <GrowWallet

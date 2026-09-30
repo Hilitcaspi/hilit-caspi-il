@@ -120,6 +120,7 @@ const JOURNEY_LABELS_SERVER: Record<string, string> = {
   abandoned_database: "נטישת עגלה - מאגר",
   abandoned_course: "נטישת עגלה - קורס",
   abandoned_coaching: "נטישת עגלה - ליווי",
+  abandoned_session: "נטישת תשלום - פגישה",
 };
 
 type SingleRow = typeof singles.$inferSelect;
@@ -1243,7 +1244,7 @@ export const appRouter = router({
           if (input.status === "client_guide") journeyType = "guide";
           else if (input.status === "client_database") journeyType = "matchmaking_welcome";
           else if (input.status === "client_course") journeyType = "course";
-          else if (input.status === "client_coaching") journeyType = "transformation";
+          else if (input.status === "call_done") journeyType = "transformation";
 
           if (journeyType) {
             const journeyKey = getJourneyKey(lead.gender, journeyType);
@@ -3510,6 +3511,7 @@ export const appRouter = router({
         abandoned_database:   { label: "נטישת עגלה - מאגר", gender: "כלל", timing: ["אחרי 1 שעה", "אחרי 24 שעות", "אחרי 48 שעות"] },
         abandoned_course:     { label: "נטישת עגלה - קורס", gender: "כלל", timing: ["אחרי 1 שעה", "אחרי 24 שעות", "אחרי 48 שעות"] },
         abandoned_coaching:   { label: "נטישת עגלה - ליווי", gender: "כלל", timing: ["אחרי 1 שעה", "אחרי 24 שעות", "אחרי 48 שעות"] },
+        abandoned_session:    { label: "נטישת תשלום - פגישה", gender: "כלל", timing: ["אחרי 75 דקות", "אחרי 24 שעות", "אחרי 48 שעות"] },
         // Course purchase sequences
         women_course:         { label: "קורס - נשים", gender: "נשים", timing: ["מיד", "אחרי 72 שעות", "אחרי 7 ימים"] },
         men_course:           { label: "קורס - גברים", gender: "גברים", timing: ["מיד", "אחרי 72 שעות", "אחרי 7 ימים"] },
