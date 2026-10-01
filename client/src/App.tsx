@@ -17,6 +17,7 @@ import NotFound from "@/pages/NotFound";
 
 // Lazy loaded (non-critical)
 const Register = lazy(() => import("@/pages/Register"));
+const RegistrationPaymentRecovery = lazy(() => import("@/pages/RegistrationPaymentRecovery"));
 const UploadPhoto = lazy(() => import("@/pages/UploadPhoto"));
 const Matches = lazy(() => import("@/pages/Matches"));
 const Admin = lazy(() => import("@/pages/Admin"));
@@ -263,6 +264,7 @@ function HeRouter() {
           <Route path={"/compass"} component={CourseCompass} />
           <Route path={"/join/complete"} component={ProfileComplete} />
           <Route path={"/join/questionnaire"} component={ScientificQuestionnaire} />
+          <Route path={"/join/recover"} component={RegistrationPaymentRecovery} />
           <Route path={"/join/:token"} component={Register} />
           <Route path={"/join"} component={Register} />
           <Route path={"/matches"} component={Matches} />

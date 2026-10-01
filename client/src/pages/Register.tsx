@@ -152,9 +152,15 @@ export default function Register() {
   const [existingProfileToken, setExistingProfileToken] = useState("");
 
   // Pre-filled from DNA quiz URL params (name, email, phone)
-  const nameFromDna = params.get("name") || "";
-  const emailFromDna = params.get("email") || "";
-  const phoneFromDna = params.get("phone") || "";
+  const recoveryPrefill = (() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("registration_recovery_prefill") || "null");
+      return saved?.sessionId === sessionId && Date.now() - saved.savedAt < 30 * 60 * 1000 ? saved : null;
+    } catch { return null; }
+  })();
+  const nameFromDna = params.get("name") || recoveryPrefill?.name || "";
+  const emailFromDna = params.get("email") || recoveryPrefill?.email || "";
+  const phoneFromDna = params.get("phone") || recoveryPrefill?.phone || "";
   // If name from DNA has a space, split into first/last
   const firstNameFromDna = nameFromDna.includes(" ") ? nameFromDna.split(" ")[0] : nameFromDna;
   const lastNameFromDna = nameFromDna.includes(" ") ? nameFromDna.split(" ").slice(1).join(" ") : "";
@@ -705,6 +711,19 @@ export default function Register() {
     utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
     utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
     utmContent: sessionStorage.getItem("utm_content") || localStorage.getItem("utm_content") || undefined,
+  });
+
+  // Keep a same-device backup as soon as the main form has enough identifying
+  // fields. This complements the server draft saved on submit and lets a
+  // verified recovery link restore the exact answers after an interrupted flow.
+  useEffect(() => {
+    if (step !== "profile" || !firstName.trim() || !birthDate || !city.trim()
+      || !email.includes("@") || !normalizeIsraeliPhone(phone)) return;
+    const timer = window.setTimeout(() => {
+      try { localStorage.setItem("pending_profile_payload", JSON.stringify(buildRegisterPayload())); }
+      catch { /* Storage may be disabled or full; the server draft remains primary. */ }
+    }, 800);
+    return () => window.clearTimeout(timer);
   });
 
   async function saveProfileDraftBeforePayment(overrides?: {

@@ -7,7 +7,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { singles, dnaQuizResults, matches, matchDeliveryEvents, feedbackFollowups, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, plusPilotMembers, plusCheckoutIntents, matchBoostMemberships } from "../drizzle/schema";
+import { singles, dnaQuizResults, matches, matchDeliveryEvents, feedbackFollowups, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, completedPayments, plusPilotMembers, plusCheckoutIntents, matchBoostMemberships } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
 import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, buildAnonymousBoostCard, cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
@@ -2482,6 +2482,71 @@ export const appRouter = router({
         }
         const { isPaid: _isPaid, ...draft } = profile;
         return { status: "ready" as const, draft };
+      }),
+
+    /**
+     * Personal recovery for a DNA lead who lost the join form before the draft
+     * reached the server. A random v4 session is a bearer secret: never look up
+     * this record by a guessable email or expose incomplete profiles publicly.
+     */
+    getRegistrationRecoveryBySession: publicProcedure
+      .input(z.object({ sessionId: z.string().uuid() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return null;
+        const [lead] = await db.select({
+          email: crmLeads.email,
+          phone: crmLeads.phone,
+          name: crmLeads.name,
+          gender: crmLeads.gender,
+          dnaType: crmLeads.dnaType,
+          createdAt: crmLeads.createdAt,
+          paymentRef: crmLeads.paymentRef,
+          product: crmLeads.product,
+        }).from(crmLeads)
+          .where(eq(crmLeads.quizSessionId, input.sessionId))
+          .orderBy(desc(crmLeads.createdAt))
+          .limit(1);
+        if (!lead || !lead.email || !lead.phone || !lead.gender || !lead.dnaType
+          || lead.createdAt < Date.now() - 30 * 24 * 60 * 60 * 1000) return null;
+        const [quiz] = await db.select({ dnaType: dnaQuizResults.dnaType })
+          .from(dnaQuizResults).where(eq(dnaQuizResults.sessionId, input.sessionId)).limit(1);
+        if (!quiz || quiz.dnaType !== lead.dnaType) return null;
+
+        const email = lead.email.trim().toLowerCase();
+        const [payment] = await db.select({ id: completedPayments.id })
+          .from(completedPayments)
+          .where(and(sql`LOWER(TRIM(${completedPayments.email})) = ${email}`, eq(completedPayments.product, "database")))
+          .limit(1);
+        const [confirmedAttempt] = await db.select({ id: paymentLeads.id })
+          .from(paymentLeads)
+          .where(and(sql`LOWER(TRIM(${paymentLeads.email})) = ${email}`,
+            eq(paymentLeads.product, "database"), isNotNull(paymentLeads.confirmedAt)))
+          .limit(1);
+        const [profile] = await db.select({
+          isPaid: singles.isPaid, questionnaireToken: singles.questionnaireToken,
+          age: singles.age, city: singles.city,
+        }).from(singles).where(sql`LOWER(TRIM(${singles.email})) = ${email}`).limit(1);
+        if (payment || confirmedAttempt || (lead.paymentRef && lead.product === "database") || profile?.isPaid) {
+          return { status: "already_paid" as const };
+        }
+        if (profile) {
+          // A skeleton or a profile without a resume token must not be charged.
+          if (!profile.age || !profile.city || !/^[a-f0-9]{64}$/i.test(profile.questionnaireToken || "")) {
+            return { status: "needs_support" as const };
+          }
+          return { status: "resume" as const, token: profile.questionnaireToken! };
+        }
+
+        // Only the lead/DNA are on the server. Full join answers may still be
+        // in pending_profile_payload on the *same browser*, not in this response.
+        return {
+          status: "recover_local" as const,
+          lead: {
+            email, phone: lead.phone, name: lead.name,
+            gender: lead.gender, dnaType: lead.dnaType,
+          },
+        };
       }),
 
     /**
