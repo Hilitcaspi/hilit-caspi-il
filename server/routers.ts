@@ -14,7 +14,7 @@ import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, buildAnonymousBoost
 import { getBoostAdminState, summarizeBoostMembers } from "./boostAdmin";
 import { matchBoostPilotRouter } from "./matchBoostPilotRouter";
 import { operationsRouter } from "./operationsRouter";
-import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeFullScoreForAdminSend, computeProfileScore, scoreVisualAsync, scoreOpenText } from "./compatibility";
+import { calculateCompatibility, findMatches, findMatchesWithText, computeFullScore, computeFullScoreAdmin, computeFullScoreForAdminSend, computeProfileScore, scoreVisualAsync, scoreOpenText, passesHardFilters } from "./compatibility";
 import type { ScoreBreakdown as FullScoreBreakdown } from "./compatibility";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
 import crypto from "crypto";
@@ -67,6 +67,7 @@ import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivac
 import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYMENT_ATTRIBUTION_TTL_MS } from "./paymentAttribution";
 import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
 import { wasMatchProposalSent } from "../shared/matchDelivery";
+import { blocksNewMatch, canSuggestNewMatch, matchPairKey } from "./unmatchedQueue";
 import { hashActor, recordSelfServiceEventSafely } from "./usageMetrics";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
@@ -3247,7 +3248,7 @@ export const appRouter = router({
           recipientA: { singleId: singleA.id, result: emailResultA },
           recipientB: { singleId: singleB.id, result: emailResultB },
         });
-        await sendInitialMatchSmsOnce(db, {
+        const smsResult = await sendInitialMatchSmsOnce(db, {
           matchId,
           score,
           recipientA: { singleId: singleA.id, phone: singleA.phone, firstName: singleA.firstName, matchFirstName: singleB.firstName, isActive: singleA.isActive, isSeed: singleA.isSeed },
@@ -3268,7 +3269,17 @@ export const appRouter = router({
           },
         });
 
-        return { success: true, matchId, score };
+        return {
+          success: true,
+          matchId,
+          score,
+          delivery: {
+            emailA: emailResultA.success,
+            emailB: emailResultB.success,
+            smsA: smsResult.sentA,
+            smsB: smsResult.sentB,
+          },
+        };
       }),
 
     getAllSingles: teamProcedure.query(async ({ ctx }) => {
@@ -5294,7 +5305,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       const db = await getDb();
       const page = input?.page ?? 1;
       const limit = input?.limit ?? 40;
-      if (!db) return { items: [], total: 0, page, limit, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0 } };
+      if (!db) return { items: [], total: 0, page, limit, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } };
 
       // Get all active singles
       const allSingles = await db.select().from(singles)
@@ -5321,6 +5332,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         )),
       ]);
       const sentMatchRows = allMatchRows.filter(wasMatchProposalSent);
+      const blockingProposalIds = new Set<number>();
+      const blockingMatchStatusBySingle = new Map<number, "proposed" | "matched">();
+      for (const match of allMatchRows) {
+        if (!blocksNewMatch(match)) continue;
+        blockingProposalIds.add(match.singleAId);
+        blockingProposalIds.add(match.singleBId);
+        if (match.status === "proposed" || match.status === "matched") {
+          blockingMatchStatusBySingle.set(match.singleAId, match.status);
+          blockingMatchStatusBySingle.set(match.singleBId, match.status);
+        }
+      }
+      const previouslySentPairs = new Set(sentMatchRows.map(match => matchPairKey(match.singleAId, match.singleBId)));
       const fourteenDaysAgo = Date.now() - (14 * 24 * 60 * 60 * 1000);
       const acceptedByMatchAndSingle = new Set(acceptedDeliveries.map(row => `${row.matchId}:${row.singleId}`));
       const feedbackAttentionIds = new Set(feedbackAttentionRows.map(row => Number(row.singleId)).filter(Boolean));
@@ -5338,8 +5361,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         for (const id of [m.singleAId, m.singleBId]) {
           if (!acceptedByMatchAndSingle.has(`${m.id}:${id}`)) continue;
           sentMatchCountBySingle.set(id, (sentMatchCountBySingle.get(id) ?? 0) + 1);
-          const stillInActiveConnection = m.status === "proposed"
-            || (m.status === "matched" && !m.returnedToPoolAt && m.matchDetailStatus !== "ended");
+          const stillInActiveConnection = blocksNewMatch(m);
           if (stillInActiveConnection) activeProposalBySingle.set(id, true);
         }
       }
@@ -5381,7 +5403,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const sAnswers = answersBySingleId.get(s.id) ?? [];
 
         // Find top 3 potential matches using the full algorithm
-        const candidates = pool.filter(c => c.id !== s.id && !activeProposalBySingle.get(c.id));
+        const candidates = pool.filter(c => canSuggestNewMatch(s, c, blockingProposalIds, previouslySentPairs)
+          && passesHardFilters(s as any, c as any).pass);
 
         const suggestions = candidates
           .map(c => {
@@ -5460,6 +5483,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           waitingDays,
           lastMatchAt: lastMatchDateBySingle.get(s.id) ?? null,
           feedbackNeedsMatchmaking: feedbackAttentionIds.has(s.id),
+          hasBlockingProposal: blockingProposalIds.has(s.id),
+          blockingMatchStatus: blockingMatchStatusBySingle.get(s.id) ?? null,
           suggestions,
         };
       });
@@ -5475,6 +5500,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           }).length,
           fromFeedback: singlesWithout.filter(item => feedbackAttentionIds.has(item.id)).length,
           neverDelivered: singlesWithout.filter(item => !lastMatchDateBySingle.has(item.id)).length,
+          blocked: singlesWithout.filter(item => blockingProposalIds.has(item.id)).length,
+          missingPhoto: singlesWithout.filter(item => !item.photoUrl?.trim()).length,
         },
       };
     }),

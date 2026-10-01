@@ -12,7 +12,18 @@ describe("CRM compatibility direct-send refresh", () => {
     const mutationSource = source.slice(start, end);
 
     expect(mutationSource).toContain("refetchMatches();");
+    expect(mutationSource).toContain("refetchUnmatched();");
+    expect(mutationSource).toContain("result.delivery.emailA");
+    expect(mutationSource).toContain("result.delivery.emailB");
     expect(mutationSource).toContain("מופיעה בטאב קיבלו התאמה");
+  });
+
+  it("does not report an empty queue while loading and routes blocked profiles to treatment", () => {
+    expect(source).toContain("unmatchedLoading ? (");
+    expect(source).toContain("unmatchedError ? (");
+    expect(source).toContain("s.hasBlockingProposal &&");
+    expect(source).toContain("openAdvancedForUnmatched(s)");
+    expect(routerSource).toContain("canSuggestNewMatch(s, c, blockingProposalIds, previouslySentPairs)");
   });
 
   it("passes an explicit criteria override through both new and existing match paths", () => {

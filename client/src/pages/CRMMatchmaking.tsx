@@ -380,10 +380,21 @@ export default function CRMMatchmaking() {
   const { data: tokens = [], refetch: refetchTokens } = trpc.invites.getAll.useQuery(undefined, {
     enabled: !!user && user.role === "admin",
   });
-  const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0 } }, refetch: refetchUnmatched } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40 }, {
+  const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } }, refetch: refetchUnmatched, isLoading: unmatchedLoading, isFetching: unmatchedFetching, isError: unmatchedError } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40 }, {
     enabled: !!user && user.role === "admin" && activeTab === "unmatched",
   });
   const singlesWithoutMatches = unmatchedResult.items ?? [];
+  const openAdvancedForUnmatched = (single: { id: number; firstName: string; lastName?: string | null }) => {
+    setFilterGender(""); setFilterMinAge(""); setFilterMaxAge(""); setFilterCity("");
+    setFilterReligiosity(""); setFilterDna(""); setFilterName("");
+    setFilterMinHeight(""); setFilterMaxHeight(""); setFilterMaritalStatus("");
+    setFilterWantsKids(""); setFilterHasKids(""); setFilterArea("");
+    setFilterCompatTarget(single.id);
+    setFilterCompatSearch(`${single.firstName} ${single.lastName || ""}`.trim());
+    setFilterCompatResult({});
+    setFilterCompatDropdown(false);
+    setActiveTab("filter_search");
+  };
   const { data: inactiveSingles = [] } = (trpc.matchmaking as any).listInactiveSingles.useQuery(undefined, {
     enabled: !!user && user.role === "admin" && activeTab === "inactive_leads",
   });
@@ -453,10 +464,15 @@ export default function CRMMatchmaking() {
   });
 
   const createAndSendMatch = (trpc.admin as any).createAndSendMatch.useMutation({
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       setCompatResult((prev: any) => prev ? { ...prev, matchStatus: 'proposed' } : prev);
       refetchMatches();
-      toast.success("ההצעה נשלחה לשני הצדדים ומופיעה בטאב קיבלו התאמה 💛");
+      refetchUnmatched();
+      if (result.delivery && (!result.delivery.emailA || !result.delivery.emailB)) {
+        toast.warning("ההתאמה נוצרה, אבל לפחות מייל אחד לא התקבל אצל הספק. בדקי את המסירות בטאב ההתאמות.", { duration: 8000 });
+      } else {
+        toast.success("ההצעה נשלחה לשני הצדדים ומופיעה בטאב קיבלו התאמה 💛");
+      }
     },
     onError: (err: any) => {
       const msg = err?.message || "שגיאה בשליחת ההצעה";
@@ -2309,8 +2325,8 @@ export default function CRMMatchmaking() {
               <div>
                 <p className="text-sm font-bold text-[#191265]">🔍 לא קיבלו התאמה יותר מ־14 יום או ביקשו טיפול דרך המשוב</p>
                 <p className="text-xs text-[#727272]">רק חברי מאגר פעילים ומשולמים, עם שאלון והסכמה. הספירה מבוססת על מסירה אישית שנרשמה או שוחזרה מנתוני העבר, ולא על מועמדות פנימית שלא נשלחה.</p>
-                <p className="text-xs font-semibold text-[#191265] mt-1">{unmatchedResult.total} ממתינים לטיפול · עמוד {unmatchedResult.page} מתוך {Math.max(1, Math.ceil(unmatchedResult.total / unmatchedResult.limit))}</p>
-                <div className="flex flex-wrap gap-2 mt-2 text-[10px]"><span className="bg-orange-100 text-orange-800 rounded-full px-2 py-1">{unmatchedResult.summary.over14} מעל 14 יום</span><span className="bg-violet-100 text-violet-800 rounded-full px-2 py-1">{unmatchedResult.summary.fromFeedback} בעקבות משוב</span><span className="bg-red-100 text-red-800 rounded-full px-2 py-1">{unmatchedResult.summary.neverDelivered} מעולם לא קיבלו</span></div>
+                <p className="text-xs font-semibold text-[#191265] mt-1">{unmatchedLoading ? "טוענת נתונים מעודכנים..." : `${unmatchedResult.total} ממתינים לטיפול · עמוד ${unmatchedResult.page} מתוך ${Math.max(1, Math.ceil(unmatchedResult.total / unmatchedResult.limit))}`}{unmatchedFetching && !unmatchedLoading ? " · מרעננת..." : ""}</p>
+                {!unmatchedLoading && <div className="flex flex-wrap gap-2 mt-2 text-[10px]"><span className="bg-orange-100 text-orange-800 rounded-full px-2 py-1">{unmatchedResult.summary.over14} מעל 14 יום</span><span className="bg-violet-100 text-violet-800 rounded-full px-2 py-1">{unmatchedResult.summary.fromFeedback} בעקבות משוב</span><span className="bg-red-100 text-red-800 rounded-full px-2 py-1">{unmatchedResult.summary.neverDelivered} מעולם לא קיבלו</span>{unmatchedResult.summary.blocked > 0 && <span className="bg-yellow-100 text-yellow-800 rounded-full px-2 py-1">{unmatchedResult.summary.blocked} עם הצעה פתוחה לטיפול</span>}{unmatchedResult.summary.missingPhoto > 0 && <span className="bg-slate-100 text-slate-700 rounded-full px-2 py-1">{unmatchedResult.summary.missingPhoto} חסרי תמונה</span>}</div>}
               </div>
               <button
                 onClick={() => refetchUnmatched()}
@@ -2320,11 +2336,16 @@ export default function CRMMatchmaking() {
                 רענן
               </button>
             </div>
-            {(singlesWithoutMatches as any[]).length === 0 ? (
+            {unmatchedError ? (
+              <div className="bg-white rounded-xl p-8 text-center text-rose-800">לא הצלחנו לטעון את הרשימה כרגע. לחצי ״רענן״ כדי לנסות שוב.</div>
+            ) : unmatchedLoading ? (
+              <div className="bg-white rounded-xl p-8 text-center text-[#191265]">מחשבת מי ממתינים להתאמה והמלצות זמינות...</div>
+            ) : (singlesWithoutMatches as any[]).length === 0 ? (
               <div className="bg-white rounded-xl p-8 text-center">
-                <div className="text-4xl mb-3">🎉</div>
-                <p className="text-[#191265] font-bold">אין כרגע התאמות שממתינות לטיפול</p>
-                <p className="text-xs text-[#727272] mt-1">אין פרופיל שעבר 14 יום ואין פידבק פתוח שדורש בדיקת התאמות</p>
+                <div className="text-4xl mb-3">{unmatchedResult.total ? "↩" : "🎉"}</div>
+                <p className="text-[#191265] font-bold">{unmatchedResult.total ? "אין אנשים בעמוד הזה" : "אין כרגע התאמות שממתינות לטיפול"}</p>
+                <p className="text-xs text-[#727272] mt-1">{unmatchedResult.total ? "ייתכן שהרשימה התעדכנה לאחר שליחה. חזרי לעמוד הקודם." : "אין פרופיל שעבר 14 יום ואין פידבק פתוח שדורש בדיקת התאמות"}</p>
+                {unmatchedResult.total > 0 && <button onClick={() => setUnmatchedPage(page => Math.max(1, page - 1))} className="mt-3 text-xs underline text-[#191265]">לעמוד הקודם</button>}
               </div>
             ) : (<>
               {(singlesWithoutMatches as any[]).map((s: any) => (
@@ -2351,6 +2372,7 @@ export default function CRMMatchmaking() {
                           {s.isCoachingClient && <span className="text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
                           {s.isNotBasic && <span className="text-[9px] bg-amber-200 text-amber-800 font-bold px-1.5 py-0.5 rounded-full">⭐ דורש תשומת לב</span>}
                           {s.feedbackNeedsMatchmaking && <span className="text-[9px] bg-violet-100 text-violet-800 font-bold px-1.5 py-0.5 rounded-full">💬 נכנס בעקבות משוב</span>}
+                          {s.hasBlockingProposal && <span className="text-[9px] bg-yellow-100 text-yellow-800 font-bold px-1.5 py-0.5 rounded-full">הצעה פתוחה לטיפול</span>}
                           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
                             ⏳ {s.waitingDays} ימים ללא התאמה שנמסרה
                           </span>
@@ -2411,9 +2433,13 @@ export default function CRMMatchmaking() {
                             profile={{ id: s.id, firstName: s.firstName, lastName: s.lastName, isActive: true }}
                             onClosed={refreshAfterProfileClosure}
                           />
+                          <button onClick={() => openAdvancedForUnmatched(s)} disabled={s.hasBlockingProposal || !s.photoUrl} className="text-[10px] px-2 py-1 rounded bg-[#f0eadc] text-[#191265] font-semibold disabled:opacity-40">חפש התאמה אחרת</button>
                         </div>
                       </div>
                     </div>
+
+                    {s.hasBlockingProposal && <div className="mb-3 rounded-lg bg-yellow-50 text-yellow-900 p-3 text-xs">יש התאמה פתוחה שמונעת שליחה חדשה, גם אם לא התקבל אישור מסירה. <button onClick={() => { setMatchSearch(s.firstName); setMatchSubTab(s.blockingMatchStatus === "matched" ? "mutual_yes" : "proposed"); setActiveTab("matches"); }} className="underline font-bold">פתחי את ההתאמה לטיפול</button></div>}
+                    {!s.photoUrl && <div className="mb-3 rounded-lg bg-slate-100 text-slate-700 p-3 text-xs">חסרה תמונת פרופיל, ולכן אין לשלוח התאמה חדשה. <button onClick={() => { setSinglesSearch(s.firstName); setSelectedSingle(s.id); setActiveTab("singles"); }} className="underline font-bold">פתחי את הפרופיל להשלמת תמונה</button></div>}
 
                     {/* Suggested matches */}
                     {s.suggestions && s.suggestions.length > 0 && (
@@ -2492,6 +2518,9 @@ export default function CRMMatchmaking() {
                           ))}
                         </div>
                       </div>
+                    )}
+                    {!s.hasBlockingProposal && s.photoUrl && (!s.suggestions || s.suggestions.length === 0) && (
+                      <p className="text-xs text-[#727272]">אין כרגע הצעה חדשה מתאימה לשליחה מהירה. אפשר לבדוק מועמדים נוספים דרך ״חפש התאמה אחרת״.</p>
                     )}
                   </div>
                 </div>
