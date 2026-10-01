@@ -621,8 +621,8 @@ export async function processPendingEmails(options: { minMarketingGapHours?: num
         .where(eq(crmLeads.id, entry.leadId))
         .limit(1);
 
-      if (lead[0]?.emailUnsubscribed) {
-        // Mark as cancelled (use 'failed' status with note)
+      if (lead[0]?.emailUnsubscribed && !isOperationalJourneyEmail(entry.journeyKey, entry.emailIndex)) {
+        // Marketing opt-out must not cancel operational purchase delivery.
         await db.update(emailLog)
           .set({ status: "failed", errorMessage: "unsubscribed", sentAt: Date.now() })
           .where(eq(emailLog.id, entry.id));

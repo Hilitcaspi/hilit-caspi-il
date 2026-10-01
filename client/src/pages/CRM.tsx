@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import CourseCompassAdminSection from "@/components/CourseCompassAdminSection";
 import { toast } from "sonner";
 import { format, formatDistanceToNow, isValid } from "date-fns";
@@ -55,6 +56,7 @@ type CrmLead = {
   dnaType?: string | null;
   source?: string | null;
   status: LeadStatus;
+  emailUnsubscribed?: boolean;
   notes?: string | null;
   meetingAt?: Date | null;
   product?: string | null;
@@ -394,11 +396,13 @@ function JourneyPanel({ leadId }: { leadId: number }) {
 }
 
 // Lead Card
-function LeadCard({ lead, onStatusChange, onNotesChange, onLeadUpdate }: {
+function LeadCard({ lead, onStatusChange, onNotesChange, onLeadUpdate, onUnsubscribe, isUnsubscribing }: {
   lead: CrmLead;
   onStatusChange: (id: number, status: LeadStatus) => void;
   onNotesChange: (id: number, notes: string) => void;
   onLeadUpdate: (id: number, fields: Partial<Pick<CrmLead, "name" | "email" | "phone" | "gender">>) => Promise<void>;
+  onUnsubscribe: (id: number) => Promise<void>;
+  isUnsubscribing: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showJourney, setShowJourney] = useState(false);
@@ -464,6 +468,9 @@ function LeadCard({ lead, onStatusChange, onNotesChange, onLeadUpdate }: {
               <Badge className={`text-xs ${statusCfg.color}`}>
                 {statusCfg.icon} {statusCfg.label}
               </Badge>
+              {lead.emailUnsubscribed && (
+                <Badge className="bg-slate-100 text-slate-700 border border-slate-300 text-xs">הוסר מדיוור מייל</Badge>
+              )}
               {lead.dnaType && (
                 <span className="text-xs text-purple-600 font-medium">{DNA_LABELS[lead.dnaType] ?? lead.dnaType}</span>
               )}
@@ -536,6 +543,31 @@ function LeadCard({ lead, onStatusChange, onNotesChange, onLeadUpdate }: {
               <Mail size={12} /> מייל
             </Button>
           </a>
+          {lead.emailUnsubscribed ? (
+            <Button size="sm" variant="outline" disabled={isUnsubscribing} onClick={() => void onUnsubscribe(lead.id)} className="h-7 text-xs text-slate-600 border-slate-300">
+              {isUnsubscribing ? "בודק..." : "וודא חסימה ב־Brevo"}
+            </Button>
+          ) : (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline" disabled={isUnsubscribing} className="h-7 text-xs text-rose-700 border-rose-300 hover:bg-rose-50">
+                  הסרה מדיוור מייל
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent dir="rtl" className="bg-white text-[#191265]">
+                <AlertDialogHeader className="text-right sm:text-right">
+                  <AlertDialogTitle>להסיר מדיוור מייל?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-right">
+                    כתובת המייל של {lead.name} תוסר מדיוור שיווקי. הליד לא יימחק, ופעולה זו לא מבטלת הודעות שירות או התאמות.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>ביטול</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => void onUnsubscribe(lead.id)} className="bg-rose-700 hover:bg-rose-800 text-white">אישור הסרה</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -714,6 +746,18 @@ export default function CRM() {
   const updateLead = trpc.crm.updateLead.useMutation({
     onSuccess: () => refetch(),
   });
+
+  const unsubscribeMarketingEmail = trpc.crm.unsubscribeMarketingEmail.useMutation();
+  const handleUnsubscribe = async (id: number) => {
+    try {
+      const result = await unsubscribeMarketingEmail.mutateAsync({ id });
+      await refetch();
+      if (result.brevoSynced) toast.success("הוסר מדיוור המייל במערכת וב־Brevo");
+      else toast.warning("הוסר מדיוור באתר, אך סנכרון Brevo לא הושלם. אפשר לנסות שוב מהכרטיס.");
+    } catch {
+      toast.error("לא ניתן להשלים את ההסרה. נסי שוב.");
+    }
+  };
 
   const flagFollowup = trpc.crm.flagForFollowup.useMutation({
     onSuccess: (data) => {
@@ -1092,6 +1136,8 @@ export default function CRM() {
                 lead={lead}
                 onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
                 onNotesChange={(id, notes) => updateNotes.mutate({ id, notes })}
+                onUnsubscribe={handleUnsubscribe}
+                isUnsubscribing={unsubscribeMarketingEmail.isPending}
                 onLeadUpdate={async (id, fields) => {
                   const safeFields: Parameters<typeof updateLead.mutateAsync>[0] = {
                     id,

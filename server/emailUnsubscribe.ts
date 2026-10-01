@@ -108,7 +108,7 @@ export async function applyEmailUnsubscribe(input: {
   email: string;
   leadId?: number;
   singleId?: number;
-  source: "signed_token" | "legacy_token" | "legacy_email" | "boost_token" | "brevo_webhook";
+  source: "signed_token" | "legacy_token" | "legacy_email" | "boost_token" | "brevo_webhook" | "admin_crm";
 }): Promise<boolean> {
   const normalized = normalizeEmail(input.email);
   if (!normalized || !normalized.includes("@")) return false;
@@ -135,12 +135,16 @@ export async function applyEmailUnsubscribe(input: {
     .set({ consentEmailMarketing: false, updatedAt: now })
     .where(singleIdentity);
 
-  await db.update(emailLog)
-    .set({ status: "cancelled", sentAt: now, errorMessage: `suppressed:${input.source}` })
-    .where(and(
-      sql`LOWER(TRIM(${emailLog.recipientEmail})) = ${normalized}`,
-      inArray(emailLog.status, ["pending", "processing"]),
-    ));
+  // The CRM action is *marketing-only*: the send worker checks this opt-out
+  // before delivery, but pending operational emails and SMS must remain queued.
+  if (input.source !== "admin_crm") {
+    await db.update(emailLog)
+      .set({ status: "cancelled", sentAt: now, errorMessage: `suppressed:${input.source}` })
+      .where(and(
+        sql`LOWER(TRIM(${emailLog.recipientEmail})) = ${normalized}`,
+        inArray(emailLog.status, ["pending", "processing"]),
+      ));
+  }
 
   return true;
 }

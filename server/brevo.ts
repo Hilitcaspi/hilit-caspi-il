@@ -92,6 +92,28 @@ async function brevoFetch(
   });
 }
 
+/** Keep a CRM marketing opt-out in sync with Brevo contact lists. */
+export async function blacklistBrevoContactEmail(email: string): Promise<"blacklisted" | "not_found" | "failed"> {
+  try {
+    const path = `/contacts/${encodeURIComponent(email.trim().toLowerCase())}`;
+    const current = await brevoFetch(path);
+    if (current.status === 404) return "not_found";
+    if (!current.ok) return "failed";
+    const contact = await current.json();
+    if (contact.emailBlacklisted === true) return "blacklisted";
+    const updated = await brevoFetch(path, {
+      method: "PUT",
+      body: JSON.stringify({ emailBlacklisted: true }),
+    });
+    if (!updated.ok) return "failed";
+    const verified = await brevoFetch(path);
+    if (!verified.ok) return "failed";
+    return (await verified.json()).emailBlacklisted === true ? "blacklisted" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
 /**
  * Send a transactional email via Brevo
  */

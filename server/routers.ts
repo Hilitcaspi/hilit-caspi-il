@@ -25,7 +25,7 @@ import { notifyOwner } from "./_core/notification";
 import { startJourney, getJourneyKey } from "./automation";
 import { ga4GenerateLead, ga4SignUp, clientIdFromEmail } from "./_core/ga4";
 import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as buildMatchProposalEmailTemplate, buildContactRevealEmail as buildContactRevealEmailTemplate, buildMatchRejectionAckEmail, buildOwnerMatchApprovalEmail, buildConsolationEmail, WOMEN_MATCHMAKING_EMAIL_1, MEN_MATCHMAKING_EMAIL_1, DNA_PROFILES, buildMatchFollowUpEmail } from "./emailTemplates";
-import { sendEmail } from "./brevo";
+import { sendEmail, blacklistBrevoContactEmail } from "./brevo";
 import { createPlusCheckoutReference } from "./plusCheckoutReference";
 import { activatePendingPlusAfterRegistration } from "./plusFulfillment";
 import { hasPlusPilotCapacity } from "./plusPilotCapacity";
@@ -1190,6 +1190,22 @@ export const appRouter = router({
       if (!db) return [];
       return db.select().from(crmLeads).orderBy(desc(crmLeads.createdAt));
     }),
+
+    unsubscribeMarketingEmail: teamProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+        if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [lead] = await db.select({ email: crmLeads.email })
+          .from(crmLeads).where(eq(crmLeads.id, input.id)).limit(1);
+        if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "הליד לא נמצא" });
+        const removed = await applyEmailUnsubscribe({ email: lead.email, source: "admin_crm" });
+        if (!removed) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "ההסרה לא נשמרה" });
+        const brevoStatus = await blacklistBrevoContactEmail(lead.email);
+        return { success: true, brevoSynced: brevoStatus !== "failed" };
+      }),
 
     // Get leads that need follow-up (48h+ with no purchase, not yet flagged)
     getNeedingFollowup: teamProcedure.query(async ({ ctx }) => {

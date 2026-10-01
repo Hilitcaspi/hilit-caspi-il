@@ -95,6 +95,18 @@ describe("email unsubscribe security and suppression", () => {
     expect(mock.updates[2].values).toMatchObject({ status: "cancelled" });
   });
 
+  it("removes marketing consent from CRM without cancelling operational email or SMS queues", async () => {
+    const mock = createDbMock();
+    vi.mocked(getDb).mockResolvedValue(mock.db);
+
+    await expect(applyEmailUnsubscribe({ email: " Person@Example.com ", source: "admin_crm" }))
+      .resolves.toBe(true);
+
+    expect(mock.updates).toHaveLength(2);
+    expect(mock.updates[0].values).toMatchObject({ emailUnsubscribed: true });
+    expect(mock.updates[1].values).toMatchObject({ consentEmailMarketing: false });
+  });
+
   it("is idempotent when the same unsubscribe link is confirmed twice", async () => {
     const mock = createDbMock();
     vi.mocked(getDb).mockResolvedValue(mock.db);
