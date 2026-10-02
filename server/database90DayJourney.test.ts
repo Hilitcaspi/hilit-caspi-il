@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { buildDatabase90DayEmail, DATABASE_90_DAY_LAUNCH_AT, DATABASE_90_DAY_STAGES } from "./database90DayJourney";
+import { buildDatabase90DayEmail, DATABASE_90_DAY_LAUNCH_AT, DATABASE_90_DAY_STAGES, dueDatabaseOnboardingStage } from "./database90DayJourney";
 
 const single = {
   id: 42,
@@ -16,9 +16,13 @@ describe("database onboarding journey", () => {
     expect(DATABASE_90_DAY_LAUNCH_AT).toBe(Date.UTC(2026, 7, 22, 0, 0, 0));
   });
 
-  it("allows only the day-3 and day-7 onboarding messages", () => {
-    expect(DATABASE_90_DAY_STAGES.map(stage => stage.day)).toEqual([3, 7]);
-    expect(DATABASE_90_DAY_STAGES.map(stage => stage.index)).toEqual([1, 2]);
+  it("allows only the day-3 incomplete-profile reminder before day 7", () => {
+    expect(DATABASE_90_DAY_STAGES).toEqual([{ index: 1, day: 3, beforeDay: 7 }]);
+    expect(dueDatabaseOnboardingStage(2)).toBeUndefined();
+    expect(dueDatabaseOnboardingStage(3)?.index).toBe(1);
+    expect(dueDatabaseOnboardingStage(6)?.index).toBe(1);
+    expect(dueDatabaseOnboardingStage(7)).toBeUndefined();
+    expect(dueDatabaseOnboardingStage(30)).toBeUndefined();
   });
 
   it("skips the day-3 reminder when the profile is complete", () => {
@@ -32,16 +36,11 @@ describe("database onboarding journey", () => {
     expect(email.htmlBody).toContain("/join/questionnaire?token=token-1234567890");
   });
 
-  it("explains reciprocal matching on day 7 without misrepresenting bundle or discounted purchases", () => {
+  it("disables the day-7 explanation even when invoked directly", () => {
     const email = buildDatabase90DayEmail(2, single, []);
-    expect(email.htmlBody).toContain("בדיקה לשני הכיוונים");
-    expect(email.htmlBody).toContain("אין מספר או תדירות קבועים");
-    expect(email.htmlBody).toContain("המחיר והמוצרים שרכשת הם אלה שאושרו בתשלום שלך");
-    expect(email.htmlBody).toContain("אם בחרת מארז או הטבה");
-    expect(email.htmlBody).not.toContain("299 ש״ח");
-    expect(email.textBody).not.toContain("299 ש״ח");
-    expect(email.htmlBody).toContain("/unsubscribe?token=");
-    expect(email.htmlBody).not.toContain("/unsubscribe?email=");
+    expect(email.skipReason).toBe("day_seven_explanation_disabled");
+    expect(email.htmlBody).toBe("");
+    expect(email.textBody).toBe("");
   });
 
   it("permanently blocks every generic status stage from day 14 onward", () => {

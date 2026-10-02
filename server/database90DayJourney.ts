@@ -9,21 +9,19 @@ const SITE_BASE = "https://hilitcaspi.com";
 const JOURNEY_KEY = "database_90_day_v1";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// The legacy journey name is retained for idempotency, but all generic status/count
-// emails from day 14 onward are permanently disabled. Only the day-3 completion
-// reminder and the day-7 service explanation remain active.
+// The legacy journey name is retained for idempotency. Only the day-3
+// incomplete-profile reminder remains active. It expires before day 7 so
+// disabling day 7 cannot trigger a belated day-3 email for older members.
 export const DATABASE_90_DAY_LAUNCH_AT = Date.UTC(2026, 7, 22, 0, 0, 0);
 
 export const DATABASE_90_DAY_STAGES = [
-  { index: 1, day: 3 },
-  { index: 2, day: 7 },
+  { index: 1, day: 3, beforeDay: 7 },
 ] as const;
 
 type JourneySingle = typeof singles.$inferSelect;
 
-function profileUrl(single: JourneySingle): string {
-  if (!single.questionnaireToken) return `${SITE_BASE}/join`;
-  return `${SITE_BASE}/my-profile?email=${encodeURIComponent(single.email || "")}&token=${encodeURIComponent(single.questionnaireToken)}`;
+export function dueDatabaseOnboardingStage(ageDays: number): (typeof DATABASE_90_DAY_STAGES)[number] | undefined {
+  return DATABASE_90_DAY_STAGES.find(stage => ageDays >= stage.day && ageDays < stage.beforeDay);
 }
 
 function questionnaireUrl(single: JourneySingle): string {
@@ -46,7 +44,6 @@ export function buildDatabase90DayEmail(
   missing: string[],
 ): { subject: string; htmlBody: string; textBody: string; skipReason?: string } {
   const firstName = single.firstName || "היי";
-  const personalProfileUrl = profileUrl(single);
   const frame = (content: string) => emailFrame(content, single.email || "");
 
   if (stageIndex === 1 && missing.length === 0) {
@@ -65,9 +62,10 @@ export function buildDatabase90DayEmail(
 
   if (stageIndex === 2) {
     return {
-      subject: `${firstName}, כך פועל תהליך ההתאמה במאגר`,
-      htmlBody: frame(`<h2 style="font-size:24px">כך אנחנו מחפשים התאמה בשבילך</h2><p>מאחורי כל הצעה יש בדיקה לשני הכיוונים: לא רק מי מתאים לך, אלא גם האם החיבור מתאים לצד השני. אנחנו בוחנים גיל, אזור, אורח חיים, רצון בילדים, ערכים, תשובות לשאלון והעדפות הדדיות.</p><p>ההצטרפות למאגר מאפשרת להשתתף בתהליך ההתאמה. הצעה נשלחת כשנמצאת אפשרות רלוונטית לשני הצדדים, ולכן אין מספר או תדירות קבועים של הצעות. <strong>המחיר והמוצרים שרכשת הם אלה שאושרו בתשלום שלך</strong> — אם בחרת מארז או הטבה, הם לא משתנים בעקבות המייל הזה.</p><p>כדאי לוודא שהפרטים שלך מעודכנים באזור האישי, כדי שנוכל להכיר אותך טוב יותר.</p>${cta(personalProfileUrl, "כניסה לאזור האישי")}`),
-      textBody: `${firstName}, כל הצעה נבדקת לשני הכיוונים ונשלחת כשנמצאת התאמה רלוונטית לשניכם. אין מספר או תדירות קבועים של הצעות. המחיר והמוצרים שרכשת הם אלה שאושרו בתשלום שלך. לעדכון הפרטים: ${personalProfileUrl}`,
+      subject: "מייל יום 7 מבוטל",
+      htmlBody: "",
+      textBody: "",
+      skipReason: "day_seven_explanation_disabled",
     };
   }
 
@@ -124,7 +122,7 @@ export async function processDatabase90DayJourney(options: { now?: number; limit
     const joinedAt = Number(single.subscriptionStartedAt || single.createdAt || 0);
     if (!joinedAt) continue;
     const ageDays = Math.floor((now - joinedAt) / DAY_MS);
-    const due = [...DATABASE_90_DAY_STAGES].reverse().find(stage => ageDays >= stage.day);
+    const due = dueDatabaseOnboardingStage(ageDays);
     if (!due || processed.has(`${recipientEmail.toLowerCase()}:${due.index}`)) continue;
     evaluated++;
 
