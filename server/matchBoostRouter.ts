@@ -575,7 +575,7 @@ export async function getEligibleBoostOpportunityForSingle(db: any, single: any,
     ignoreRequestCooldown: context.requests.some(hasReusablePaidBoostCredit),
   });
   if (!eligibility.eligible) return null;
-  const boostOptions = eligibility.candidates.filter((candidate: any) =>
+  const boostOptions = eligibility.candidates.slice(0, MAX_BOOST_OPTIONS).filter((candidate: any) =>
     candidate.singleId === single.id
     && String(candidate.notes || "").startsWith(BOOST_CANDIDATE_NOTE_MARKER),
   );

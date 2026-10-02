@@ -79,6 +79,7 @@ describe("lifecycle marketing automation", () => {
     expect(automation).toContain("getEligibleBoostOpportunityForSingle(db, member, matchId)");
     expect(router).toContain('String(candidate.notes || "").startsWith(BOOST_CANDIDATE_NOTE_MARKER)');
     expect(router).toContain("candidate.singleId === single.id");
+    expect(router).toContain("eligibility.candidates.slice(0, MAX_BOOST_OPTIONS).filter");
     expect(dashboard).toContain("status.cooldownUntil");
   });
 
