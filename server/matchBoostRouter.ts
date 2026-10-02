@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   crmTeamTasks,
@@ -143,16 +143,14 @@ export function selectOnDemandBoostCandidates(input: {
 }
 
 export async function ensureBoostCandidatesForSingle(db: any, single: any, now = Date.now()) {
-  const [membershipRows, memberMatches, requests] = await Promise.all([
+  const [membershipRows, memberMatches] = await Promise.all([
     db.select().from(matchBoostMemberships).where(eq(matchBoostMemberships.singleId, single.id)).limit(1),
     db.select().from(matches).where(or(eq(matches.singleAId, single.id), eq(matches.singleBId, single.id))),
-    db.select().from(matchBoostRequests).where(eq(matchBoostRequests.singleId, single.id)).orderBy(desc(matchBoostRequests.requestedAt)),
   ]);
   const membership = membershipRows[0];
   if (!hasActiveBoostConsent(membership) || !getBoostProfileReadiness(single).ready) return 0;
   if (!single.isPaid || !single.isActive) return 0;
-  if (memberMatches.some((match: any) => !match.returnedToPoolAt && ["proposed", "matched"].includes(match.status))) return 0;
-  if (requests.some((request: any) => OPEN_BOOST_STATUSES.includes(request.status))) return 0;
+  if (memberMatches.some((match: any) => !match.returnedToPoolAt && match.status === "matched" && match.matchDetailStatus !== "ended")) return 0;
 
   await db.update(matchBoostMemberships).set({ lastActiveAt: now, updatedAt: now })
     .where(eq(matchBoostMemberships.singleId, single.id));
@@ -171,7 +169,8 @@ export async function ensureBoostCandidatesForSingle(db: any, single: any, now =
     )),
     db.select({ singleAId: matches.singleAId, singleBId: matches.singleBId }).from(matches).where(and(
       isNull(matches.returnedToPoolAt),
-      inArray(matches.status, ["proposed", "matched"]),
+      eq(matches.status, "matched"),
+      or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended")),
       or(inArray(matches.singleAId, candidateIds), inArray(matches.singleBId, candidateIds)),
     )),
     db.select().from(matchmakingAnswers).where(inArray(matchmakingAnswers.singleId, [single.id, ...candidateIds])),
@@ -397,15 +396,20 @@ export function evaluateBoostEligibility(input: {
   const now = input.now ?? Date.now();
   const missingFields = getMissingBoostProfileFields(input.single);
   const activeMatch = input.memberMatches.some(match =>
-    !match.returnedToPoolAt && (match.status === "proposed" || match.status === "matched"),
+    !match.returnedToPoolAt && match.status === "matched" && match.matchDetailStatus !== "ended",
   );
   const positiveOutcome = input.memberMatches.some(match =>
     !match.returnedToPoolAt && ["continuing", "together", "relationship", "engaged", "married"].includes(match.matchDetailStatus || ""),
   );
+  const inFlightMatchIds = new Set((input.boostRequests || [])
+    .filter(request => OPEN_BOOST_STATUSES.includes(request.status)
+      || (request.status === "awaiting_payment" && Number(request.expiresAt || 0) > now))
+    .map(request => Number(request.matchId)));
   const candidates = input.memberMatches
     .filter(match =>
       !match.returnedToPoolAt
       && match.status === "pending"
+      && !inFlightMatchIds.has(Number(match.id))
       && Number(match.score || 0) >= MIN_BOOST_SCORE
       && match.candidateEligible !== false,
     )
@@ -431,7 +435,6 @@ export function evaluateBoostEligibility(input: {
   if (activeMatch) blockers.push("יש לך התאמה פעילה כרגע");
   if (positiveOutcome) blockers.push("הבוסט אינו מוצע בזמן תוצאה זוגית פעילה");
   if (candidates.length === 0) blockers.push("אין כרגע התאמה אפשרית שמתאימה לבדיקת בוסט");
-  if (openRequest) blockers.push("בקשת בוסט קודמת עדיין בטיפול");
 
   return {
     eligible: blockers.length === 0,
@@ -508,7 +511,8 @@ async function loadBoostContext(db: any, single: any) {
       returnedToPoolAt: matches.returnedToPoolAt,
     }).from(matches).where(and(
       isNull(matches.returnedToPoolAt),
-      inArray(matches.status, ["proposed", "matched"]),
+      eq(matches.status, "matched"),
+      or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended")),
       or(inArray(matches.singleAId, candidateIds), inArray(matches.singleBId, candidateIds)),
     )),
     db.select().from(matchBoostMemberships).where(inArray(matchBoostMemberships.singleId, candidateIds)),
@@ -762,6 +766,19 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   });
   if (!bothConsented || !passesHardFilters(partyA, partyB).pass || !passesHardFilters(partyB, partyA).pass) {
     throw new TRPCError({ code: "CONFLICT", message: "אחד הצדדים אינו עומד עוד בתנאי מסלול Boost. לא תישלח הצעה." });
+  }
+
+  const [newActiveRelationship] = await db.select({ id: matches.id }).from(matches).where(and(
+    isNull(matches.returnedToPoolAt),
+    eq(matches.status, "matched"),
+    or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended")),
+    or(
+      eq(matches.singleAId, partyA.id), eq(matches.singleBId, partyA.id),
+      eq(matches.singleAId, partyB.id), eq(matches.singleBId, partyB.id),
+    ),
+  )).limit(1);
+  if (newActiveRelationship) {
+    throw new TRPCError({ code: "CONFLICT", message: "אחד הצדדים נמצא כעת בהתאמה פעילה. לא נשלח Boost; תשלום שאושר יישמר כקרדיט." });
   }
 
   const now = Date.now();
@@ -1270,7 +1287,7 @@ export const matchBoostRouter = router({
         try {
           return await dispatchAlgorithmicBoostProposal(db, requestId);
         } catch (error: any) {
-          if (String(error?.message || "") === "boost_recipient_delivery_failed") {
+          if (String(error?.message || "") === "boost_recipient_delivery_failed" || error?.code === "CONFLICT") {
             const failedAt = Date.now();
             await db.update(matchBoostRequests).set({
               status: "cancelled",

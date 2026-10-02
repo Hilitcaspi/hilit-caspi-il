@@ -188,16 +188,34 @@ describe("match boost eligibility", () => {
     expect(result.blockers.join(" ")).toContain("השאלון המדעי");
   });
 
-  it("blocks a boost while a proposal or successful relationship is active", () => {
-    const active = evaluateBoostEligibility({
+  it("allows another card while a proposal awaits approval, but blocks an approved active match", () => {
+    const proposed = evaluateBoostEligibility({
       single: completeSingle(),
       memberMatches: [pendingMatch(), pendingMatch({ id: 102, status: "proposed" })],
       membership: activeMembership(),
       boostRequests: [],
       now: NOW,
     });
+    expect(proposed.eligible).toBe(true);
+
+    const active = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [pendingMatch(), pendingMatch({ id: 102, status: "matched" })],
+      membership: activeMembership(),
+      boostRequests: [],
+      now: NOW,
+    });
     expect(active.eligible).toBe(false);
     expect(active.blockers).toContain("יש לך התאמה פעילה כרגע");
+
+    const ended = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [pendingMatch(), pendingMatch({ id: 102, status: "matched", matchDetailStatus: "ended" })],
+      membership: activeMembership(),
+      boostRequests: [],
+      now: NOW,
+    });
+    expect(ended.eligible).toBe(true);
 
     const relationship = evaluateBoostEligibility({
       single: completeSingle(),
@@ -210,17 +228,33 @@ describe("match boost eligibility", () => {
     expect(relationship.eligible).toBe(false);
   });
 
-  it("blocks duplicate requests only while a Boost request remains open", () => {
+  it("keeps other Boost cards available while hiding the exact card already in flight", () => {
     const result = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [pendingMatch(), pendingMatch({ id: 102, singleBId: 12 })],
+      membership: activeMembership(),
+      boostRequests: [{ id: 1, status: "queued", matchId: 101, requestedAt: NOW - 1000, source: "paid" }],
+      now: NOW,
+    });
+    expect(result.eligible).toBe(true);
+    expect(result.candidates.map(match => match.id)).toEqual([102]);
+    expect(result.openRequest?.id).toBe(1);
+    expect(result.blockers).toEqual([]);
+  });
+
+  it("reserves the same card during a live checkout but frees it after checkout expiry", () => {
+    const input = {
       single: completeSingle(),
       memberMatches: [pendingMatch()],
       membership: activeMembership(),
-      boostRequests: [{ id: 1, status: "queued", requestedAt: NOW - 1000, source: "paid" }],
-      now: NOW,
-    });
-    expect(result.eligible).toBe(false);
-    expect(result.openRequest?.id).toBe(1);
-    expect(result.blockers).toContain("בקשת בוסט קודמת עדיין בטיפול");
+      boostRequests: [{ id: 7, status: "awaiting_payment", matchId: 101, expiresAt: NOW + 1000, requestedAt: NOW, source: "paid" }],
+    };
+    const reserved = evaluateBoostEligibility({ ...input, now: NOW });
+    expect(reserved.eligible).toBe(false);
+    expect(reserved.candidateCount).toBe(0);
+    const expired = evaluateBoostEligibility({ ...input, now: NOW + 1001 });
+    expect(expired.eligible).toBe(true);
+    expect(expired.candidateCount).toBe(1);
   });
 
   it("allows another paid Boost immediately after a completed request", () => {
@@ -517,9 +551,12 @@ describe("match boost privacy and payment gate", () => {
     expect(source).toContain("refreshOptions: publicProcedure");
     expect(source).toContain(BOOST_CANDIDATE_NOTE_MARKER);
     expect(generationSource).toContain('status: "pending"');
-    expect(generationSource).toContain("OPEN_BOOST_STATUSES.includes(request.status)");
+    expect(generationSource).not.toContain("OPEN_BOOST_STATUSES.includes(request.status)");
     expect(generationSource).not.toContain("30 * DAY_MS");
     expect(source).not.toContain("orderBy(desc(matchBoostRequests.requestedAt)).limit(10)");
+    expect(source).not.toContain('inArray(matches.status, ["proposed", "matched"])');
+    expect(source).toContain('ne(matches.matchDetailStatus, "ended")');
+    expect(source).toContain("const [newActiveRelationship] = await db.select");
     expect(generationSource).not.toContain("sendEmail(");
     expect(generationSource).not.toContain("sendInitialMatchWhatsAppsOnce(");
     expect(generationSource).not.toContain("preparePaidBoostCheckout(");
@@ -529,7 +566,12 @@ describe("match boost privacy and payment gate", () => {
     expect(boostCardSource).toContain("אין כרגע אפשרויות Boost זמינות");
     expect(boostCardSource).not.toContain("ניתן להפעיל בוסט אחד בכל 30 יום");
     const termsSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/TermsMatchBoost.tsx"), "utf8");
-    expect(termsSource).toContain("אין מגבלה של Boost אחד בחודש על רכישה בתשלום");
+    expect(termsSource).toContain("אין מכסה חודשית לשליחה או לקבלה של Boost לחברי המאגר");
+    expect(termsSource).not.toContain("ללא בקשה פתוחה");
+    expect(boostCardSource).toContain("Boost הכלול במחזור Plus הנוכחי כבר מומש");
+    expect(boostCardSource).toContain("Boost אחד ללא עלות זמין במחזור Plus הנוכחי");
+    expect(boostCardSource).toContain("כרגע יש לך התאמה פעילה");
+    expect(boostCardSource).toContain("תשלום עבור כרטיס נוסף דורש אישור נפרד");
   });
 
   it("provides a clearly labelled non-customer demo of the paid Boost card without opening Grow", () => {
@@ -624,12 +666,14 @@ describe("match boost privacy and payment gate", () => {
     expect(boostCardSource).toContain("לא הצלחנו לטעון את Boost כרגע");
   });
 
-  it("shows the waiting banner while one or both Boost sides still need to respond", () => {
+  it("shows a waiting note without hiding other available Boost cards", () => {
     expect(source).toContain('latestRequestMatch?.status === "proposed"');
     expect(source).toContain("!latestRequestMatch?.returnedToPoolAt");
     expect(source).toContain("!(Boolean(latestRequestMatch?.approvedByA) && Boolean(latestRequestMatch?.approvedByB))");
     expect(source).toContain("awaitingRecipientResponse");
-    expect(boostCardSource).toContain("if (status.awaitingRecipientResponse)");
+    expect(boostCardSource).not.toContain("if (status.awaitingRecipientResponse) {");
+    expect(boostCardSource).toContain("Boost אחר ששלחת עדיין ממתין לאישור שני הצדדים");
+    expect(boostCardSource).toContain("זה לא מונע קבלת הצעות אחרות");
     expect(boostCardSource).not.toContain("status.candidateCount === 0 && !status.openRequest && status.awaitingRecipientResponse");
     expect(boostCardSource).not.toContain('status.latestRequest?.status === "approved"');
   });

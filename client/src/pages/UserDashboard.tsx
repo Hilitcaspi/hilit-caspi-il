@@ -421,7 +421,8 @@ function MatchBoostCard({
       || !status?.membership?.active
       || !status.profileReady
       || status.candidateCount > 0
-      || Boolean(status.openRequest)
+      || status.blockers.includes("יש לך התאמה פעילה כרגע")
+      || status.blockers.includes("הבוסט אינו מוצע בזמן תוצאה זוגית פעילה")
     ) return;
     didRefreshOptionsRef.current = true;
     refreshOptions.mutate({ email, token });
@@ -526,17 +527,20 @@ function MatchBoostCard({
     );
   }
 
-  if (status.awaitingRecipientResponse) {
+  const plusBenefitNote = status.plusActive
+    ? status.plusBenefitAvailable
+      ? "Boost אחד ללא עלות זמין במחזור Plus הנוכחי. אחריו אפשר לשלוח Boost נוספים בתשלום."
+      : "Boost הכלול במחזור Plus הנוכחי כבר מומש. אפשר לשלוח Boost נוספים בתשלום, ללא מכסה חודשית."
+    : null;
+
+  if (status.blockers.includes("יש לך התאמה פעילה כרגע") || status.blockers.includes("הבוסט אינו מוצע בזמן תוצאה זוגית פעילה")) {
     return (
-      <section id="boost-card" className="overflow-hidden rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
-        <div className="flex items-center gap-4">
-          <AnonymousBoostSilhouette className="h-24 w-20 shrink-0" />
-          <div>
-            <p className="text-xs font-black text-[#ffe27c]">Boost נשלח</p>
-            <h3 className="mt-1 text-xl font-black text-white">ההתאמה ממתינה לאישור שני הצדדים</h3>
-            <p className="mt-2 text-sm leading-6 text-white/80">מייל עם התמונה, פרטי ההתאמה וכפתורי האישור נשלח לשני הצדדים. גם מי ששלח את ה־Boost צריך לאשר במייל. פרטי הקשר יישלחו רק לאחר שני אישורים.</p>
-          </div>
-        </div>
+      <section id="boost-card" className="rounded-[2rem] border border-white/20 bg-[radial-gradient(circle_at_18%_8%,#fd73bd_0,transparent_24%),linear-gradient(145deg,#180b43_0%,#5d176d_58%,#a52178_100%)] p-6 text-right text-white shadow-xl shadow-fuchsia-950/20">
+        <p className="text-xs font-black text-[#ffe27c]">Boost לחברי המאגר</p>
+        <h3 className="mt-1 text-xl font-black">כרגע יש לך התאמה פעילה</h3>
+        <p role="status" className="mt-2 text-sm leading-6 text-white/85">כדי לתת לה מקום, לא נשלח Boost נוסף בזמן ההתאמה הזו. כשהיא תסתיים או תוחזרו למאגר, תוכלו לבחור ולשלוח Boostים נוספים. אין מגבלה חודשית על Boostים בתשלום.</p>
+        {plusBenefitNote && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold leading-5 text-[#ffe27c]">{plusBenefitNote}</p>}
+        {resultMessage && <p className="mt-3 text-xs font-bold text-white">{resultMessage}</p>}
       </section>
     );
   }
@@ -547,6 +551,8 @@ function MatchBoostCard({
         <p className="text-xs font-black text-[#ffe27c]">Boost פעיל</p>
         <h3 className="mt-1 text-xl font-black text-white">{refreshOptions.isPending ? "מחפשים עבורך אפשרויות Boost..." : "אין כרגע אפשרויות Boost זמינות"}</h3>
         <p className="mt-2 text-sm leading-6 text-white/80">{refreshOptions.isPending ? "המערכת בודקת כעת רק חברי מאגר פעילים שאישרו Boost ועומדים בתנאי ההתאמה ההדדיים." : "נבדקו חברי המאגר שאישרו Boost. כשתימצא אפשרות חדשה שעוברת את תנאי ההתאמה ההדדיים, היא תופיע כאן."}</p>
+        {status.awaitingRecipientResponse && <p className="mt-3 text-xs leading-5 text-white/75">Boost שכבר שלחת עדיין ממתין לאישור שני הצדדים; זה לא מונע קבלת הצעות אחרות או בחירת Boost לכרטיס אחר כשיהיה זמין.</p>}
+        {plusBenefitNote && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold leading-5 text-[#ffe27c]">{plusBenefitNote}</p>}
         {status.creditAvailable && <p className="mt-3 rounded-xl bg-[#f5f2ff] p-3 text-xs font-bold leading-5 text-[#51448c]">{status.creditCount === 1 ? "קרדיט Boost אחד שמור עבורך." : `${status.creditCount} קרדיטי Boost שמורים עבורך.`} ברגע שיופיע כרטיס חדש שעובר את כל תנאי הסף, ניתן יהיה לממש אותם ללא חיוב נוסף, אחד בכל פעם.</p>}
         <button type="button" disabled={leavePool.isPending} onClick={() => leavePool.mutate({ email, token })} className="mt-4 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">ניהול או יציאה משירות Boost</button>
         {resultMessage && <p className="mt-3 text-xs font-bold text-emerald-700">{resultMessage}</p>}
@@ -554,7 +560,7 @@ function MatchBoostCard({
     );
   }
 
-  if (status.openRequest) {
+  if (status.openRequest && status.candidateCount === 0) {
     const labels: Record<string, string> = {
       awaiting_payment: "ממתין להשלמת הפעולה",
       paid: "הבקשה התקבלה",
@@ -567,6 +573,8 @@ function MatchBoostCard({
         <h3 className="mt-1 text-xl font-black text-white">הבקשה שלך בטיפול</h3>
         <p className="mt-2 text-sm font-bold leading-6 text-white/90">{labels[status.openRequest.status] || "הבקשה נמצאת בטיפול"}</p>
         <p className="mt-3 text-xs leading-5 text-white/70">לפני השליחה המערכת בודקת שוב ששני הצדדים פעילים, פנויים והסכימו לשירות. הצעת Boost אינה נבדקת ידנית על ידי הילית.</p>
+        <p className="mt-2 text-xs leading-5 text-white/70">זו בדיקת שליחה זמנית, לא מגבלה על מספר ה־Boostים בחודש.</p>
+        {plusBenefitNote && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold leading-5 text-[#ffe27c]">{plusBenefitNote}</p>}
       </section>
     );
   }
@@ -585,6 +593,7 @@ function MatchBoostCard({
             <p className="text-xs font-black text-[#ffe27c]">אפשרויות Boost לבחירה עצמאית</p>
             <h3 className="mt-1 text-2xl font-black text-white">בחרו למי תרצו לשלוח בקשת Boost</h3>
             {status.creditAvailable && <p className="mt-2 text-sm font-black text-[#ffe27c]">{status.creditCount === 1 ? "קרדיט אחד זמין" : `${status.creditCount} קרדיטים זמינים`} — ללא חיוב נוסף</p>}
+            {plusBenefitNote && <p className="mt-2 text-xs font-bold leading-5 text-[#ffe27c]">{plusBenefitNote}</p>}
           </div>
           <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black text-white">
             {status.candidateCount} אפשרויות זמינות
@@ -593,6 +602,8 @@ function MatchBoostCard({
         <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm leading-6 text-white/85">
           <p><strong className="text-[#ffe27c]">אפשרויות נוספות לבחירתכם.</strong> ככל שאחוז ההתאמה גבוה יותר, האלגוריתם מצא יותר נקודות חיבור בנתונים ובשאלונים.</p>
           <p className="mt-2">השם והתמונה מוסתרים כדי לשמור על הפרטיות ולאפשר להכיר קודם את האדם, מעבר למראה.</p>
+          {status.awaitingRecipientResponse && <p className="mt-2 text-xs font-bold text-[#ffe27c]">Boost אחר ששלחת עדיין ממתין לאישור שני הצדדים. אפשר לבחור גם הצעה אחרת; כל כרטיס יישלח בנפרד.</p>}
+          {status.openRequest && <p className="mt-2 text-xs font-bold text-[#ffe27c]">בקשה אחרת בטיפול. היא לא מונעת בחירה בכרטיס חדש, ותשלום עבור כרטיס נוסף דורש אישור נפרד.</p>}
         </div>
 
         <div className="mt-5 space-y-5">
