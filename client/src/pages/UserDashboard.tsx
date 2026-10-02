@@ -673,6 +673,14 @@ function MatchBoostCard({
                         onFailure={() => setResultMessage("התשלום לא הושלם ולא יישלח Boost.")}
                       />
                     ) : null}
+                    {!status.eligible && primaryBlocker && (
+                      <p role="status" className="mt-3 rounded-xl border border-[#ffe27c]/30 bg-[#ffe27c]/10 px-4 py-3 text-center text-xs font-bold leading-6 text-[#fff4c4]">
+                        {primaryBlocker}
+                        {status.cooldownUntil && primaryBlocker === "ניתן להפעיל בוסט אחד בכל 30 יום" && (
+                          <>. אפשר יהיה לנסות לשלוח Boost שוב החל מ־{new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric", year: "numeric" }).format(new Date(status.cooldownUntil))}, אם האפשרות עדיין תהיה זמינה.</>
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
               </details>

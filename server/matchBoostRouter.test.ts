@@ -236,6 +236,32 @@ describe("match boost eligibility", () => {
     expect(result.blockers).not.toContain("ניתן להפעיל בוסט אחד בכל 30 יום");
   });
 
+  it("explains why an unused Plus benefit is blocked by a recent paid Boost", () => {
+    const paidAt = NOW - 25 * 24 * 60 * 60 * 1000;
+    const member = {
+      status: "active",
+      billingStatus: "active",
+      billingCycleStartedAt: NOW - 7 * 24 * 60 * 60 * 1000,
+    };
+    const input = {
+      single: completeSingle(),
+      memberMatches: [pendingMatch()],
+      plusMember: member,
+      membership: activeMembership(),
+      boostRequests: [{ id: 2, source: "paid", status: "rejected", requestedAt: paidAt }],
+    };
+    const blocked = evaluateBoostEligibility({ ...input, now: NOW });
+    expect(blocked.plusBenefitAvailable).toBe(true);
+    expect(blocked.candidateCount).toBe(1);
+    expect(blocked.eligible).toBe(false);
+    expect(blocked.blockers).toContain("ניתן להפעיל בוסט אחד בכל 30 יום");
+    expect(blocked.cooldownUntil).toBe(paidAt + 30 * 24 * 60 * 60 * 1000);
+
+    const later = evaluateBoostEligibility({ ...input, now: paidAt + 30 * 24 * 60 * 60 * 1000 });
+    expect(later.eligible).toBe(true);
+    expect(later.cooldownUntil).toBeNull();
+  });
+
   it("includes one Plus boost per active billing cycle only", () => {
     const plusMember = {
       status: "active",

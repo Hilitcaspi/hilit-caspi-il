@@ -447,6 +447,9 @@ export function evaluateBoostEligibility(input: {
   return {
     eligible: blockers.length === 0,
     blockers,
+    cooldownUntil: recentRequest && !openRequest && !input.ignoreRequestCooldown
+      ? Number(recentRequest.requestedAt) + 30 * DAY_MS
+      : null,
     activeMatch,
     positiveOutcome,
     candidateCount: candidates.length,
@@ -492,9 +495,11 @@ async function loadBoostContext(db: any, single: any) {
   const [rawMemberMatches, plusRows, requests, membershipRows] = await Promise.all([
     db.select({
       id: matches.id,
+      singleId: matches.singleId,
       singleAId: matches.singleAId,
       singleBId: matches.singleBId,
       score: matches.score,
+      notes: matches.notes,
       status: matches.status,
       matchDetailStatus: matches.matchDetailStatus,
       returnedToPoolAt: matches.returnedToPoolAt,
@@ -558,6 +563,26 @@ async function loadBoostContext(db: any, single: any) {
     membership: membershipRows[0] || null,
     requests,
   };
+}
+
+/** Use the same eligibility and exact-card checks as the personal-area button before inviting a member. */
+export async function getEligibleBoostOpportunityForSingle(db: any, single: any, matchId?: number, now = Date.now()) {
+  const context = await loadBoostContext(db, single);
+  const eligibility = evaluateLoadedBoostContext({
+    single,
+    context,
+    now,
+    ignoreRequestCooldown: context.requests.some(hasReusablePaidBoostCredit),
+  });
+  if (!eligibility.eligible) return null;
+  const boostOptions = eligibility.candidates.filter((candidate: any) =>
+    candidate.singleId === single.id
+    && String(candidate.notes || "").startsWith(BOOST_CANDIDATE_NOTE_MARKER),
+  );
+  const option = matchId
+    ? boostOptions.find((candidate: any) => candidate.id === matchId)
+    : boostOptions[0];
+  return option ? { id: option.id as number, score: Number(option.score || 0) } : null;
 }
 
 export async function preparePaidBoostCheckout(input: {
@@ -1068,6 +1093,7 @@ export const matchBoostRouter = router({
       return {
         eligible: eligibility.eligible,
         blockers: eligibility.blockers,
+        cooldownUntil: eligibility.cooldownUntil,
         candidateCount: eligibility.candidateCount,
         topScore: eligibility.topScore,
         plusActive: eligibility.plusActive,

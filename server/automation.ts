@@ -508,15 +508,13 @@ async function lifecycleCancellationReason(db: any, entry: any): Promise<string 
 
   if (entry.journeyKey.startsWith("boost_opportunity_v1:")) {
     const matchId = Number(entry.journeyKey.split(":")[1] || 0);
-    const [availableMatch] = matchId ? await db.select({ id: matches.id })
-      .from(matches)
-      .where(and(
-        eq(matches.id, matchId),
-        eq(matches.status, "pending"),
-        isNull(matches.returnedToPoolAt),
-      ))
-      .limit(1) : [];
-    if (!availableMatch) return "boost_option_unavailable";
+    if (!Number.isInteger(matchId) || matchId <= 0) return "boost_option_unavailable";
+    const [member] = await db.select().from(singles)
+      .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`).limit(1);
+    if (!member) return "boost_member_unavailable";
+    const { getEligibleBoostOpportunityForSingle } = await import("./matchBoostRouter");
+    const option = await getEligibleBoostOpportunityForSingle(db, member, matchId);
+    if (!option) return "boost_option_or_eligibility_changed";
   }
 
   return null;

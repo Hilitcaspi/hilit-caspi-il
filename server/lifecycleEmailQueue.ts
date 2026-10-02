@@ -1,17 +1,16 @@
 import crypto from "crypto";
-import { and, asc, desc, eq, gt, isNull, like, sql } from "drizzle-orm";
+import { and, asc, eq, gt, like, sql } from "drizzle-orm";
 import {
   emailLog,
   lifecycleMessageKeys,
   lifecycleRunClaims,
   matchBoostMemberships,
-  matches,
   plusPilotMembers,
   singles,
 } from "../drizzle/schema";
 import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
 import { getDb } from "./db";
-import { BOOST_CANDIDATE_NOTE_MARKER, ensureBoostCandidatesForSingle } from "./matchBoostRouter";
+import { ensureBoostCandidatesForSingle, getEligibleBoostOpportunityForSingle } from "./matchBoostRouter";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SITE_BASE = "https://hilitcaspi.com";
@@ -137,16 +136,7 @@ export async function processBoostOpportunityEmails(options: { now?: number; que
     if (await hasRecentJourney(db, single.email, "boost_opportunity_v1:%", now - 21 * DAY_MS)) continue;
 
     createdOptions += await ensureBoostCandidatesForSingle(db, single, now);
-    const [option] = await db.select({ id: matches.id, score: matches.score })
-      .from(matches)
-      .where(and(
-        eq(matches.singleId, single.id),
-        eq(matches.status, "pending"),
-        isNull(matches.returnedToPoolAt),
-        like(matches.notes, `${BOOST_CANDIDATE_NOTE_MARKER}%`),
-      ))
-      .orderBy(desc(matches.score), desc(matches.id))
-      .limit(1);
+    const option = await getEligibleBoostOpportunityForSingle(db, single, undefined, now);
     if (!option) continue;
 
     const score = Math.max(0, Math.min(100, Math.round(Number(option.score || 0))));

@@ -75,6 +75,11 @@ describe("lifecycle marketing automation", () => {
     expect(queue).toContain("lifecycle_run_claims");
     expect(queue).toContain('already_ran_today');
     expect(queue).toContain("orderBy(asc(matchBoostMemberships.eligibleAt)");
+    expect(queue).toContain("getEligibleBoostOpportunityForSingle(db, single, undefined, now)");
+    expect(automation).toContain("getEligibleBoostOpportunityForSingle(db, member, matchId)");
+    expect(router).toContain('String(candidate.notes || "").startsWith(BOOST_CANDIDATE_NOTE_MARKER)');
+    expect(router).toContain("candidate.singleId === single.id");
+    expect(dashboard).toContain("status.cooldownUntil");
   });
 
   it("prefills BACK10 on all supported recovery checkout pages", () => {
