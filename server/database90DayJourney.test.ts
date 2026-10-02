@@ -32,10 +32,14 @@ describe("database onboarding journey", () => {
     expect(email.htmlBody).toContain("/join/questionnaire?token=token-1234567890");
   });
 
-  it("states the service boundaries explicitly at day 7", () => {
+  it("explains reciprocal matching on day 7 without misrepresenting bundle or discounted purchases", () => {
     const email = buildDatabase90DayEmail(2, single, []);
-    expect(email.htmlBody).toContain("299 ש״ח הם דמי הצטרפות");
-    expect(email.htmlBody).toContain("אינם התחייבות לכמות או לתדירות קבועה");
+    expect(email.htmlBody).toContain("בדיקה לשני הכיוונים");
+    expect(email.htmlBody).toContain("אין מספר או תדירות קבועים");
+    expect(email.htmlBody).toContain("המחיר והמוצרים שרכשת הם אלה שאושרו בתשלום שלך");
+    expect(email.htmlBody).toContain("אם בחרת מארז או הטבה");
+    expect(email.htmlBody).not.toContain("299 ש״ח");
+    expect(email.textBody).not.toContain("299 ש״ח");
     expect(email.htmlBody).toContain("/unsubscribe?token=");
     expect(email.htmlBody).not.toContain("/unsubscribe?email=");
   });
