@@ -210,7 +210,7 @@ describe("match boost eligibility", () => {
     expect(relationship.eligible).toBe(false);
   });
 
-  it("enforces one request every 30 days and blocks duplicate open requests", () => {
+  it("blocks duplicate requests only while a Boost request remains open", () => {
     const result = evaluateBoostEligibility({
       single: completeSingle(),
       memberMatches: [pendingMatch()],
@@ -223,20 +223,19 @@ describe("match boost eligibility", () => {
     expect(result.blockers).toContain("בקשת בוסט קודמת עדיין בטיפול");
   });
 
-  it("lets a paid recovery credit bypass only the 30-day purchase cooldown", () => {
+  it("allows another paid Boost immediately after a completed request", () => {
     const result = evaluateBoostEligibility({
       single: completeSingle(),
       memberMatches: [pendingMatch()],
       membership: activeMembership(),
-      boostRequests: [{ id: 1, status: "approved", requestedAt: NOW - 1000, source: "paid" }],
+      boostRequests: [{ id: 1, status: "rejected", requestedAt: NOW - 1000, source: "paid" }],
       now: NOW,
-      ignoreRequestCooldown: true,
     });
     expect(result.eligible).toBe(true);
-    expect(result.blockers).not.toContain("ניתן להפעיל בוסט אחד בכל 30 יום");
+    expect(result.openRequest).toBeNull();
   });
 
-  it("explains why an unused Plus benefit is blocked by a recent paid Boost", () => {
+  it("lets a Plus member use the unused included Boost after a recent paid Boost", () => {
     const paidAt = NOW - 25 * 24 * 60 * 60 * 1000;
     const member = {
       status: "active",
@@ -250,16 +249,11 @@ describe("match boost eligibility", () => {
       membership: activeMembership(),
       boostRequests: [{ id: 2, source: "paid", status: "rejected", requestedAt: paidAt }],
     };
-    const blocked = evaluateBoostEligibility({ ...input, now: NOW });
-    expect(blocked.plusBenefitAvailable).toBe(true);
-    expect(blocked.candidateCount).toBe(1);
-    expect(blocked.eligible).toBe(false);
-    expect(blocked.blockers).toContain("ניתן להפעיל בוסט אחד בכל 30 יום");
-    expect(blocked.cooldownUntil).toBe(paidAt + 30 * 24 * 60 * 60 * 1000);
-
-    const later = evaluateBoostEligibility({ ...input, now: paidAt + 30 * 24 * 60 * 60 * 1000 });
-    expect(later.eligible).toBe(true);
-    expect(later.cooldownUntil).toBeNull();
+    const result = evaluateBoostEligibility({ ...input, now: NOW });
+    expect(result.plusBenefitAvailable).toBe(true);
+    expect(result.candidateCount).toBe(1);
+    expect(result.eligible).toBe(true);
+    expect(result.blockers).toEqual([]);
   });
 
   it("includes one Plus boost per active billing cycle only", () => {
@@ -294,6 +288,7 @@ describe("match boost eligibility", () => {
       now: NOW,
     });
     expect(used.plusBenefitAvailable).toBe(false);
+    expect(used.eligible).toBe(true); // Further Boosts use the paid checkout, not a second Plus benefit.
 
     const retryAfterDeliveryFailure = evaluateBoostEligibility({
       single: completeSingle(),
@@ -312,6 +307,26 @@ describe("match boost eligibility", () => {
     });
     expect(retryAfterDeliveryFailure.plusBenefitAvailable).toBe(true);
     expect(retryAfterDeliveryFailure.eligible).toBe(true);
+  });
+
+  it("does not restore an already-used Plus benefit after many additional paid Boosts", () => {
+    const cycleStart = NOW - 20 * 24 * 60 * 60 * 1000;
+    const paidBoosts = Array.from({ length: 12 }, (_, i) => ({
+      id: 100 + i, status: "rejected", source: "paid", requestedAt: NOW - (i + 1) * 1000,
+    }));
+    const result = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [pendingMatch()],
+      plusMember: { status: "active", billingStatus: "active", billingCycleStartedAt: cycleStart },
+      membership: activeMembership(),
+      boostRequests: [
+        ...paidBoosts,
+        { id: 1, status: "rejected", source: "plus_included", plusBillingCycleStartedAt: cycleStart, requestedAt: cycleStart, fulfilledAt: cycleStart + 1000 },
+      ],
+      now: NOW,
+    });
+    expect(result.eligible).toBe(true);
+    expect(result.plusBenefitAvailable).toBe(false);
   });
 
   it("maps loaded context requests into eligibility checks", () => {
@@ -336,7 +351,7 @@ describe("match boost eligibility", () => {
 
     expect(result.plusBenefitAvailable).toBe(false);
     expect(result.plusBenefitUsed).toBe(true);
-    expect(result.blockers).toContain("ניתן להפעיל בוסט אחד בכל 30 יום");
+    expect(result.eligible).toBe(true);
   });
 
   it("blocks members without current explicit Boost consent", () => {
@@ -458,7 +473,8 @@ describe("match boost privacy and payment gate", () => {
     expect(uiSource).not.toContain("const regularPaymentReady = false");
     expect(uiSource).toContain('product="match_boost"');
     expect(uiSource).toContain("שליחת Boost | 19.90 ₪");
-    expect(boostCardSource.match(/19\.90/g)).toHaveLength(1);
+    expect(uiSource).toContain('status.plusActive ? "שליחת Boost נוסף | 19.90 ₪"');
+    expect(boostCardSource.match(/19\.90/g)).toHaveLength(2); // Regular and additional-Plus paid buttons.
     expect(uiSource).toContain("boostMatchId={option.matchId}");
     expect(source).toContain("eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)");
     expect(boostCardSource).not.toContain("Plus חודשי");
@@ -490,7 +506,7 @@ describe("match boost privacy and payment gate", () => {
     expect(source).toContain("if (affectedRows < 1)");
     expect(source).toContain("alreadyProcessed: true");
     expect(source).toContain("creditCount");
-    expect(source).toContain("ignoreRequestCooldown: true");
+    expect(source).not.toContain("ignoreRequestCooldown");
     expect(uiSource).toContain("קרדיטי Boost שמורים עבורך");
     expect(uiSource).toContain("קרדיטים זמינים");
   });
@@ -501,6 +517,9 @@ describe("match boost privacy and payment gate", () => {
     expect(source).toContain("refreshOptions: publicProcedure");
     expect(source).toContain(BOOST_CANDIDATE_NOTE_MARKER);
     expect(generationSource).toContain('status: "pending"');
+    expect(generationSource).toContain("OPEN_BOOST_STATUSES.includes(request.status)");
+    expect(generationSource).not.toContain("30 * DAY_MS");
+    expect(source).not.toContain("orderBy(desc(matchBoostRequests.requestedAt)).limit(10)");
     expect(generationSource).not.toContain("sendEmail(");
     expect(generationSource).not.toContain("sendInitialMatchWhatsAppsOnce(");
     expect(generationSource).not.toContain("preparePaidBoostCheckout(");
@@ -508,6 +527,9 @@ describe("match boost privacy and payment gate", () => {
     expect(boostCardSource).toContain("didRefreshOptionsRef");
     expect(boostCardSource).toContain("refreshOptions.mutate({ email, token })");
     expect(boostCardSource).toContain("אין כרגע אפשרויות Boost זמינות");
+    expect(boostCardSource).not.toContain("ניתן להפעיל בוסט אחד בכל 30 יום");
+    const termsSource = fs.readFileSync(path.join(process.cwd(), "client/src/pages/TermsMatchBoost.tsx"), "utf8");
+    expect(termsSource).toContain("אין מגבלה של Boost אחד בחודש על רכישה בתשלום");
   });
 
   it("provides a clearly labelled non-customer demo of the paid Boost card without opening Grow", () => {
@@ -539,6 +561,10 @@ describe("match boost privacy and payment gate", () => {
     const plusFlow = source.slice(source.indexOf("redeemPlusBoost:"), source.indexOf("startPaidBoost:"));
     expect(source).toContain("dispatchAlgorithmicBoostProposal");
     expect(plusFlow).toContain("dispatchAlgorithmicBoostProposal");
+    expect(plusFlow).toContain('source: "plus_included"');
+    expect(plusFlow).toContain("amountAgorot: 0");
+    expect(plusFlow).toContain('const idempotencyKey = `plus:${single.id}:${cycleStart}`');
+    expect(uiSource).toContain("שליחת Boost ללא עלות · הטבת Plus");
     expect(plusFlow).not.toContain("tx.insert(crmTeamTasks)");
     expect(source).toContain('proposalSource: "boost"');
     expect(source).toContain('ownerApprovedAt: null');

@@ -146,16 +146,13 @@ export async function ensureBoostCandidatesForSingle(db: any, single: any, now =
   const [membershipRows, memberMatches, requests] = await Promise.all([
     db.select().from(matchBoostMemberships).where(eq(matchBoostMemberships.singleId, single.id)).limit(1),
     db.select().from(matches).where(or(eq(matches.singleAId, single.id), eq(matches.singleBId, single.id))),
-    db.select().from(matchBoostRequests).where(eq(matchBoostRequests.singleId, single.id)).orderBy(desc(matchBoostRequests.requestedAt)).limit(10),
+    db.select().from(matchBoostRequests).where(eq(matchBoostRequests.singleId, single.id)).orderBy(desc(matchBoostRequests.requestedAt)),
   ]);
   const membership = membershipRows[0];
   if (!hasActiveBoostConsent(membership) || !getBoostProfileReadiness(single).ready) return 0;
   if (!single.isPaid || !single.isActive) return 0;
   if (memberMatches.some((match: any) => !match.returnedToPoolAt && ["proposed", "matched"].includes(match.status))) return 0;
-  if (requests.some((request: any) =>
-    OPEN_BOOST_STATUSES.includes(request.status)
-    || (request.status !== "refunded" && request.status !== "cancelled" && request.status !== "awaiting_payment" && Number(request.requestedAt || 0) > now - 30 * DAY_MS)
-  )) return 0;
+  if (requests.some((request: any) => OPEN_BOOST_STATUSES.includes(request.status))) return 0;
 
   await db.update(matchBoostMemberships).set({ lastActiveAt: now, updatedAt: now })
     .where(eq(matchBoostMemberships.singleId, single.id));
@@ -396,7 +393,6 @@ export function evaluateBoostEligibility(input: {
   membership?: any | null;
   boostRequests?: any[];
   now?: number;
-  ignoreRequestCooldown?: boolean;
 }) {
   const now = input.now ?? Date.now();
   const missingFields = getMissingBoostProfileFields(input.single);
@@ -418,12 +414,6 @@ export function evaluateBoostEligibility(input: {
     OPEN_BOOST_STATUSES.includes(request.status)
     && !(request.status === "awaiting_payment" && Number(request.expiresAt || 0) > 0 && Number(request.expiresAt) <= now),
   );
-  const recentRequest = (input.boostRequests || []).find(request =>
-    request.status !== "refunded"
-    && request.status !== "cancelled"
-    && request.status !== "awaiting_payment"
-    && Number(request.requestedAt || 0) > now - 30 * DAY_MS,
-  );
   const plusActive = input.plusMember?.status === "active" && input.plusMember?.billingStatus === "active";
   const cycleStart = Number(input.plusMember?.billingCycleStartedAt || 0);
   const plusBenefitUsed = plusActive && cycleStart > 0 && (input.boostRequests || []).some(request =>
@@ -442,14 +432,10 @@ export function evaluateBoostEligibility(input: {
   if (positiveOutcome) blockers.push("הבוסט אינו מוצע בזמן תוצאה זוגית פעילה");
   if (candidates.length === 0) blockers.push("אין כרגע התאמה אפשרית שמתאימה לבדיקת בוסט");
   if (openRequest) blockers.push("בקשת בוסט קודמת עדיין בטיפול");
-  if (recentRequest && !openRequest && !input.ignoreRequestCooldown) blockers.push("ניתן להפעיל בוסט אחד בכל 30 יום");
 
   return {
     eligible: blockers.length === 0,
     blockers,
-    cooldownUntil: recentRequest && !openRequest && !input.ignoreRequestCooldown
-      ? Number(recentRequest.requestedAt) + 30 * DAY_MS
-      : null,
     activeMatch,
     positiveOutcome,
     candidateCount: candidates.length,
@@ -472,7 +458,6 @@ export function evaluateLoadedBoostContext(input: {
     requests: any[];
   };
   now?: number;
-  ignoreRequestCooldown?: boolean;
 }) {
   return evaluateBoostEligibility({
     single: input.single,
@@ -481,7 +466,6 @@ export function evaluateLoadedBoostContext(input: {
     membership: input.context.membership,
     boostRequests: input.context.requests,
     now: input.now,
-    ignoreRequestCooldown: input.ignoreRequestCooldown,
   });
 }
 
@@ -506,7 +490,8 @@ async function loadBoostContext(db: any, single: any) {
       createdAt: matches.createdAt,
     }).from(matches).where(or(eq(matches.singleAId, single.id), eq(matches.singleBId, single.id))),
     db.select().from(plusPilotMembers).where(eq(plusPilotMembers.singleId, single.id)).limit(1),
-    db.select().from(matchBoostRequests).where(eq(matchBoostRequests.singleId, single.id)).orderBy(desc(matchBoostRequests.requestedAt)).limit(10),
+    // Do not truncate: the included Plus Boost can precede many paid Boosts in this cycle.
+    db.select().from(matchBoostRequests).where(eq(matchBoostRequests.singleId, single.id)).orderBy(desc(matchBoostRequests.requestedAt)),
     db.select().from(matchBoostMemberships).where(eq(matchBoostMemberships.singleId, single.id)).limit(1),
   ]);
   const candidateIds = Array.from(new Set(rawMemberMatches
@@ -572,7 +557,6 @@ export async function getEligibleBoostOpportunityForSingle(db: any, single: any,
     single,
     context,
     now,
-    ignoreRequestCooldown: context.requests.some(hasReusablePaidBoostCredit),
   });
   if (!eligibility.eligible) return null;
   const boostOptions = eligibility.candidates.slice(0, MAX_BOOST_OPTIONS).filter((candidate: any) =>
@@ -1078,7 +1062,7 @@ export const matchBoostRouter = router({
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const context = await loadBoostContext(db, single);
       const creditCount = context.requests.filter(hasReusablePaidBoostCredit).length;
-      const eligibility = evaluateLoadedBoostContext({ single, context, ignoreRequestCooldown: creditCount > 0 });
+      const eligibility = evaluateLoadedBoostContext({ single, context });
       const profileReadiness = getBoostProfileReadiness(single);
       const latestRequest = context.requests[0] || null;
       const latestRequestMatch = latestRequest
@@ -1093,7 +1077,6 @@ export const matchBoostRouter = router({
       return {
         eligible: eligibility.eligible,
         blockers: eligibility.blockers,
-        cooldownUntil: eligibility.cooldownUntil,
         candidateCount: eligibility.candidateCount,
         topScore: eligibility.topScore,
         plusActive: eligibility.plusActive,
@@ -1355,7 +1338,6 @@ export const matchBoostRouter = router({
         plusMember: context.plusMember,
         membership: context.membership,
         boostRequests: context.requests.filter((request: any) => request.id !== credit.id),
-        ignoreRequestCooldown: true,
       });
       const selectedCandidate = input.matchId
         ? eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)

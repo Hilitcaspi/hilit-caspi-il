@@ -653,12 +653,12 @@ function MatchBoostCard({
                       </button>
                     ) : status.plusBenefitAvailable ? (
                       <button type="button" disabled={!status.eligible || redeemPlus.isPending} onClick={() => redeemPlus.mutate({ email, token, matchId: option.matchId })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
-                        {redeemPlus.isPending ? "שולח את ה־Boost..." : "שליחת Boost"}
+                        {redeemPlus.isPending ? "שולח את ה־Boost..." : "שליחת Boost ללא עלות · הטבת Plus"}
                       </button>
                     ) : status.eligible ? (
                       <GrowWallet
                         product="match_boost"
-                        buttonLabel="שליחת Boost | 19.90 ₪"
+                        buttonLabel={status.plusActive ? "שליחת Boost נוסף | 19.90 ₪" : "שליחת Boost | 19.90 ₪"}
                         prefillName={`${profile.firstName || ""} ${profile.lastName || ""}`.trim()}
                         prefillEmail={profile.email || email}
                         prefillPhone={profile.phone || ""}
@@ -676,9 +676,6 @@ function MatchBoostCard({
                     {!status.eligible && primaryBlocker && (
                       <p role="status" className="mt-3 rounded-xl border border-[#ffe27c]/30 bg-[#ffe27c]/10 px-4 py-3 text-center text-xs font-bold leading-6 text-[#fff4c4]">
                         {primaryBlocker}
-                        {status.cooldownUntil && primaryBlocker === "ניתן להפעיל בוסט אחד בכל 30 יום" && (
-                          <>. אפשר יהיה לנסות לשלוח Boost שוב החל מ־{new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric", year: "numeric" }).format(new Date(status.cooldownUntil))}, אם האפשרות עדיין תהיה זמינה.</>
-                        )}
                       </p>
                     )}
                   </div>
