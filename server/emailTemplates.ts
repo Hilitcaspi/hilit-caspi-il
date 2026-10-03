@@ -15,14 +15,22 @@ export type EmailTemplate = {
 
 const CALENDLY_15MIN = "https://hilitcaspi.com/single-session";
 
-// DNA profile descriptions for email personalization
-export const DNA_PROFILES: Record<string, { label_f: string; label_m: string; subtitle: string; superpower: string; challenge: string; match_f: string; match_m: string }> = {
+// DNA profile descriptions for email personalization. Recipient-facing copy must be gendered as a unit.
+type DnaEmailProfile = {
+  label_f: string; label_m: string; subtitle: string;
+  superpower_f: string; superpower_m: string;
+  challenge_f: string; challenge_m: string;
+  match_f: string; match_m: string;
+};
+export const DNA_PROFILES: Record<string, DnaEmailProfile> = {
   leader: {
     label_f: "המנהיגה הממגנטת",
     label_m: "המנהיג הממגנט",
     subtitle: "עוצמה, כריזמה, עצמאות",
-    superpower: "הכריזמה והביטחון שלך הם הנכס הזוגי הגדול ביותר שלך. אתה מביא לקשר עוצמה, בהירות ומנהיגות טבעית. מי שזוכה בך כשותף - מקבל מישהו שאוהב ללא משחקים ומחפש שותף שירוץ לצידו, לא מאחוריו.",
-    challenge: "בגלל שאתה כל כך עוצמתי, הרבה אנשים מרגישים מאוימים. אתה לפעמים מוצא את עצמך 'מנהל' את הקשר ואת בן הזוג - למרות שכל מה שאתה רוצה זה פשוט להישען על מישהו אחר.",
+    superpower_f: "הכריזמה והביטחון שלך הם הנכס הזוגי הגדול ביותר שלך. את מביאה לקשר עוצמה, בהירות ומנהיגות טבעית. מי שנמצא לצדך זוכה בבת זוג שאוהבת בלי משחקים ורוצה שותף שירוץ לצידה, לא מאחוריה.",
+    superpower_m: "הכריזמה והביטחון שלך הם הנכס הזוגי הגדול ביותר שלך. אתה מביא לקשר עוצמה, בהירות ומנהיגות טבעית. מי שנמצאת לצדך זוכה בבן זוג שאוהב בלי משחקים ורוצה שותפה שתרוץ לצידו, לא מאחוריו.",
+    challenge_f: "בגלל שאת כל כך עוצמתית, יש אנשים שמרגישים מאוימים. לפעמים את מוצאת את עצמך מנהלת את הקשר ואת בן הזוג, למרות שכל מה שאת רוצה הוא פשוט להישען גם על מישהו אחר.",
+    challenge_m: "בגלל שאתה כל כך עוצמתי, יש אנשים שמרגישים מאוימים. לפעמים אתה מוצא את עצמך מנהל את הקשר ואת בת הזוג, למרות שכל מה שאתה רוצה הוא פשוט להישען גם על מישהי אחרת.",
     match_f: "את צריכה 'סלע בטוח' - גבר עם ביטחון עצמי ורוגע פנימי שלא נכנס לקרבות אגו, לא מבוהל מהצלחתך, ונשאר נוכח ורגוע.",
     match_m: "אתה צריך 'סלע בטוח' - אישה עם ביטחון עצמי ורוגע פנימי שלא נכנסת לקרבות אגו, לא מבוהלת מהצלחתך, ונשארת נוכחת ורגועה.",
   },
@@ -30,17 +38,21 @@ export const DNA_PROFILES: Record<string, { label_f: string; label_m: string; su
     label_f: "הרומנטיקנית העמוקה",
     label_m: "הרומנטיקן העמוק",
     subtitle: "עומק, רגש, חיבור נשמתי",
-    superpower: "הלב שלך הוא הנכס הזוגי הגדול ביותר שלך. יש לך יכולת נדירה לאהוב, להכיל ולהעניק. אתה מביא לקשר אינטימיות אמיתית, עומק רגשי ורצון לבנות חיבור נשמתי.",
-    challenge: "הנתינה האינסופית שלך לפעמים גורמת לך לשכוח את הצרכים שלך. הנטייה שלך לנתח כל מילה נובעת מפחד להיפגע ולפעמים גורמת לך להיאחז חזק מדי.",
+    superpower_f: "הלב שלך הוא הנכס הזוגי הגדול ביותר שלך. יש לך יכולת נדירה לאהוב, להכיל ולהעניק. את מביאה לקשר אינטימיות אמיתית, עומק רגשי ורצון לבנות חיבור עמוק.",
+    superpower_m: "הלב שלך הוא הנכס הזוגי הגדול ביותר שלך. יש לך יכולת נדירה לאהוב, להכיל ולהעניק. אתה מביא לקשר אינטימיות אמיתית, עומק רגשי ורצון לבנות חיבור עמוק.",
+    challenge_f: "הנתינה האינסופית שלך לפעמים גורמת לך לשכוח את הצרכים שלך. כשאת מנתחת כל מילה מתוך פחד להיפגע, את עלולה להיאחז חזק מדי.",
+    challenge_m: "הנתינה האינסופית שלך לפעמים גורמת לך לשכוח את הצרכים שלך. כשאתה מנתח כל מילה מתוך פחד להיפגע, אתה עלול להיאחז חזק מדי.",
     match_f: "ההתאמה המושלמת שלך היא 'האביר התקשורתי' - גבר שלא מפחד לדבר על רגשות, יוזם שיחות עומק, נותן לך חיזוקים קבועים ויוצר שקיפות מלאה.",
-    match_m: "ההתאמה המושלמת שלך היא 'האביר התקשורתי' - אישה שלא מפחדת לדבר על רגשות, יוזמת שיחות עומק ויוצרת שקיפות מלאה.",
+    match_m: "ההתאמה המושלמת שלך היא 'השותפה התקשורתית' - אישה שלא מפחדת לדבר על רגשות, יוזמת שיחות עומק ויוצרת שקיפות מלאה.",
   },
   free_spirit: {
     label_f: "הרוח החופשית",
     label_m: "הרוח החופשית",
     subtitle: "ספונטניות, חיות, אנרגיה",
-    superpower: "אתה מכניס לכל חדר שנכנסים אליו אנרגיה, חיות וריגוש. הנכס הזוגי הגדול ביותר שלך הוא הספונטניות ושמחת החיים. הזוגיות איתך היא הרפתקה.",
-    challenge: "הפחד משגרה כובלת לפעמים גורם לך לברוח כשדברים הופכים יציבים. אתה עלול לבלבל בין יציבות בריאה לשעמום.",
+    superpower_f: "את מביאה איתך לכל מקום אנרגיה, חיות וריגוש. הנכס הזוגי הגדול ביותר שלך הוא הספונטניות ושמחת החיים. הזוגיות איתך היא הרפתקה.",
+    superpower_m: "אתה מביא איתך לכל מקום אנרגיה, חיות וריגוש. הנכס הזוגי הגדול ביותר שלך הוא הספונטניות ושמחת החיים. הזוגיות איתך היא הרפתקה.",
+    challenge_f: "החשש משגרה כובלת לפעמים גורם לך להתרחק דווקא כשהקשר נעשה יציב. את עלולה לבלבל בין יציבות בריאה לשעמום.",
+    challenge_m: "החשש משגרה כובלת לפעמים גורם לך להתרחק דווקא כשהקשר נעשה יציב. אתה עלול לבלבל בין יציבות בריאה לשעמום.",
     match_f: "ההתאמה המושלמת שלך היא 'העוגן הגמיש' - גבר יציב עם ראש פתוח שיש לו חיים מלאים משלו. הוא ייתן לך את המרחב שאת צריכה ויזרום עם הרעיונות שלך.",
     match_m: "ההתאמה המושלמת שלך היא 'העוגן הגמיש' - אישה יציבה עם ראש פתוח שיש לה חיים מלאים משלה. היא תיתן לך מרחב ותזרום עם הרעיונות שלך.",
   },
@@ -48,12 +60,28 @@ export const DNA_PROFILES: Record<string, { label_f: string; label_m: string; su
     label_f: "העוגן היציב",
     label_m: "העוגן היציב",
     subtitle: "יציבות, נאמנות, ביטחון",
-    superpower: "אתה ה'בית' - ההגדרה של בית. הנכס הזוגי הגדול ביותר שלך הוא היכולת ליצור שקט, ביטחון ומרחב מוגן למי שאיתך. אתה נאמן, מעשי ויודע לקחת אחריות.",
-    challenge: "מרוב שאתה דואג לכולם ולכל דבר, לפעמים הופך ל'מטפל' של הקשר ומושך אליך אנשים שמחפשים מי שידאג להם.",
-    match_f: "את צריכה גבר אלפא חיובי - 'היוזם המעריך'. הוא יודע לקחת פיקוד, מזמין תוכניות, ובעיקר שואל: 'מה אני יכול לעשות היום כדי להקל עליך?'",
+    superpower_f: "את ה'בית' - המקום שבו אפשר להרגיש בטוחים. הנכס הזוגי הגדול ביותר שלך הוא היכולת ליצור שקט, ביטחון ומרחב מוגן למי שאיתך. את נאמנה, מעשית ויודעת לקחת אחריות.",
+    superpower_m: "אתה ה'בית' - המקום שבו אפשר להרגיש בטוחים. הנכס הזוגי הגדול ביותר שלך הוא היכולת ליצור שקט, ביטחון ומרחב מוגן למי שאיתך. אתה נאמן, מעשי ויודע לקחת אחריות.",
+    challenge_f: "מרוב שאת דואגת לכולם ולכל דבר, לפעמים את הופכת ל'מטפלת' של הקשר ומושכת אלייך אנשים שמחפשים מי שתדאג להם. מותר לך גם להניח את הראש ולהישען.",
+    challenge_m: "מרוב שאתה דואג לכולם ולכל דבר, לפעמים אתה הופך ל'מטפל' של הקשר ומושך אליך אנשים שמחפשים מי שידאג להם. מותר לך גם להניח את הראש ולהישען.",
+    match_f: "את צריכה גבר אלפא חיובי - 'היוזם המעריך'. הוא יודע לקחת פיקוד, יוזם תוכניות, ובעיקר שואל: 'מה אני יכול לעשות היום כדי להקל עלייך?'",
     match_m: "אתה צריך 'היוזמת המעריכה' - אישה שרואה ומעריכה את כל הנתינה שלך, יוזמת ביחד, ויודעת לפנק אותך בדיוק כמו שאתה מפנק אחרים.",
   },
 };
+
+/** Select every recipient-facing profile field using the same, validated gender. */
+export function getDnaEmailVars(dnaType: string | undefined, gender: "female" | "male") {
+  if (gender !== "female" && gender !== "male") throw new Error("Invalid DNA email gender");
+  const profile = dnaType ? DNA_PROFILES[dnaType] : undefined;
+  const isFemale = gender === "female";
+  return {
+    dnaTypeLabel: profile ? (isFemale ? profile.label_f : profile.label_m) : "לא ידוע",
+    dnaTypeSubtitle: profile?.subtitle ?? "",
+    dnaTypeSuperpower: profile ? (isFemale ? profile.superpower_f : profile.superpower_m) : "",
+    dnaTypeChallenge: profile ? (isFemale ? profile.challenge_f : profile.challenge_m) : "",
+    dnaTypeMatch: profile ? (isFemale ? profile.match_f : profile.match_m) : "",
+  };
+}
 const WHATSAPP_LINK = "https://wa.me/972552442334";
 const WA_GROUP = "https://hilitcaspi.com/api/wa/email";
 const GUIDE_PURCHASE = "https://hilitcaspi.com/guide?utm_source=email&utm_medium=brevo&utm_campaign=guide";
@@ -183,7 +211,7 @@ export const WOMEN_FIRST_STEP_EMAIL_1: EmailTemplate = {
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הפרופיל הזוגי שלך מוכן!\n\nהטיפוס שלך: {{dnaTypeLabel}}\n\nלפני כמה שנים עזבתי קריירה בהייטק כדי לעזור לאנשים למצוא אהבה. מאז ליוויתי מאות נשים - רופאות, לוחמים, מנהלות. בימים הקרובים אשתף אותך בתובנות שיכולות לשנות הכל.\n\nהצטרפי לקבוצה השקטה שלי: ${WA_GROUP}\n\nבאהבה,\nהילית כספי\nמאמנת ומשדכת | Relationship Expert & Matchmaker`,
+  textBody: `{{firstName}}, הפרופיל הזוגי שלך מוכן!\n\nהטיפוס שלך: {{dnaTypeLabel}}\n\nהכוח הזוגי שלך: {{dnaTypeSuperpower}}\n\nהאתגר שלך: {{dnaTypeChallenge}}\n\nההתאמה שלך: {{dnaTypeMatch}}\n\nלפני כמה שנים עזבתי קריירה בהייטק כדי לעזור לאנשים למצוא אהבה. מאז ליוויתי נשים רבות - רופאות, לוחמות ומנהלות. בימים הקרובים אשתף אותך בתובנות שיכולות לשנות הכול.\n\nהצטרפי לקבוצה השקטה שלי: ${WA_GROUP}\n\nבאהבה,\nהילית כספי\nמאמנת ומשדכת | Relationship Expert & Matchmaker`,
 };
 
 export const WOMEN_FIRST_STEP_EMAIL_2: EmailTemplate = {
@@ -275,7 +303,7 @@ export const MEN_FIRST_STEP_EMAIL_1: EmailTemplate = {
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הפרופיל הזוגי שלך מוכן!\n\nהטיפוס שלך: {{dnaTypeLabel}}\n\nלפני כמה שנים עזבתי קריירה בהייטק כדי לעזור לאנשים למצוא אהבה. מאז ליוויתי מאות אנשים - רופאים, לוחמים, מנהלים. בימים הקרובים אשתף אותך בתובנות שיכולות לשנות הכל.\n\nהצטרף לקבוצה: ${WA_GROUP}\n\nבאהבה,\nהילית כספי\nמאמנת ומשדכת | Relationship Expert & Matchmaker`,
+  textBody: `{{firstName}}, הפרופיל הזוגי שלך מוכן!\n\nהטיפוס שלך: {{dnaTypeLabel}}\n\nהכוח הזוגי שלך: {{dnaTypeSuperpower}}\n\nהאתגר שלך: {{dnaTypeChallenge}}\n\nההתאמה שלך: {{dnaTypeMatch}}\n\nלפני כמה שנים עזבתי קריירה בהייטק כדי לעזור לאנשים למצוא אהבה. מאז ליוויתי מאות אנשים - רופאים, לוחמים ומנהלים. בימים הקרובים אשתף אותך בתובנות שיכולות לשנות הכול.\n\nהצטרף לקבוצה: ${WA_GROUP}\n\nבאהבה,\nהילית כספי\nמאמנת ומשדכת | Relationship Expert & Matchmaker`,
 };
 
 export const MEN_FIRST_STEP_EMAIL_2: EmailTemplate = {
@@ -1765,7 +1793,7 @@ export const WOMEN_V2_EMAIL_1: EmailTemplate = {
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הפרופיל הזוגי שלך מוכן!\n\nהטיפוס שלך: {{dnaTypeLabel}}\n\nהצטרפי למאגר הרווקים ב-₪499: ${MATCHMAKING_JOIN}\n\nבאהבה,\nהילית כספי`,
+  textBody: `{{firstName}}, הפרופיל הזוגי שלך מוכן!\n\nהטיפוס שלך: {{dnaTypeLabel}}\n\nהכוח הזוגי שלך: {{dnaTypeSuperpower}}\n\nהאתגר שלך: {{dnaTypeChallenge}}\n\nההתאמה שלך: {{dnaTypeMatch}}\n\nהצטרפי למאגר הרווקים ב-₪299: ${MATCHMAKING_JOIN}\n\nבאהבה,\nהילית כספי`,
 };
 
 // מייל 2: תובנה מהמחקר + שאלון DNA (יום 1)
@@ -1922,7 +1950,7 @@ export const MEN_V2_EMAIL_1: EmailTemplate = {
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, הפרופיל הזוגי שלך מוכן!\n\nהטיפוס שלך: {{dnaTypeLabel}}\n\nהצטרף למאגר הרווקים ב-₪499: ${MATCHMAKING_JOIN}\n\nבאהבה,\nהילית כספי`,
+  textBody: `{{firstName}}, הפרופיל הזוגי שלך מוכן!\n\nהטיפוס שלך: {{dnaTypeLabel}}\n\nהכוח הזוגי שלך: {{dnaTypeSuperpower}}\n\nהאתגר שלך: {{dnaTypeChallenge}}\n\nההתאמה שלך: {{dnaTypeMatch}}\n\nהצטרף למאגר הרווקים ב-₪299: ${MATCHMAKING_JOIN}\n\nבאהבה,\nהילית כספי`,
 };
 
 // מייל 2: "יש נשים שמחפשות בדיוק את הפרופיל שלך" (יום 1)

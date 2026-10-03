@@ -16,7 +16,7 @@ import { and, desc, eq, lt, gt, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { sendEmail, addContactToList } from "./brevo";
 import { sendSMS } from "./vibrate";
 import { buildMatchFollowUpSmsMessage } from "./matchSms";
-import { EMAIL_SEQUENCES, renderTemplate, DNA_PROFILES, type JourneyKey, buildMatchFollowUpEmail } from "./emailTemplates";
+import { EMAIL_SEQUENCES, renderTemplate, getDnaEmailVars, type JourneyKey, buildMatchFollowUpEmail } from "./emailTemplates";
 import crypto from "crypto";
 import { isEmailMarketingSuppressed } from "./emailUnsubscribe";
 
@@ -279,9 +279,8 @@ export async function startJourney({
     courseLink = await generateProductAccessToken(email, firstName, "course_249");
   }
 
-  // Resolve DNA profile details for email personalization
-  const dnaProfile = dnaType ? DNA_PROFILES[dnaType] : null;
-  const isF = gender === "female";
+  // Resolve all recipient-facing DNA copy from one validated gender selection.
+  const dnaEmailVars = getDnaEmailVars(dnaType, gender);
 
   // Render first, then atomically claim one journey instance and queue the full
   // sequence. The date-scoped key only resolves concurrent starts; the 30-day
@@ -296,11 +295,7 @@ export async function startJourney({
     const rendered = renderTemplate(template, {
       firstName,
       dnaType: dnaType ?? "לא ידוע",
-      dnaTypeLabel: dnaProfile ? (isF ? dnaProfile.label_f : dnaProfile.label_m) : "לא ידוע",
-      dnaTypeSubtitle: dnaProfile?.subtitle ?? "",
-      dnaTypeSuperpower: dnaProfile?.superpower ?? "",
-      dnaTypeChallenge: dnaProfile?.challenge ?? "",
-      dnaTypeMatch: dnaProfile ? (isF ? dnaProfile.match_f : dnaProfile.match_m) : "",
+      ...dnaEmailVars,
       joinDnaType: encodeURIComponent(dnaType ?? ""),
       joinGender: gender,
       joinFirstName: encodeURIComponent(firstName),
