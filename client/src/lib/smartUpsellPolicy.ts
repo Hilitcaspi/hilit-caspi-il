@@ -65,7 +65,7 @@ const EXCLUDED_PREFIXES = [
   "/crm", "/admin", "/team", "/terms", "/match", "/my-profile", "/unsubscribe",
   "/join", "/upload-photo", "/course/view", "/guide/view", "/guide/access",
   "/database", "/maagar", "/dna", "/dna-quiz", "/thank-you/database",
-  "/database-plus", "/thank-you/plus", "/lead",
+  "/database-plus", "/thank-you/plus", "/lead", "/live",
 ];
 
 export function selectSmartUpsell(path: string, purchases: PurchaseFlags): UpsellOffer | null {
@@ -75,13 +75,12 @@ export function selectSmartUpsell(path: string, purchases: PurchaseFlags): Upsel
   if (path.startsWith("/thank-you/course")) return purchases.session ? DATABASE : SESSION;
   if (path.startsWith("/thank-you/digital") || path.startsWith("/thank-you/bundle")) return purchases.course ? SESSION : COURSE;
   if (path.startsWith("/thank-you/coaching")) return purchases.database ? null : DATABASE;
-  if (path.startsWith("/live/thank-you")) return purchases.session ? COURSE : SESSION;
 
   if (path.startsWith("/single-session")) return purchases.coaching ? DATABASE : COACHING;
   if (path.startsWith("/coaching")) return purchases.database ? null : DATABASE;
   if (path.startsWith("/course")) return purchases.session ? DATABASE : SESSION;
   if (path.startsWith("/guide")) return purchases.course ? SESSION : COURSE;
-  if (path.startsWith("/live") || path.startsWith("/tu-bav")) return purchases.session ? COURSE : SESSION;
+  if (path.startsWith("/tu-bav")) return purchases.session ? COURSE : SESSION;
 
   if (path === "/" || path.startsWith("/blog") || path.startsWith("/signs") || path.startsWith("/brain") || path.startsWith("/lamekabel")) {
     if (!purchases.database) return DATABASE;

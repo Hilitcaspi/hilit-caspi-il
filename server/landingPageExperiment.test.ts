@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { buildDatabaseJoinHref } from "../client/src/lib/landingPageExperiment";
+import { buildDatabaseJoinHref, buildLiveDatabaseJoinHref } from "../client/src/lib/landingPageExperiment";
 
 function storage(values: Record<string, string>) {
   return {
@@ -54,6 +54,28 @@ describe("landing page experiment attribution", () => {
 
     expect(params.get("coupon")).toBe("NOW");
     expect(params.get("utm_campaign")).toBe("database_holiday_now_sep27");
+  });
+
+  it("pre-applies LIVE from its dedicated database page instead of an old NOW coupon", () => {
+    const href = buildLiveDatabaseJoinHref(
+      "?coupon=NOW&utm_source=instagram&utm_content=story_1",
+      storage({ coupon: "NOW", utm_campaign: "old_campaign" }) as Storage,
+      storage({ coupon: "OLD" }) as Storage,
+    );
+    const params = new URLSearchParams(href.split("?")[1]);
+    expect(params.get("coupon")).toBe("LIVE");
+    expect(params.get("source")).toBe("database");
+    expect(params.get("utm_source")).toBe("instagram");
+    expect(params.get("utm_content")).toBe("story_1");
+    expect(params.get("utm_campaign")).toBe("live_october_2026");
+  });
+
+  it("uses explicit LIVE attribution even with no query string or browser history", () => {
+    const params = new URLSearchParams(buildLiveDatabaseJoinHref("").split("?")[1]);
+    expect(params.get("coupon")).toBe("LIVE");
+    expect(params.get("utm_source")).toBe("site");
+    expect(params.get("utm_medium")).toBe("live_page");
+    expect(params.get("utm_campaign")).toBe("live_october_2026");
   });
 
   it("tracks database_cta on real database-page clicks, not on join page load", () => {

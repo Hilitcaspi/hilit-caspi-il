@@ -7733,6 +7733,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (requested === "LIVE" && input.product === "database") {
           if (Date.now() >= new Date("2026-10-31T20:30:00+02:00").getTime())
             return { valid: false as const, error: "הטבת הלייב הסתיימה" };
+          if (!input.email) return { valid: false as const, error: "יש להזין כתובת מייל כדי לאמת את הטבת המצטרפים החדשים" };
+          const db = await getDb();
+          if (!db) return { valid: false as const, error: "לא ניתן לאמת זכאות כרגע" };
+          const [existingMember] = await db.select({ isPaid: singles.isPaid }).from(singles)
+            .where(eq(singles.email, input.email.trim().toLowerCase())).limit(1);
+          const [priorPurchase] = await db.select({ id: completedPayments.id }).from(completedPayments)
+            .where(and(sql`LOWER(TRIM(${completedPayments.email})) = ${input.email.trim().toLowerCase()}`, eq(completedPayments.product, "database"))).limit(1);
+          if (existingMember?.isPaid || priorPurchase)
+            return { valid: false as const, error: "הטבת LIVE למצטרפים חדשים בלבד. לחברי המאגר קיימת הטבת כרטיס FRIENDS" };
           return { valid: true as const, code: "LIVE" };
         }
         if (requested === "FRIENDS" && input.product === "live_october") {
@@ -8083,6 +8092,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail, reservedCode === "FRIENDS" ? "friends" : "standalone");
           }
           if (reservedCode === "LIVE") {
+            const [existingMember] = await db.select({ isPaid: singles.isPaid }).from(singles)
+              .where(eq(singles.email, normalizedCheckoutEmail)).limit(1);
+            const [priorPurchase] = await db.select({ id: completedPayments.id }).from(completedPayments)
+              .where(and(sql`LOWER(TRIM(${completedPayments.email})) = ${normalizedCheckoutEmail}`, eq(completedPayments.product, "database"))).limit(1);
+            if (existingMember?.isPaid || priorPurchase)
+              throw new TRPCError({ code: "CONFLICT", message: "הטבת LIVE למצטרפים חדשים בלבד. חברי המאגר יכולים לממש את הטבת FRIENDS" });
+            if (await existingLiveTicket(normalizedCheckoutEmail))
+              throw new TRPCError({ code: "CONFLICT", message: "כבר שמור לך כרטיס ללייב. אין צורך להצטרף מחדש למאגר" });
             liveCheckoutPrice("database", "LIVE");
             const { createLiveCheckoutReference } = await import("./liveCheckoutReference");
             preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail, "database_live");

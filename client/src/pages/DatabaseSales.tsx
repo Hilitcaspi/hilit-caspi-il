@@ -6,13 +6,15 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import React from "react";
 import { track } from "@/lib/track";
-import { buildDatabaseJoinHref } from "@/lib/landingPageExperiment";
+import { buildDatabaseJoinHref, buildLiveDatabaseJoinHref } from "@/lib/landingPageExperiment";
 import { trackViewContent } from "@/lib/metaPixel";
 import { gaViewItem } from "@/lib/ga";
 import { motion, useInView } from "framer-motion";
 import { Link, useSearch } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 const CASUAL_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-casual_dac3228f.jpg";
+const SMILING_IMG = "/manus-storage/hilit-smiling-portrait_cddd0dfc.jpg";
 const DNA_QUIZ_URL = "/dna-quiz";
 
 const fadeUp = {
@@ -41,32 +43,42 @@ const DIMENSIONS = [
 ];
 
 const STEPS = [
-  { num: 1, title: "שאלון DNA זוגי", desc: "ממלאים שאלון מעמיק שחושף את הדפוסים הזוגיים האמיתיים שלך. לא מה שאתה/את חושבים שאתם רוצים. מה שבאמת מנבא הצלחה בזוגיות." },
-  { num: 2, title: "פרופיל אישי", desc: "מוסיפים תמונה ומספר משפטים עליך. אני קוראת כל פרופיל לפני שהוא נכנס, ומאשרת אותו אישית." },
+  { num: 1, title: "שאלון DNA זוגי", desc: "ממלאים שאלון שעוזר לזהות דפוסים, העדפות ומה חשוב בתוך קשר. אלה תובנות שיכולות לדייק את תהליך ההיכרות." },
+  { num: 2, title: "פרופיל אישי", desc: "מוסיפים תמונה וכמה משפטים על עצמכם. כל פרופיל נבדק לפני הכניסה למאגר." },
   { num: 3, title: "כניסה למאגר", desc: "תשלום חד-פעמי. אין דמי חבר חודשיים, אין הפתעות. משלמים פעם אחת ונכנסים." },
   { num: 4, title: "המערכת בודקת", desc: "המערכת משווה בין פרופילים, העדפות ושאלונים. הציון הוא כלי עזר, וההתאמות האפשריות עוברות בדיקה אנושית לפני שליחה." },
   { num: 5, title: "אישור הדדי", desc: "שניכם מקבלים מייל ומחליטים בנפרד אם להתקדם לפגישה. רק אם שניכם אמרתם כן, הפרטים נחשפים. אם אחד מכם לא מעוניין, לא קורה כלום, וממשיכים הלאה עד שמגיעה ההתאמה הבאה." },
 ];
 
-export default function DatabaseSales() {
+export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
+  const isLiveOffer = campaign === "live";
+  const liveSales = trpc.liveOctober.salesStatus.useQuery(undefined, { enabled: isLiveOffer });
+  const liveSalesOpen = liveSales.data?.open === true;
   // Track database page view
   React.useEffect(() => {
-    track({ eventType: "database_view" });
+    track({ eventType: "database_view", page: isLiveOffer ? "/live/database" : "/database" });
     trackViewContent({ content_name: "מאגר רווקים", content_category: "matchmaking" });
     gaViewItem("database");
-  }, []);
+  }, [isLiveOffer]);
   const [scrolled, setScrolled] = useState(false);
   const search = useSearch();
-  const isNowHolidayOffer = new URLSearchParams(search).get("coupon")?.toUpperCase() === "NOW";
+  const isNowHolidayOffer = !isLiveOffer && new URLSearchParams(search).get("coupon")?.toUpperCase() === "NOW";
   const joinHref = useMemo(
-    () => buildDatabaseJoinHref(search, window.sessionStorage, window.localStorage),
-    [search],
+    () => (isLiveOffer ? buildLiveDatabaseJoinHref : buildDatabaseJoinHref)(search, window.sessionStorage, window.localStorage),
+    [isLiveOffer, search],
   );
+  // The offer must remain review-only until the online event and access links exist.
+  const offerLocked = isLiveOffer && !liveSalesOpen;
+  const actionHref = offerLocked ? "#live-offer" : joinHref;
+  const actionLabel = isLiveOffer
+    ? offerLocked ? "הטבת LIVE בהכנה" : "הצטרפות למאגר עם כרטיס במתנה"
+    : isNowHolidayOffer ? "הצטרפות עם קוד NOW" : "הצטרפות למאגר";
   const trackJoinClick = (placement: "navbar" | "hero" | "final") => {
+    if (offerLocked) return;
     track({
       eventType: "database_cta",
-      page: "/database",
-      metadata: { destination: "/join", placement, experiment: "database_lp_test_sep2026" },
+      page: isLiveOffer ? "/live/database" : "/database",
+      metadata: { destination: "/join", placement, experiment: isLiveOffer ? "live_october_2026" : "database_lp_test_sep2026" },
     });
   };
 
@@ -96,11 +108,9 @@ export default function DatabaseSales() {
             <span className="text-white font-bold text-lg cursor-pointer hover:text-[#ffe27c] transition-colors">הילית כספי</span>
           </Link>
           <div className="flex items-center gap-4">
-            <Link href={joinHref} onClick={() => trackJoinClick("navbar")}>
-              <span className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105 cursor-pointer">
-                הצטרפות למאגר
-              </span>
-            </Link>
+            <a href={actionHref} onClick={() => trackJoinClick("navbar")} className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105 cursor-pointer">
+              {actionLabel}
+            </a>
             <Link href="/">
               <span className="text-white/80 hover:text-[#ffe27c] text-sm cursor-pointer transition-colors">חזרה לאתר →</span>
             </Link>
@@ -114,7 +124,7 @@ export default function DatabaseSales() {
         <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center relative z-10">
           <motion.div initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.85 }} className="text-right">
             <div className="inline-block bg-[#ffe27c]/15 border border-[#ffe27c]/35 text-[#ffe27c] text-sm font-medium px-4 py-2 rounded-full mb-6">
-              {isNowHolidayOffer ? "✦ הטבת חג עד 1.10" : "✦ הדור הבא של matchmaking"}
+              {isLiveOffer ? "✦ המאגר המקורי + כרטיס ללייב במתנה" : isNowHolidayOffer ? "✦ הטבת חג עד 1.10" : "✦ הדור הבא של matchmaking"}
             </div>
             <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-5">
               לא שידוך.<br />
@@ -124,6 +134,13 @@ export default function DatabaseSales() {
             <p className="text-white/75 text-lg leading-relaxed mb-8">
               בניתי שיטה שלוקחת את כל מה שטוב בכל אחד מהעולמות: גם המראה חשוב, גם הפרמטרים הבסיסיים, וגם הדפוסים הפנימיים שמנבאים אהבה שתחזיק לאורך שנים. לא בחרתי בין הגישות. שילבתי את כולן.
             </p>
+            {isLiveOffer && (
+              <div className="mb-7 rounded-2xl border border-[#ffe27c]/55 bg-white/10 p-5 text-white shadow-lg backdrop-blur-sm">
+                <p className="text-sm font-black text-[#ffe27c]">הצעה מיוחדת למצטרפים חדשים למאגר</p>
+                <p className="mt-2 text-2xl font-black">המאגר ב־299 ₪ · כרטיס אחד ללייב במתנה</p>
+                <p className="mt-2 text-sm leading-7 text-white/85">מכירים את המאגר לעומק, יוצרים פרופיל ושאלון, ומקבלים גם מקום במפגש הלייב הראשון שלי על סודות ההתאמה. מחיר כרטיס נפרד: 149 ₪. קוד LIVE יתווסף אוטומטית בהרשמה.</p>
+              </div>
+            )}
             {isNowHolidayOffer && (
               <div className="mb-7 rounded-2xl border border-[#ffe27c]/45 bg-white/10 p-4 text-white shadow-lg backdrop-blur-sm">
                 <p className="text-sm font-bold text-[#ffe27c]">קוד NOW בתוקף עד 1.10 · עד 200 מימושים בסך הכול</p>
@@ -132,22 +149,18 @@ export default function DatabaseSales() {
               </div>
             )}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href={joinHref} onClick={() => trackJoinClick("hero")}>
-                <span className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl text-center cursor-pointer block">
-                  {isNowHolidayOffer ? "♡ הצטרפות עם קוד NOW" : "♡ הצטרפות למאגר"}
-                </span>
-              </Link>
-              <Link href={DNA_QUIZ_URL}>
+              <a href={actionHref} onClick={() => trackJoinClick("hero")} className="bg-[#ffe27c] text-[#191265] font-black text-lg px-8 py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl text-center cursor-pointer block">♡ {actionLabel}</a>
+              {isLiveOffer ? <a href="#how-it-works" className="border-2 border-white/40 text-white font-semibold text-lg px-8 py-4 rounded-2xl hover:border-[#ffe27c] hover:text-[#ffe27c] transition-all duration-300 text-center cursor-pointer block">איך עובד המאגר?</a> : <Link href={DNA_QUIZ_URL}>
                 <span className="border-2 border-white/40 text-white font-semibold text-lg px-8 py-4 rounded-2xl hover:border-[#ffe27c] hover:text-[#ffe27c] transition-all duration-300 text-center cursor-pointer block">
                   🧬 שאלון DNA חינמי קודם
                 </span>
-              </Link>
+              </Link>}
             </div>
           </motion.div>
           <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.85, delay: 0.2 }} className="flex justify-center">
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-br from-[#ffe27c]/30 to-[#1800ad]/30 rounded-3xl blur-2xl" />
-              <img src={CASUAL_IMG} alt="הילית כספי" className="relative w-64 md:w-80 h-auto rounded-3xl object-cover shadow-2xl" />
+              <img src={isLiveOffer ? SMILING_IMG : CASUAL_IMG} alt="הילית כספי מחייכת" className="relative w-64 md:w-80 h-auto rounded-3xl object-cover shadow-2xl" fetchPriority="high" />
               <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
                 <div className="text-[#191265] font-black text-lg">התאמה לעומק</div>
                 <div className="text-[#727272] text-xs">שאלון, נתונים ובדיקה אנושית</div>
@@ -157,8 +170,35 @@ export default function DatabaseSales() {
         </div>
       </section>
 
+      {isLiveOffer && (
+        <section id="live-offer" className="scroll-mt-24 bg-[#fff8e8] px-6 py-16 md:py-20" aria-labelledby="live-offer-title">
+          <div className="mx-auto grid max-w-5xl gap-8 rounded-[2rem] border border-[#e3cb78] bg-white p-7 shadow-[0_20px_65px_rgba(25,18,101,.1)] md:grid-cols-[1.25fr_.75fr] md:p-10">
+            <div className="text-right">
+              <p className="text-xs font-black tracking-wider text-[#594593]">הטבת הלייב · למצטרפים חדשים למאגר</p>
+              <h2 id="live-offer-title" className="mt-3 text-3xl font-black leading-tight text-[#191265] md:text-4xl">המאגר נשאר אותו מאגר. <span className="text-[#4e3eb4]">הערב איתי הוא המתנה.</span></h2>
+              <p className="mt-4 text-base leading-8 text-[#625d78]">במחיר הצטרפות חד־פעמי של 299 ₪ נכנסים למאגר, ממלאים שאלון זוגי ופרופיל, ונבחנות עבורכם התאמות רלוונטיות. כשנרשמים מכאן עם קוד LIVE, ההצטרפות כוללת גם <strong className="text-[#191265]">כרטיס אחד ללייב שלי ב־31.10 בשעה 20:30</strong>. מחיר הכרטיס בנפרד הוא 149 ₪.</p>
+              <p className="mt-4 rounded-xl bg-[#f5efff] px-4 py-3 text-sm font-bold leading-6 text-[#191265]">איך מקבלים את ההטבה? הכניסה מהעמוד הזה מעבירה לקופה את קוד LIVE אוטומטית. לאחר הזנת כתובת המייל הקוד נבדק, ואחרי אישור התשלום השובר מופיע בדף התודה ובאזור האישי. אין צורך להזין קוד ידנית.</p>
+              {!liveSalesOpen && <p className="mt-4 text-sm font-bold text-[#75591e]">כעת זו תצוגה מוקדמת. ההרשמה להטבת LIVE תיפתח כשפרטי האירוע וקישורי הכניסה יהיו מוכנים.</p>}
+              <div className="mt-6 flex flex-wrap items-center gap-4">
+                {liveSalesOpen ? <a href={joinHref} onClick={() => trackJoinClick("hero")} className="rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">להצטרפות עם הכרטיס במתנה</a> : <span className="rounded-2xl border border-[#191265]/20 px-7 py-4 text-sm font-black text-[#191265]">ההטבה נפתחת בקרוב</span>}
+                <Link href="/live" className="text-sm font-bold text-[#4e3eb4] underline underline-offset-4">מה יהיה בלייב?</Link>
+              </div>
+            </div>
+            <div className="self-center rounded-[1.5rem] bg-[#191265] p-7 text-center text-white">
+              <p className="text-xs font-black tracking-wider text-[#ffe27c]">מועבר להטבת LIVE ללקוחות חדשים</p>
+              <p className="mt-5 text-5xl font-black text-[#ffe27c]">299 ₪</p>
+              <p className="mt-2 text-sm text-white/75">מאגר · תשלום חד־פעמי</p>
+              <div className="my-6 h-px bg-white/20" />
+              <p className="text-lg font-black">+ כרטיס אחד ללייב במתנה</p>
+              <p className="mt-2 text-xs text-white/70">כרטיס רגיל בנפרד: 149 ₪</p>
+              <div className="mt-6 rounded-xl border border-[#ffe27c]/35 bg-white/10 px-4 py-3 text-sm"><span className="text-white/75">קוד הטבה בקופה: </span><strong className="tracking-widest text-[#ffe27c]" dir="ltr">LIVE</strong><span className="block text-xs text-white/65">יועבר אוטומטית בהרשמה</span></div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── THE PROBLEM: WHY EVERYTHING ELSE FAILS ── */}
-      <section className="py-20 px-6 bg-white">
+      <section id="how-it-works" className="scroll-mt-20 py-20 px-6 bg-white">
         <AnimatedSection>
           <div className="max-w-3xl mx-auto text-right">
             <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-4 text-center">למה הכל עד עכשיו לא עבד</motion.p>
@@ -188,11 +228,11 @@ export default function DatabaseSales() {
             <div className="text-center mb-14">
               <motion.p variants={fadeUp} className="text-[#ffe27c]/70 font-semibold text-sm uppercase tracking-widest mb-4">השיטה</motion.p>
               <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-white mb-5 leading-snug">
-                האלגוריתם שמנבא<br />
-                <span className="text-[#ffe27c]">אם שניים ייהפכו לזוג.</span>
+                לא רק תמונה או גיל.<br />
+                <span className="text-[#ffe27c]">גם מה שקורה בין השורות.</span>
               </motion.h2>
               <motion.p variants={fadeUp} className="text-white/65 text-lg max-w-2xl mx-auto leading-relaxed">
-                לקחתי את המחקרים המוכחים ביותר בתחום הזוגיות ובניתי מהם אלגוריתם שמחשב תאימות על פני ששה ממדים מרכזיים. לא ניחוש. לא אינטואיציה. מתמטיקה שמבוססת על מדע.
+                השאלון, הפרופיל וההעדפות נבחנים יחד עם דפוסים של קרבה, ערכים וקצב חיים. מחשב מזהה אפשרויות, אבל בדיקה אנושית והסכמה הדדית הן חלק בלתי נפרד מהתהליך.
               </motion.p>
             </div>
             <div className="grid md:grid-cols-3 gap-5">
@@ -338,11 +378,11 @@ export default function DatabaseSales() {
               ממלאים שאלון DNA, יוצרים פרופיל, והמערכת ואני בודקות התאמות רלוונטיות. תשלום חד-פעמי, ללא דמי חבר חודשיים.
             </motion.p>
             <motion.div variants={fadeUp}>
-              <Link href={joinHref} onClick={() => trackJoinClick("final")}>
+              <a href={actionHref} onClick={() => trackJoinClick("final")}>
                 <span className="inline-block bg-[#ffe27c] text-[#191265] font-black text-xl px-10 py-5 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl cursor-pointer">
-                  ♡ הצטרפות למאגר
+                  ♡ {actionLabel}
                 </span>
-              </Link>
+              </a>
             </motion.div>
             <motion.p variants={fadeUp} className="text-white/50 text-xs mt-5 max-w-lg mx-auto leading-relaxed">
               אין התחייבות למספר התאמות או לתדירות קבועה. כל הצעה נשלחת רק לאחר שנמצאה התאמה הדדית ורלוונטית.
@@ -386,4 +426,8 @@ export default function DatabaseSales() {
       </footer>
     </div>
   );
+}
+
+export default function DatabaseSales() {
+  return <DatabaseSalesContent />;
 }

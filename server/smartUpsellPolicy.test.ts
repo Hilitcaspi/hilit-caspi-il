@@ -23,10 +23,11 @@ describe("smart upsell policy", () => {
     expect(selectSmartUpsell("/thank-you/session", { session: true })?.id).toBe("personal_coaching");
   });
 
-  it("adds relevant upsells to public content and product pages outside the database funnel", () => {
+  it("keeps the October live funnel focused while upselling other public products", () => {
     expect(selectSmartUpsell("/guide-free", {})?.id).toBe("relationship_course");
-    expect(selectSmartUpsell("/live", {})?.id).toBe("intro_session");
-    expect(selectSmartUpsell("/live/thank-you", { session: true })?.id).toBe("relationship_course");
+    expect(selectSmartUpsell("/live", {})).toBeNull();
+    expect(selectSmartUpsell("/live/database", {})).toBeNull();
+    expect(selectSmartUpsell("/live/thank-you", { session: true })).toBeNull();
     expect(selectSmartUpsell("/tu-bav", {})?.id).toBe("intro_session");
     expect(selectSmartUpsell("/lead", {})).toBeNull();
   });

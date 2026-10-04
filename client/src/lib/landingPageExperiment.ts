@@ -29,3 +29,17 @@ export function buildDatabaseJoinHref(
 
   return `/join?${outgoing.toString()}`;
 }
+
+/** Explicit LIVE offer page: URL LIVE takes precedence over stale browser coupon history. */
+export function buildLiveDatabaseJoinHref(
+  currentSearch: string,
+  sessionStore?: ReadableStorage | null,
+  localStore?: ReadableStorage | null,
+): string {
+  const params = new URLSearchParams(currentSearch);
+  params.set("coupon", "LIVE");
+  if (!params.has("utm_source")) params.set("utm_source", "site");
+  if (!params.has("utm_medium")) params.set("utm_medium", "live_page");
+  if (!params.has("utm_campaign")) params.set("utm_campaign", "live_october_2026");
+  return buildDatabaseJoinHref(params.toString(), sessionStore, localStore);
+}
