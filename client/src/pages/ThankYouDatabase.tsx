@@ -9,15 +9,22 @@ import { Link } from "wouter";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DatabaseExpectations from "@/components/DatabaseExpectations";
+import { readPurchaseTrackingToken } from "@/lib/purchaseTracking";
+import LiveVoucherCard from "@/components/LiveVoucherCard";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, שילמתי כניסה למאגר הרווקים באתר ואשמח לעזרה");
 const INSTAGRAM_URL = "https://www.instagram.com/hilitcaspi_relationship";
 
 export default function ThankYouDatabase() {
+  const isLiveOffer = new URLSearchParams(window.location.search).get("offer") === "live";
   const [email, setEmail] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
+  const requestPersonalLink = trpc.singles.sendDashboardLink.useMutation({
+    onSuccess: () => setErrorMsg("אם המייל רשום במאגר, נשלח אליו קישור אישי לאזור שלך."),
+    onError: () => setErrorMsg("לא הצלחנו לשלוח קישור. אפשר לנסות שוב מאוחר יותר."),
+  });
 
   const getLinkMutation = trpc.singles.getQuestionnaireLink.useMutation({
     onSuccess: (data) => {
@@ -36,7 +43,8 @@ export default function ThankYouDatabase() {
           const delay = (retryCount + 1) * 3000; // 3s, 6s, 9s, 12s
           setTimeout(() => {
             setRetryCount(prev => prev + 1);
-            getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
+            const trackingToken = readPurchaseTrackingToken();
+            if (trackingToken) getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin, trackingToken });
           }, delay);
         } else {
           setIsRetrying(false);
@@ -59,7 +67,9 @@ export default function ThankYouDatabase() {
     setRetryCount(0);
     setIsRetrying(false);
     if (!email.trim()) return;
-    getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
+    const trackingToken = readPurchaseTrackingToken();
+    if (trackingToken) getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin, trackingToken });
+    else requestPersonalLink.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
   };
 
   return (
@@ -73,6 +83,7 @@ export default function ThankYouDatabase() {
       />
 
       <div className="relative z-10 max-w-lg w-full text-center">
+        {isLiveOffer && <div className="mb-8"><LiveVoucherCard receiptOnly showPending /></div>}
         {/* Success icon */}
         <motion.div
           initial={{ scale: 0 }}

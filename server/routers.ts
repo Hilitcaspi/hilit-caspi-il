@@ -63,6 +63,7 @@ import { contentStudioRouter } from "./contentStudioRouter";
 import { dashboardAssistantRouter } from "./dashboardAssistantRouter";
 import { usageRouter } from "./usageRouter";
 import { courseCompassRouter } from "./courseCompassRouter";
+import { liveOctoberRouter } from "./liveOctoberRouter";
 import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivacy";
 import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYMENT_ATTRIBUTION_TTL_MS } from "./paymentAttribution";
 import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
@@ -647,6 +648,7 @@ export const appRouter = router({
   dashboardAssistant: dashboardAssistantRouter,
   usage: usageRouter,
   courseCompass: courseCompassRouter,
+  liveOctober: liveOctoberRouter,
   publicProof: router({
     approvedTestimonials: publicProcedure.query(async () => {
       const db = await getDb();
@@ -3048,10 +3050,15 @@ export const appRouter = router({
      * Get questionnaire link by email - used on thank-you page so user can go directly to questionnaire
      */
     getQuestionnaireLink: publicProcedure
-      .input(z.object({ email: z.string().email(), origin: z.string() }))
+      .input(z.object({ email: z.string().email(), origin: z.string(), trackingToken: z.string().regex(/^[a-f0-9]{64}$/) }))
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) return { success: false, url: null };
+        const normalizedEmail = input.email.trim().toLowerCase();
+        const [verifiedPurchase] = await db.select({ id: paymentLeads.id }).from(paymentLeads)
+          .where(and(eq(paymentLeads.email, normalizedEmail), eq(paymentLeads.product, "database"),
+            eq(paymentLeads.trackingToken, input.trackingToken), sql`${paymentLeads.confirmedAt} IS NOT NULL`)).limit(1);
+        if (!verifiedPurchase) return { success: false, url: null, notFound: true };
         const [profile] = await db.select({
           id: singles.id,
           firstName: singles.firstName,
@@ -3059,12 +3066,13 @@ export const appRouter = router({
           questionnaireCompletedAt: singles.questionnaireCompletedAt,
           isPaid: singles.isPaid,
         }).from(singles)
-          .where(sql`LOWER(${singles.email}) = ${input.email.trim().toLowerCase()}`)
+          .where(sql`LOWER(${singles.email}) = ${normalizedEmail}`)
           .limit(1);
         if (!profile || !profile.isPaid) return { success: false, url: null, notFound: true };
         if (profile.questionnaireCompletedAt) return { success: true, url: null, alreadyCompleted: true };
         if (!profile.questionnaireToken) return { success: false, url: null };
-        const url = `${input.origin}/join/questionnaire?token=${profile.questionnaireToken}`;
+        const safeOrigin = /^https:\/\/(www\.)?hilitcaspi\.com$/i.test(input.origin) ? input.origin : "https://hilitcaspi.com";
+        const url = `${safeOrigin}/join/questionnaire?token=${profile.questionnaireToken}`;
         return { success: true, url };
       }),
   }),
@@ -7684,93 +7692,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
   // ── Live Events ────────────────────────────────────────────────────────────
   events: router({
     registerLiveEvent: publicProcedure
-      .input(z.object({
-        name: z.string().min(1),
-        email: z.string().email(),
-        phone: z.string().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-        const { liveEventRegistrations } = await import("../drizzle/schema");
-
-        // Save registration
-        await db.insert(liveEventRegistrations).values({
-          name: input.name,
-          email: input.email,
-          phone: input.phone,
-          createdAt: Date.now(),
-        });
-
-        const ZOOM_LINK = "https://us06web.zoom.us/j/86584508771?pwd=XYV0VbPuuGMmaxdMHoOpCa8mmFxx2n.1";
-        const PAID_GUIDE_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/Hilit_Caspi_Paid_Guide_6518dc09.pdf";
-        const firstName = input.name.split(" ")[0];
-
-        // Send confirmation email with Zoom link + guide
-        const emailHtml = `
-<!DOCTYPE html>
-<html dir="rtl" lang="he">
-<head><meta charset="UTF-8"><style>
-  body { font-family: Arial, sans-serif; background: #f0eadc; margin: 0; padding: 0; }
-  .container { max-width: 600px; margin: 0 auto; background: white; }
-  .header { background: #191265; padding: 40px 30px; text-align: center; }
-  .header h1 { color: #ffe27c; margin: 0; font-size: 24px; }
-  .header p { color: rgba(255,255,255,0.7); margin: 8px 0 0; }
-  .body { padding: 40px 30px; }
-  .body h2 { color: #191265; font-size: 22px; }
-  .body p { color: #555; line-height: 1.7; }
-  .cta { display: block; background: #ffe27c; color: #191265; text-decoration: none; font-weight: bold; padding: 16px 32px; border-radius: 12px; text-align: center; margin: 24px 0; font-size: 16px; }
-  .guide-box { background: #f0eadc; border: 2px solid #ffe27c; border-radius: 12px; padding: 20px; margin: 24px 0; }
-  .guide-box h3 { color: #191265; margin: 0 0 8px; }
-  .guide-box p { color: #727272; margin: 0 0 12px; font-size: 14px; }
-  .footer { background: #191265; padding: 24px; text-align: center; }
-  .footer p { color: rgba(255,255,255,0.5); font-size: 12px; margin: 0; }
-</style></head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>💛 נרשמת בהצלחה!</h1>
-      <p>לייב שאלות ותשובות עם הילית כספי</p>
-    </div>
-    <div class="body">
-      <h2>היי ${firstName},</h2>
-      <p>כל הכבוד! נרשמת ללייב שאלות ותשובות עם הילית כספי.</p>
-      <p><strong>יום שלישי, 16 ביוני 2026 | 20:30</strong></p>
-      <a href="${ZOOM_LINK}" class="cta">🎥 כניסה לזום ←</a>
-      <p style="font-size:13px;color:#999;text-align:center">Meeting ID: 865 8450 8771 | Passcode: 696071</p>
-
-      <div class="guide-box">
-        <h3>🎁 המדריך שלך מוכן!</h3>
-        <p>"לבחור נכון" — המדריך המעשי לזוגיות (שווי ₪249) — הנה הלינק שלך:</p>
-        <a href="${PAID_GUIDE_URL}" class="cta" style="background:#191265;color:white">📖 לקריאת המדריך ←</a>
-      </div>
-
-      <p>מחכה לראות אותך בלייב! 💛</p>
-      <p>הילית כספי<br>מאמנת ומשדכת | Relationship Expert & Matchmaker</p>
-    </div>
-    <div class="footer">
-      <p>© 2026 הילית כספי | hilitcaspi.com</p>
-    </div>
-  </div>
-</body>
-</html>`;
-
-        await sendEmail({
-          to: { email: input.email, name: input.name },
-          subject: "💛 נרשמת! הנה הלינק לזום + המדריך שלך",
-          htmlContent: emailHtml,
-          textContent: `היי ${firstName},\n\nנרשמת ללייב שאלות ותשובות עם הילית כספי!\n\nיום שלישי, 16.6.2026 | 20:30\nלינק לזום: ${ZOOM_LINK}\nMeeting ID: 865 8450 8771 | Passcode: 696071\n\nהמדריך שלך: ${PAID_GUIDE_URL}\n\nמחכה לראות אותך!\nהילית`,
-        });
-
-        // Update guideSent + confirmationSent
-        await db.update(liveEventRegistrations)
-          .set({ guideSent: true, confirmationSent: true })
-          .where(eq(liveEventRegistrations.email, input.email));
-
-        // notifyOwner removed — live event registration no longer sends email/push
-
-        return { success: true };
+      .input(z.object({ name: z.string().min(1), email: z.string().email(), phone: z.string().optional() }))
+      .mutation(async () => {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "ההרשמה לאירוע זה הסתיימה" });
       }),
 
     getSpotsLeft: publicProcedure.query(async () => {
@@ -7800,8 +7724,29 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         code: z.string().min(1).max(50),
         product: z.string().optional(),
         email: z.string().email().optional(),
+        personalToken: z.string().min(16).max(200).optional(),
       }))
       .mutation(async ({ input }) => {
+        const requested = input.code.trim().toUpperCase();
+        if ((requested === "LIVE" || requested === "FRIENDS") && !(await import("./liveOctober")).LIVE_OCTOBER_SALES_OPEN)
+          return { valid: false as const, error: "הרשמת הלייב טרם נפתחה" };
+        if (requested === "LIVE" && input.product === "database") {
+          if (Date.now() >= new Date("2026-10-31T20:30:00+02:00").getTime())
+            return { valid: false as const, error: "הטבת הלייב הסתיימה" };
+          return { valid: true as const, code: "LIVE" };
+        }
+        if (requested === "FRIENDS" && input.product === "live_october") {
+          const { getVerifiedLiveMember, existingLiveTicket } = await import("./liveOctober");
+          const member = input.email && input.personalToken && await getVerifiedLiveMember(input.email, input.personalToken);
+          if (!member)
+            return { valid: false as const, error: "כדי לקבל מחיר חברים, יש לפתוח את הקישור האישי שנשלח למייל" };
+          if (member.plus) return { valid: false as const, error: "לחברי Plus פעילים יש כרטיס ללא עלות באזור האישי" };
+          if (await existingLiveTicket(input.email!))
+            return { valid: false as const, error: "כבר שמור לך כרטיס ללייב באזור האישי" };
+          return { valid: true as const, code: "FRIENDS", fixedPrice: 49 };
+        }
+        if (requested === "LIVE" || requested === "FRIENDS")
+          return { valid: false as const, error: "הקוד אינו תקף למוצר זה" };
         const db = await getDb();
         if (!db) return { valid: false as const, error: "שגיאת שרת" };
         const { discountCodes } = await import("../drizzle/schema");
@@ -7938,7 +7883,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     }),
     createProcess: publicProcedure
       .input(z.object({
-        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "bundle_new_year", "match_boost", "plus"]),
+        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "bundle_new_year", "match_boost", "plus", "live_october"]),
         fullName: z.string().min(2),
         email: z.string().email(),
         phone: z.string().optional().transform((value, ctx) => {
@@ -7986,6 +7931,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         let preparedBoostRequestId: number | null = null;
         let preparedBoostCheckoutReference: string | null = null;
         let preparedPlusCheckoutReference: string | null = null;
+        let preparedLiveCheckoutReference: string | null = null;
         let verifiedPaymentIdentity: { fullName: string; email: string; phone: string } | null = null;
 
         if (input.product === "match_boost") {
@@ -8105,9 +8051,49 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           };
         }
 
+        // Reserved live campaign codes are entitlements, not generic discounts.
+        // Neither LIVE nor FRIENDS may be used on any other product.
+        const reservedCode = input.couponCode?.trim().toUpperCase();
+        if ((reservedCode === "LIVE" && input.product !== "database") ||
+            (reservedCode === "FRIENDS" && input.product !== "live_october")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "קוד ההטבה אינו תקף למוצר הזה" });
+        }
+        if (input.product === "live_october" && reservedCode && reservedCode !== "FRIENDS") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "קוד ההטבה אינו תקף לכרטיס הלייב" });
+        }
+        if (reservedCode === "LIVE" || input.product === "live_october") {
+          if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+          const { existingLiveTicket, getVerifiedLiveMember, liveCheckoutPrice, LIVE_START_ISO, LIVE_OCTOBER_SALES_OPEN } = await import("./liveOctober");
+          if (!LIVE_OCTOBER_SALES_OPEN) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "הרשמת הלייב טרם נפתחה" });
+          if (Date.now() >= new Date(LIVE_START_ISO).getTime())
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "ההרשמה ללייב הסתיימה" });
+          if (input.product === "live_october") {
+            if (await existingLiveTicket(normalizedCheckoutEmail))
+              throw new TRPCError({ code: "CONFLICT", message: "כבר שמור לך כרטיס ללייב. אין צורך לרכוש כרטיס נוסף" });
+            if (reservedCode === "FRIENDS") {
+              const member = input.personalToken && await getVerifiedLiveMember(normalizedCheckoutEmail, input.personalToken);
+              if (!member) throw new TRPCError({ code: "FORBIDDEN", message: "מחיר החברים דורש כניסה בקישור האישי שנשלח למייל" });
+              if (member.plus) throw new TRPCError({ code: "CONFLICT", message: "לחברי Plus פעילים יש כבר כרטיס ללא תשלום באזור האישי" });
+              verifiedPaymentIdentity = {
+                fullName: [member.firstName, member.lastName].filter(Boolean).join(" ") || input.fullName,
+                email: normalizedCheckoutEmail, phone: input.phone || "",
+              };
+            }
+            const { createLiveCheckoutReference } = await import("./liveCheckoutReference");
+            preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail, reservedCode === "FRIENDS" ? "friends" : "standalone");
+          }
+          if (reservedCode === "LIVE") {
+            liveCheckoutPrice("database", "LIVE");
+            const { createLiveCheckoutReference } = await import("./liveCheckoutReference");
+            preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail, "database_live");
+          }
+        }
+
         // Server-side coupon validation — never trust client-supplied price
         let finalSum: number | undefined = undefined;
-        if (input.couponCode && db && input.product !== "plus" && input.product !== "match_boost") {
+        if (input.product === "live_october") finalSum = reservedCode === "FRIENDS" ? 49 : 149;
+        if (reservedCode === "LIVE") finalSum = 299;
+        if (input.couponCode && db && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "FRIENDS") {
           const { discountCodes } = await import("../drizzle/schema");
           const [code] = await db.select().from(discountCodes)
             .where(eq(discountCodes.code, input.couponCode.toUpperCase()))
@@ -8259,6 +8245,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             sum: finalSum,
             webhookReference: preparedBoostCheckoutReference || undefined,
             plusWebhookReference: preparedPlusCheckoutReference || undefined,
+            liveWebhookReference: preparedLiveCheckoutReference || undefined,
           });
           if (input.product === "plus" && db) {
             await db.update(plusCheckoutIntents)

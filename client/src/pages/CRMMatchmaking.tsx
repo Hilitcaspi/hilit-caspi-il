@@ -5,6 +5,7 @@
 import { useState } from "react";
 import MatchmakingDashboard from "./MatchmakingDashboard";
 import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
+import LiveOctoberAdminSection from "@/components/LiveOctoberAdminSection";
 import BoostMembersAdminSection from "@/components/BoostMembersAdminSection";
 import TestimonialManagementSection from "@/components/TestimonialManagementSection";
 import DailyReportManagementSection from "@/components/DailyReportManagementSection";
@@ -312,11 +313,11 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report">(() => {
+  const [activeTab, setActiveTab] = useState<"self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "live_october" | "testimonials" | "daily_report">(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    const allowedTabs = new Set(["self_service", "singles", "matches", "unmatched", "now", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "testimonials", "daily_report"]);
+    const allowedTabs = new Set(["self_service", "singles", "matches", "unmatched", "now", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "live_october", "testimonials", "daily_report"]);
     return allowedTabs.has(requestedTab || "")
-      ? requestedTab as "self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "testimonials" | "daily_report"
+      ? requestedTab as "self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "live_october" | "testimonials" | "daily_report"
       : "singles";
   });
   // Filter-search tab state
@@ -944,6 +945,7 @@ export default function CRMMatchmaking() {
             { id: "inactive" as const, label: "לא פעילים", icon: <span>🚫</span> },
             { id: "boost" as const, label: "מאושרי Boost", icon: <Sparkles size={14} /> },
             { id: "plus" as const, label: "חברי PLUS", icon: <span className="font-black text-[#8b7420]">＋</span> },
+            { id: "live_october" as const, label: "הלייב עם הילית", icon: <Gift size={14} /> },
             { id: "testimonials" as const, label: "משובים והמלצות", icon: <span>✍️</span> },
             { id: "daily_report" as const, label: "דוח חצות", icon: <MessageSquareText size={14} /> },
             { id: "dashboard" as const, label: "דשבורד התאמות 📊", icon: <BarChart3 size={14} /> },
@@ -3187,6 +3189,9 @@ export default function CRMMatchmaking() {
         )}
         {activeTab === "plus" && (
           <PlusPilotAdminSection />
+        )}
+        {activeTab === "live_october" && (
+          <LiveOctoberAdminSection />
         )}
         {activeTab === "testimonials" && (
           <TestimonialManagementSection />

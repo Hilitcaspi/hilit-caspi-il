@@ -753,6 +753,36 @@ export const liveEventRegistrations = mysqlTable("live_event_registrations", {
 export type LiveEventRegistration = typeof liveEventRegistrations.$inferSelect;
 export type InsertLiveEventRegistration = typeof liveEventRegistrations.$inferInsert;
 
+/** October 2026 event: a single ticket per verified email, independent of the June event. */
+export const liveOctoberTickets = mysqlTable("live_october_tickets", {
+  id: int("id").autoincrement().primaryKey(),
+  eventSlug: varchar("event_slug", { length: 64 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  singleId: int("single_id"),
+  source: mysqlEnum("source", ["database_live", "plus", "friends", "standalone"]).notNull(),
+  voucherCode: varchar("voucher_code", { length: 30 }).notNull(),
+  amountAgorot: int("amount_agorot").notNull().default(0),
+  providerTransactionId: varchar("provider_transaction_id", { length: 200 }),
+  issuedAt: bigint("issued_at", { mode: "number" }).notNull(),
+  revokedAt: bigint("revoked_at", { mode: "number" }),
+}, (t) => ({
+  eventEmailUnique: uniqueIndex("live_october_event_email_unique").on(t.eventSlug, t.email),
+  voucherUnique: uniqueIndex("live_october_voucher_unique").on(t.voucherCode),
+  sourceIdx: index("live_october_source_idx").on(t.source),
+}));
+export type LiveOctoberTicket = typeof liveOctoberTickets.$inferSelect;
+
+export const liveOctoberQuestions = mysqlTable("live_october_questions", {
+  id: int("id").autoincrement().primaryKey(),
+  ticketId: int("ticket_id").notNull(),
+  body: text("body").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  ticketIdx: index("live_october_question_ticket_idx").on(t.ticketId),
+}));
+export type LiveOctoberQuestion = typeof liveOctoberQuestions.$inferSelect;
+
 /**
  * WhatsApp Group Click Tracking
  * Each row = one click on a WhatsApp group redirect link.

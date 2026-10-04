@@ -66,6 +66,8 @@ const UserDashboard = lazy(() => import("@/pages/UserDashboard"));
 const LeadCall = lazy(() => import("@/pages/LeadCall"));
 const LiveEvent = lazy(() => import("@/pages/LiveEvent"));
 const LiveEventThankYou = lazy(() => import("@/pages/LiveEventThankYou"));
+const LiveDatabaseOffer = lazy(() => import("@/pages/LiveDatabase"));
+const TermsLiveOctober = lazy(() => import("@/pages/TermsLiveOctober"));
 const SignsGuide = lazy(() => import("@/pages/SignsGuide"));
 const LaMekabel = lazy(() => import("@/pages/LaMekabel"));
 const Brain = lazy(() => import("@/pages/Brain"));
@@ -326,6 +328,8 @@ function HeRouter() {
           <Route path={"/match/return-to-pool"} component={lazy(() => import("./pages/MatchReturnToPool"))} />
           <Route path={"/match/owner-approve"} component={MatchOwnerApprove} />
           <Route path={"/live/thank-you"} component={LiveEventThankYou} />
+          <Route path={"/terms/live-october"} component={TermsLiveOctober} />
+          <Route path={"/live/database"} component={LiveDatabaseOffer} />
           <Route path={"/live"} component={LiveEvent} />
           <Route path={"/my-profile"} component={UserDashboard} />
           <Route path={"/lead"} component={LeadCall} />

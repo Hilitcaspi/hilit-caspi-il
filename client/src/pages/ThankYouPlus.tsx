@@ -1,5 +1,6 @@
 import { CheckCircle2, MessageCircle } from "lucide-react";
 import { Link } from "wouter";
+import LiveVoucherCard from "@/components/LiveVoucherCard";
 
 export default function ThankYouPlus() {
   const params = new URLSearchParams(window.location.search);
@@ -29,6 +30,7 @@ export default function ThankYouPlus() {
         <div className="mt-4 rounded-2xl bg-[#f8f6ff] p-5 text-right text-sm leading-7">
           <strong>מה קורה עכשיו?</strong><br />אם הפרופיל שלך כבר מלא ופעיל, ההטבות יופיעו באזור האישי. אם עדיין חסרים פרטים או שאלון, במייל ששלחנו מחכה קישור אישי להשלמה. מיד לאחר ההשלמה נוכל להתחיל לעבוד על ההתאמות שלך.
         </div>
+        {hasPersonalLink && <div className="mt-4"><LiveVoucherCard email={email} token={token} /></div>}
         <Link href={profileUrl}><span className="mt-6 block cursor-pointer rounded-2xl bg-[#191265] py-4 font-black text-white">{hasPersonalLink ? "לאזור האישי" : "חזרה לאתר"}</span></Link>
         <a href="https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%2C%20%D7%94%D7%A6%D7%98%D7%A8%D7%A4%D7%AA%D7%99%20%D7%9C%D6%BEDatabase%20Plus" className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-[#191265] py-3 text-sm font-bold"><MessageCircle className="h-4 w-4" />שירות Plus</a>
       </section>

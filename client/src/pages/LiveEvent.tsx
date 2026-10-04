@@ -1,569 +1,403 @@
-/**
- * Live Q&A Event Landing Page
- * Event: יום שלישי 16/6/2026 20:30
- * Payment: Grow link (direct)
- */
+import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { Link } from "wouter";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Crown,
+  KeyRound,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+  Ticket,
+  UserRoundCheck,
+} from "lucide-react";
+import GrowWallet from "@/components/GrowWallet";
+import { trpc } from "@/lib/trpc";
 
-import { useState, useEffect, useRef } from "react";
-import { motion, useInView } from "framer-motion";
-import { buildGrowUrl } from "@/lib/utils";
+const EDITORIAL_IMAGE = "/manus-storage/hilit-portrait-editorial_6e4736cc.jpg";
+const BRIGHT_IMAGE = "/manus-storage/hilit-portrait-bright_56720420.jpg";
+const EVENT_DATE = "שבת, 31 באוקטובר 2026";
+const EVENT_TIME = "20:30 לפי שעון ישראל";
 
-// CDN Image URLs
-const HERO_IMG    = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-hero_30e4b53c.png";
-const ABOUT_IMG   = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-about_1da3754a.jpg";
-
-// Links
-const GROW_PAYMENT = "https://pay.grow.link/OTkwNzQ~37ba5f3ada87872fd5446ded66942ebe-MzUwODUwMg";
-const WA_GROUP     = "https://hilitcaspi.com/api/wa/site";
-const WA_DIRECT    = "https://wa.me/972552442334";
-const INSTAGRAM    = "https://www.instagram.com/hilitcaspi_relationship";
-const ARTICLE_URL  = "https://www.atmag.co.il/ppost/%D7%94%D7%90%D7%99%D7%A9%D7%94-%D7%A9%D7%A4%D7%99%D7%A6%D7%97%D7%94-%D7%90%D7%AA-%D7%A7%D7%95%D7%93-%D7%94%D7%94%D7%AA%D7%90%D7%9E%D7%94-%D7%94%D7%96%D7%95%D7%92%D7%99%D7%AA/";
-const EVENT_DATE   = new Date("2026-06-16T17:30:00Z"); // 20:30 Jerusalem
-
-// Animation helpers
 const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] as [number,number,number,number] } },
+  hidden: { opacity: 0, y: 24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.58, ease: [0.23, 1, 0.32, 1] as const },
+  },
 };
-const stagger = { visible: { transition: { staggerChildren: 0.12 } } };
 
-function AnimatedSection({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-60px" });
+const liveTopics = [
+  ["הפרופיל שמספר את הסיפור", "איך בניית פרופיל מדויקת נותנת מקום למה שחשוב באמת, בלי להפוך אדם לרשימת נתונים."],
+  ["ההתאמה שמתרחשת מאחורי הקלעים", "מבט מפוכח על הדרך שבה העדפות, שאלון והיכרות אנושית פוגשים זה את זה בתהליך."],
+  ["טיפים להיכרות מוצלחת", "מחשבות מעשיות על סקרנות, קצב וציפיות, כדי להגיע להיכרות עם קצת יותר בהירות."],
+  ["תובנות מהשאלון", "איך להשתמש במה שעולה בשאלון כדי לדייק בחירות ולהבין טוב יותר את דפוסי ההיכרות."],
+] as const;
+
+const steps = [
+  ["01", "מצטרפים ללייב", "רוכשים כרטיס רגיל, או פותחים הטבה אישית דרך האזור האישי."],
+  ["02", "שולחים שאלה מראש", "לאחר ההרשמה אפשר לשלוח שאלה מראש. השאלות עוזרות לעצב את השיחה, בלי התחייבות למענה על כל שאלה."],
+  ["03", "נפגשים בזמן אמת", "בשבת בערב נפתח מרחב לשיחה, לתובנות ולצעדים קטנים שאפשר לקחת הלאה."],
+] as const;
+
+function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <motion.div ref={ref} variants={stagger} initial="hidden" animate={inView ? "visible" : "hidden"} className={className}>
+    <motion.div
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-70px" }}
+      variants={{ visible: { transition: { staggerChildren: 0.11 } } }}
+      className={className}
+    >
       {children}
     </motion.div>
   );
 }
 
-// Countdown Timer — RTL: ימים שעות דקות שניות
-function Countdown() {
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  useEffect(() => {
-    const calc = () => {
-      const diff = EVENT_DATE.getTime() - Date.now();
-      if (diff <= 0) return setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-      setTimeLeft({
-        days: Math.floor(diff / 86400000),
-        hours: Math.floor((diff % 86400000) / 3600000),
-        minutes: Math.floor((diff % 3600000) / 60000),
-        seconds: Math.floor((diff % 60000) / 1000),
-      });
-    };
-    calc();
-    const t = setInterval(calc, 1000);
-    return () => clearInterval(t);
-  }, []);
+function Rule({ light = false }: { light?: boolean }) {
+  return <div aria-hidden="true" className={`h-px w-20 bg-gradient-to-l from-transparent via-current to-transparent ${light ? "text-[#ffe27c]/80" : "text-[#191265]/35"}`} />;
+}
 
-  const units = [
-    { label: "ימים",  value: timeLeft.days },
-    { label: "שעות",  value: timeLeft.hours },
-    { label: "דקות",  value: timeLeft.minutes },
-    { label: "שניות", value: timeLeft.seconds },
-  ];
-
+function SectionHeading({ eyebrow, title, description, light = false }: { eyebrow: string; title: React.ReactNode; description?: string; light?: boolean }) {
   return (
-    <div className="flex gap-2 justify-center" dir="rtl">
-      {units.map(({ label, value }) => (
-        <div key={label} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 text-center min-w-[68px]">
-          <div className="text-3xl md:text-4xl font-black text-[#ffe27c] tabular-nums">
-            {String(value).padStart(2, "0")}
-          </div>
-          <div className="text-white/60 text-xs mt-1">{label}</div>
-        </div>
-      ))}
+    <div className="mx-auto max-w-3xl text-center">
+      <motion.div variants={fadeUp} className={`flex items-center justify-center gap-3 text-xs font-black tracking-[.18em] ${light ? "text-[#ffe27c]" : "text-[#191265]"}`}>
+        <Rule light={light} />
+        <span>{eyebrow}</span>
+        <Rule light={light} />
+      </motion.div>
+      <motion.h2 variants={fadeUp} className={`mt-5 text-3xl font-black leading-[1.18] tracking-[-.04em] md:text-5xl ${light ? "text-white" : "text-[#191265]"}`}>
+        {title}
+      </motion.h2>
+      {description ? <motion.p variants={fadeUp} className={`mx-auto mt-5 max-w-2xl text-base leading-8 md:text-lg ${light ? "text-white/76" : "text-[#5d587e]"}`}>{description}</motion.p> : null}
     </div>
   );
 }
 
-// Big CTA Button to Grow
-function PayButton({ size = "large" }: { size?: "large" | "small" }) {
-  const cls = size === "large"
-    ? "inline-block bg-[#ffe27c] text-[#191265] font-black text-xl px-10 py-5 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-2xl text-center w-full max-w-sm"
-    : "inline-block bg-[#ffe27c] text-[#191265] font-black text-base px-7 py-3.5 rounded-xl hover:bg-white transition-all duration-300 hover:scale-105 shadow-lg text-center";
+function FriendLinkRequest() {
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const requestLink = trpc.singles.sendDashboardLink.useMutation({
+    onSuccess: () => setMessage("אם נמצאה חברות פעילה, נשלח קישור אישי ומאובטח למייל הרשום במאגר."),
+    onError: () => setMessage("לא הצלחנו לשלוח קישור כרגע. אפשר לנסות שוב בעוד רגע."),
+  });
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setMessage("יש להזין כתובת אימייל כדי לקבל קישור אישי.");
+      return;
+    }
+    setMessage("");
+    requestLink.mutate({ email: normalizedEmail, origin: window.location.origin });
+  };
+
   return (
-    <a href={buildGrowUrl(GROW_PAYMENT)} target="_blank" rel="noopener noreferrer" className={cls}>
-      ♡ שמרו לי מקום עכשיו
-    </a>
+    <div className="rounded-[1.7rem] border border-[#191265]/12 bg-[#faf7f0] p-5 text-right shadow-[0_16px_40px_rgba(25,18,101,.08)] sm:p-6">
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#191265] text-[#ffe27c]"><KeyRound className="h-5 w-5" /></span>
+        <div>
+          <p className="font-black text-[#191265]">חברי FRIENDS במאגר?</p>
+                <p className="mt-1 text-sm leading-6 text-[#625d78]">ההטבה נפתחת רק מתוך קישור אישי ומאובטח. מזינים את כתובת המייל של החברות ונשלח קישור לאזור האישי.</p>
+        </div>
+      </div>
+      <form onSubmit={submit} className="mt-5 flex flex-col gap-3 sm:flex-row">
+        <label className="sr-only" htmlFor="live-friend-email">כתובת אימייל</label>
+        <input
+          id="live-friend-email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="כתובת אימייל"
+          className="min-w-0 flex-1 rounded-xl border border-[#191265]/15 bg-white px-4 py-3 text-right text-sm text-[#191265] outline-none transition placeholder:text-[#77718a] focus:border-[#191265] focus:ring-2 focus:ring-[#ffe27c]"
+        />
+        <button type="submit" disabled={requestLink.isPending} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white transition hover:bg-[#292177] disabled:cursor-wait disabled:opacity-70">
+          <Mail className="h-4 w-4" />
+          {requestLink.isPending ? "שולחים קישור" : "לשליחת קישור אישי"}
+        </button>
+      </form>
+      {message ? <p className="mt-3 text-xs leading-5 text-[#625d78]" role="status">{message}</p> : null}
+    </div>
   );
 }
 
 export default function LiveEvent() {
-  const [scrolled, setScrolled] = useState(false);
+  const salesStatus = trpc.liveOctober.salesStatus.useQuery();
+  const salesOpen = salesStatus.data?.open === true;
+  const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const email = params.get("email")?.trim().toLowerCase() || "";
+  const token = params.get("token") || "";
+  const hasPersonalLink = Boolean(email && token);
+  const eligibilityQuery = trpc.liveOctober.eligibility.useQuery(
+    { email, token },
+    { enabled: hasPersonalLink, retry: false },
+  );
+  const eligibility = eligibilityQuery.data;
+  const isFriendEligible = Boolean(eligibility?.eligible && !eligibility?.plus);
+  const hasPlus = Boolean(eligibility?.plus);
+  const personalAreaHref = hasPersonalLink
+    ? `/my-profile?${new URLSearchParams({ email, token }).toString()}`
+    : "/my-profile";
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const scrollToRegister = () => {
-    document.getElementById("register")?.scrollIntoView({ behavior: "smooth" });
-  };
+  const scrollToTickets = () => document.getElementById("tickets")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const goToThankYou = () => window.location.assign("/live/thank-you");
 
   return (
-    <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">
+    <main dir="rtl" className="min-h-screen overflow-x-hidden bg-[#f0eadc] font-rubik text-[#191265]">
+      <section className="relative isolate overflow-hidden bg-[#191265] text-white">
+        <div aria-hidden="true" className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_12%_16%,rgba(255,226,124,.23),transparent_0_24%),radial-gradient(circle_at_87%_80%,rgba(102,80,224,.34),transparent_0_31%),linear-gradient(142deg,#17105b_0%,#191265_55%,#100a48_100%)]" />
+        <div aria-hidden="true" className="absolute inset-0 -z-10 opacity-45 [background-image:linear-gradient(90deg,transparent_49.7%,rgba(255,255,255,.08)_50%,transparent_50.3%)] [background-size:84px_84px]" />
+        <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
+          <Link href="/" className="text-sm font-black text-white transition hover:text-[#ffe27c]">הילית כספי</Link>
+          <button type="button" onClick={scrollToTickets} className="rounded-full border border-[#ffe27c]/50 bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#191265] transition hover:bg-white sm:px-5 sm:text-sm">לבחירת כרטיס</button>
+        </header>
 
-      {/* STICKY NAV */}
-      <nav className={`fixed top-0 right-0 left-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#191265]/95 backdrop-blur-md shadow-lg" : "bg-transparent"}`}>
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <a href="/" className="text-white font-bold text-lg">הילית כספי</a>
-          <button onClick={scrollToRegister}
-            className="bg-[#ffe27c] text-[#191265] font-black px-5 py-2.5 rounded-full text-sm hover:bg-white transition-all duration-300 hover:scale-105 shadow-lg">
-            הרשמה לאירוע
-          </button>
-        </div>
-      </nav>
-
-      {/* HERO */}
-      <section className="relative min-h-screen bg-[#191265] overflow-hidden flex items-center">
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: "radial-gradient(circle at 20% 80%, #ffe27c 0%, transparent 50%), radial-gradient(circle at 80% 20%, #1800ad 0%, transparent 50%)" }} />
-
-        <div className="relative z-10 max-w-6xl mx-auto px-6 pt-28 pb-16 grid md:grid-cols-2 gap-12 items-center w-full">
-
-          {/* Text */}
-          <motion.div initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.9 }} className="order-2 md:order-1 text-right">
-
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.6 }}
-              className="inline-flex items-center gap-2 bg-[#ffe27c]/20 border border-[#ffe27c]/40 text-[#ffe27c] text-sm font-bold px-4 py-2 rounded-full mb-5">
-              🎙️ לייב זום | יום שלישי 16.6 | 20:30
+        <div className="relative mx-auto grid max-w-7xl items-center gap-9 px-5 pb-16 pt-7 sm:px-8 md:pb-24 lg:grid-cols-[1.08fr_.92fr] lg:gap-16 lg:px-10">
+          <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="order-2 lg:order-1">
+            <motion.div variants={fadeUp} className="inline-flex items-center gap-2 rounded-full border border-[#ffe27c]/45 bg-white/10 px-4 py-2 text-xs font-black text-[#ffe27c] backdrop-blur-sm">
+              <Sparkles className="h-4 w-4" />
+              {salesOpen ? "סדנת לייב אינטימית עם הילית כספי" : "הלייב בדרך · הרשמה תיפתח לאחר הכנת האירוע"}
             </motion.div>
-
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
-              יש לי הפתעה לכם<br />
-              <span className="text-[#ffe27c]">ואני כל כך מתרגשת לספר!</span>
-            </h1>
-
-            <p className="text-white/80 text-lg md:text-xl leading-relaxed mb-3">
-              ב-16.6 ביום שלישי בשעה 20:30 אני עושה לייב זום שבו אני עונה על הכל. ממש הכל. בלי פילטרים, בלי תסריטים.
-            </p>
-            <p className="text-white/80 text-lg leading-relaxed mb-5">
-              רציתם לשאול אותי מה הסוד מאחורי ההתאמות שלי? איך המדע עובד? למה חלק מהאנשים מוצאים אהבה ואחרים תקועים באותו מקום שנים? מה הטעויות שאנשים עושים בדייטינג שאף אחד לא מדבר עליהן?
-            </p>
-            <p className="text-[#ffe27c] font-black text-xl mb-6">
-              זו ההזדמנות שלכם לשאול אותי הכל. פנים אל פנים. בזמן אמת.
-            </p>
-
-            {/* BONUS BANNER */}
-            <div className="bg-[#ffe27c] rounded-2xl p-5 mb-7 text-right">
-              <p className="text-[#191265] font-black text-base mb-2">🎁 ועכשיו תשמעו את ההטבה שהכנתי לכם</p>
-              <p className="text-[#191265]/90 text-sm leading-relaxed mb-3">
-                50 הנרשמים הראשונים מקבלים ממני מתנה את המדריך שלי <strong>"לבחור נכון"</strong> שווי ₪249 לגמרי בחינם.
-              </p>
-              <p className="text-[#191265] font-black text-sm">
-                כרטיס כניסה ללייב: <span className="line-through font-normal opacity-60">₪299</span> <span className="text-lg">₪99 בלבד</span> לחברי הקהילה שלי. מהרו לפני שהמחיר עולה!
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4 mb-10">
-              <PayButton size="large" />
-            </div>
-
-            <div className="flex gap-6 pt-6 border-t border-white/10 flex-wrap" dir="rtl">
-              {[
-                { val: "16.6", label: "יום שלישי" },
-                { val: "20:30", label: "שעת התחלה" },
-                { val: "זום", label: "מצלמות פתוחות" },
-                { val: "₪99", label: "במקום ₪299" },
-              ].map(({ val, label }) => (
-                <div key={label} className="text-center">
-                  <div className="text-xl font-black text-[#ffe27c]">{val}</div>
-                  <div className="text-white/50 text-xs mt-0.5">{label}</div>
-                </div>
-              ))}
-            </div>
+            <motion.p variants={fadeUp} className="mt-6 text-sm font-bold tracking-wide text-white/66">{EVENT_DATE} · {EVENT_TIME}</motion.p>
+            <motion.h1 variants={fadeUp} className="mt-3 max-w-3xl text-5xl font-black leading-[1.05] tracking-[-.055em] sm:text-6xl lg:text-7xl">
+              סודות ההתאמה
+              <span className="block text-[#ffe27c]">המושלמת.</span>
+            </motion.h1>
+            <motion.p variants={fadeUp} className="mt-6 max-w-2xl text-lg leading-8 text-white/83 sm:text-xl">
+              ערב לייב על הדרך שבה בונים פרופיל, קוראים דפוסים, ניגשים להיכרות ומותירים מקום גם למה שלא רואים במבט ראשון.
+            </motion.p>
+            <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button type="button" onClick={scrollToTickets} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#ffe27c] px-8 py-4 text-base font-black text-[#191265] shadow-[0_16px_35px_rgba(0,0,0,.2)] transition hover:-translate-y-0.5 hover:bg-white active:scale-[.98]">לבחירת כרטיס ללייב <ArrowLeft className="h-5 w-5" /></button>
+              <a href="#what-awaits" className="inline-flex items-center justify-center rounded-2xl border border-white/25 px-7 py-4 text-sm font-bold text-white transition hover:border-[#ffe27c] hover:text-[#ffe27c]">מה מחכה בסדנה</a>
+            </motion.div>
+            <motion.div variants={fadeUp} className="mt-9 flex flex-wrap gap-x-6 gap-y-3 border-t border-white/14 pt-6 text-xs font-bold text-white/72">
+              <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />שיחה חיה בזמן אמת</span>
+              <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />אפשרות לשאלות מראש</span>
+              <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />תוכן מעשי וללא הבטחות קסם</span>
+            </motion.div>
           </motion.div>
 
-          {/* Image + Countdown */}
-          <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }}
-            className="order-1 md:order-2 flex flex-col items-center gap-8">
-            <div className="relative w-full max-w-sm">
-              <div className="absolute -inset-4 bg-gradient-to-br from-[#ffe27c]/30 to-[#1800ad]/30 rounded-3xl blur-2xl" />
-              <img
-                src={HERO_IMG}
-                alt="הילית כספי"
-                className="relative w-full rounded-3xl object-cover object-[center_20%] shadow-2xl"
-                style={{ aspectRatio: "3/4", maxHeight: "480px" }}
-              />
-              <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">
-                <div className="text-xl">💛</div>
-                <div className="text-[#191265] font-black text-xs">מומחית זוגיות</div>
-                <div className="text-[#727272] text-xs">ומשדכת</div>
+          <motion.div initial={{ opacity: 0, x: -28 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="relative order-1 mx-auto w-full max-w-md lg:order-2 lg:max-w-none">
+            <div aria-hidden="true" className="absolute -inset-6 rounded-[3rem] border border-[#ffe27c]/25" />
+            <div aria-hidden="true" className="absolute -inset-2 rounded-[2.4rem] bg-[#ffe27c]/15 blur-2xl" />
+            <div className="relative overflow-hidden rounded-[2rem] border border-white/20 shadow-[0_28px_80px_rgba(5,2,37,.48)]">
+              <img src={EDITORIAL_IMAGE} alt="הילית כספי" className="aspect-[4/5] w-full object-cover object-[center_18%]" fetchPriority="high" />
+              <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-white/18 bg-[#171053]/80 p-4 text-right shadow-xl backdrop-blur-md">
+                <p className="text-xs font-black text-[#ffe27c]">בהנחיית הילית כספי</p>
+                <p className="mt-1 text-sm font-bold leading-6 text-white">מקום לשאלות חשובות על היכרות, בחירה והתאמה.</p>
               </div>
-            </div>
-
-            <div className="w-full text-center">
-              <p className="text-white/60 text-sm mb-3">האירוע מתחיל בעוד:</p>
-              <Countdown />
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* PAIN SECTION */}
-      <section className="bg-white py-20 px-6">
-        <AnimatedSection>
-          <div className="max-w-3xl mx-auto text-center">
-            <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-4">את/ה מכיר/ה את התחושה הזו?</motion.p>
-            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-[#191265] leading-tight mb-8">
-              יצאת לדייט נוסף.<br />
-              <span className="text-[#1800ad]">שוב לא הרגשת כלום.</span><br />
-              שוב שאלת את עצמך למה.
-            </motion.h2>
-
-            <div className="grid md:grid-cols-3 gap-4 mb-10">
-              {[
-                { icon: "😮‍💨", text: "\"אני כבר לא מאמין/ת שיש מישהו בשבילי\"" },
-                { icon: "📱", text: "\"האפליקציות מתישות אותי, אבל אני לא יודע/ת מה עוד לעשות\"" },
-                { icon: "🧠", text: "\"אני יודע/ת שמשהו בי עוצר אותי. אבל לא יודע/ת מה\"" },
-              ].map(item => (
-                <motion.div key={item.text} variants={fadeUp} className="bg-[#f0eadc] rounded-2xl p-6 text-right">
-                  <div className="text-3xl mb-3">{item.icon}</div>
-                  <p className="text-[#191265] font-semibold text-sm leading-relaxed">{item.text}</p>
-                </motion.div>
-              ))}
-            </div>
-
-            <motion.div variants={fadeUp} className="bg-[#191265] rounded-3xl p-8 text-right mb-8">
-              <p className="text-[#ffe27c] font-black text-xl md:text-2xl leading-relaxed mb-4">
-                אני מאמינה בכם. לגמרי. בלי שאלות.
-              </p>
-              <p className="text-white/80 text-base leading-relaxed">
-                אחרי שנים של ליווי מאות אנשים, אני יודעת דבר אחד בוודאות: לא קיים אדם שלא מסוגל לזוגיות. יש רק מוח שלמד לחבל. ויש שיטה לשנות את זה. בלייב הזה אני מסבירה הכל.
-              </p>
-            </motion.div>
-
-            <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a href={WA_GROUP} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-[#25D366] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-[#1da851] transition-all">
-                💬 קבוצת הווטסאפ שלי
-              </a>
-              <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity">
-                📸 אינסטגרם | מדע האהבה
-              </a>
-            </motion.div>
+      <section id="what-awaits" className="relative overflow-hidden bg-[#f0eadc] px-5 py-20 sm:px-8 md:py-28 lg:px-10">
+        <div aria-hidden="true" className="absolute left-0 top-20 h-px w-[27%] bg-[#191265]/15" />
+        <Reveal className="relative mx-auto max-w-7xl">
+          <SectionHeading eyebrow="בסדנה הזו" title={<>להבין קצת יותר.<br /><span className="text-[#4e3eb4]">לבחור קצת אחרת.</span></>} description="לא תמצאו כאן נוסחה שמבטיחה תוצאה. כן נפתח שיחה כנה על מה אפשר לראות, לשאול ולנסות כשמחפשים היכרות משמעותית." />
+          <div className="mt-12 grid gap-4 md:grid-cols-2">
+            {liveTopics.map(([title, text], index) => (
+              <motion.article key={title} variants={fadeUp} className="group relative overflow-hidden rounded-[1.75rem] border border-[#191265]/10 bg-[#faf8f2] p-7 shadow-[0_14px_34px_rgba(25,18,101,.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(25,18,101,.11)] sm:p-8">
+                <span className="absolute left-5 top-4 text-5xl font-black leading-none text-[#191265]/[.055]">0{index + 1}</span>
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#191265] text-[#ffe27c]"><Sparkles className="h-5 w-5" /></span>
+                <h3 className="mt-5 text-xl font-black text-[#191265]">{title}</h3>
+                <p className="mt-3 max-w-md text-sm leading-7 text-[#635e76]">{text}</p>
+              </motion.article>
+            ))}
           </div>
-        </AnimatedSection>
+        </Reveal>
       </section>
 
-      {/* WHAT HAPPENS IN THE LIVE */}
-      <section className="bg-[#f0eadc] py-20 px-6">
-        <AnimatedSection>
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-14">
-              <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">מה קורה בלייב</motion.p>
-              <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-[#191265] leading-tight">
-                שעה אחת. שאלות אמיתיות.<br />
-                <span className="text-[#1800ad]">תשובות שאין בשום מקום אחר.</span>
-              </motion.h2>
+      <section className="relative overflow-hidden bg-white px-5 py-20 sm:px-8 md:py-28 lg:px-10">
+        <div aria-hidden="true" className="absolute -right-24 top-0 h-72 w-72 rounded-full border-[38px] border-[#ffe27c]/25" />
+        <Reveal className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[.85fr_1.15fr] lg:gap-20">
+          <motion.div variants={fadeUp} className="relative mx-auto w-full max-w-sm">
+            <div className="absolute -inset-3 rounded-[2.3rem] bg-[#191265]/10 blur-xl" />
+            <img src={BRIGHT_IMAGE} alt="הילית כספי" loading="lazy" decoding="async" className="relative aspect-[4/5] w-full rounded-[2rem] object-cover object-[center_18%] shadow-[0_24px_55px_rgba(25,18,101,.18)]" />
+            <div className="absolute -bottom-5 -left-4 rounded-2xl border border-[#191265]/10 bg-[#f0eadc] px-5 py-4 shadow-xl">
+              <p className="text-xs font-black text-[#191265]">סודות ההתאמה המושלמת</p>
+              <p className="mt-1 text-xs text-[#625d78]">לייב עם הילית כספי</p>
             </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {[
-                {
-                  icon: "💬",
-                  title: "שאלו אותי הכל ואני עונה",
-                  text: "על דייטים שלא הלכו. על אפליקציות שמתישות. על הדפוסים שחוזרים. על איך מוצאים אנשים איכותיים. על לאן לצאת לדייט ראשון. על מה שעוצר אתכם. אין שאלה שאני לא עונה עליה בלי פילטרים.",
-                },
-                {
-                  icon: "🧬",
-                  title: "מדע האהבה בפעם הראשונה בלייב",
-                  text: "אסביר איך מדע האהבה עובד. למה המוח שלנו בוחר בדיוק את מי שמזיק לנו. ואיך שוברים את הדפוס הזה פעם אחת ולתמיד. זו ההזדמנות שלכם לשאול אותי הכל.",
-                },
-                {
-                  icon: "💎",
-                  title: "המאגר הייחודי שבניתי",
-                  text: "מאגר של רווקים ורווקות שמחפשים קשר רציני, עם שאלוני עומק ובדיקת התאמה. אספר איך הוא עובד, מה הופך אותו לשונה מכל דבר אחר, ואיך נכנסים.",
-                },
-                {
-                  icon: "💛",
-                  title: "אינטימי. אישי. עם מצלמות פתוחות.",
-                  text: "זו הפעם הראשונה שאני עושה לייב כזה. כי רציתי להכיר אתכם. לראות את הפנים. לשמוע מה באמת מעסיק אתכם. לא הרצאה אלא שיחה אמיתית.",
-                },
-              ].map((item) => (
-                <motion.div key={item.title} variants={fadeUp}
-                  className="bg-white rounded-2xl p-7 text-right shadow-sm">
-                  <div className="text-4xl mb-4">{item.icon}</div>
-                  <h3 className="text-xl font-black text-[#191265] mb-3">{item.title}</h3>
-                  <p className="text-[#555] text-sm leading-relaxed">{item.text}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </AnimatedSection>
-      </section>
-
-      {/* GUIDE BONUS */}
-      <section className="bg-[#191265] py-20 px-6">
-        <AnimatedSection>
-          <div className="max-w-3xl mx-auto">
-            <motion.div variants={fadeUp} className="bg-gradient-to-br from-[#1800ad] to-[#191265] border border-[#ffe27c]/30 rounded-3xl p-8 md:p-10 text-right">
-              <div className="inline-block bg-[#ffe27c] text-[#191265] font-black text-sm px-4 py-1.5 rounded-full mb-5">
-                🎁 בונוס מיוחד ל-50 הנרשמים הראשונים
-              </div>
-
-              <h3 className="text-3xl font-black text-white mb-2">
-                המדריך <span className="text-[#ffe27c]">"לבחור נכון"</span>
-              </h3>
-              <p className="text-white/60 text-sm mb-5">מדריך דיגיטלי שווי ₪249 חינם לגמרי!</p>
-
-              <p className="text-white/85 text-base leading-relaxed mb-6">
-                המדריך שיעזור לכם להבין <strong className="text-white">מה באמת עוצר אתכם</strong>, לזהות את הדפוסים שחוזרים על עצמם בדייטים, ולבחור מתוך חופש ולא מתוך פחד, לחץ, או ייאוש.
-              </p>
-
-              <div className="grid md:grid-cols-3 gap-3 mb-6">
-                {[
-                  { icon: "🧠", title: "4 דפוסי חשיבה", text: "שמעכבים אנשים ממציאת זוגיות ואיך מזהים אותם בעצמך" },
-                  { icon: "✍️", title: "3 תרגילים מעמיקים", text: "לכל דפוס לעבודה אישית אמיתית, לא קריאה חטופה" },
-                  { icon: "🎯", title: "כלים מעשיים", text: "לבחירה מתוך בהירות מי אתם ומה אתם מחפשים באמת" },
-                ].map(item => (
-                  <div key={item.title} className="bg-white/10 rounded-xl p-4">
-                    <div className="text-2xl mb-2">{item.icon}</div>
-                    <div className="text-white font-black text-sm mb-1">{item.title}</div>
-                    <div className="text-white/60 text-xs leading-relaxed">{item.text}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="line-through text-white/40 text-base">₪249</span>
-                <span className="text-[#ffe27c] font-black text-xl">חינם ל-50 הנרשמים הראשונים</span>
-              </div>
+          </motion.div>
+          <div>
+            <motion.div variants={fadeUp} className="inline-flex items-center gap-2 text-sm font-black text-[#4e3eb4]"><UserRoundCheck className="h-4 w-4" />מאחורי ההתאמה יש אנשים</motion.div>
+            <motion.h2 variants={fadeUp} className="mt-4 max-w-2xl text-3xl font-black leading-[1.2] tracking-[-.04em] text-[#191265] md:text-5xl">פרופיל הוא התחלה. התאמה היא שיחה רחבה יותר.</motion.h2>
+            <motion.div variants={fadeUp} className="mt-6 max-w-2xl space-y-4 text-base leading-8 text-[#625d78]">
+              <p>בסדנה הילית תשתף איך פרופיל, העדפות ותשובות לשאלון הופכים לחומר גלם לתהליך התאמה. ניגע גם במה שאפשר ללמוד מתהליך ההיכרות עצמו, ולא רק מהתוצאה.</p>
+              <p>זהו מרחב ללמידה ולחשיבה, לא אבחון אישי ולא התחייבות לדייט, לזוגיות או לתוצאה מסוימת.</p>
             </motion.div>
+            <motion.a variants={fadeUp} href="#tickets" className="mt-8 inline-flex items-center gap-2 font-black text-[#191265] underline decoration-[#ffe27c] decoration-4 underline-offset-8 transition hover:text-[#4e3eb4]">לבחירת הכרטיס המתאים <ArrowLeft className="h-4 w-4" /></motion.a>
           </div>
-        </AnimatedSection>
+        </Reveal>
       </section>
 
-      {/* PRESS SECTION */}
-      <section className="bg-[#f0eadc] py-20 px-6">
-        <AnimatedSection>
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-3">כפי שסוקר בתקשורת</motion.p>
-              <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-[#191265]">
-                הילית בתקשורת
-              </motion.h2>
-            </div>
+      <section className="relative isolate overflow-hidden bg-[#191265] px-5 py-20 text-white sm:px-8 md:py-28 lg:px-10">
+        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_83%_22%,rgba(255,226,124,.17),transparent_0_25%),linear-gradient(125deg,#191265,#100a4b)]" />
+        <Reveal className="relative mx-auto max-w-7xl">
+          <SectionHeading light eyebrow="כך מגיעים מוכנים" title="שלושה רגעים, ערב אחד." description="פרטי ההצטרפות יימסרו לנרשמים בערוץ המאובטח המתאים. אין קישור גישה בעמוד הציבורי." />
+          <div className="mt-12 grid gap-4 md:grid-cols-3">
+            {steps.map(([number, title, text]) => (
+              <motion.article variants={fadeUp} key={number} className="rounded-[1.7rem] border border-white/15 bg-white/[.075] p-6 backdrop-blur-sm sm:p-7">
+                <span className="text-3xl font-black text-[#ffe27c]">{number}</span>
+                <h3 className="mt-5 text-xl font-black text-white">{title}</h3>
+                <p className="mt-3 text-sm leading-7 text-white/70">{text}</p>
+              </motion.article>
+            ))}
+          </div>
+        </Reveal>
+      </section>
 
-            <motion.div variants={fadeUp}>
-              <a href={ARTICLE_URL} target="_blank" rel="noopener noreferrer"
-                className="block bg-white rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-shadow group">
-                <div className="grid md:grid-cols-2 gap-0">
-                  <div className="relative overflow-hidden">
-                    <img
-                      src={ABOUT_IMG}
-                      alt="הילית כספי בכתבה במגזין את"
-                      className="w-full h-64 md:h-full object-cover object-[center_20%] group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute top-4 right-4 bg-[#191265] text-white font-black text-xs px-3 py-1.5 rounded-full">
-                      📰 מגזין "את"
-                    </div>
-                  </div>
-                  <div className="p-8 text-right flex flex-col justify-center">
-                    <p className="text-[#1800ad] font-semibold text-xs uppercase tracking-widest mb-3">כתבה מיוחדת</p>
-                    <h3 className="text-2xl font-black text-[#191265] leading-tight mb-4">
-                      "האישה שפיצחה את קוד ההתאמה הזוגית"
-                    </h3>
-                    <p className="text-[#555] text-sm leading-relaxed mb-6">
-                      מגזין "את" הגדול בישראל פרסם כתבה מיוחדת על הילית כספי ועל השיטה הייחודית שפיתחה לאיתור זוגיות אמיתית. קראו את הסיפור המלא.
-                    </p>
-                    <span className="inline-flex items-center gap-2 text-[#191265] font-black text-sm">
-                      לכתבה המלאה ←
-                    </span>
-                  </div>
+      <section id="tickets" className="scroll-mt-8 bg-[#f0eadc] px-5 py-20 sm:px-8 md:py-28 lg:px-10">
+        <Reveal className="mx-auto max-w-7xl">
+          <SectionHeading eyebrow="בחירת כרטיס" title={<>מקום לשיחה שאולי<br /><span className="text-[#4e3eb4]">תפתח כיוון חדש.</span></>} description="אפשר להצטרף בכרטיס רגיל, לבדוק זכאות להטבת חברי מאגר, או להצטרף למאגר ולקבל כרטיס אחד במתנה." />
+
+          <div className="mx-auto mt-12 grid max-w-6xl gap-6 lg:grid-cols-[1fr_1.1fr]">
+            <motion.article variants={fadeUp} className="rounded-[2rem] border border-[#191265]/12 bg-white p-6 text-right shadow-[0_18px_45px_rgba(25,18,101,.08)] sm:p-8">
+              <div className="flex items-start justify-between gap-4 border-b border-[#191265]/10 pb-5">
+                <div>
+                  <p className="text-xs font-black tracking-[.16em] text-[#4e3eb4]">כרטיס רגיל</p>
+                  <h3 className="mt-2 text-2xl font-black text-[#191265]">כניסה לסדנת הלייב</h3>
                 </div>
-              </a>
-            </motion.div>
-          </div>
-        </AnimatedSection>
-      </section>
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#f0eadc] text-[#191265]"><Ticket className="h-5 w-5" /></span>
+              </div>
+              <ul className="mt-6 space-y-3 text-sm leading-6 text-[#625d78]">
+                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#4e3eb4]" />השתתפות בסדנת הלייב בשבת, 31 באוקטובר</li>
+                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#4e3eb4]" />אפשרות לשליחת שאלה מראש לאחר ההרשמה</li>
+                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#4e3eb4]" />פרטי הצטרפות בערוץ מאובטח לאחר אישור</li>
+              </ul>
+              <div className="mt-7 rounded-2xl bg-[#f0eadc] p-5 text-center">
+                <p className="text-xs font-bold text-[#625d78]">מחיר הכרטיס המתוכנן</p>
+                <p className="mt-1 text-4xl font-black text-[#191265]">149 ₪</p>
+                <p className="mt-1 text-xs text-[#625d78]">תשלום חד פעמי</p>
+              </div>
+            </motion.article>
 
-      {/* ABOUT HILIT */}
-      <section className="bg-[#191265] py-20 px-6">
-        <AnimatedSection>
-          <div className="max-w-5xl mx-auto">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-              <motion.div variants={fadeUp} className="flex justify-center">
-                <div className="relative">
-                  <img
-                    src={ABOUT_IMG}
-                    alt="הילית כספי"
-                    className="w-72 rounded-3xl shadow-2xl object-cover object-[center_20%]"
-                    style={{ height: "380px" }}
+            <motion.article variants={fadeUp} className="relative overflow-hidden rounded-[2rem] bg-[linear-gradient(140deg,#17105b,#30247e)] p-6 text-right text-white shadow-[0_23px_60px_rgba(25,18,101,.3)] sm:p-8">
+              <div aria-hidden="true" className="absolute -left-16 -top-20 h-56 w-56 rounded-full bg-[#ffe27c]/15 blur-3xl" />
+              <div className="relative flex items-start justify-between gap-4 border-b border-white/15 pb-5">
+                <div>
+                  <p className="text-xs font-black tracking-[.16em] text-[#ffe27c]">חברי המאגר</p>
+                  <h3 className="mt-2 text-2xl font-black">הטבה אישית ל־FRIENDS</h3>
+                </div>
+                <span className="grid h-11 w-11 place-items-center rounded-2xl border border-[#ffe27c]/30 bg-white/10 text-[#ffe27c]"><Crown className="h-5 w-5" /></span>
+              </div>
+              <p className="relative mt-6 text-sm leading-7 text-white/78">חברות פעילה במאגר פותחת מחיר אישי של 49 ₪, רק לאחר אימות דרך קישור אישי. הקוד אינו פתוח לשימוש ציבורי.</p>
+              <div className="relative mt-6 flex items-end gap-3">
+                <span className="mb-1 text-lg text-white/45 line-through">149 ₪</span>
+                <span className="text-4xl font-black text-[#ffe27c]">49 ₪</span>
+                <span className="mb-1 text-xs font-bold text-white/65">לאחר אימות חברות</span>
+              </div>
+              <div className="relative mt-6 rounded-2xl border border-white/15 bg-white/[.08] p-4 text-xs leading-6 text-white/74">
+                <span className="font-black text-[#ffe27c]">כבר ב־Plus?</span> כרטיס הלייב האישי ללא עלות מחכה באזור האישי, בכפוף לזכאות פעילה.
+              </div>
+            </motion.article>
+          </div>
+
+          <motion.div variants={fadeUp} className="mx-auto mt-6 max-w-6xl rounded-[2rem] border border-[#d9c777] bg-[linear-gradient(115deg,#fffaf0,#f6edcd)] p-6 shadow-[0_16px_40px_rgba(117,91,11,.10)] sm:p-8">
+            <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+              <div>
+                <p className="inline-flex items-center gap-2 text-xs font-black tracking-[.14em] text-[#796116]"><Sparkles className="h-4 w-4" />לא חברים במאגר עדיין?</p>
+                <h3 className="mt-2 text-2xl font-black text-[#191265]">מצטרפים למאגר עם קוד LIVE ומקבלים כרטיס אחד במתנה.</h3>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-[#625d78]">הצטרפות חד פעמית למאגר ב־299 ₪. יוצרים פרופיל, ממלאים שאלון ומתחילים את תהליך ההיכרות. ההצטרפות כוללת בדיוק כרטיס אחד לסדנת הלייב, ללא כפל כרטיסים.</p>
+              </div>
+              {salesOpen ? <a href="/live/database" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#191265] px-6 py-4 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#30247e]">לפרטי ההצטרפות למאגר <ArrowLeft className="h-4 w-4" /></a> : <span className="rounded-2xl border border-[#191265]/20 px-6 py-4 text-sm font-black text-[#191265]">פרטי ההטבה ייפתחו בקרוב</span>}
+            </div>
+          </motion.div>
+
+          <motion.div variants={fadeUp} className="mx-auto mt-10 max-w-3xl">
+            {hasPersonalLink && eligibilityQuery.isLoading ? (
+              <div className="rounded-[1.75rem] border border-[#191265]/10 bg-white p-7 text-center shadow-sm">
+                <p className="font-black text-[#191265]">בודקים את הזכאות האישית שלך</p>
+                <p className="mt-2 text-sm text-[#625d78]">רגע אחד, כדי לשמור על ההטבה אישית ומאובטחת.</p>
+              </div>
+            ) : hasPlus ? (
+              <div className="rounded-[1.75rem] border border-[#191265]/10 bg-white p-7 text-center shadow-[0_16px_40px_rgba(25,18,101,.08)] sm:p-9">
+                <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#191265] text-[#ffe27c]"><Crown className="h-6 w-6" /></span>
+                <h3 className="mt-5 text-2xl font-black text-[#191265]">הטבת Plus האישית מחכה באזור האישי</h3>
+                <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#625d78]">עם Plus פעיל, כרטיס הלייב ללא עלות זמין דרך השובר האישי באזור האישי. כך נשמרת ההטבה אישית ומדויקת.</p>
+                <a href={personalAreaHref} className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">לשובר שלי באזור האישי <ArrowLeft className="h-4 w-4" /></a>
+                <p className="mt-4 text-xs text-[#625d78]">אפשר גם להכיר את מסלול ההטבות של <a href="/database-plus" className="font-black text-[#191265] underline underline-offset-4">Database Plus</a>.</p>
+              </div>
+            ) : !salesOpen ? (
+              <div className="rounded-[1.75rem] border border-[#191265]/10 bg-white p-7 text-center shadow-sm"><h3 className="text-xl font-black text-[#191265]">ההרשמה ללייב תיפתח בקרוב</h3><p className="mt-2 text-sm leading-7 text-[#625d78]">המחירים וההטבות המתוכננים מוצגים לעיון. לא נגבה תשלום ולא נפתח קוד LIVE או FRIENDS עד שהאירוע המקוון וקישורי הכניסה יהיו מוכנים.</p></div>
+            ) : isFriendEligible ? (
+              <div className="overflow-hidden rounded-[1.9rem] border border-[#191265]/10 bg-white shadow-[0_18px_45px_rgba(25,18,101,.1)]">
+                <div className="bg-[#191265] px-6 py-5 text-center text-white">
+                  <p className="text-xs font-black tracking-[.16em] text-[#ffe27c]">ההטבה האישית נפתחה</p>
+                  <h3 className="mt-2 text-2xl font-black">כרטיס FRIENDS ב־49 ₪</h3>
+                </div>
+                <div className="p-6 sm:p-8">
+                  <p className="text-center text-sm leading-7 text-[#625d78]">האימות בוצע בקישור האישי. קוד FRIENDS מוחל כאן בלבד כדי שההטבה תישאר לחברי המאגר הזכאים.</p>
+                  <GrowWallet
+                    product="live_october"
+                    prefillEmail={email}
+                    prefillCoupon="FRIENDS"
+                    personalToken={token}
+                    showCoupon={false}
+                    buttonLabel="להמשך לתשלום המאובטח ב־49 ₪"
+                    buttonClassName="!mt-6 !w-full !rounded-2xl !bg-[#191265] !py-4 !font-black !text-white hover:!bg-[#30247e]"
+                    termsPath="/terms/live-october"
+                    onSuccess={goToThankYou}
                   />
                 </div>
-              </motion.div>
-
-              <motion.div variants={fadeUp} className="text-right">
-                <p className="text-[#ffe27c] font-semibold text-sm uppercase tracking-widest mb-4">מי אני</p>
-                <h2 className="text-3xl md:text-4xl font-black text-white leading-tight mb-6">
-                  הילית כספי<br />
-                  <span className="text-[#ffe27c]">פיצחתי את קוד ההתאמה הזוגית</span>
-                </h2>
-
-                <div className="space-y-4 text-white/80 text-base leading-relaxed mb-8">
-                  <p>מאמנת זוגיות, משדכת ומייסדת מאגר רווקים פעיל המבוסס על שאלוני עומק ובדיקת פרופילים.</p>
-                  <p>פיתחתי תהליך שמשלב נתוני התאמה, DNA זוגי, שאלון מדעי ובדיקה אנושית לפני כל הצעה.</p>
-                  <p className="text-white font-semibold">המטרה היא להרחיב הזדמנויות להיכרות תוך שמירה על פרטיות והסכמה הדדית.</p>
+              </div>
+            ) : (
+              <div className="grid gap-6 rounded-[1.9rem] border border-[#191265]/10 bg-white p-6 shadow-[0_18px_45px_rgba(25,18,101,.08)] md:grid-cols-[.9fr_1.1fr] md:items-center sm:p-8">
+                <div className="text-right">
+                  <p className="text-xs font-black tracking-[.16em] text-[#4e3eb4]">כרטיס רגיל</p>
+                  <h3 className="mt-2 text-2xl font-black text-[#191265]">מקום ללייב ב־149 ₪</h3>
+                  <p className="mt-3 text-sm leading-7 text-[#625d78]">המחיר הרגיל פתוח לכל מי שרוצים להצטרף לשיחה. פרטי ההצטרפות יועברו לאחר אישור ההרשמה.</p>
                 </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <a href={WA_GROUP} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-[#25D366] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-[#1da851] transition-all">
-                    💬 קבוצת הווטסאפ שלי
-                  </a>
-                  <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity">
-                    📸 אינסטגרם
-                  </a>
-                </div>
-              </motion.div>
-            </div>
-          </div>
-        </AnimatedSection>
-      </section>
-
-      {/* EVENT TAKEAWAYS */}
-      <section className="bg-[#f0eadc] py-20 px-6">
-        <AnimatedSection>
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-14">
-              <motion.p variants={fadeUp} className="text-[#1800ad] font-semibold text-sm uppercase tracking-widest mb-4">מה לוקחים מהאירוע</motion.p>
-              <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-[#191265] leading-tight">
-                פחות רעש. יותר בהירות.<br />
-                <span className="text-[#1800ad]">וכיוון מעשי להמשך.</span>
-              </motion.h2>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-6">
-              {[
-                { icon: "🧠", title: "הבנת דפוסים", text: "לזהות מה חוזר בבחירות ובקשרים בלי להפוך את זה להאשמה עצמית." },
-                { icon: "🎯", title: "בחירה מדויקת יותר", text: "להבחין בין רשימת דרישות לבין צרכים שבאמת חשובים לקשר." },
-                { icon: "🧭", title: "צעד להמשך", text: "לצאת עם שאלה אחת וכלי אחד שאפשר לקחת למציאות." },
-              ].map((item) => (
-                <motion.div key={item.title} variants={fadeUp} className="rounded-2xl bg-white p-6 text-right shadow-xl">
-                  <div className="text-3xl">{item.icon}</div>
-                  <h3 className="mt-4 text-lg font-black text-[#191265]">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-7 text-[#555]">{item.text}</p>
-                </motion.div>
-              ))}
-            </div>
-            <motion.p variants={fadeUp} className="mx-auto mt-8 max-w-2xl text-center text-xs leading-6 text-[#727272]">האירוע הוא תוכן לימודי ואינו מבטיח זוגיות או תוצאה בזמן קבוע.</motion.p>
-          </div>
-        </AnimatedSection>
-      </section>
-
-      {/* REGISTRATION / PAYMENT */}
-      <section id="register" className="bg-[#191265] py-20 px-6" style={{ scrollMarginTop: "80px" }}>
-        <AnimatedSection>
-          <div className="max-w-lg mx-auto text-center">
-            <motion.p variants={fadeUp} className="text-[#ffe27c] font-semibold text-sm uppercase tracking-widest mb-3">הרשמה לאירוע</motion.p>
-            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-white leading-tight mb-6">
-              יום שלישי, 16.6<br />
-              <span className="text-[#ffe27c]">20:30 | זום</span>
-            </motion.h2>
-
-            {/* VALUE BOX */}
-            <motion.div variants={fadeUp} className="bg-[#ffe27c] rounded-2xl p-6 mb-6 text-right">
-              <p className="text-[#191265] font-black text-lg mb-3">מה כלול:</p>
-              <ul className="text-[#191265]/85 text-sm space-y-2 mb-4">
-                <li>✅ <strong>שעה שלמה של לייב אישי עם הילית</strong> שאלות ותשובות, מצלמות פתוחות</li>
-                <li>✅ <strong>המדריך "לבחור נכון" שווי ₪249 חינם</strong> ל-50 הנרשמים הראשונים</li>
-                <li>✅ קישור זום ותזכורת למייל לפני האירוע</li>
-              </ul>
-              <div className="flex items-center gap-3 justify-end">
-                <span className="line-through text-[#191265]/50 text-base">₪299</span>
-                <span className="text-[#191265] font-black text-2xl">₪99 בלבד</span>
+                <GrowWallet
+                  product="live_october"
+                  showCoupon={false}
+                  buttonLabel="להמשך לתשלום המאובטח"
+                  buttonClassName="!w-full !rounded-2xl !bg-[#191265] !py-4 !font-black !text-white hover:!bg-[#30247e]"
+                  termsPath="/terms/live-october"
+                  onSuccess={goToThankYou}
+                />
+                {hasPersonalLink && eligibilityQuery.isSuccess && !eligibility?.eligible ? <p className="md:col-span-2 text-center text-xs leading-5 text-[#625d78]">הקישור האישי לא פתח כרגע את הטבת FRIENDS. אפשר להצטרף בכרטיס רגיל או לפנות לאזור האישי.</p> : null}
               </div>
-              <p className="text-[#191265]/70 text-xs mt-1">לחברי הקהילה שלי. מהרו לפני שהמחיר עולה!</p>
-            </motion.div>
+            )}
+          </motion.div>
 
-            <motion.div variants={fadeUp} className="flex flex-col items-center gap-4">
-              <PayButton size="large" />
-              <p className="text-white/50 text-xs">לחיצה על הכפתור תעביר אתכם לדף התשלום המאובטח</p>
-            </motion.div>
-
-            <motion.div variants={fadeUp} className="mt-10 pt-8 border-t border-white/10">
-              <p className="text-white/60 text-sm mb-4">רוצים לשלוח שאלה מראש? אפשר גם בווטסאפ:</p>
-              <div className="flex flex-col gap-3">
-                <a href={WA_DIRECT} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 bg-[#25D366] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#1da851] transition-all text-sm">
-                  📱 שלחו לי שאלה בווטסאפ
-                </a>
-                <a href={WA_GROUP} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/20 text-white font-bold px-6 py-3 rounded-xl hover:bg-white/20 transition-all text-sm">
-                  💬 הצטרפות לקבוצת הווטסאפ שלי
-                </a>
-                <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity text-sm">
-                  📸 אינסטגרם | תכנים על מדע האהבה
-                </a>
-              </div>
-            </motion.div>
-          </div>
-        </AnimatedSection>
+          {!hasPersonalLink && !hasPlus ? <motion.div variants={fadeUp} className="mx-auto mt-6 max-w-3xl"><FriendLinkRequest /></motion.div> : null}
+          <motion.p variants={fadeUp} className="mx-auto mt-6 max-w-3xl text-center text-xs leading-6 text-[#6d6780]">הכרטיס מעניק השתתפות באירוע עצמו. הסדנה היא תוכן לימודי ואינה מבטיחה התאמה, היכרות, דייט או זוגיות.</motion.p>
+        </Reveal>
       </section>
 
-      {/* FAQ */}
-      <section className="bg-[#f0eadc] py-20 px-6">
-        <AnimatedSection>
-          <div className="max-w-3xl mx-auto">
-            <div className="text-center mb-12">
-              <motion.h2 variants={fadeUp} className="text-3xl font-black text-[#191265]">שאלות שאנשים שואלים</motion.h2>
-            </div>
-            <div className="space-y-4">
-              {[
-                { q: "האם האירוע מיועד לנשים בלבד?", a: "לא! האירוע מיועד לנשים ולגברים כאחד. כל מי שמחפש זוגיות, בכל גיל ורקע, מוזמן." },
-                { q: "האם תהיה הקלטה?", a: "האירוע הוא לייב בלבד. אם תרצו לשמוע שוב, תצטרכו להיות שם." },
-                { q: "מה קורה אם לא יכולים להגיע בשעה הזו?", a: "האירוע מתקיים ב-20:30 בזום. אם לא תוכלו להגיע, אפשר לשלוח שאלות מראש בווטסאפ ואני אענה עליהן בלייב." },
-                { q: "מה כלול ב-₪99?", a: "שעה שלמה של לייב עם הילית, קישור זום מיד אחרי ההרשמה, תזכורת לפני האירוע, והמדריך 'לבחור נכון' (שווי ₪249) חינם ל-50 הנרשמים הראשונים." },
-                { q: "האם אפשר לשאול שאלות אישיות?", a: "כן. זה בדיוק הרעיון. אפשר לשאול על מצב אישי, על דייט ספציפי, על קשר שלא עבד. אני עונה בכנות ובלי פילטרים." },
-                { q: "איך שולחים שאלה מראש?", a: "אפשר לשלוח שאלות מראש בווטסאפ. לא כולם יספיקו לשאול בלייב אז ממליצה להכין שאלות מראש." },
-              ].map(({ q, a }) => (
-                <motion.div key={q} variants={fadeUp} className="bg-white rounded-2xl p-6 text-right shadow-sm">
-                  <h3 className="text-[#191265] font-black text-base mb-2">{q}</h3>
-                  <p className="text-[#555] text-sm leading-relaxed">{a}</p>
-                </motion.div>
-              ))}
-            </div>
+      <section className="bg-white px-5 py-20 sm:px-8 md:py-24 lg:px-10">
+        <Reveal className="mx-auto max-w-4xl">
+          <SectionHeading eyebrow="שאלות קצרות לפני שמצטרפים" title="טוב לדעת" />
+          <div className="mt-10 space-y-3">
+            {[
+              ["למי מתאימה הסדנה?", "למי שרוצים לחשוב מחדש על היכרות, פרופיל ובחירה. אין צורך להיות חברים במאגר כדי לרכוש כרטיס רגיל."],
+              ["אפשר לשלוח שאלה מראש?", "כן. לאחר ההרשמה תהיה דרך לשלוח שאלה מראש. נעשה מאמץ להתייחס לשאלות, אך אין התחייבות למענה על כל שאלה."],
+              ["איך מקבלים את פרטי ההצטרפות?", "לאחר אישור ההרשמה פרטי ההצטרפות יימסרו לנרשמים בערוץ מאובטח. העמוד הציבורי אינו מציג קישור גישה."],
+              ["איך עובדת הטבת FRIENDS או Plus?", "הטבות חברי המאגר ו־Plus זמינות רק דרך קישור אישי ואימות זכאות. קוד FRIENDS אינו קוד פתוח לציבור."],
+            ].map(([question, answer]) => (
+              <motion.details variants={fadeUp} key={question} className="group rounded-2xl border border-[#191265]/10 bg-[#faf9f5] p-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-black text-[#191265] marker:content-none"><span>{question}</span><ChevronDown className="h-5 w-5 shrink-0 transition group-open:rotate-180" /></summary>
+                <p className="mt-4 max-w-3xl text-sm leading-7 text-[#625d78]">{answer}</p>
+              </motion.details>
+            ))}
           </div>
-        </AnimatedSection>
+        </Reveal>
       </section>
 
-      {/* FINAL CTA */}
-      <section className="bg-[#191265] py-20 px-6">
-        <AnimatedSection>
-          <div className="max-w-2xl mx-auto text-center">
-            <motion.div variants={fadeUp} className="text-5xl mb-6">💛</motion.div>
-            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-black text-white mb-4 leading-tight">
-              בואו לשמוע. בואו לשאול.<br />
-              <span className="text-[#ffe27c]">בואו להכיר את חברי הקהילה האיכותית שלי.</span>
-            </motion.h2>
-            <motion.p variants={fadeUp} className="text-white/80 text-lg leading-relaxed mb-8">
-              אולי זו ההזדמנות שלכם לשאול אותי הכל. להבין למה עד עכשיו זה לא עבד ומה עושים אחרת.
-              <br />
-              <span className="text-[#ffe27c] font-semibold">₪99 בלבד במקום ₪299. המדריך לבחור נכון שווי ₪249 חינם ל-50 הנרשמים הראשונים.</span>
-            </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-col items-center gap-4">
-              <PayButton size="large" />
-              <div className="flex gap-3 flex-wrap justify-center">
-                <a href={WA_GROUP} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-[#25D366] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-[#1da851] transition-all">
-                  💬 קבוצת הווטסאפ שלי
-                </a>
-                <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity">
-                  📸 אינסטגרם
-                </a>
-              </div>
-            </motion.div>
-          </div>
-        </AnimatedSection>
-      </section>
-
-    </div>
+      <footer className="bg-[#100a48] px-5 py-10 text-center text-white/65 sm:px-8">
+        <div className="mx-auto flex max-w-4xl flex-col items-center gap-4">
+          <ShieldCheck className="h-6 w-6 text-[#ffe27c]" />
+          <p className="text-sm font-black text-white">סודות ההתאמה המושלמת · הילית כספי</p>
+          <p className="max-w-2xl text-xs leading-6">ההרשמה והתשלום מתבצעים במערכת מאובטחת. תנאי ההשתתפות והביטול מפורטים בתקנון.</p>
+          <div className="flex items-center gap-4 text-xs font-bold"><a href="/terms/live-october" className="transition hover:text-[#ffe27c]">תקנון הלייב</a><a href="/database-plus" className="transition hover:text-[#ffe27c]">Database Plus</a><Link href="/" className="transition hover:text-[#ffe27c]">חזרה לאתר</Link></div>
+        </div>
+      </footer>
+    </main>
   );
 }

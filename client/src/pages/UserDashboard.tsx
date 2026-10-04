@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import DatabaseExpectations from "@/components/DatabaseExpectations";
+import LiveVoucherCard from "@/components/LiveVoucherCard";
 import GrowWallet from "@/components/GrowWallet";
 import AnonymousBoostSilhouette from "@/components/AnonymousBoostSilhouette";
 import { trpc } from "@/lib/trpc";
@@ -1258,6 +1259,7 @@ export default function UserDashboard() {
               className="space-y-4">
               <DatabaseExpectations compact showStats={false} />
               <PlusPilotCard email={email} token={token} />
+              <LiveVoucherCard email={email} token={token} />
               <MissingFieldsBanner profile={profile} onEditClick={() => setOpenProfileEditor(true)} />
               <ProfileSection profile={profile} />
               <div id="update-profile-section">

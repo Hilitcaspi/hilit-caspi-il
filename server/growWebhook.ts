@@ -44,6 +44,8 @@ import { buildNewYearBundleAccessEmail } from "./newYearBundleEmail";
 import { activatePendingPlusAfterRegistration, activatePlusForSingle } from "./plusFulfillment";
 import { verifyPlusCheckoutReference } from "./plusCheckoutReference";
 import { ensureDatabaseNowMatchTask } from "./databaseNowFulfillment";
+import { ensureLiveTicket, ensurePlusLiveTicket, LIVE_PRODUCT } from "./liveOctober";
+import { verifyLiveCheckoutReference } from "./liveCheckoutReference";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -102,6 +104,7 @@ export function completedPaymentDedupeKey(input: {
 // Fallback: detect by description
 export function detectProductByDesc(desc: string): string | null {
   const d = (desc || "").toLowerCase();
+  if (d.includes("סודות ההתאמה המושלמת 31.10.2026")) return LIVE_PRODUCT;
   if (d.includes("match boost") || d.includes("match_boost") || d.includes("בוסט התאמה") || d.includes("boost - הצעת התאמה")) return "match_boost";
   if (d.includes("database plus") || d.includes("מאגר פלוס") || d.includes("database+")) return "plus";
   if (d.includes("חבילת שנה חדשה") || d.includes("bundle_new_year") || (d.includes("מאגר") && d.includes("מדריך") && d.includes("קורס"))) return "bundle_new_year";
@@ -670,7 +673,7 @@ function extractUtmFromWebhook(data: any): { utmSource?: string; utmMedium?: str
 }
 
 // ─── Main webhook handler (exported, registered in index.ts) ──────────────────
-export async function handleGrowWebhook(body: any, context: { boostCheckoutReference?: string; plusCheckoutReference?: string } = {}): Promise<void> {
+export async function handleGrowWebhook(body: any, context: { boostCheckoutReference?: string; plusCheckoutReference?: string; liveCheckoutReference?: string } = {}): Promise<void> {
   // Support both PaymentLinks (new) and legacy formats
   const data = body?.data ?? body;
   const email: string = (data.payerEmail || data.email || "").trim().toLowerCase();
@@ -680,8 +683,12 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   const sum = typeof sumRaw === "string" ? parseFloat(sumRaw) : Number(sumRaw);
   const desc: string = data.description || data.paymentDesc || "";
   const transactionId: string = data.transactionId || data.transactionCode || "";
-  const processToken: string = data.paymentLinkProcessToken || "";
+  const processToken: string = data.paymentLinkProcessToken || data.processToken || "";
   const hasVerifiedPlusReference = verifyPlusCheckoutReference(context.plusCheckoutReference, email);
+  const verifiedLiveTier = verifyLiveCheckoutReference(context.liveCheckoutReference, email);
+  // A CreatePaymentProcess checkout uses processToken; Payment Links also carry
+  // paymentLinkProcessToken, which may identify a different object.
+  const liveProcessToken = String(data.processToken || data.paymentLinkProcessToken || "").trim();
   let verifiedBoostReference: string | undefined;
   if (context.boostCheckoutReference) {
     try {
@@ -757,11 +764,12 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   const descProduct = detectProductByDesc(desc);
   if (descProduct) {
     // Description is more specific than processToken for bundles (bundle_tubav uses same pageCode as database)
-    if (descProduct === "bundle_tubav" || descProduct === "bundle_new_year" || descProduct === "match_boost" || !product) {
+    if (descProduct === "bundle_tubav" || descProduct === "bundle_new_year" || descProduct === "match_boost" || descProduct === LIVE_PRODUCT || !product) {
       product = descProduct;
     }
   }
   if (hasVerifiedPlusReference) product = "plus";
+  if (verifiedLiveTier) product = verifiedLiveTier === "database_live" ? "database" : LIVE_PRODUCT;
   // 3. A 99₪ charge is ambiguous with the historical live event, and the temporary
   // Plus Sandbox uses 1₪. If this email has a pending Plus checkout, prefer Plus;
   // otherwise continue to the normal amount fallback.
@@ -799,6 +807,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   let purchaseTracking: {
     id: number;
     couponCode: string | null;
+    providerProcessToken: string | null;
     utmSource: string | null;
     utmMedium: string | null;
     utmCampaign: string | null;
@@ -815,7 +824,9 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     try {
       const db = await getDb();
       if (db) {
-        const trackingWhere = processToken
+        const trackingWhere = verifiedLiveTier
+          ? and(eq(paymentLeads.providerProcessToken, liveProcessToken), eq(paymentLeads.email, email), eq(paymentLeads.product, product))
+          : processToken
           ? or(
               eq(paymentLeads.providerProcessToken, processToken),
               and(eq(paymentLeads.email, email), eq(paymentLeads.product, product)),
@@ -824,6 +835,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
         const [row] = await db.select({
           id: paymentLeads.id,
           couponCode: paymentLeads.couponCode,
+          providerProcessToken: paymentLeads.providerProcessToken,
           utmSource: paymentLeads.utmSource,
           utmMedium: paymentLeads.utmMedium,
           utmCampaign: paymentLeads.utmCampaign,
@@ -855,6 +867,22 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       content: `${name} (${email}) שילם ${sum} ₪ אבל לא הצלחנו לזהות את המוצר.\nתיאור: ${desc}\nTransaction: ${transactionId}`,
     });
     return;
+  }
+
+  // Grow's ApproveTransaction acknowledges a notification; it does NOT verify
+  // a payment. New live offers require a signed checkout and an independent
+  // GetTransactionInfo read from Grow before any idempotency/paid record write.
+  if (product === LIVE_PRODUCT && !verifiedLiveTier) throw new Error("Live checkout missing signed reference");
+  if (verifiedLiveTier) {
+    const { matchesPaidLiveCheckout } = await import("./liveOctober");
+    if (!purchaseTracking || !matchesPaidLiveCheckout({
+      tier: verifiedLiveTier, product, couponCode: purchaseTracking.couponCode,
+      webhookProcessToken: liveProcessToken, orderProcessToken: purchaseTracking.providerProcessToken,
+      transactionId, transactionToken: String(data.transactionToken || ""),
+      statusCode: data.statusCode, status: data.status, sum,
+    })) {
+      throw new Error("Live payment or checkout not verified");
+    }
   }
 
   // ── Idempotency guard: skip duplicate webhook deliveries ─────────────────
@@ -952,22 +980,32 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       case "coaching":     await handleCoaching(email, name); break;
       case "coaching_mas": await handleCoachingMas(email, name); break;
       case "session":  await handleSession(email, name); break;
-      case "database": await handleDatabase(
-        email,
-        name,
-        phone,
-        transactionId,
-        purchaseTracking?.couponCode,
-      ); break;
+      case "database": {
+        await handleDatabase(email, name, phone, transactionId, purchaseTracking?.couponCode);
+        if (verifiedLiveTier === "database_live") {
+          await ensureLiveTicket({ email, name, source: "database_live", transactionId, amountAgorot: 0 });
+        }
+        break;
+      }
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId, sum); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
+      case "live_october": {
+        if (!verifiedLiveTier || verifiedLiveTier === "database_live") throw new Error("Live ticket tier missing");
+        await ensureLiveTicket({ email, name, source: verifiedLiveTier, transactionId, amountAgorot: Math.round(sum * 100) });
+        break;
+      }
       case "match_boost": {
         const boostResult = await handleMatchBoost(email, transactionId, sum, verifiedBoostReference);
         businessActionAlreadyProcessed = Boolean(boostResult.alreadyProcessed);
         break;
       }
-      case "plus": await handlePlus(email, name, transactionId, sum, data); break;
+      case "plus": {
+        await handlePlus(email, name, transactionId, sum, data);
+        const { ensurePaidPlusLiveTicket } = await import("./liveOctober");
+        await ensurePaidPlusLiveTicket(email).catch(() => console.warn("[GrowWebhook] Plus live voucher awaits an active membership"));
+        break;
+      }
     }
 
     if (transactionId && product && !businessActionAlreadyProcessed) {
@@ -1091,6 +1129,15 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     console.log(`[GrowWebhook] ✓ Processed ${product} for ${email}`);
   } catch (err) {
     console.error(`[GrowWebhook] ✗ Failed to process ${product} for ${email}:`, err);
+    if (verifiedLiveTier) {
+      // Allow Grow to retry the strict endpoint instead of swallowing the error
+      // after the initial idempotency row was created.
+      if (transactionId) {
+        const db = await getDb();
+        if (db) await db.delete(webhookIdempotency).where(eq(webhookIdempotency.transactionId, transactionId));
+      }
+      throw err;
+    }
     await notifyOwner({
       title: `⚠️ שגיאה בעיבוד תשלום Grow (${product})`,
       content: `${name} (${email}) שילם ${sum} ₪ אבל אירעה שגיאה בעיבוד.\nTransaction: ${transactionId}\nError: ${err}`,

@@ -98,6 +98,13 @@ export const GA_PRODUCTS = {
     price: 0, // update when known
     currency: "ILS",
   },
+  live_october: {
+    item_id: "live_october_2026_149",
+    item_name: "סודות ההתאמה המושלמת - לייב אוקטובר",
+    item_category: "event",
+    price: 149,
+    currency: "ILS",
+  },
   bundle_tubav: {
     item_id: "bundle_tubav_349",
     item_name: "חבילת טו באב - מאגר + מדריך",

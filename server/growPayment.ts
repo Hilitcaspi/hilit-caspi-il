@@ -68,6 +68,7 @@ const PAGE_CODES: Record<string, string> = {
   // wallet page. Product identity is preserved by its unique description and
   // by the pending Boost request created before Grow is opened.
   match_boost: process.env.GROW_PAGE_CODE_MATCH_BOOST || process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
+  live_october: process.env.GROW_PAGE_CODE_LIVE_OCTOBER || process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   // Plus uses the dedicated recurring-payment Production branch below. Never
   // fall back to a regular production payment page for this product.
   plus:         process.env.GROW_PAGE_CODE_PLUS || "",
@@ -117,6 +118,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון",            sum: 349,  paymentNum: 1 },
   bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 399, paymentNum: 1 },
   match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית",                       sum: 19.90, paymentNum: 1 },
+  live_october: { description: "כרטיס ללייב סודות ההתאמה המושלמת 31.10.2026", sum: 149, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי",                         sum: 99 },
 };
 
@@ -156,6 +158,8 @@ export interface CreatePaymentInput {
   webhookReference?: string;
   /** Signed non-PII reference used to bind a public Plus webhook to one checkout. */
   plusWebhookReference?: string;
+  /** Signed reference for the October live ticket tier, without personal details. */
+  liveWebhookReference?: string;
   /** Browser origin used for the hosted Plus recurring-payment callback. */
   origin?: string;
   /** Campaign identifier used only to render the matching post-payment offer state. */
@@ -263,19 +267,22 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     bundle_tubav: "/thank-you/bundle",
     bundle_new_year: "/thank-you/new-year-love",
     match_boost:  "/thank-you/match-boost",
+    live_october: "/live/thank-you",
     plus:         "/thank-you/plus",
   };
   const successPath = SUCCESS_PATHS[input.product] || "/thank-you/digital";
   const successUrl = new URL(`${SITE_BASE}${successPath}`);
+  if (input.product === "database" && input.liveWebhookReference) successUrl.searchParams.set("offer", "live");
   if (input.product === "plus" || input.product === "match_boost") {
     successUrl.searchParams.set("email", input.email);
     if (input.personalToken) successUrl.searchParams.set("token", input.personalToken);
   }
   params.append("successUrl", successUrl.toString());
   params.append("cancelUrl", `${SITE_BASE}`);
-  const notifyUrl = new URL(`${SITE_BASE}/api/grow/webhook`);
+  const notifyUrl = new URL(`${SITE_BASE}${input.liveWebhookReference ? "/api/grow/live-webhook" : "/api/grow/webhook"}`);
   if (input.webhookReference) notifyUrl.searchParams.set("boost_ref", input.webhookReference);
   if (input.plusWebhookReference) notifyUrl.searchParams.set("plus_ref", input.plusWebhookReference);
+  if (input.liveWebhookReference) notifyUrl.searchParams.set("live_ref", input.liveWebhookReference);
   params.append("notifyUrl", notifyUrl.toString());
   params.append("pageField[fullName]", input.fullName);
   params.append("pageField[email]", input.email);

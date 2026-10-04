@@ -233,6 +233,23 @@ async function startServer() {
     }
   });
 
+  // Live-event purchases use a strict webhook: signed checkout reference,
+  // provider verification and retryable errors. Never acknowledge before fulfillment.
+  app.post("/api/grow/live-webhook", express.json(), express.urlencoded({ extended: true }), async (req, res) => {
+    const reference = typeof req.query.live_ref === "string" ? req.query.live_ref : undefined;
+    const payload = req.body?.data ?? req.body;
+    const email = String(payload?.payerEmail || payload?.email || "");
+    const { verifyLiveCheckoutReference } = await import("../liveCheckoutReference");
+    if (!verifyLiveCheckoutReference(reference, email)) return res.status(403).json({ error: "invalid_live_checkout" });
+    try {
+      await handleGrowWebhook(req.body, { liveCheckoutReference: reference });
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("[GrowLiveWebhook] Verification or fulfillment failed", error instanceof Error ? error.name : "unknown");
+      res.status(503).json({ error: "live_checkout_retry" });
+    }
+  });
+
   // ─── Grow Payment Webhook ──────────────────────────────────────────────────────────
   // Receives payment notifications from Grow after successful purchases.
   // Configure in Grow dashboard: Webhook URL → https://hilitcaspi.com/api/grow/webhook

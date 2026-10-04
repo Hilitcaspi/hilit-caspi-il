@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { readPurchaseTrackingToken } from "@/lib/purchaseTracking";
 
 const WHATSAPP_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("Hi Hilit, I just joined the singles database and would love your help getting started!");
 
 export default function EnThankYouDatabase() {
   const [email, setEmail] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const sendDashboardLink = trpc.singles.sendDashboardLink.useMutation({
+    onSuccess: () => setErrorMsg("If your email is registered, a personal access link has been sent to your inbox."),
+    onError: () => setErrorMsg("We couldn't send your link right now. Please try again later."),
+  });
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -33,7 +38,9 @@ export default function EnThankYouDatabase() {
     e.preventDefault();
     setErrorMsg("");
     if (!email.trim()) return;
-    getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
+    const trackingToken = readPurchaseTrackingToken();
+    if (trackingToken) getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin, trackingToken });
+    else sendDashboardLink.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
   };
 
   return (

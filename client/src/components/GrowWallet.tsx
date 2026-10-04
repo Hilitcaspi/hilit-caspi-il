@@ -44,6 +44,7 @@ const PAGE_CODES: Record<string, string> = {
   bundle_tubav: import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   bundle_new_year: import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   match_boost: import.meta.env.VITE_GROW_PAGE_CODE_MATCH_BOOST || import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
+  live_october: import.meta.env.VITE_GROW_PAGE_CODE_LIVE_OCTOBER || import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   plus:         import.meta.env.VITE_GROW_PAGE_CODE_PLUS || "",
 };
 
@@ -57,6 +58,7 @@ const PRODUCT_CONFIGS: Record<string, { description: string; sum: number; paymen
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון", sum: 349, paymentNum: 1 },
   bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 399, paymentNum: 1 },
   match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית", sum: 19.90, paymentNum: 1 },
+  live_october: { description: "כרטיס ללייב סודות ההתאמה המושלמת 31.10.2026", sum: 149, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי", sum: 99 },
 };
 
@@ -203,7 +205,7 @@ declare global {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface GrowWalletProps {
-  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "match_boost" | "plus";
+  product: "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "match_boost" | "plus" | "live_october";
   buttonLabel?: string;
   buttonClassName?: string;
   prefillName?: string;
@@ -271,7 +273,7 @@ export default function GrowWallet({
     autoCouponKeyRef.current = attemptKey;
     setCouponCode(requestedCode);
     setCouponError("");
-    validateCouponMutation.mutateAsync({ code: requestedCode, product, email: normalizedEmail })
+    validateCouponMutation.mutateAsync({ code: requestedCode, product, email: normalizedEmail, personalToken })
       .then(result => {
         if (result.valid) {
           setCouponApplied({ code: result.code, discountPercent: result.discountPercent, discountAmount: result.discountAmount, fixedPrice: result.fixedPrice });
@@ -314,11 +316,11 @@ export default function GrowWallet({
     setCouponError("");
     setCouponLoading(true);
     try {
-      const result = await validateCouponMutation.mutateAsync({ code: normalizedCode, product, email: email.trim() || undefined });
+      const result = await validateCouponMutation.mutateAsync({ code: normalizedCode, product, email: email.trim() || undefined, personalToken });
       if (result.valid) {
         setCouponApplied({ code: result.code, discountPercent: result.discountPercent, discountAmount: result.discountAmount, fixedPrice: result.fixedPrice });
-        const label = result.fixedPrice ? `מחיר מיוחד: ₪${result.fixedPrice}` : result.discountPercent ? `${result.discountPercent}% הנחה` : result.discountAmount ? `₪${result.discountAmount} הנחה` : "הנחה";
-        toast.success(`קופון הוחל! ${label}`);
+        const label = result.fixedPrice ? `מחיר מיוחד: ₪${result.fixedPrice}` : result.discountPercent ? `${result.discountPercent}% הנחה` : result.discountAmount ? `₪${result.discountAmount} הנחה` : "כרטיס ללייב במתנה";
+        toast.success(`קוד הוחל! ${label}`);
       } else if (product === "database" && onFreeAccessCode) {
         const freeAccess = await onFreeAccessCode(normalizedCode, email.trim());
         if (!freeAccess.valid) {
@@ -536,7 +538,7 @@ export default function GrowWallet({
       logStep("4_createProcess_start");
       failureStage = "createProcess";
       const result = await createProcessMutation.mutateAsync({
-        product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "match_boost" | "plus",
+        product: product as "database" | "guide" | "course" | "coaching" | "coaching_mas" | "session" | "bundle_tubav" | "bundle_new_year" | "match_boost" | "plus" | "live_october",
         fullName,
         email: userEmail,
         phone: userPhone || undefined,

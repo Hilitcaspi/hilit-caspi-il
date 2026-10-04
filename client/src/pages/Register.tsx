@@ -14,6 +14,7 @@ import { useLocation, useSearch } from "wouter";
 import { MATCH_QUESTIONS, IMPORTANCE_LABELS, CHAPTER2_QUESTION_IDS, PARENTS_ONLY_QUESTION_IDS, type MatchAnswer } from "@/lib/matchmakingQuestions";
 import EmbeddedDnaQuiz from "@/components/EmbeddedDnaQuiz";
 import GrowWallet from "@/components/GrowWallet";
+import LiveVoucherCard from "@/components/LiveVoucherCard";
 import { normalizeIsraeliPhone } from "@shared/profileValidation";
 
 type Step = "profile" | "dna_select" | "compatibility_quiz" | "free_token_verify" | "payment" | "uploading" | "uploading_error" | "already_registered" | "done";
@@ -1812,6 +1813,7 @@ export default function Register() {
           {/* ── DONE ── */}
           {step === "done" && (
             <motion.div key="done" {...slideIn} className="text-center py-16">
+              {promotionalCoupon === "LIVE" && <div className="mx-auto mb-8 max-w-lg"><LiveVoucherCard receiptOnly /></div>}
               <div className="text-6xl mb-6">🎉</div>
                 <h2 className="text-3xl font-black text-[#191265] mb-4">
                 הפרופיל שלך במאגר!
