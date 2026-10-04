@@ -375,6 +375,12 @@ export default function GrowWallet({
       toast.error("יש לאשר את התקנון לפני התשלום.");
       return;
     }
+    // A database gift-page visitor must never pay for a plain database order
+    // just because the automatic LIVE coupon validation is still pending.
+    if (product === "database" && prefillCoupon?.trim().toUpperCase() === "LIVE" && couponApplied?.code !== "LIVE") {
+      toast.error("ממתינים לאימות כרטיס הלייב במתנה. אין לבצע תשלום בלי שהטבת LIVE מופיעה בקופה.");
+      return;
+    }
 
     const baseCheckoutPrice = PRODUCT_CONFIGS[product]?.sum ?? 0;
     const trackedCheckoutPrice = couponApplied?.fixedPrice

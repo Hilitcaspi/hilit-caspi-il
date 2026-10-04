@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { buildDatabaseJoinHref, buildLiveDatabaseJoinHref, buildRegularDatabaseJoinHrefFromLive } from "../client/src/lib/landingPageExperiment";
+import { buildDatabaseJoinHref, buildLiveDatabaseJoinHref } from "../client/src/lib/landingPageExperiment";
 
 function storage(values: Record<string, string>) {
   return {
@@ -78,29 +78,21 @@ describe("landing page experiment attribution", () => {
     expect(params.get("utm_campaign")).toBe("live_october_2026");
   });
 
-  it("lets visitors join the ordinary database while the gift is closed, without a stale LIVE or NOW coupon", () => {
-    const href = buildRegularDatabaseJoinHrefFromLive(
-      "?coupon=LIVE&utm_source=instagram&utm_content=story",
-      storage({ coupon: "NOW", utm_medium: "paid_social" }) as Storage,
-    );
-    const params = new URLSearchParams(href.split("?")[1]);
-    expect(params.get("coupon")).toBeNull();
-    expect(params.get("source")).toBe("database");
-    expect(params.get("utm_source")).toBe("instagram");
-    expect(params.get("utm_content")).toBe("story");
-    expect(params.get("utm_medium")).toBe("paid_social");
-    expect(params.get("utm_campaign")).toBe("database_regular_october_2026");
-  });
-
-  it("keeps the LIVE details on the database offer page and does not promise a Zoom access code", () => {
+  it("keeps the LIVE gift in every checkout CTA and never redirects this offer to a plain database checkout", () => {
     const databasePage = readFileSync(resolve(process.cwd(), "client/src/pages/DatabaseSales.tsx"), "utf8");
     const livePage = readFileSync(resolve(process.cwd(), "client/src/pages/LiveEvent.tsx"), "utf8");
     const voucher = readFileSync(resolve(process.cwd(), "client/src/components/LiveVoucherCard.tsx"), "utf8");
+    const checkout = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
+    const register = readFileSync(resolve(process.cwd(), "client/src/pages/Register.tsx"), "utf8");
     expect(databasePage).toContain('href="#about-live"');
     expect(databasePage).not.toContain('<Link href="/live"');
-    expect(databasePage).toContain('offerLocked ? regularJoinHref : joinHref');
+    expect(databasePage).toContain('offerLocked ? "#live-offer" : joinHref');
+    expect(databasePage).not.toContain("regularJoinHref");
+    expect(databasePage).not.toContain("ללא כרטיס");
     expect(livePage).not.toContain("49 ₪ · חברי Plus");
     expect(voucher).toContain("לא קוד כניסה ל־Zoom");
+    expect(checkout).toContain('couponApplied?.code !== "LIVE"');
+    expect(register).toContain('promotionalCoupon === "LIVE"');
   });
 
   it("tracks database_cta on real database-page clicks, not on join page load", () => {

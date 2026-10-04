@@ -5,15 +5,18 @@ import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { liveOctoberQuestions, liveOctoberTickets } from "../drizzle/schema";
 import {
-  LIVE_OCTOBER_SLUG, LIVE_OCTOBER_SALES_OPEN, ensurePlusLiveTicket, existingLiveTicket,
-  getVerifiedLiveMember, liveTicketByReceipt, submitLiveQuestion,
+  LIVE_OCTOBER_SLUG, ensurePlusLiveTicket, existingLiveTicket,
+  getVerifiedLiveMember, isLiveCheckoutOpen, liveTicketByReceipt, submitLiveQuestion,
 } from "./liveOctober";
 
 const memberInput = z.object({ email: z.string().email().max(320), token: z.string().min(16).max(200) });
 const receiptInput = z.object({ trackingToken: z.string().regex(/^[a-f0-9]{64}$/) });
 
 export const liveOctoberRouter = router({
-  salesStatus: publicProcedure.query(() => ({ open: LIVE_OCTOBER_SALES_OPEN })),
+  salesStatus: publicProcedure.query(() => ({
+    open: isLiveCheckoutOpen("live_october", undefined),
+    databaseGiftOpen: isLiveCheckoutOpen("database", "LIVE"),
+  })),
   eligibility: publicProcedure.input(memberInput).query(async ({ input }) => {
     const member = await getVerifiedLiveMember(input.email, input.token);
     if (!member) return { eligible: false, plus: false, ticket: null };

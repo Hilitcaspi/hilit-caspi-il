@@ -7728,10 +7728,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }))
       .mutation(async ({ input }) => {
         const requested = input.code.trim().toUpperCase();
-        if ((requested === "LIVE" || requested === "FRIENDS") && !(await import("./liveOctober")).LIVE_OCTOBER_SALES_OPEN)
+        const { isLiveCheckoutOpen } = await import("./liveOctober");
+        if (requested === "FRIENDS" && !isLiveCheckoutOpen("live_october", "FRIENDS"))
           return { valid: false as const, error: "הרשמת הלייב טרם נפתחה" };
         if (requested === "LIVE" && input.product === "database") {
-          if (Date.now() >= new Date("2026-10-31T20:30:00+02:00").getTime())
+          if (!isLiveCheckoutOpen("database", "LIVE"))
             return { valid: false as const, error: "הטבת הלייב הסתיימה" };
           if (!input.email) return { valid: false as const, error: "יש להזין כתובת מייל כדי לאמת את הטבת המצטרפים החדשים" };
           const db = await getDb();
@@ -8072,10 +8073,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
         if (reservedCode === "LIVE" || input.product === "live_october") {
           if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-          const { existingLiveTicket, getVerifiedLiveMember, liveCheckoutPrice, LIVE_START_ISO, LIVE_OCTOBER_SALES_OPEN } = await import("./liveOctober");
-          if (!LIVE_OCTOBER_SALES_OPEN) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "הרשמת הלייב טרם נפתחה" });
-          if (Date.now() >= new Date(LIVE_START_ISO).getTime())
-            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "ההרשמה ללייב הסתיימה" });
+          const { existingLiveTicket, getVerifiedLiveMember, liveCheckoutPrice, isLiveCheckoutOpen } = await import("./liveOctober");
+          if (!isLiveCheckoutOpen(input.product, reservedCode))
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "ההרשמה למסלול זה עדיין אינה זמינה" });
           if (input.product === "live_october") {
             if (await existingLiveTicket(normalizedCheckoutEmail))
               throw new TRPCError({ code: "CONFLICT", message: "כבר שמור לך כרטיס ללייב. אין צורך לרכוש כרטיס נוסף" });
@@ -8255,6 +8255,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           }
         }
 
+        // A LIVE gift depends on the persisted order to match a paid Grow webhook.
+        // Do not open a payable wallet when that order cannot be verified later.
+        if (preparedLiveCheckoutReference && !paymentTrackingSaved) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא ניתן לשמור את הטבת הלייב כרגע. אנא נסו שוב בעוד רגע." });
+        }
+
         try {
           const result = await createPaymentProcess({
             ...input,
@@ -8264,6 +8270,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             plusWebhookReference: preparedPlusCheckoutReference || undefined,
             liveWebhookReference: preparedLiveCheckoutReference || undefined,
           });
+          if (preparedLiveCheckoutReference && !result.processToken) {
+            throw new Error("LIVE checkout missing Grow processToken");
+          }
           if (input.product === "plus" && db) {
             await db.update(plusCheckoutIntents)
               .set({ processToken: result.processToken || null, updatedAt: Date.now() })
@@ -8277,6 +8286,17 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
                 eq(paymentLeads.product, input.product),
                 eq(paymentLeads.trackingToken, paymentTracking.trackingToken),
               ));
+            if (preparedLiveCheckoutReference) {
+              const [persisted] = await db.select({ providerProcessToken: paymentLeads.providerProcessToken })
+                .from(paymentLeads).where(and(
+                  eq(paymentLeads.email, normalizedCheckoutEmail),
+                  eq(paymentLeads.product, input.product),
+                  eq(paymentLeads.trackingToken, paymentTracking.trackingToken),
+                )).limit(1);
+              if (persisted?.providerProcessToken !== result.processToken) {
+                throw new Error("LIVE checkout Grow processToken was not persisted");
+              }
+            }
           }
           return {
             ...result,

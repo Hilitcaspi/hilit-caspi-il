@@ -891,6 +891,12 @@ export default function Register() {
                   <p className="text-white/80 text-sm leading-relaxed mb-4">
                     המאגר שלי שונה מכל אפליקציה אחרת. ההתאמות מבוססות על חישובים מתקדמים ומודלים מדעיים, ולאחר מכן אני עוברת על כל הצעה אישית ומאשרת אותה בעצמי.
                   </p>
+                  {promotionalCoupon === "LIVE" && (
+                    <div className="mb-4 rounded-xl border border-[#ffe27c]/50 bg-[#ffe27c]/15 p-4 text-white">
+                      <p className="font-black text-[#ffe27c]">כרטיס ללייב שלי במתנה</p>
+                      <p className="mt-1 text-sm leading-6">הצטרפות למאגר ב־299 ₪ כוללת כרטיס אחד למפגש סודות ההתאמה המושלמת ב־31.10. קוד LIVE כבר צורף להזמנה שלך ונבדק לפני התשלום.</p>
+                    </div>
+                  )}
                   <div className="bg-[#ffe27c]/10 border border-[#ffe27c]/30 rounded-xl p-3">
                     <p className="text-[#ffe27c] text-xs font-bold mb-1">איך מצטרפים:</p>
                     <p className="text-white/70 text-xs">{isFemale ? "מלאי פרטים ושאלון DNA" : "מלא פרטים ושאלון DNA"} → תשלום ₪299 → מייל עם קישור לשאלון המדעי → אישור כניסה למאגר</p>
@@ -1645,6 +1651,12 @@ export default function Register() {
 
                     {!couponValid && (
                       <div className="pt-5 border-t border-[#e9e8e8]">
+                        {promotionalCoupon === "LIVE" && (
+                          <div className="mb-5 rounded-xl border border-[#d9c777] bg-[#fff9e8] p-4 text-right" dir="rtl">
+                            <p className="font-black text-[#191265]">מאגר ב־299 ₪ וכרטיס אחד ללייב במתנה</p>
+                            <p className="mt-1 text-sm leading-6 text-[#625d78]">קוד LIVE ייבדק אוטומטית לפי כתובת המייל שהזנתם. לאחר אישור התשלום השובר יופיע בדף התודה ובאזור האישי. קישור הכניסה יישלח לקראת האירוע.</p>
+                          </div>
+                        )}
                         <GrowWallet
                           product="database"
                           termsPath="/terms/database"
@@ -1813,7 +1825,7 @@ export default function Register() {
           {/* ── DONE ── */}
           {step === "done" && (
             <motion.div key="done" {...slideIn} className="text-center py-16">
-              {promotionalCoupon === "LIVE" && <div className="mx-auto mb-8 max-w-lg"><LiveVoucherCard receiptOnly /></div>}
+              {promotionalCoupon === "LIVE" && <div className="mx-auto mb-8 max-w-lg"><LiveVoucherCard receiptOnly showPending /></div>}
               <div className="text-6xl mb-6">🎉</div>
                 <h2 className="text-3xl font-black text-[#191265] mb-4">
                 הפרופיל שלך במאגר!

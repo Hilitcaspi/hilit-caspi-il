@@ -179,6 +179,7 @@ function FriendLinkRequest() {
 export default function LiveEvent() {
   const salesStatus = trpc.liveOctober.salesStatus.useQuery();
   const salesOpen = salesStatus.data?.open === true;
+  const databaseGiftOpen = salesStatus.data?.databaseGiftOpen === true;
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const email = params.get("email")?.trim().toLowerCase() || "";
   const token = params.get("token") || "";
@@ -347,8 +348,8 @@ export default function LiveEvent() {
             <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
               <div>
                 <p className="inline-flex items-center gap-2 text-xs font-black tracking-[.14em] text-[#796116]"><Sparkles className="h-4 w-4" />לא חברים במאגר עדיין?</p>
-                <h3 className="mt-2 text-2xl font-black text-[#191265]">{salesOpen ? "מצטרפים למאגר ומקבלים כרטיס ללייב במתנה." : "המאגר פתוח. הטבת הלייב למצטרפים חדשים בדרך."}</h3>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-[#625d78]">בהצטרפות למאגר ב־299 ₪ ממלאים שאלון, יוצרים פרופיל ונותנים לי להכיר אתכם מעבר לתמונה. כשהטבת הלייב תיפתח, מצטרפים חדשים דרך עמוד ההטבה יקבלו כרטיס אחד במתנה עם קוד LIVE שיצורף אוטומטית בהרשמה.</p>
+                <h3 className="mt-2 text-2xl font-black text-[#191265]">מצטרפים למאגר ומקבלים כרטיס ללייב במתנה.</h3>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-[#625d78]">בהצטרפות למאגר ב־299 ₪ ממלאים שאלון, יוצרים פרופיל ונותנים לי להכיר אתכם מעבר לתמונה. כרטיס אחד ללייב יתווסף במתנה למצטרפים חדשים מעמוד ההטבה, וקוד LIVE יחול אוטומטית בקופה.</p>
               </div>
               <a href="/live/database" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#191265] px-6 py-4 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#30247e]">להכיר את המאגר ואת הטבת הלייב <ArrowLeft className="h-4 w-4" /></a>
             </div>
@@ -371,7 +372,7 @@ export default function LiveEvent() {
             ) : !salesOpen ? (
               <div className="rounded-[1.75rem] border border-[#191265]/10 bg-white p-7 text-center shadow-sm">
                 <h3 className="text-xl font-black text-[#191265]">ההרשמה ללייב תיפתח בקרוב</h3>
-                <p className="mt-2 text-sm leading-7 text-[#625d78]">אני מסיימת להכין את הכניסה האישית למפגש. ברגע שההרשמה תיפתח תוכלו לבחור כרטיס או לפתוח את ההטבה שמגיעה לכם דרך האזור האישי.</p>
+                <p className="mt-2 text-sm leading-7 text-[#625d78]">אני מסיימת להכין את הכניסה האישית למפגש. {databaseGiftOpen ? "בינתיים, מצטרפים חדשים למאגר מקבלים כבר עכשיו כרטיס מתנה. קישור הכניסה יישלח לקראת האירוע." : "מכירת הכרטיסים הנפרדים תיפתח בהמשך."}</p>
               </div>
             ) : isFriendEligible ? (
               <div className="overflow-hidden rounded-[1.9rem] border border-[#191265]/10 bg-white shadow-[0_18px_45px_rgba(25,18,101,.1)]">

@@ -6,7 +6,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import React from "react";
 import { track } from "@/lib/track";
-import { buildDatabaseJoinHref, buildLiveDatabaseJoinHref, buildRegularDatabaseJoinHrefFromLive } from "@/lib/landingPageExperiment";
+import { buildDatabaseJoinHref, buildLiveDatabaseJoinHref } from "@/lib/landingPageExperiment";
 import { trackViewContent } from "@/lib/metaPixel";
 import { gaViewItem } from "@/lib/ga";
 import { motion, useInView } from "framer-motion";
@@ -53,7 +53,7 @@ const STEPS = [
 export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
   const isLiveOffer = campaign === "live";
   const liveSales = trpc.liveOctober.salesStatus.useQuery(undefined, { enabled: isLiveOffer });
-  const liveSalesOpen = liveSales.data?.open === true;
+  const liveGiftOpen = liveSales.data?.databaseGiftOpen === true;
   // Track database page view
   React.useEffect(() => {
     track({ eventType: "database_view", page: isLiveOffer ? "/live/database" : "/database" });
@@ -67,22 +67,17 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
     () => (isLiveOffer ? buildLiveDatabaseJoinHref : buildDatabaseJoinHref)(search, window.sessionStorage, window.localStorage),
     [isLiveOffer, search],
   );
-  // The offer must remain review-only until the online event and access links exist.
-  const offerLocked = isLiveOffer && !liveSalesOpen;
-  // Regular database checkout stays available. Never attach LIVE while the gift is locked.
-  const regularJoinHref = useMemo(
-    () => buildRegularDatabaseJoinHrefFromLive(search, window.sessionStorage, window.localStorage),
-    [search],
-  );
-  const actionHref = offerLocked ? regularJoinHref : joinHref;
+  // Never redirect a visitor on this gift page to a checkout without LIVE.
+  const offerLocked = isLiveOffer && !liveGiftOpen;
+  const actionHref = offerLocked ? "#live-offer" : joinHref;
   const actionLabel = isLiveOffer
-    ? offerLocked ? "להצטרפות למאגר ב־299 ₪" : "להצטרפות למאגר עם כרטיס במתנה"
+    ? offerLocked ? "פרטי הטבת המאגר והלייב" : "להצטרפות למאגר עם כרטיס במתנה"
     : isNowHolidayOffer ? "הצטרפות עם קוד NOW" : "הצטרפות למאגר";
   const trackJoinClick = (placement: "navbar" | "hero" | "final") => {
     track({
       eventType: "database_cta",
       page: isLiveOffer ? "/live/database" : "/database",
-      metadata: { destination: "/join", placement, experiment: offerLocked ? "database_regular_from_live_preview" : isLiveOffer ? "live_october_2026" : "database_lp_test_sep2026" },
+      metadata: { destination: offerLocked ? "#live-offer" : "/join", placement, experiment: isLiveOffer ? "live_october_2026" : "database_lp_test_sep2026" },
     });
   };
 
@@ -142,10 +137,9 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
             </p>
             {isLiveOffer && (
               <div className="mb-7 rounded-2xl border border-[#ffe27c]/55 bg-white/10 p-5 text-white shadow-lg backdrop-blur-sm">
-                <p className="text-sm font-black text-[#ffe27c]">{offerLocked ? "המאגר פתוח להצטרפות" : "הצעה מיוחדת למצטרפים חדשים למאגר"}</p>
-                <p className="mt-2 text-2xl font-black">{offerLocked ? "הצטרפות למאגר ב־299 ₪. הטבת הלייב בדרך." : "מצטרפים למאגר ב־299 ₪ ומקבלים כרטיס ללייב שלי במתנה"}</p>
-                <p className="mt-2 text-sm leading-7 text-white/85">קודם כל נכנסים למאגר, ממלאים שאלון ויוצרים פרופיל. כשהטבת הלייב תיפתח, מצטרפים חדשים דרך העמוד הזה יקבלו גם כרטיס אחד עם קוד LIVE שמוחל אוטומטית בקופה.</p>
-                {offerLocked && <p className="mt-3 text-xs font-bold text-[#ffe27c]">המאגר פתוח להצטרפות כבר עכשיו. ברכישה רגילה היום כרטיס הלייב עדיין אינו כלול.</p>}
+                <p className="text-sm font-black text-[#ffe27c]">הצעה מיוחדת למצטרפים חדשים למאגר</p>
+                <p className="mt-2 text-2xl font-black">מצטרפים למאגר ב־299 ₪ ומקבלים כרטיס ללייב שלי במתנה</p>
+                <p className="mt-2 text-sm leading-7 text-white/85">ממלאים שאלון ויוצרים פרופיל במאגר, וכרטיס אחד למפגש איתי נוסף במתנה. קוד LIVE מצורף אוטומטית כשמצטרפים דרך העמוד הזה.</p>
               </div>
             )}
             {isNowHolidayOffer && (
@@ -183,11 +177,11 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
             <div className="text-right">
               <p className="text-xs font-black tracking-wider text-[#594593]">הטבת הלייב · למצטרפים חדשים למאגר</p>
               <h2 id="live-offer-title" className="mt-3 text-3xl font-black leading-tight text-[#191265] md:text-4xl">אני רוצה להכיר אתכם במאגר. <span className="text-[#4e3eb4]">ואז לפגוש אתכם בלייב.</span></h2>
-              <p className="mt-4 text-base leading-8 text-[#625d78]">בהצטרפות למאגר ב־299 ₪ ממלאים שאלון זוגי ופרופיל, ואני בוחנת חיבורים שיכולים להתאים. כשהטבת LIVE תיפתח, מצטרפים חדשים מכאן יקבלו גם <strong className="text-[#191265]">כרטיס אחד במתנה למפגש ב־31.10 בשעה 20:30</strong>. מחיר הכרטיס בנפרד הוא 149 ₪.</p>
-              <p className="mt-4 rounded-xl bg-[#f5efff] px-4 py-3 text-sm font-bold leading-6 text-[#191265]">{liveSalesOpen ? "אין צורך לזכור קוד. קוד LIVE עובר אוטומטית מהעמוד הזה לקופה. אחרי שהתשלום יאושר, השובר האישי יוצג בדף התודה ובאזור האישי. קישור הכניסה למפגש יישלח בנפרד לפני האירוע." : "כשהטבת הלייב תיפתח, קוד LIVE יצטרף אוטומטית להזמנה דרך העמוד הזה. השובר האישי יופיע אחרי אישור התשלום, וקישור הכניסה למפגש יישלח בנפרד."}</p>
-              {!liveSalesOpen && <p className="mt-4 text-sm font-bold text-[#75591e]">אפשר להצטרף למאגר כבר עכשיו במחיר הרגיל של 299 ₪, בלי כרטיס ללייב. ההרשמה שכוללת את כרטיס המתנה תיפתח רק כשקישורי הכניסה האישיים יהיו מוכנים.</p>}
+              <p className="mt-4 text-base leading-8 text-[#625d78]">בהצטרפות למאגר ב־299 ₪ ממלאים שאלון זוגי ופרופיל, ואני בוחנת חיבורים שיכולים להתאים. למצטרפים חדשים דרך העמוד הזה מחכה גם <strong className="text-[#191265]">כרטיס אחד במתנה למפגש ב־31.10 בשעה 20:30</strong>. מחיר הכרטיס בנפרד הוא 149 ₪.</p>
+              <p className="mt-4 rounded-xl bg-[#f5efff] px-4 py-3 text-sm font-bold leading-6 text-[#191265]">אין צורך לזכור קוד. קוד LIVE עובר אוטומטית לקופה דרך העמוד הזה. לאחר שהתשלום למאגר יאושר, השובר האישי יופיע בדף התודה ובאזור האישי. קישור הכניסה למפגש יישלח בנפרד לקראת האירוע.</p>
+              {offerLocked && <p className="mt-4 text-sm font-bold text-[#75591e]">{liveSales.isLoading ? "בודקים את זמינות ההטבה. עוד רגע אפשר יהיה להמשיך בהרשמה." : "ההטבה אינה זמינה כרגע. לא נבצע רכישה בלי הכרטיס במתנה מהעמוד הזה."}</p>}
               <div className="mt-6 flex flex-wrap items-center gap-4">
-                {liveSalesOpen ? <a href={joinHref} onClick={() => trackJoinClick("hero")} className="rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">להצטרפות למאגר ולקבלת הכרטיס</a> : <a href={regularJoinHref} onClick={() => trackJoinClick("hero")} className="rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">להצטרפות למאגר עכשיו, ללא כרטיס</a>}
+                {liveGiftOpen ? <a href={joinHref} onClick={() => trackJoinClick("hero")} className="rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">להצטרפות למאגר ולקבלת הכרטיס</a> : <span className="rounded-2xl border border-[#191265]/20 px-7 py-4 text-sm font-black text-[#191265]">ממתינים לאימות ההטבה</span>}
                 <a href="#about-live" className="text-sm font-bold text-[#4e3eb4] underline underline-offset-4">מה יהיה בלייב?</a>
               </div>
             </div>
@@ -196,7 +190,7 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
               <p className="mt-5 text-5xl font-black text-[#ffe27c]">299 ₪</p>
               <p className="mt-2 text-sm text-white/75">מאגר · תשלום חד־פעמי</p>
               <div className="my-6 h-px bg-white/20" />
-              <p className="text-lg font-black">+ כרטיס אחד ללייב במתנה כשההטבה תיפתח</p>
+              <p className="text-lg font-black">+ כרטיס אחד ללייב במתנה</p>
               <p className="mt-2 text-xs text-white/70">כרטיס רגיל בנפרד: 149 ₪</p>
               <div className="mt-6 rounded-xl border border-[#ffe27c]/35 bg-white/10 px-4 py-3 text-sm"><span className="text-white/75">קוד ההטבה: </span><strong className="tracking-widest text-[#ffe27c]" dir="ltr">LIVE</strong><span className="block text-xs text-white/65">נוסף אוטומטית בהרשמה דרך העמוד הזה</span></div>
             </div>

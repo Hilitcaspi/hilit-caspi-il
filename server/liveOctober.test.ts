@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createLiveCheckoutReference, verifyLiveCheckoutReference } from "./liveCheckoutReference";
-import { liveCheckoutPrice, matchesPaidLiveCheckout } from "./liveOctober";
+import { isLiveCheckoutOpen, liveCheckoutPrice, matchesPaidLiveCheckout } from "./liveOctober";
 
 const previous = process.env.JWT_SECRET;
 beforeAll(() => { process.env.JWT_SECRET = "test-signing-secret-at-least-thirty-two-characters"; });
@@ -14,6 +14,17 @@ const validPayment = {
 };
 
 describe("October live signed checkout", () => {
+  it("issues a database gift before the event while standalone and FRIENDS ticket sales remain closed", () => {
+    const beforeEvent = Date.parse("2026-10-04T12:00:00Z");
+    const eventStart = Date.parse("2026-10-31T20:30:00+02:00");
+    expect(isLiveCheckoutOpen("database", "LIVE", beforeEvent, false)).toBe(true);
+    expect(isLiveCheckoutOpen("database", undefined, beforeEvent, false)).toBe(false);
+    expect(isLiveCheckoutOpen("live_october", undefined, beforeEvent, false)).toBe(false);
+    expect(isLiveCheckoutOpen("live_october", "FRIENDS", beforeEvent, false)).toBe(false);
+    expect(isLiveCheckoutOpen("live_october", "FRIENDS", beforeEvent, true)).toBe(true);
+    expect(isLiveCheckoutOpen("database", "LIVE", eventStart, true)).toBe(false);
+    expect(isLiveCheckoutOpen("live_october", undefined, eventStart, true)).toBe(false);
+  });
   it.each(["database_live", "friends", "standalone"] as const)("signs and verifies %s for the same email", tier => {
     const ref = createLiveCheckoutReference("Person@Example.com", tier, 100_000);
     expect(verifyLiveCheckoutReference(ref, "person@example.com", 101_000)).toBe(tier);

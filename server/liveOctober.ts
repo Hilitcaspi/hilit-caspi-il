@@ -9,9 +9,23 @@ export const LIVE_START_ISO = "2026-10-31T20:30:00+02:00";
 export const LIVE_CAMPAIGN_CODE = "LIVE";
 export const LIVE_FRIEND_CODE = "FRIENDS";
 export const LIVE_PRODUCT = "live_october";
-// The event platform and admission workflow must be ready before accepting
-// purchases for the event. This flag defaults off in every environment.
+// Standalone and FRIENDS ticket sales remain closed until admission is ready.
+// A confirmed new database signup may receive a site voucher before Zoom links exist.
 export const LIVE_OCTOBER_SALES_OPEN = process.env.LIVE_OCTOBER_SALES_OPEN === "true";
+export function isLiveDatabaseGiftOpen(now = Date.now()): boolean {
+  return now < new Date(LIVE_START_ISO).getTime();
+}
+
+export function isLiveCheckoutOpen(
+  product: string | undefined,
+  couponCode: string | undefined,
+  now = Date.now(),
+  ticketSalesOpen = LIVE_OCTOBER_SALES_OPEN,
+): boolean {
+  if (!isLiveDatabaseGiftOpen(now)) return false;
+  if (product === "database" && couponCode === LIVE_CAMPAIGN_CODE) return true;
+  return product === LIVE_PRODUCT && ticketSalesOpen;
+}
 
 export type LiveTicketSource = "database_live" | "plus" | "friends" | "standalone";
 export function normalizeLiveEmail(email: string) { return email.trim().toLowerCase(); }
