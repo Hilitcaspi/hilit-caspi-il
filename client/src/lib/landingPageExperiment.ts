@@ -43,3 +43,18 @@ export function buildLiveDatabaseJoinHref(
   if (!params.has("utm_campaign")) params.set("utm_campaign", "live_october_2026");
   return buildDatabaseJoinHref(params.toString(), sessionStore, localStore);
 }
+
+/** Regular checkout remains available before the LIVE gift launches. Never carry over a coupon. */
+export function buildRegularDatabaseJoinHrefFromLive(
+  currentSearch: string,
+  sessionStore?: ReadableStorage | null,
+  localStore?: ReadableStorage | null,
+): string {
+  const href = buildDatabaseJoinHref(currentSearch, sessionStore, localStore);
+  const params = new URLSearchParams(href.split("?")[1]);
+  params.delete("coupon");
+  if (!params.has("utm_source")) params.set("utm_source", "site");
+  if (!params.has("utm_medium")) params.set("utm_medium", "live_page");
+  if (!params.has("utm_campaign")) params.set("utm_campaign", "database_regular_october_2026");
+  return `/join?${params.toString()}`;
+}

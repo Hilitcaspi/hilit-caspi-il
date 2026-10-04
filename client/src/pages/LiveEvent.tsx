@@ -33,18 +33,18 @@ const fadeUp = {
 };
 
 const liveTopics = [
-  ["מה באמת קורה מאחורי ההתאמה", "איך העדפות, תשובות לשאלון והיכרות אנושית מצטרפים לתמונה אחת — ומה אי אפשר לדעת רק מנתון בודד."],
-  ["פרופיל שמאפשר להכיר אתכם", "על הפרטים, התמונות והניסוח שעוזרים להציג אדם שלם; בלי לייצר דמות ובלי להעמיס מידע שלא משרת את ההיכרות."],
-  ["איך קוראים את השאלון נכון", "איך להשתמש בתשובות כדי לדייק שיחה, ערכים וקצב, ולא להפוך את השאלון לציון או לתווית."],
-  ["פסיכולוגיה של התחלה טובה", "מחשבות מבוססות פסיכולוגיה על ציפיות, סקרנות, הקשבה וגבולות בתחילת היכרות — בלי נוסחאות קסם ובלי הבטחות לתוצאה."],
-  ["בחירה, סימני שאלה והמשך הדרך", "איך אפשר להישאר קשובים למה שעולה תוך כדי היכרות, ולבחון התאמה בנחת ובכנות."],
-  ["שאלות אמיתיות מהקהל", "יהיה זמן ללייב Q&A: אפשר לשלוח שאלה מראש לאחר ההרשמה, והילית תבחר שאלות לשיחה החיה ככל שיתאפשר."],
+  ["מה קורה מאחורי ההתאמה", "אפתח את הדרך שבה אני מחברת בין העדפות, תשובות לשאלון והיכרות אישית עם האנשים שמאחורי הפרופילים."],
+  ["פרופיל שעובד בשבילכם", "נדבר על תמונות, ניסוח ופרטים קטנים שעוזרים לי לראות מי אתם באמת ולתת לאדם הנכון הזדמנות להכיר אתכם."],
+  ["מה מספר השאלון הזוגי", "אראה איך אפשר להבין מהתשובות ערכים, קצב וציפיות, ומה כדאי לשאול לפני שממהרים להחליט על התאמה."],
+  ["סודות של התחלה טובה", "נדבר על המשיכה הראשונית, על ציפיות ועל הדרך שבה שיחה אחת יכולה לפתוח דלת להיכרות אחרת."],
+  ["מה עושים כשההיכרות מתחילה", "אשתף מהניסיון שלי על בחירה, סקרנות ותקשורת בתחילת קשר, וגם על הרגעים שבהם כדאי לעצור ולבדוק מה באמת מרגיש נכון."],
+  ["השאלות שלכם", "אחרי ההרשמה תוכלו לשלוח לי שאלה מראש. אבחר נושאים שעלו ואקדיש להם מקום בשיחה החיה."],
 ] as const;
 
 const steps = [
-  ["01", "בוחרים דרך להצטרף", "כרטיס רגיל, הטבת FRIENDS אישית למי שזכאים, או שובר Plus חינמי באזור האישי."],
-  ["02", "שולחים שאלה מראש", "לאחר ההרשמה אפשר לשלוח שאלה. השאלות עוזרות לעצב את השיחה, בלי התחייבות למענה על כל שאלה."],
-  ["03", "נפגשים בלייב", "בשבת בערב נפתח מפגש חי עם הילית: מאחורי הקלעים, כלים מעשיים וזמן לשאלות נבחרות."],
+  ["01", "בוחרים את הדרך להצטרף", "כרטיס רגיל, הטבה אישית לחברי המאגר או שובר חינמי לחברי Plus באזור האישי."],
+  ["02", "שולחים לי שאלה", "אחרי ההרשמה תוכלו לשלוח שאלה מראש ולעזור לי להבין מה הכי מסקרן אתכם לקראת הערב."],
+  ["03", "נפגשים בלייב", "נפתח יחד את מאחורי הקלעים של ההתאמות, נדבר על פרופילים ועל היכרות, ונשאיר זמן לשאלות שלכם."],
 ] as const;
 
 function getRemainingTime(now: number) {
@@ -88,7 +88,7 @@ function LiveCountdown() {
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs leading-5 text-white/68">הספירה היא עד תחילת המפגש. פתיחת רכישת הכרטיסים וההטבות נשארת כפופה לזמינות ההרשמה.</p>
+      <p className="mt-3 text-xs leading-5 text-white/68">השעון סופר עד תחילת המפגש. ההרשמה תיפתח אחרי שפרטי הכניסה יהיו מוכנים.</p>
     </div>
   );
 }
@@ -151,8 +151,8 @@ function FriendLinkRequest() {
       <div className="flex items-start gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#191265] text-[#ffe27c]"><KeyRound className="h-5 w-5" /></span>
         <div>
-          <p className="font-black text-[#191265]">כבר חברים במאגר ורוצים מחיר FRIENDS?</p>
-          <p className="mt-1 text-sm leading-6 text-[#625d78]">הטבת FRIENDS נפתחת רק מתוך קישור אישי ומאובטח. לא מזינים קוד ציבורי: מזינים את כתובת המייל של החברות כדי לבקש קישור אישי לאזור האישי.</p>
+          <p className="font-black text-[#191265]">כבר חברים במאגר? הכנתי לכם מחיר מיוחד.</p>
+          <p className="mt-1 text-sm leading-6 text-[#625d78]">השאירו את כתובת המייל שאיתה נרשמתם למאגר. אשלח אליה קישור אישי, ומהקישור הזה תוכלו לראות את ההטבה שלכם כשההרשמה תיפתח.</p>
         </div>
       </div>
       <form onSubmit={submit} className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -220,9 +220,9 @@ export default function LiveEvent() {
               <span className="block text-[#ffe27c]">המושלמת.</span>
             </motion.h1>
             <motion.p variants={fadeUp} className="mt-6 max-w-2xl text-lg leading-8 text-white/83 sm:text-xl">
-              ערב כזה עוד לא עשיתי: לראשונה ניפגש בלייב כדי לפתוח את מאחורי הקלעים של ההתאמות. נדבר על מה באמת עובד בפרופיל, איך נבחנת התאמה ומה יכול לעזור להגיע להיכרות מדויקת יותר.
+              ערב כזה עוד לא עשיתי. בפעם הראשונה אני מזמינה אתכם לפגוש אותי בלייב, לשמוע איך אני בוחנת התאמות מאחורי הקלעים ולגלות מה יכול להפוך את הפרופיל שלכם להזדמנות אמיתית להיכרות.
             </motion.p>
-            <motion.p variants={fadeUp} className="mt-4 text-sm font-black text-[#ffe27c]">כרטיס רגיל 149 ₪ · חברי מאגר זכאים 49 ₪ · חברי Plus זכאים ללא עלות</motion.p>
+            <motion.p variants={fadeUp} className="mt-4 text-sm font-black text-[#ffe27c]">כרטיס ללייב ב־149 ₪. לחברי המאגר הכנתי מחיר מיוחד.</motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <button type="button" onClick={scrollToTickets} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#ffe27c] px-8 py-4 text-base font-black text-[#191265] shadow-[0_16px_35px_rgba(0,0,0,.2)] transition hover:-translate-y-0.5 hover:bg-white active:scale-[.98]">לפרטי הכרטיסים וההטבות <ArrowLeft className="h-5 w-5" /></button>
               <a href="#what-awaits" className="inline-flex items-center justify-center rounded-2xl border border-white/25 px-7 py-4 text-sm font-bold text-white transition hover:border-[#ffe27c] hover:text-[#ffe27c]">מה נפתח בלייב?</a>
@@ -230,7 +230,7 @@ export default function LiveEvent() {
             <motion.div variants={fadeUp} className="mt-9 flex flex-wrap gap-x-6 gap-y-3 border-t border-white/14 pt-6 text-xs font-bold text-white/72">
               <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />הילית בלייב, לא הקלטה</span>
               <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />שאלות שנשלחות מראש</span>
-              <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />כלים מעשיים, בלי הבטחות קסם</span>
+              <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />רעיונות שאפשר לקחת כבר להיכרות הבאה</span>
             </motion.div>
             <motion.div variants={fadeUp}><LiveCountdown /></motion.div>
           </motion.div>
@@ -252,7 +252,7 @@ export default function LiveEvent() {
       <section id="what-awaits" className="relative overflow-hidden bg-[#f0eadc] px-5 py-20 sm:px-8 md:py-28 lg:px-10">
         <div aria-hidden="true" className="absolute left-0 top-20 h-px w-[27%] bg-[#191265]/15" />
         <Reveal className="relative mx-auto max-w-7xl">
-          <SectionHeading eyebrow="במפגש הזה" title={<>פחות ניחושים.<br /><span className="text-[#4e3eb4]">יותר הבנה של התהליך.</span></>} description="זהו מפגש למי שרוצים לשפר את הדרך שבה הם מציגים את עצמם ובוחרים להכיר. לא נבטיח התאמה, דייט או זוגיות — כן נשתף נקודת מבט, כלים ושאלות טובות יותר." />
+          <SectionHeading eyebrow="במפגש הזה" title={<>פחות ניחושים.<br /><span className="text-[#4e3eb4]">יותר הבנה של התהליך.</span></>} description="אני רוצה שתצאו מהערב עם מבט חדש על הפרופיל שלכם, על הדרך שבה נוצרת התאמה ועל הדברים הקטנים שמשנים את תחילתה של היכרות." />
           <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {liveTopics.map(([title, text], index) => (
               <motion.article key={title} variants={fadeUp} className="group relative overflow-hidden rounded-[1.75rem] border border-[#191265]/10 bg-[#faf8f2] p-7 shadow-[0_14px_34px_rgba(25,18,101,.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(25,18,101,.11)] sm:p-8">
@@ -273,14 +273,14 @@ export default function LiveEvent() {
             <div className="inline-flex items-center gap-2 text-sm font-black text-[#4e3eb4]"><UserRoundCheck className="h-4 w-4" />מאחורי התאמה יש אנשים</div>
             <h2 className="mt-4 max-w-2xl text-3xl font-black leading-[1.2] tracking-[-.04em] text-[#191265] md:text-5xl">אני רוצה לפתוח את מה שבדרך כלל נשאר מאחורי הקלעים.</h2>
             <div className="mt-6 max-w-2xl space-y-4 text-base leading-8 text-[#625d78]">
-              <p>במשך המפגש אספר איך אני מסתכלת על פרופיל, העדפות ותשובות לשאלון כחומר גלם לשיחה — ולא כרשימת נתונים שמחליטה במקומנו.</p>
-              <p>חשוב לי שיהיה כאן מקום לשאלות אמיתיות: מה נכון לכתוב, איך ניגשים לבחירה, ומה אפשר ללמוד תוך כדי היכרות. זה לא אבחון אישי או הבטחה לתוצאה מסוימת.</p>
+              <p>אני קוראת את הפרופיל, ההעדפות והתשובות לשאלון, ואז מסתכלת גם על האנשים שמאחורי הנתונים. בלייב אראה לכם איך כל החלקים האלה נפגשים בתהליך ההתאמה.</p>
+              <p>אני גם רוצה לשמוע אתכם. מה נכון לכתוב בפרופיל? איך מחליטים אם לתת הזדמנות? מה אפשר ללמוד כבר מהשיחה הראשונה? אלה בדיוק השאלות שנביא לערב הזה.</p>
             </div>
             <a href="#tickets" className="mt-8 inline-flex items-center gap-2 font-black text-[#191265] underline decoration-[#ffe27c] decoration-4 underline-offset-8 transition hover:text-[#4e3eb4]">לכרטיסים, להטבות ולשאלות מראש <ArrowLeft className="h-4 w-4" /></a>
           </motion.div>
           <motion.figure variants={fadeUp} className="order-1 overflow-hidden rounded-[2rem] border border-[#191265]/10 bg-[#f0eadc] p-2 shadow-[0_24px_55px_rgba(25,18,101,.14)] lg:order-2">
             <img src={AUDIENCE_IMAGE} alt="הילית כספי מדברת מול קהל" loading="lazy" decoding="async" className="w-full rounded-[1.55rem]" />
-            <figcaption className="px-3 py-4 text-sm font-bold leading-6 text-[#625d78]">הילית מול קהל באחד ממפגשיה. בלייב הקרוב נפתח גם מקום לשאלות שלכם.</figcaption>
+            <figcaption className="px-3 py-4 text-sm font-bold leading-6 text-[#625d78]">אני אוהבת את הרגע שבו שאלה אחת מהקהל פותחת שיחה חדשה. בלייב הזה יהיה גם לכם מקום לשאול.</figcaption>
           </motion.figure>
         </Reveal>
       </section>
@@ -288,7 +288,7 @@ export default function LiveEvent() {
       <section className="relative isolate overflow-hidden bg-[#191265] px-5 py-20 text-white sm:px-8 md:py-28 lg:px-10">
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_83%_22%,rgba(255,226,124,.17),transparent_0_25%),linear-gradient(125deg,#191265,#100a4b)]" />
         <Reveal className="relative mx-auto max-w-7xl">
-          <SectionHeading light eyebrow="כך מגיעים מוכנים" title="שלושה רגעים, מפגש אחד." description="פרטי ההצטרפות יימסרו לנרשמים בערוץ המאובטח המתאים. אין קישור גישה בעמוד הציבורי." />
+          <SectionHeading light eyebrow="כך מגיעים מוכנים" title="שלושה רגעים, מפגש אחד." description="בוחרים כרטיס, שולחים לי את מה שמסקרן אתכם, ונפגשים בשבת בערב. קישור הכניסה האישי יישלח לנרשמים לפני המפגש." />
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             {steps.map(([number, title, text]) => (
               <motion.article variants={fadeUp} key={number} className="rounded-[1.7rem] border border-white/15 bg-white/[.075] p-6 backdrop-blur-sm sm:p-7">
@@ -303,7 +303,7 @@ export default function LiveEvent() {
 
       <section id="tickets" className="scroll-mt-8 bg-[#f0eadc] px-5 py-20 sm:px-8 md:py-28 lg:px-10">
         <Reveal className="mx-auto max-w-7xl">
-          <SectionHeading eyebrow="כרטיסים והטבות" title={<>מגיעים ללייב<br /><span className="text-[#4e3eb4]">בדרך שמתאימה לכם.</span></>} description="כרטיס רגיל הוא 149 ₪. חברי מאגר זכאים מקבלים הטבה אישית רק דרך קישור מאובטח, וחברי Plus מוצאים שובר חינמי באזור האישי." />
+          <SectionHeading eyebrow="כרטיסים והטבות" title={<>מגיעים ללייב<br /><span className="text-[#4e3eb4]">בדרך שמתאימה לכם.</span></>} description="כרטיס רגיל עולה 149 ₪. כבר חברים במאגר? הכנתי לכם מחיר מיוחד, ואת הפרטים אפשר לראות בקישור האישי שלכם." />
 
           <div className="mx-auto mt-12 grid max-w-6xl gap-6 lg:grid-cols-[1fr_1.1fr]">
             <motion.article variants={fadeUp} className="rounded-[2rem] border border-[#191265]/12 bg-white p-6 text-right shadow-[0_18px_45px_rgba(25,18,101,.08)] sm:p-8">
@@ -322,7 +322,7 @@ export default function LiveEvent() {
               <div className="mt-7 rounded-2xl bg-[#191265] p-5 text-center text-white shadow-lg">
                 <p className="text-xs font-bold text-white/70">מחיר כרטיס רגיל</p>
                 <p className="mt-1 text-5xl font-black text-[#ffe27c]">149 ₪</p>
-                <p className="mt-2 text-xs text-white/70">תשלום חד־פעמי · הרכישה זמינה רק כשההרשמה פתוחה</p>
+                <p className="mt-2 text-xs text-white/70">תשלום חד־פעמי. ההרשמה תיפתח בקרוב.</p>
               </div>
             </motion.article>
 
@@ -331,18 +331,14 @@ export default function LiveEvent() {
               <div className="relative flex items-start justify-between gap-4 border-b border-white/15 pb-5">
                 <div>
                   <p className="text-xs font-black tracking-[.16em] text-[#ffe27c]">חברי המאגר</p>
-                  <h3 className="mt-2 text-2xl font-black">הטבה אישית ל־FRIENDS</h3>
+                  <h3 className="mt-2 text-2xl font-black">מחיר מיוחד לחברי המאגר</h3>
                 </div>
                 <span className="grid h-11 w-11 place-items-center rounded-2xl border border-[#ffe27c]/30 bg-white/10 text-[#ffe27c]"><Crown className="h-5 w-5" /></span>
               </div>
-              <p className="relative mt-6 text-sm leading-7 text-white/78">חברות פעילה במאגר פותחת מחיר אישי של 49 ₪, רק לאחר אימות דרך קישור אישי. השרת בודק את הזכאות; FRIENDS אינו קוד פתוח לציבור.</p>
-              <div className="relative mt-6 flex items-end gap-3">
-                <span className="mb-1 text-lg text-white/45 line-through">149 ₪</span>
-                <span className="text-4xl font-black text-[#ffe27c]">49 ₪</span>
-                <span className="mb-1 text-xs font-bold text-white/65">לאחר אימות חברות</span>
-              </div>
+              <p className="relative mt-6 text-sm leading-7 text-white/78">אם אתם כבר במאגר, מגיע לכם מחיר מיוחד. בקשו קישור אישי למייל שאיתו נרשמתם, וההטבה תופיע שם אוטומטית אחרי בדיקת הזכאות.</p>
+              <a href="#friend-link" className="relative mt-5 inline-flex items-center gap-2 text-sm font-black text-[#ffe27c] underline underline-offset-4">לבדיקת ההטבה שלי <ArrowLeft className="h-4 w-4" /></a>
               <div className="relative mt-6 rounded-2xl border border-white/15 bg-white/[.08] p-4 text-xs leading-6 text-white/74">
-                <span className="font-black text-[#ffe27c]">כבר ב־Plus?</span> שובר חינמי אישי ללייב מחכה באזור האישי, בכפוף לזכאות פעילה.
+                <span className="font-black text-[#ffe27c]">כבר ב־Plus?</span> מחכה לכם שובר ללייב ללא עלות נוספת באזור האישי.
               </div>
             </motion.article>
           </div>
@@ -351,10 +347,10 @@ export default function LiveEvent() {
             <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
               <div>
                 <p className="inline-flex items-center gap-2 text-xs font-black tracking-[.14em] text-[#796116]"><Sparkles className="h-4 w-4" />לא חברים במאגר עדיין?</p>
-                <h3 className="mt-2 text-2xl font-black text-[#191265]">מצטרפים למאגר עם קוד LIVE ומקבלים כרטיס אחד במתנה.</h3>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-[#625d78]">הצטרפות חד־פעמית למאגר ב־299 ₪. יוצרים פרופיל, ממלאים שאלון ומתחילים את תהליך ההיכרות. ההצטרפות כוללת בדיוק כרטיס אחד למפגש הלייב, ללא כפל כרטיסים.</p>
+                <h3 className="mt-2 text-2xl font-black text-[#191265]">{salesOpen ? "מצטרפים למאגר ומקבלים כרטיס ללייב במתנה." : "המאגר פתוח. הטבת הלייב למצטרפים חדשים בדרך."}</h3>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-[#625d78]">בהצטרפות למאגר ב־299 ₪ ממלאים שאלון, יוצרים פרופיל ונותנים לי להכיר אתכם מעבר לתמונה. כשהטבת הלייב תיפתח, מצטרפים חדשים דרך עמוד ההטבה יקבלו כרטיס אחד במתנה עם קוד LIVE שיצורף אוטומטית בהרשמה.</p>
               </div>
-              {salesOpen ? <a href="/live/database" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#191265] px-6 py-4 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#30247e]">לפרטי ההצטרפות למאגר <ArrowLeft className="h-4 w-4" /></a> : <span className="rounded-2xl border border-[#191265]/20 px-6 py-4 text-sm font-black text-[#191265]">פרטי ההטבה ייפתחו כשההרשמה תהיה זמינה</span>}
+              <a href="/live/database" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#191265] px-6 py-4 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#30247e]">להכיר את המאגר ואת הטבת הלייב <ArrowLeft className="h-4 w-4" /></a>
             </div>
           </motion.div>
 
@@ -368,19 +364,14 @@ export default function LiveEvent() {
               <div className="rounded-[1.75rem] border border-[#191265]/10 bg-white p-7 text-center shadow-[0_16px_40px_rgba(25,18,101,.08)] sm:p-9">
                 <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#191265] text-[#ffe27c]"><Crown className="h-6 w-6" /></span>
                 <h3 className="mt-5 text-2xl font-black text-[#191265]">שובר Plus חינמי מחכה באזור האישי</h3>
-                <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#625d78]">עם Plus פעיל, כרטיס הלייב ללא עלות זמין דרך השובר האישי באזור האישי. כך נשמרת ההטבה אישית ומדויקת.</p>
+                <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#625d78]">אם אתם חברי Plus פעילים, כרטיס הלייב האישי כבר מחכה לכם באזור האישי. אין צורך לרכוש כרטיס נוסף.</p>
                 <a href={personalAreaHref} className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">לשובר החינמי שלי באזור האישי <ArrowLeft className="h-4 w-4" /></a>
                 <p className="mt-4 text-xs text-[#625d78]">אפשר גם להכיר את מסלול ההטבות של <a href="/database-plus" className="font-black text-[#191265] underline underline-offset-4">Database Plus</a>.</p>
               </div>
             ) : !salesOpen ? (
               <div className="rounded-[1.75rem] border border-[#191265]/10 bg-white p-7 text-center shadow-sm">
                 <h3 className="text-xl font-black text-[#191265]">ההרשמה ללייב תיפתח בקרוב</h3>
-                <p className="mt-2 text-sm leading-7 text-[#625d78]">הכרטיס הרגיל עולה 149 ₪. לחברי מאגר זכאים יש הטבת FRIENDS אישית; לחברי Plus זכאים יש שובר ללא עלות. לא נגבה תשלום עד שהאירוע המקוון וקישורי הכניסה יהיו מוכנים.</p>
-                <div className="mx-auto mt-5 max-w-sm text-right">
-                  <label htmlFor="friends-code-preview" className="mb-2 block text-sm font-bold text-[#191265]">קוד הטבה לחברי המאגר</label>
-                  <input id="friends-code-preview" disabled placeholder="אפשר יהיה להזין קוד כשההרשמה תיפתח" className="w-full rounded-xl border border-[#191265]/15 bg-[#f5f3ef] px-4 py-3 text-sm text-[#625d78] placeholder:text-[#807b8b]" />
-                  <p className="mt-2 text-xs leading-5 text-[#625d78]">הפעלת FRIENDS תדרוש גם אימות חברות דרך קישור אישי. הקוד לבדו אינו מעניק הנחה.</p>
-                </div>
+                <p className="mt-2 text-sm leading-7 text-[#625d78]">אני מסיימת להכין את הכניסה האישית למפגש. ברגע שההרשמה תיפתח תוכלו לבחור כרטיס או לפתוח את ההטבה שמגיעה לכם דרך האזור האישי.</p>
               </div>
             ) : isFriendEligible ? (
               <div className="overflow-hidden rounded-[1.9rem] border border-[#191265]/10 bg-white shadow-[0_18px_45px_rgba(25,18,101,.1)]">
@@ -389,13 +380,13 @@ export default function LiveEvent() {
                   <h3 className="mt-2 text-2xl font-black">כרטיס FRIENDS ב־49 ₪</h3>
                 </div>
                 <div className="p-6 sm:p-8">
-                  <p className="text-center text-sm leading-7 text-[#625d78]">האימות בוצע בקישור האישי. קוד FRIENDS מוחל כאן בלבד והשרת מאמת את הזכאות, כדי שההטבה תישאר לחברי המאגר הזכאים.</p>
+                  <p className="text-center text-sm leading-7 text-[#625d78]">הזכאות שלכם זוהתה דרך הקישור האישי. ההטבה כבר מוחלת כאן, ולא צריך להקליד קוד נוסף.</p>
                   <GrowWallet
                     product="live_october"
                     prefillEmail={email}
                     prefillCoupon="FRIENDS"
                     personalToken={token}
-                    showCoupon={true}
+                    showCoupon={false}
                     buttonLabel="להמשך לתשלום המאובטח ב־49 ₪"
                     buttonClassName="!mt-6 !w-full !rounded-2xl !bg-[#191265] !py-4 !font-black !text-white hover:!bg-[#30247e]"
                     termsPath="/terms/live-october"
@@ -412,20 +403,19 @@ export default function LiveEvent() {
                 </div>
                 <GrowWallet
                   product="live_october"
-                  showCoupon={true}
+                  showCoupon={false}
                   buttonLabel="להמשך לתשלום המאובטח ב־149 ₪"
                   buttonClassName="!w-full !rounded-2xl !bg-[#191265] !py-4 !font-black !text-white hover:!bg-[#30247e]"
                   termsPath="/terms/live-october"
                   onSuccess={goToThankYou}
                 />
-                <p className="md:col-span-2 text-center text-xs leading-6 text-[#625d78]">כבר חברים במאגר? קוד FRIENDS אינו קוד ציבורי: ההטבה נפתחת רק דרך קישור אישי מאומת. <a href="#friend-link" className="font-black text-[#191265] underline underline-offset-4">לבקשת קישור אישי</a>.</p>
+                <p className="md:col-span-2 text-center text-xs leading-6 text-[#625d78]">כבר חברים במאגר? <a href="#friend-link" className="font-black text-[#191265] underline underline-offset-4">בקשו קישור אישי</a> כדי לראות את המחיר שלכם לפני התשלום.</p>
                 {needsFriendGuidance ? <div className="md:col-span-2 rounded-xl border border-[#d9c777] bg-[#fffaf0] p-4 text-center text-xs leading-6 text-[#625d78]"><strong className="text-[#191265]">הטבת FRIENDS לא נפתחה בקישור הזה.</strong> קוד FRIENDS אינו זמין ללא אימות חברות פעילה. כדי לבדוק זכאות או לקבל קישור אישי עדכני, אפשר <a href="#friend-link" className="font-black text-[#191265] underline underline-offset-4">לבקש קישור אישי</a>.</div> : null}
               </div>
             )}
           </motion.div>
 
           {(!hasPersonalLink || needsFriendGuidance) && !hasPlus ? <motion.div variants={fadeUp} className="mx-auto mt-6 max-w-3xl"><FriendLinkRequest /></motion.div> : null}
-          <motion.p variants={fadeUp} className="mx-auto mt-6 max-w-3xl text-center text-xs leading-6 text-[#6d6780]">הכרטיס מעניק השתתפות באירוע עצמו. המפגש הוא תוכן לימודי ואינו מבטיח התאמה, היכרות, דייט או זוגיות.</motion.p>
         </Reveal>
       </section>
 
@@ -435,9 +425,9 @@ export default function LiveEvent() {
           <div className="mt-10 space-y-3">
             {[
               ["למי מתאים המפגש?", "למי שרוצים להבין טוב יותר היכרות, פרופיל ובחירה. אין צורך להיות חברים במאגר כדי לרכוש כרטיס רגיל כשההרשמה פתוחה."],
-              ["אפשר לשלוח שאלה מראש?", "כן. לאחר ההרשמה תהיה דרך לשלוח שאלה מראש. נעשה מאמץ להתייחס לשאלות, אך אין התחייבות למענה על כל שאלה."],
-              ["איך מקבלים את פרטי ההצטרפות?", "לאחר אישור ההרשמה פרטי ההצטרפות יימסרו לנרשמים בערוץ מאובטח. העמוד הציבורי אינו מציג קישור גישה."],
-              ["איך עובדת הטבת FRIENDS או Plus?", "הטבת FRIENDS זמינה רק דרך קישור אישי ואימות זכאות בשרת; זה אינו קוד ציבורי. לחברי Plus זכאים מחכה שובר חינמי אישי באזור האישי."],
+              ["אפשר לשלוח שאלה מראש?", "כן. אחרי ההרשמה תוכלו לשלוח לי שאלה. אבחר מתוך השאלות נושאים שנדבר עליהם יחד בלייב."],
+              ["איך מקבלים את קישור הכניסה?", "אחרי שהאירוע המקוון יהיה מוכן אשלח לכל מי שנרשמו קישור אישי למייל של הכרטיס. השובר שמופיע באתר אינו קוד כניסה ל־Zoom."],
+              ["איך מקבלים הטבת מאגר או Plus?", "חברי מאגר מבקשים קישור לאזור האישי ורואים שם את המחיר המיוחד. לחברי Plus פעילים מחכה שובר ללא עלות נוספת."],
             ].map(([question, answer]) => (
               <motion.details variants={fadeUp} key={question} className="group rounded-2xl border border-[#191265]/10 bg-[#faf9f5] p-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-black text-[#191265] marker:content-none"><span>{question}</span><ChevronDown className="h-5 w-5 shrink-0 transition group-open:rotate-180" /></summary>
