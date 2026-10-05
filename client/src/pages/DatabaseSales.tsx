@@ -124,7 +124,7 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
         <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center relative z-10">
           <motion.div initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.85 }} className="text-right">
             <div className="inline-block bg-[#ffe27c]/15 border border-[#ffe27c]/35 text-[#ffe27c] text-sm font-medium px-4 py-2 rounded-full mb-6">
-              {isLiveOffer ? "✦ הצטרפות למאגר + מפגש לייב איתי במתנה" : isNowHolidayOffer ? "✦ הטבת חג עד 1.10" : "✦ הדור הבא של matchmaking"}
+              {isLiveOffer ? "✦ הצטרפות למאגר + כרטיס ללייב אונליין בזום במתנה" : isNowHolidayOffer ? "✦ הטבת חג עד 1.10" : "✦ הדור הבא של matchmaking"}
             </div>
             <h1 className="text-4xl md:text-5xl font-black text-white leading-tight mb-5">
               לא שידוך.<br />
@@ -139,8 +139,8 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
             {isLiveOffer && (
               <div className="mb-7 rounded-2xl border border-[#ffe27c]/55 bg-white/10 p-5 text-white shadow-lg backdrop-blur-sm">
                 <p className="text-sm font-black text-[#ffe27c]">{isTestOffer ? "בדיקת קופה בלבד" : "הצעה מיוחדת למצטרפים חדשים למאגר"}</p>
-                <p className="mt-2 text-2xl font-black">{isTestOffer ? "תשלום ניסיון ב־1 ₪ עם קוד TEST1" : "מצטרפים למאגר ב־299 ₪ ומקבלים כרטיס ללייב שלי במתנה"}</p>
-                <p className="mt-2 text-sm leading-7 text-white/85">{isTestOffer ? "נדרש מייל הבדיקה המורשה. התשלום האמיתי ינפיק שובר בדיקה בלבד; הוא לא מפעיל חברות במאגר ולא מקנה כניסה ללייב." : "ממלאים שאלון ויוצרים פרופיל במאגר, וכרטיס אחד למפגש איתי נוסף במתנה. קוד LIVE מצורף אוטומטית כשמצטרפים דרך העמוד הזה."}</p>
+                <p className="mt-2 text-2xl font-black">{isTestOffer ? "תשלום ניסיון ב־1 ₪ עם קוד TEST1" : "מצטרפים למאגר ב־299 ₪ ומקבלים כרטיס ללייב שלי בזום במתנה"}</p>
+                <p className="mt-2 text-sm leading-7 text-white/85">{isTestOffer ? "נדרש מייל הבדיקה המורשה. התשלום האמיתי ינפיק שובר בדיקה בלבד; הוא לא מפעיל חברות במאגר ולא מקנה כניסה ללייב." : "ממלאים שאלון ויוצרים פרופיל במאגר, וכרטיס אחד למפגש אונליין איתי בזום נוסף במתנה. אין צורך להגיע לשום מקום. קוד LIVE מצורף אוטומטית כשמצטרפים דרך העמוד הזה."}</p>
               </div>
             )}
             {isNowHolidayOffer && (
@@ -177,8 +177,8 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
           <div className="mx-auto grid max-w-5xl gap-8 rounded-[2rem] border border-[#e3cb78] bg-white p-7 shadow-[0_20px_65px_rgba(25,18,101,.1)] md:grid-cols-[1.25fr_.75fr] md:p-10">
             <div className="text-right">
               <p className="text-xs font-black tracking-wider text-[#594593]">הטבת הלייב · למצטרפים חדשים למאגר</p>
-              <h2 id="live-offer-title" className="mt-3 text-3xl font-black leading-tight text-[#191265] md:text-4xl">אני רוצה להכיר אתכם במאגר. <span className="text-[#4e3eb4]">ואז לפגוש אתכם בלייב.</span></h2>
-              <p className="mt-4 text-base leading-8 text-[#625d78]">{isTestOffer ? "זהו מצב בדיקה לעמוד המתנה למאגר. תהליך התשלום יחייב 1 ₪ וייצור שובר בדיקה בלבד, בלי להפעיל חברות במאגר או כניסה לאירוע. אחרי הבדיקה אפשר לפתוח את העמוד הזה ללא קוד כדי לראות את ההצעה הרגילה." : <>בהצטרפות למאגר ב־299 ₪ ממלאים שאלון זוגי ופרופיל, ואני בוחנת חיבורים שיכולים להתאים. למצטרפים חדשים דרך העמוד הזה מחכה גם <strong className="text-[#191265]">כרטיס אחד במתנה למפגש ב־31.10 בשעה 20:30</strong>. מחיר הכרטיס בנפרד הוא 149 ₪.</>}</p>
+              <h2 id="live-offer-title" className="mt-3 text-3xl font-black leading-tight text-[#191265] md:text-4xl">אני רוצה להכיר אתכם במאגר. <span className="text-[#4e3eb4]">ואז לפגוש אתכם בלייב בזום.</span></h2>
+              <p className="mt-4 text-base leading-8 text-[#625d78]">{isTestOffer ? "זהו מצב בדיקה לעמוד המתנה למאגר. תהליך התשלום יחייב 1 ₪ וייצור שובר בדיקה בלבד, בלי להפעיל חברות במאגר או כניסה לאירוע. אחרי הבדיקה אפשר לפתוח את העמוד הזה ללא קוד כדי לראות את ההצעה הרגילה." : <>בהצטרפות למאגר ב־299 ₪ ממלאים שאלון זוגי ופרופיל, ואני בוחנת חיבורים שיכולים להתאים. למצטרפים חדשים דרך העמוד הזה מחכה גם <strong className="text-[#191265]">כרטיס אחד במתנה למפגש אונליין בזום ב־31.10 בשעה 20:30</strong>. מחיר הכרטיס בנפרד הוא 149 ₪.</>}</p>
               <p className="mt-4 rounded-xl bg-[#f5efff] px-4 py-3 text-sm font-bold leading-6 text-[#191265]">{isTestOffer ? "מצב בדיקה: קוד TEST1 עובר אוטומטית לקופה ומוגבל למייל הבדיקה. לאחר תשלום 1 ₪ יופיע שובר בדיקה בדף התודה, ללא חברות פעילה או כניסה ללייב." : "אין צורך לזכור קוד. קוד LIVE עובר אוטומטית לקופה דרך העמוד הזה. לאחר שהתשלום למאגר יאושר, השובר האישי יופיע בדף התודה ובאזור האישי. קישור הכניסה למפגש יישלח בנפרד לקראת האירוע."}</p>
               {offerLocked && <p className="mt-4 text-sm font-bold text-[#75591e]">{liveSales.isLoading ? "בודקים את זמינות ההטבה. עוד רגע אפשר יהיה להמשיך בהרשמה." : "ההטבה אינה זמינה כרגע. לא נבצע רכישה בלי הכרטיס במתנה מהעמוד הזה."}</p>}
               <div className="mt-6 flex flex-wrap items-center gap-4">
@@ -202,7 +202,7 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
       {isLiveOffer && (
         <section id="about-live" className="scroll-mt-24 bg-[#fffdf8] px-6 py-16" aria-labelledby="about-live-title">
           <div className="mx-auto max-w-5xl rounded-[2rem] border border-[#e9dec6] bg-white p-7 shadow-[0_18px_45px_rgba(25,18,101,.06)] md:p-10">
-            <p className="text-sm font-black text-[#4e3eb4]">לראשונה, מפגש לייב איתי</p>
+            <p className="text-sm font-black text-[#4e3eb4]">לראשונה, מפגש לייב אונליין איתי בזום</p>
             <h2 id="about-live-title" className="mt-3 text-3xl font-black text-[#191265] md:text-4xl">מה באמת קורה מאחורי ההתאמה?</h2>
             <p className="mt-4 max-w-3xl text-base leading-8 text-[#625d78]">בערב אחד אפתח את מאחורי הקלעים של השיטה שבניתי, אראה מה עוזר לפרופיל לעבוד טוב יותר ואדבר על הדברים שאני מחפשת כשאני בוחנת התאמה. אחרי ההרשמה תוכלו לשלוח לי שאלה מראש, ואביא שאלות מהקהל לשיחה החיה.</p>
             <div className="mt-7 grid gap-3 text-sm font-bold text-[#191265] md:grid-cols-3">
