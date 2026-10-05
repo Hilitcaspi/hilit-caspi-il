@@ -7764,6 +7764,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }))
       .mutation(async ({ input }) => {
         const requested = input.code.trim().toUpperCase();
+        if (requested === "TEST1") {
+          const { isLiveTestCheckout } = await import("./liveTestCoupon");
+          if (!isLiveTestCheckout(input.product || "", requested, input.email))
+            return { valid: false as const, error: "קוד הבדיקה אינו זמין עבור כתובת המייל או המוצר הזה" };
+          const { existingLiveTicket } = await import("./liveOctober");
+          if (await existingLiveTicket(input.email!))
+            return { valid: false as const, error: "כבר קיים כרטיס עבור כתובת המייל הזו" };
+          return { valid: true as const, code: "TEST1", fixedPrice: 1 };
+        }
         const { isLiveCheckoutOpen } = await import("./liveOctober");
         if (requested === "FRIENDS" && !isLiveCheckoutOpen("live_october", "FRIENDS"))
           return { valid: false as const, error: "הרשמת הלייב טרם נפתחה" };
@@ -8097,20 +8106,25 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           };
         }
 
-        // Reserved live campaign codes are entitlements, not generic discounts.
-        // Neither LIVE nor FRIENDS may be used on any other product.
+        // Reserved live campaign/test codes are verified here, never priced by the browser.
         const reservedCode = input.couponCode?.trim().toUpperCase();
         if ((reservedCode === "LIVE" && input.product !== "database") ||
             (reservedCode === "FRIENDS" && input.product !== "live_october")) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "קוד ההטבה אינו תקף למוצר הזה" });
         }
-        if (input.product === "live_october" && reservedCode && reservedCode !== "FRIENDS") {
+        if (input.product === "live_october" && reservedCode && !["FRIENDS", "TEST1"].includes(reservedCode)) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "קוד ההטבה אינו תקף לכרטיס הלייב" });
         }
-        if (reservedCode === "LIVE" || input.product === "live_october") {
+        if (reservedCode === "TEST1") {
+          const { isLiveTestCheckout } = await import("./liveTestCoupon");
+          if (!isLiveTestCheckout(input.product, reservedCode, normalizedCheckoutEmail)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "קוד TEST1 אינו זמין עבור כתובת המייל או המוצר הזה" });
+          }
+        }
+        if (reservedCode === "LIVE" || reservedCode === "TEST1" || input.product === "live_october") {
           if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
           const { existingLiveTicket, getVerifiedLiveMember, liveCheckoutPrice, isLiveCheckoutOpen } = await import("./liveOctober");
-          if (!isLiveCheckoutOpen(input.product, reservedCode))
+          if (reservedCode !== "TEST1" && !isLiveCheckoutOpen(input.product, reservedCode))
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: "ההרשמה למסלול זה עדיין אינה זמינה" });
           if (input.product === "live_october") {
             if (await existingLiveTicket(normalizedCheckoutEmail))
@@ -8125,9 +8139,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               };
             }
             const { createLiveCheckoutReference } = await import("./liveCheckoutReference");
-            preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail, reservedCode === "FRIENDS" ? "friends" : "standalone");
+            preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail,
+              reservedCode === "TEST1" ? "standalone_test" : reservedCode === "FRIENDS" ? "friends" : "standalone");
           }
-          if (reservedCode === "LIVE") {
+          if (reservedCode === "LIVE" || (reservedCode === "TEST1" && input.product === "database")) {
             const [existingMember] = await db.select({ isPaid: singles.isPaid }).from(singles)
               .where(eq(singles.email, normalizedCheckoutEmail)).limit(1);
             const [priorPurchase] = await db.select({ id: completedPayments.id }).from(completedPayments)
@@ -8136,9 +8151,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               throw new TRPCError({ code: "CONFLICT", message: "הטבת LIVE למצטרפים חדשים בלבד. חברי המאגר יכולים לממש את הטבת FRIENDS" });
             if (await existingLiveTicket(normalizedCheckoutEmail))
               throw new TRPCError({ code: "CONFLICT", message: "כבר שמור לך כרטיס ללייב. אין צורך להצטרף מחדש למאגר" });
-            liveCheckoutPrice("database", "LIVE");
+            if (reservedCode === "LIVE") liveCheckoutPrice("database", "LIVE");
             const { createLiveCheckoutReference } = await import("./liveCheckoutReference");
-            preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail, "database_live");
+            preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail,
+              reservedCode === "TEST1" ? "database_live_test" : "database_live");
           }
         }
 
@@ -8146,7 +8162,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         let finalSum: number | undefined = undefined;
         if (input.product === "live_october") finalSum = reservedCode === "FRIENDS" ? 49 : 149;
         if (reservedCode === "LIVE") finalSum = 299;
-        if (input.couponCode && db && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "FRIENDS") {
+        if (reservedCode === "TEST1") finalSum = 1;
+        if (input.couponCode && db && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "FRIENDS" && reservedCode !== "TEST1") {
           const { discountCodes } = await import("../drizzle/schema");
           const [code] = await db.select().from(discountCodes)
             .where(eq(discountCodes.code, input.couponCode.toUpperCase()))

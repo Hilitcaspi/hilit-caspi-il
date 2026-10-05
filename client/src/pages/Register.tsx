@@ -769,8 +769,10 @@ export default function Register() {
 
   const handlePaymentSuccess = async () => {
     // Fire Meta Pixel
-    trackCompleteRegistration({ content_name: "מאגר רווקים" });
-    gaSignUp("database");
+    if (promotionalCoupon !== "TEST1") {
+      trackCompleteRegistration({ content_name: "מאגר רווקים" });
+      gaSignUp("database");
+    }
     if (draftSavedBeforePayment) {
       try { localStorage.removeItem("pending_profile_payload"); } catch {}
       setGrowOpened(true);
@@ -897,9 +899,10 @@ export default function Register() {
                       <p className="mt-1 text-sm leading-6">הצטרפות למאגר ב־299 ₪ כוללת כרטיס אחד למפגש סודות ההתאמה המושלמת ב־31.10. קוד LIVE כבר צורף להזמנה שלך ונבדק לפני התשלום.</p>
                     </div>
                   )}
+                  {promotionalCoupon === "TEST1" && <p className="mb-4 rounded-xl border border-[#ffe27c]/50 p-4 text-sm text-white">מסלול בדיקת תשלום ב־1 ₪ בלבד לכתובת הבדיקה המורשית. יונפק שובר מסומן לבדיקה, ללא חברות במאגר או כניסה לאירוע.</p>}
                   <div className="bg-[#ffe27c]/10 border border-[#ffe27c]/30 rounded-xl p-3">
                     <p className="text-[#ffe27c] text-xs font-bold mb-1">איך מצטרפים:</p>
-                    <p className="text-white/70 text-xs">{isFemale ? "מלאי פרטים ושאלון DNA" : "מלא פרטים ושאלון DNA"} → תשלום ₪299 → מייל עם קישור לשאלון המדעי → אישור כניסה למאגר</p>
+                    <p className="text-white/70 text-xs">{promotionalCoupon === "TEST1" ? "ממלאים פרטי בדיקה → תשלום 1 ₪ → שובר בדיקה בדף התודה. לא נוצרת חברות במאגר." : <>{isFemale ? "מלאי פרטים ושאלון DNA" : "מלא פרטים ושאלון DNA"} → תשלום ₪299 → מייל עם קישור לשאלון המדעי → אישור כניסה למאגר</>}</p>
                     <p className="mt-2 text-[11px] leading-5 text-white/50">זמן ההמתנה משתנה לפי הפרופיל, ההעדפות והזמינות במאגר, ואין התחייבות למועד או לכמות קבועה של הצעות.</p>
                   </div>
                 </div>
@@ -1657,6 +1660,7 @@ export default function Register() {
                             <p className="mt-1 text-sm leading-6 text-[#625d78]">קוד LIVE ייבדק אוטומטית לפי כתובת המייל שהזנתם. לאחר אישור התשלום השובר יופיע בדף התודה ובאזור האישי. קישור הכניסה יישלח לקראת האירוע.</p>
                           </div>
                         )}
+                        {promotionalCoupon === "TEST1" && <p className="mb-5 rounded-xl border border-[#d9c777] bg-[#fff9e8] p-4 text-right text-sm text-[#191265]" dir="rtl">בדיקה ב־1 ₪ לכתובת הבדיקה המורשית בלבד. לא תופעל חברות אמיתית במאגר; לאחר התשלום יופיע שובר בדיקה.</p>}
                         <GrowWallet
                           product="database"
                           termsPath="/terms/database"
@@ -1823,7 +1827,8 @@ export default function Register() {
             </motion.div>
           )}
           {/* ── DONE ── */}
-          {step === "done" && (
+          {step === "done" && promotionalCoupon === "TEST1" && <motion.div key="test-done" {...slideIn} className="mx-auto max-w-lg py-12 text-center" dir="rtl"><h2 className="mb-4 text-2xl font-black text-[#191265]">בדיקת תשלום ב־1 ₪</h2><p className="mb-6 text-[#625d78]">אם העסקה אושרה, שובר הבדיקה יופיע כאן. זה אינו כרטיס כניסה או חברות במאגר.</p><LiveVoucherCard receiptOnly showPending /></motion.div>}
+          {step === "done" && promotionalCoupon !== "TEST1" && (
             <motion.div key="done" {...slideIn} className="text-center py-16">
               {promotionalCoupon === "LIVE" && <div className="mx-auto mb-8 max-w-lg"><LiveVoucherCard receiptOnly showPending /></div>}
               <div className="text-6xl mb-6">🎉</div>

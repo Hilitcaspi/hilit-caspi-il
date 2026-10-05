@@ -57,7 +57,7 @@ function getRemainingTime(now: number) {
   };
 }
 
-function LiveCountdown() {
+function LiveCountdown({ salesOpen }: { salesOpen: boolean }) {
   const [remaining, setRemaining] = useState(() => getRemainingTime(Date.now()));
 
   useEffect(() => {
@@ -88,7 +88,7 @@ function LiveCountdown() {
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs leading-5 text-white/68">השעון סופר עד תחילת המפגש. ההרשמה תיפתח אחרי שפרטי הכניסה יהיו מוכנים.</p>
+      <p className="mt-3 text-xs leading-5 text-white/68">{salesOpen ? "ההרשמה פתוחה. קישור הכניסה האישי יישלח בנפרד לקראת המפגש." : "השעון סופר עד תחילת המפגש. ההרשמה תיפתח אחרי שפרטי הכניסה יהיו מוכנים."}</p>
     </div>
   );
 }
@@ -152,7 +152,7 @@ function FriendLinkRequest() {
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#191265] text-[#ffe27c]"><KeyRound className="h-5 w-5" /></span>
         <div>
           <p className="font-black text-[#191265]">כבר חברים במאגר? הכנתי לכם מחיר מיוחד.</p>
-          <p className="mt-1 text-sm leading-6 text-[#625d78]">השאירו את כתובת המייל שאיתה נרשמתם למאגר. אשלח אליה קישור אישי, ומהקישור הזה תוכלו לראות את ההטבה שלכם כשההרשמה תיפתח.</p>
+          <p className="mt-1 text-sm leading-6 text-[#625d78]">השאירו את כתובת המייל שאיתה נרשמתם למאגר. אשלח אליה קישור אישי, ומהקישור תוכלו לראות את ההטבה לאחר בדיקת הזכאות.</p>
         </div>
       </div>
       <form onSubmit={submit} className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -197,7 +197,7 @@ export default function LiveEvent() {
   const needsFriendGuidance = hasPersonalLink && eligibilityQuery.isSuccess && !eligibility?.eligible;
 
   const scrollToTickets = () => document.getElementById("tickets")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  const goToThankYou = () => window.location.assign("/live/thank-you");
+  const goToThankYou = () => window.location.assign(params.get("coupon")?.toUpperCase() === "TEST1" ? "/live/thank-you?test=1" : "/live/thank-you");
 
   return (
     <main dir="rtl" className="min-h-screen overflow-x-hidden bg-[#f0eadc] font-rubik text-[#191265]">
@@ -233,7 +233,7 @@ export default function LiveEvent() {
               <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />שאלות שנשלחות מראש</span>
               <span className="inline-flex items-center gap-2"><Check className="h-4 w-4 text-[#ffe27c]" />רעיונות שאפשר לקחת כבר להיכרות הבאה</span>
             </motion.div>
-            <motion.div variants={fadeUp}><LiveCountdown /></motion.div>
+            <motion.div variants={fadeUp}><LiveCountdown salesOpen={salesOpen} /></motion.div>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: -28 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="relative order-2 mx-auto w-full max-w-md lg:max-w-none">
@@ -323,7 +323,7 @@ export default function LiveEvent() {
               <div className="mt-7 rounded-2xl bg-[#191265] p-5 text-center text-white shadow-lg">
                 <p className="text-xs font-bold text-white/70">מחיר כרטיס רגיל</p>
                 <p className="mt-1 text-5xl font-black text-[#ffe27c]">149 ₪</p>
-                <p className="mt-2 text-xs text-white/70">תשלום חד־פעמי. ההרשמה תיפתח בקרוב.</p>
+                <p className="mt-2 text-xs text-white/70">{salesOpen ? "תשלום חד־פעמי. אפשר להירשם כעת." : "תשלום חד־פעמי. ההרשמה תיפתח בקרוב."}</p>
               </div>
             </motion.article>
 
@@ -401,11 +401,13 @@ export default function LiveEvent() {
                   <p className="text-xs font-black tracking-[.16em] text-[#4e3eb4]">כרטיס רגיל</p>
                   <h3 className="mt-2 text-2xl font-black text-[#191265]">מקום ללייב ב־149 ₪</h3>
                   <p className="mt-3 text-sm leading-7 text-[#625d78]">המחיר הרגיל פתוח לכל מי שרוצים להצטרף לשיחה. פרטי ההצטרפות יועברו לאחר אישור ההרשמה.</p>
+                  {params.get("coupon")?.toUpperCase() === "TEST1" && <p className="mt-3 rounded-xl bg-[#fff4d4] p-3 text-sm font-bold leading-6 text-[#191265]">קוד TEST1 מיועד לבדיקת הקופה ב־1 ₪ עם מייל הבדיקה המורשה בלבד. זו עסקת בדיקה אמיתית, והשובר שיופק אינו מקנה כניסה לאירוע.</p>}
                 </div>
                 <GrowWallet
                   product="live_october"
-                  showCoupon={false}
-                  buttonLabel="להמשך לתשלום המאובטח ב־149 ₪"
+                  showCoupon
+                  prefillCoupon={params.get("coupon")?.toUpperCase() === "TEST1" ? "TEST1" : undefined}
+                  buttonLabel="להמשך לתשלום המאובטח"
                   buttonClassName="!w-full !rounded-2xl !bg-[#191265] !py-4 !font-black !text-white hover:!bg-[#30247e]"
                   termsPath="/terms/live-october"
                   onSuccess={goToThankYou}

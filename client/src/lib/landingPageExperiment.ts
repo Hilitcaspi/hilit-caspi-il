@@ -30,14 +30,14 @@ export function buildDatabaseJoinHref(
   return `/join?${outgoing.toString()}`;
 }
 
-/** Explicit LIVE offer page: URL LIVE takes precedence over stale browser coupon history. */
+/** The gift is automatic. TEST1 is only allowed when explicitly supplied for a checkout test. */
 export function buildLiveDatabaseJoinHref(
   currentSearch: string,
   sessionStore?: ReadableStorage | null,
   localStore?: ReadableStorage | null,
 ): string {
   const params = new URLSearchParams(currentSearch);
-  params.set("coupon", "LIVE");
+  params.set("coupon", params.get("coupon")?.toUpperCase() === "TEST1" ? "TEST1" : "LIVE");
   if (!params.has("utm_source")) params.set("utm_source", "site");
   if (!params.has("utm_medium")) params.set("utm_medium", "live_page");
   if (!params.has("utm_campaign")) params.set("utm_campaign", "live_october_2026");

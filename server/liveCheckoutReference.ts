@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-export type LiveCheckoutTier = "database_live" | "friends" | "standalone";
+export type LiveCheckoutTier = "database_live" | "friends" | "standalone" | "database_live_test" | "standalone_test";
 const TTL_MS = 48 * 60 * 60 * 1000;
 
 function secret(): string {
@@ -28,6 +28,7 @@ export function verifyLiveCheckoutReference(reference: string | undefined, email
     if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
     const p = JSON.parse(Buffer.from(data, "base64url").toString("utf8"));
     if (p.v !== 1 || p.h !== emailDigest(email) || !Number.isFinite(p.i) || p.i > now + 60_000 || now - p.i > TTL_MS) return null;
-    return p.t === "database_live" || p.t === "friends" || p.t === "standalone" ? p.t : null;
+    return p.t === "database_live" || p.t === "friends" || p.t === "standalone" ||
+      p.t === "database_live_test" || p.t === "standalone_test" ? p.t : null;
   } catch { return null; }
 }

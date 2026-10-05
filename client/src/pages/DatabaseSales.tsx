@@ -62,6 +62,7 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
   }, [isLiveOffer]);
   const [scrolled, setScrolled] = useState(false);
   const search = useSearch();
+  const isTestOffer = isLiveOffer && new URLSearchParams(search).get("coupon")?.toUpperCase() === "TEST1";
   const isNowHolidayOffer = !isLiveOffer && new URLSearchParams(search).get("coupon")?.toUpperCase() === "NOW";
   const joinHref = useMemo(
     () => (isLiveOffer ? buildLiveDatabaseJoinHref : buildDatabaseJoinHref)(search, window.sessionStorage, window.localStorage),
@@ -71,7 +72,7 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
   const offerLocked = isLiveOffer && !liveGiftOpen;
   const actionHref = offerLocked ? "#live-offer" : joinHref;
   const actionLabel = isLiveOffer
-    ? offerLocked ? "פרטי הטבת המאגר והלייב" : "להצטרפות למאגר עם כרטיס במתנה"
+    ? offerLocked ? "פרטי הטבת המאגר והלייב" : isTestOffer ? "לבדיקת הקופה ב־1 ₪" : "להצטרפות למאגר עם כרטיס במתנה"
     : isNowHolidayOffer ? "הצטרפות עם קוד NOW" : "הצטרפות למאגר";
   const trackJoinClick = (placement: "navbar" | "hero" | "final") => {
     track({
@@ -137,9 +138,9 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
             </p>
             {isLiveOffer && (
               <div className="mb-7 rounded-2xl border border-[#ffe27c]/55 bg-white/10 p-5 text-white shadow-lg backdrop-blur-sm">
-                <p className="text-sm font-black text-[#ffe27c]">הצעה מיוחדת למצטרפים חדשים למאגר</p>
-                <p className="mt-2 text-2xl font-black">מצטרפים למאגר ב־299 ₪ ומקבלים כרטיס ללייב שלי במתנה</p>
-                <p className="mt-2 text-sm leading-7 text-white/85">ממלאים שאלון ויוצרים פרופיל במאגר, וכרטיס אחד למפגש איתי נוסף במתנה. קוד LIVE מצורף אוטומטית כשמצטרפים דרך העמוד הזה.</p>
+                <p className="text-sm font-black text-[#ffe27c]">{isTestOffer ? "בדיקת קופה בלבד" : "הצעה מיוחדת למצטרפים חדשים למאגר"}</p>
+                <p className="mt-2 text-2xl font-black">{isTestOffer ? "תשלום ניסיון ב־1 ₪ עם קוד TEST1" : "מצטרפים למאגר ב־299 ₪ ומקבלים כרטיס ללייב שלי במתנה"}</p>
+                <p className="mt-2 text-sm leading-7 text-white/85">{isTestOffer ? "נדרש מייל הבדיקה המורשה. התשלום האמיתי ינפיק שובר בדיקה בלבד; הוא לא מפעיל חברות במאגר ולא מקנה כניסה ללייב." : "ממלאים שאלון ויוצרים פרופיל במאגר, וכרטיס אחד למפגש איתי נוסף במתנה. קוד LIVE מצורף אוטומטית כשמצטרפים דרך העמוד הזה."}</p>
               </div>
             )}
             {isNowHolidayOffer && (
@@ -177,22 +178,22 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
             <div className="text-right">
               <p className="text-xs font-black tracking-wider text-[#594593]">הטבת הלייב · למצטרפים חדשים למאגר</p>
               <h2 id="live-offer-title" className="mt-3 text-3xl font-black leading-tight text-[#191265] md:text-4xl">אני רוצה להכיר אתכם במאגר. <span className="text-[#4e3eb4]">ואז לפגוש אתכם בלייב.</span></h2>
-              <p className="mt-4 text-base leading-8 text-[#625d78]">בהצטרפות למאגר ב־299 ₪ ממלאים שאלון זוגי ופרופיל, ואני בוחנת חיבורים שיכולים להתאים. למצטרפים חדשים דרך העמוד הזה מחכה גם <strong className="text-[#191265]">כרטיס אחד במתנה למפגש ב־31.10 בשעה 20:30</strong>. מחיר הכרטיס בנפרד הוא 149 ₪.</p>
-              <p className="mt-4 rounded-xl bg-[#f5efff] px-4 py-3 text-sm font-bold leading-6 text-[#191265]">אין צורך לזכור קוד. קוד LIVE עובר אוטומטית לקופה דרך העמוד הזה. לאחר שהתשלום למאגר יאושר, השובר האישי יופיע בדף התודה ובאזור האישי. קישור הכניסה למפגש יישלח בנפרד לקראת האירוע.</p>
+              <p className="mt-4 text-base leading-8 text-[#625d78]">{isTestOffer ? "זהו מצב בדיקה לעמוד המתנה למאגר. תהליך התשלום יחייב 1 ₪ וייצור שובר בדיקה בלבד, בלי להפעיל חברות במאגר או כניסה לאירוע. אחרי הבדיקה אפשר לפתוח את העמוד הזה ללא קוד כדי לראות את ההצעה הרגילה." : <>בהצטרפות למאגר ב־299 ₪ ממלאים שאלון זוגי ופרופיל, ואני בוחנת חיבורים שיכולים להתאים. למצטרפים חדשים דרך העמוד הזה מחכה גם <strong className="text-[#191265]">כרטיס אחד במתנה למפגש ב־31.10 בשעה 20:30</strong>. מחיר הכרטיס בנפרד הוא 149 ₪.</>}</p>
+              <p className="mt-4 rounded-xl bg-[#f5efff] px-4 py-3 text-sm font-bold leading-6 text-[#191265]">{isTestOffer ? "מצב בדיקה: קוד TEST1 עובר אוטומטית לקופה ומוגבל למייל הבדיקה. לאחר תשלום 1 ₪ יופיע שובר בדיקה בדף התודה, ללא חברות פעילה או כניסה ללייב." : "אין צורך לזכור קוד. קוד LIVE עובר אוטומטית לקופה דרך העמוד הזה. לאחר שהתשלום למאגר יאושר, השובר האישי יופיע בדף התודה ובאזור האישי. קישור הכניסה למפגש יישלח בנפרד לקראת האירוע."}</p>
               {offerLocked && <p className="mt-4 text-sm font-bold text-[#75591e]">{liveSales.isLoading ? "בודקים את זמינות ההטבה. עוד רגע אפשר יהיה להמשיך בהרשמה." : "ההטבה אינה זמינה כרגע. לא נבצע רכישה בלי הכרטיס במתנה מהעמוד הזה."}</p>}
               <div className="mt-6 flex flex-wrap items-center gap-4">
-                {liveGiftOpen ? <a href={joinHref} onClick={() => trackJoinClick("hero")} className="rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">להצטרפות למאגר ולקבלת הכרטיס</a> : <span className="rounded-2xl border border-[#191265]/20 px-7 py-4 text-sm font-black text-[#191265]">ממתינים לאימות ההטבה</span>}
+                {liveGiftOpen ? <a href={joinHref} onClick={() => trackJoinClick("hero")} className="rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">{isTestOffer ? "לבדיקת תשלום 1 ₪" : "להצטרפות למאגר ולקבלת הכרטיס"}</a> : <span className="rounded-2xl border border-[#191265]/20 px-7 py-4 text-sm font-black text-[#191265]">ממתינים לאימות ההטבה</span>}
                 <a href="#about-live" className="text-sm font-bold text-[#4e3eb4] underline underline-offset-4">מה יהיה בלייב?</a>
               </div>
             </div>
             <div className="self-center rounded-[1.5rem] bg-[#191265] p-7 text-center text-white">
-              <p className="text-xs font-black tracking-wider text-[#ffe27c]">הטבת LIVE למצטרפים חדשים</p>
-              <p className="mt-5 text-5xl font-black text-[#ffe27c]">299 ₪</p>
-              <p className="mt-2 text-sm text-white/75">מאגר · תשלום חד־פעמי</p>
+              <p className="text-xs font-black tracking-wider text-[#ffe27c]">{isTestOffer ? "בדיקת TEST1 לבעלת האתר בלבד" : "הטבת LIVE למצטרפים חדשים"}</p>
+              <p className="mt-5 text-5xl font-black text-[#ffe27c]">{isTestOffer ? "1 ₪" : "299 ₪"}</p>
+              <p className="mt-2 text-sm text-white/75">{isTestOffer ? "תשלום ניסיון אמיתי" : "מאגר · תשלום חד־פעמי"}</p>
               <div className="my-6 h-px bg-white/20" />
-              <p className="text-lg font-black">+ כרטיס אחד ללייב במתנה</p>
-              <p className="mt-2 text-xs text-white/70">כרטיס רגיל בנפרד: 149 ₪</p>
-              <div className="mt-6 rounded-xl border border-[#ffe27c]/35 bg-white/10 px-4 py-3 text-sm"><span className="text-white/75">קוד ההטבה: </span><strong className="tracking-widest text-[#ffe27c]" dir="ltr">LIVE</strong><span className="block text-xs text-white/65">נוסף אוטומטית בהרשמה דרך העמוד הזה</span></div>
+              <p className="text-lg font-black">{isTestOffer ? "שובר בדיקה שאינו כרטיס כניסה" : "+ כרטיס אחד ללייב במתנה"}</p>
+              {!isTestOffer && <p className="mt-2 text-xs text-white/70">כרטיס רגיל בנפרד: 149 ₪</p>}
+              <div className="mt-6 rounded-xl border border-[#ffe27c]/35 bg-white/10 px-4 py-3 text-sm"><span className="text-white/75">קוד ההטבה: </span><strong className="tracking-widest text-[#ffe27c]" dir="ltr">{isTestOffer ? "TEST1" : "LIVE"}</strong><span className="block text-xs text-white/65">נוסף אוטומטית בהרשמה דרך העמוד הזה</span></div>
             </div>
           </div>
         </section>

@@ -72,11 +72,14 @@ export const liveOctoberRouter = router({
     }).from(liveOctoberTickets).where(and(
       eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG),
       sql`${liveOctoberTickets.revokedAt} is null`,
+      sql`${liveOctoberTickets.voucherCode} not like 'TEST-%'`,
     ));
+    const [testCount] = await db.select({ total: sql<number>`count(*)` }).from(liveOctoberTickets)
+      .where(and(eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG), sql`${liveOctoberTickets.voucherCode} like 'TEST-%'`));
     const [questionTotal] = await db.select({ total: sql<number>`count(*)` })
       .from(liveOctoberQuestions)
       .innerJoin(liveOctoberTickets, eq(liveOctoberQuestions.ticketId, liveOctoberTickets.id))
-      .where(eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG));
+      .where(and(eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG), sql`${liveOctoberTickets.voucherCode} not like 'TEST-%'`));
     const tickets = await db.select({
       id: liveOctoberTickets.id, name: liveOctoberTickets.name,
       email: liveOctoberTickets.email, source: liveOctoberTickets.source,
@@ -85,6 +88,7 @@ export const liveOctoberRouter = router({
     }).from(liveOctoberTickets).where(and(
       eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG),
       sql`${liveOctoberTickets.revokedAt} is null`,
+      sql`${liveOctoberTickets.voucherCode} not like 'TEST-%'`,
     )).orderBy(desc(liveOctoberTickets.issuedAt)).limit(300);
     const questions = await db.select({
       id: liveOctoberQuestions.id, name: liveOctoberTickets.name,
@@ -92,13 +96,14 @@ export const liveOctoberRouter = router({
       createdAt: liveOctoberQuestions.createdAt,
     }).from(liveOctoberQuestions)
       .innerJoin(liveOctoberTickets, eq(liveOctoberQuestions.ticketId, liveOctoberTickets.id))
-      .where(eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG))
+      .where(and(eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG), sql`${liveOctoberTickets.voucherCode} not like 'TEST-%'`))
       .orderBy(desc(liveOctoberQuestions.createdAt)).limit(300);
     return {
       totals: {
         total: Number(totals?.total || 0), database: Number(totals?.database || 0),
         plus: Number(totals?.plus || 0), friends: Number(totals?.friends || 0),
         standalone: Number(totals?.standalone || 0), questions: Number(questionTotal?.total || 0),
+        test: Number(testCount?.total || 0),
       },
       tickets, questions,
     };

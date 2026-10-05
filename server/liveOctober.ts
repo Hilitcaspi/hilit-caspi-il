@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { liveOctoberQuestions, liveOctoberTickets, paymentLeads, plusPilotMembers, singles } from "../drizzle/schema";
 import { hasActivePlusCouponEntitlement } from "./couponPolicy";
+import { LIVE_TEST_CODE, LIVE_TEST_PRICE } from "./liveTestCoupon";
 
 export const LIVE_OCTOBER_SLUG = "matching-secrets-2026-10-31";
 export const LIVE_START_ISO = "2026-10-31T20:30:00+02:00";
@@ -32,15 +33,16 @@ export function normalizeLiveEmail(email: string) { return email.trim().toLowerC
 
 /** Grow callback must be authenticated by the signed notify URL before this check. */
 export function matchesPaidLiveCheckout(input: {
-  tier: "database_live" | "friends" | "standalone";
+  tier: "database_live" | "friends" | "standalone" | "database_live_test" | "standalone_test";
   product: string | null; couponCode: string | null | undefined;
   webhookProcessToken: string; orderProcessToken: string | null | undefined;
   transactionId: string; transactionToken: string;
   statusCode: unknown; status: unknown; sum: number;
 }): boolean {
-  const amount = input.tier === "database_live" ? 299 : input.tier === "friends" ? 49 : 149;
-  const product = input.tier === "database_live" ? "database" : LIVE_PRODUCT;
-  const coupon = input.tier === "database_live" ? "LIVE" : input.tier === "friends" ? "FRIENDS" : null;
+  const test = input.tier.endsWith("_test");
+  const amount = test ? LIVE_TEST_PRICE : input.tier === "database_live" ? 299 : input.tier === "friends" ? 49 : 149;
+  const product = input.tier.startsWith("database_live") ? "database" : LIVE_PRODUCT;
+  const coupon = test ? LIVE_TEST_CODE : input.tier === "database_live" ? "LIVE" : input.tier === "friends" ? "FRIENDS" : null;
   return Number(input.statusCode) === 2 && (input.status === undefined || String(input.status).trim() === "שולם")
     && /^\d{3,30}$/.test(input.transactionId) && /^[a-zA-Z0-9]{12,200}$/.test(input.transactionToken)
     && !!input.webhookProcessToken && input.webhookProcessToken === input.orderProcessToken
@@ -56,7 +58,7 @@ export function liveCheckoutPrice(product: string, coupon: string | undefined): 
   throw new Error("מסלול לייב לא מוכר");
 }
 
-function newVoucherCode() { return `HC31-${crypto.randomBytes(6).toString("hex").toUpperCase()}`; }
+function newVoucherCode(test = false) { return `${test ? "TEST-" : ""}HC31-${crypto.randomBytes(6).toString("hex").toUpperCase()}`; }
 
 export async function getVerifiedLiveMember(email: string, token: string) {
   const db = await getDb();
@@ -91,7 +93,7 @@ export async function existingLiveTicket(email: string) {
 /** Only call for confirmed Grow payments or for a verified active Plus member. */
 export async function ensureLiveTicket(input: {
   email: string; name: string; source: LiveTicketSource;
-  singleId?: number | null; amountAgorot?: number; transactionId?: string;
+  singleId?: number | null; amountAgorot?: number; transactionId?: string; testCheckout?: boolean;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -104,7 +106,7 @@ export async function ensureLiveTicket(input: {
     name: input.name.trim().slice(0, 200) || "משתתף",
     singleId: input.singleId ?? null,
     source: input.source,
-    voucherCode: newVoucherCode(),
+    voucherCode: newVoucherCode(input.testCheckout),
     amountAgorot: input.amountAgorot ?? 0,
     providerTransactionId: input.transactionId || null,
     issuedAt: Date.now(),
@@ -157,8 +159,11 @@ export async function liveTicketByReceipt(trackingToken: string) {
   const purchasedTicket = receipt.product === LIVE_PRODUCT &&
     ((receipt.couponCode === LIVE_FRIEND_CODE && receipt.amountAgorot === 4900) ||
       (!receipt.couponCode && receipt.amountAgorot === 14900));
-  if (!newDatabase && !purchasedTicket) return null;
-  return existingLiveTicket(receipt.email);
+  const testPurchase = receipt.couponCode === LIVE_TEST_CODE && receipt.amountAgorot === 100 &&
+    (receipt.product === "database" || receipt.product === LIVE_PRODUCT);
+  if (!newDatabase && !purchasedTicket && !testPurchase) return null;
+  const ticket = await existingLiveTicket(receipt.email);
+  return ticket && (testPurchase === ticket.voucherCode.startsWith("TEST-")) ? ticket : null;
 }
 
 export async function submitLiveQuestion(ticketId: number, question: string) {

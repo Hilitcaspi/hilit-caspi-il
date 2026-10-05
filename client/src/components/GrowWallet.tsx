@@ -377,8 +377,8 @@ export default function GrowWallet({
     }
     // A database gift-page visitor must never pay for a plain database order
     // just because the automatic LIVE coupon validation is still pending.
-    if (product === "database" && prefillCoupon?.trim().toUpperCase() === "LIVE" && couponApplied?.code !== "LIVE") {
-      toast.error("ממתינים לאימות כרטיס הלייב במתנה. אין לבצע תשלום בלי שהטבת LIVE מופיעה בקופה.");
+    if (product === "database" && ["LIVE", "TEST1"].includes(prefillCoupon?.trim().toUpperCase() || "") && couponApplied?.code !== prefillCoupon?.trim().toUpperCase()) {
+      toast.error("ממתינים לאימות קוד ההטבה. אין לבצע תשלום בלי שהקוד מופיע בקופה.");
       return;
     }
 
@@ -391,8 +391,10 @@ export default function GrowWallet({
           : baseCheckoutPrice);
     const checkoutDescription = PRODUCT_CONFIGS[product]?.description ?? product;
 
-    gaBeginCheckout(product);
-    trackInitiateCheckout({ value: trackedCheckoutPrice, currency: "ILS", content_name: checkoutDescription });
+    if (couponApplied?.code !== "TEST1") {
+      gaBeginCheckout(product);
+      trackInitiateCheckout({ value: trackedCheckoutPrice, currency: "ILS", content_name: checkoutDescription });
+    }
     track({ eventType: "button_click", metadata: { product, action: "initiate_checkout", value: trackedCheckoutPrice } });
 
     setWalletLoading(true);
@@ -679,6 +681,7 @@ export default function GrowWallet({
               ✓ קופון "{couponApplied.code}" הוחל
               {couponApplied.discountPercent ? ` — ${couponApplied.discountPercent}% הנחה` : ""}
               {couponApplied.discountAmount ? ` — ₪${couponApplied.discountAmount} הנחה` : ""}
+              {couponApplied.fixedPrice ? ` — מחיר לתשלום: ₪${couponApplied.fixedPrice}` : ""}
             </span>
             <button onClick={() => { setCouponApplied(null); setCouponCode(""); }} className="text-xs text-gray-400 hover:text-red-500 transition-colors mr-2">✕</button>
           </div>

@@ -78,6 +78,13 @@ describe("landing page experiment attribution", () => {
     expect(params.get("utm_campaign")).toBe("live_october_2026");
   });
 
+  it("passes TEST1 only from an explicit test URL, not from stale coupon storage", () => {
+    const withTest = new URLSearchParams(buildLiveDatabaseJoinHref("?coupon=TEST1").split("?")[1]);
+    const normal = new URLSearchParams(buildLiveDatabaseJoinHref("", storage({ coupon: "TEST1" }) as Storage).split("?")[1]);
+    expect(withTest.get("coupon")).toBe("TEST1");
+    expect(normal.get("coupon")).toBe("LIVE");
+  });
+
   it("keeps the LIVE gift in every checkout CTA and never redirects this offer to a plain database checkout", () => {
     const databasePage = readFileSync(resolve(process.cwd(), "client/src/pages/DatabaseSales.tsx"), "utf8");
     const livePage = readFileSync(resolve(process.cwd(), "client/src/pages/LiveEvent.tsx"), "utf8");
@@ -91,7 +98,7 @@ describe("landing page experiment attribution", () => {
     expect(databasePage).not.toContain("ללא כרטיס");
     expect(livePage).not.toContain("49 ₪ · חברי Plus");
     expect(voucher).toContain("לא קוד כניסה ל־Zoom");
-    expect(checkout).toContain('couponApplied?.code !== "LIVE"');
+    expect(checkout).toContain('["LIVE", "TEST1"].includes');
     expect(register).toContain('promotionalCoupon === "LIVE"');
   });
 

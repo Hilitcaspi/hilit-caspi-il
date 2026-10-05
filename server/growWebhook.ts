@@ -769,7 +769,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     }
   }
   if (hasVerifiedPlusReference) product = "plus";
-  if (verifiedLiveTier) product = verifiedLiveTier === "database_live" ? "database" : LIVE_PRODUCT;
+  if (verifiedLiveTier) product = verifiedLiveTier.startsWith("database_live") ? "database" : LIVE_PRODUCT;
   // 3. A 99₪ charge is ambiguous with the historical live event, and the temporary
   // Plus Sandbox uses 1₪. If this email has a pending Plus checkout, prefer Plus;
   // otherwise continue to the normal amount fallback.
@@ -875,6 +875,11 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   if (product === LIVE_PRODUCT && !verifiedLiveTier) throw new Error("Live checkout missing signed reference");
   if (verifiedLiveTier) {
     const { matchesPaidLiveCheckout } = await import("./liveOctober");
+    if (verifiedLiveTier.endsWith("_test")) {
+      const { isLiveTestCheckout } = await import("./liveTestCoupon");
+      if (!isLiveTestCheckout(product || "", purchaseTracking?.couponCode, email))
+        throw new Error("TEST1 checkout no longer authorized");
+    }
     if (!purchaseTracking || !matchesPaidLiveCheckout({
       tier: verifiedLiveTier, product, couponCode: purchaseTracking.couponCode,
       webhookProcessToken: liveProcessToken, orderProcessToken: purchaseTracking.providerProcessToken,
@@ -981,18 +986,24 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       case "coaching_mas": await handleCoachingMas(email, name); break;
       case "session":  await handleSession(email, name); break;
       case "database": {
-        await handleDatabase(email, name, phone, transactionId, purchaseTracking?.couponCode);
-        if (verifiedLiveTier === "database_live") {
-          await ensureLiveTicket({ email, name, source: "database_live", transactionId, amountAgorot: 0 });
+        if (verifiedLiveTier !== "database_live_test") {
+          await handleDatabase(email, name, phone, transactionId, purchaseTracking?.couponCode);
         }
+        if (verifiedLiveTier === "database_live" || verifiedLiveTier === "database_live_test") {
+          await ensureLiveTicket({ email, name, source: "database_live", transactionId, amountAgorot: 0,
+            testCheckout: verifiedLiveTier === "database_live_test" });
+        }
+        if (verifiedLiveTier === "database_live_test") businessActionAlreadyProcessed = true;
         break;
       }
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId, sum); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
       case "live_october": {
-        if (!verifiedLiveTier || verifiedLiveTier === "database_live") throw new Error("Live ticket tier missing");
-        await ensureLiveTicket({ email, name, source: verifiedLiveTier, transactionId, amountAgorot: Math.round(sum * 100) });
+        if (!verifiedLiveTier || verifiedLiveTier.startsWith("database_live")) throw new Error("Live ticket tier missing");
+        await ensureLiveTicket({ email, name, source: verifiedLiveTier === "friends" ? "friends" : "standalone",
+          transactionId, amountAgorot: Math.round(sum * 100), testCheckout: verifiedLiveTier === "standalone_test" });
+        if (verifiedLiveTier === "standalone_test") businessActionAlreadyProcessed = true;
         break;
       }
       case "match_boost": {
