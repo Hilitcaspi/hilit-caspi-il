@@ -38,6 +38,20 @@ describe("October live signed checkout", () => {
     expect(verifyLiveCheckoutReference(`${ref}x`, "person@example.com", 101_000)).toBeNull();
     expect(verifyLiveCheckoutReference(ref, "person@example.com", 100_000 + 49 * 60 * 60 * 1000)).toBeNull();
   });
+  it("derives a stable live-only HMAC key from the site's 22-character secret", () => {
+    const prior = process.env.JWT_SECRET;
+    try {
+      process.env.JWT_SECRET = "0123456789abcdefghijkl";
+      const ref = createLiveCheckoutReference("person@example.com", "standalone_test", 100_000);
+      expect(verifyLiveCheckoutReference(ref, "person@example.com", 101_000)).toBe("standalone_test");
+      delete process.env.JWT_SECRET;
+      expect(() => createLiveCheckoutReference("person@example.com", "standalone", 100_000)).toThrow();
+      expect(verifyLiveCheckoutReference(ref, "person@example.com", 101_000)).toBeNull();
+    } finally {
+      if (prior === undefined) delete process.env.JWT_SECRET;
+      else process.env.JWT_SECRET = prior;
+    }
+  });
   it("rejects unknown product/coupon combinations", () => {
     expect(liveCheckoutPrice("database", "LIVE")).toBe(299);
     expect(liveCheckoutPrice("live_october", "FRIENDS")).toBe(49);

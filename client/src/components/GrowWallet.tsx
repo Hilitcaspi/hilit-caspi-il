@@ -760,8 +760,8 @@ export default function GrowWallet({
 
       <div className="flex justify-center items-center gap-4 mt-3 text-xs opacity-70" style={{ color: '#191265' }}>
         <span>🔒 תשלום מאובטח</span>
-        {product === "match_boost" ? <span>✓ חיוב חד־פעמי</span> : <span>⚡ גישה מיידית</span>}
-        {product !== "match_boost" && <span>✓ תוכן מעשי וישים</span>}
+        {product === "match_boost" ? <span>✓ חיוב חד־פעמי</span> : product === "live_october" ? <span>✓ שובר אישי לאחר אישור התשלום</span> : <span>⚡ גישה מיידית</span>}
+        {product === "live_october" ? <span>✓ קישור כניסה יישלח לקראת האירוע</span> : product !== "match_boost" && <span>✓ תוכן מעשי וישים</span>}
       </div>
       {product !== "match_boost" && (
         <p className="text-center text-xs mt-1 opacity-60" style={{ color: '#191265' }}>

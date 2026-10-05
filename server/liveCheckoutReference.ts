@@ -3,10 +3,12 @@ import crypto from "node:crypto";
 export type LiveCheckoutTier = "database_live" | "friends" | "standalone" | "database_live_test" | "standalone_test";
 const TTL_MS = 48 * 60 * 60 * 1000;
 
-function secret(): string {
+function secret(): Buffer {
   const value = process.env.JWT_SECRET?.trim();
-  if (!value || value.length < 32) throw new Error("Missing signing secret for live ticket checkout");
-  return value;
+  if (!value || value.length < 16) throw new Error("Missing signing secret for live ticket checkout");
+  // Derive a domain-separated HMAC key from the existing stable server secret.
+  // JWT_SECRET is provisioned by the site and need not itself be 32 characters.
+  return Buffer.from(crypto.hkdfSync("sha256", Buffer.from(value), Buffer.from("hilitcaspi-live-checkout-v1"), Buffer.from("hmac-sha256"), 32));
 }
 function emailDigest(email: string) {
   return crypto.createHash("sha256").update(email.trim().toLowerCase()).digest("hex").slice(0, 32);
