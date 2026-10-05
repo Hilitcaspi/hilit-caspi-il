@@ -78,11 +78,13 @@ describe("landing page experiment attribution", () => {
     expect(params.get("utm_campaign")).toBe("live_october_2026");
   });
 
-  it("passes TEST1 only from an explicit test URL, not from stale coupon storage", () => {
-    const withTest = new URLSearchParams(buildLiveDatabaseJoinHref("?coupon=TEST1").split("?")[1]);
-    const normal = new URLSearchParams(buildLiveDatabaseJoinHref("", storage({ coupon: "TEST1" }) as Storage).split("?")[1]);
-    expect(withTest.get("coupon")).toBe("TEST1");
-    expect(normal.get("coupon")).toBe("LIVE");
+  it("passes TEST1 only after the inline page verification, never just from a URL or storage", () => {
+    const urlOnly = new URLSearchParams(buildLiveDatabaseJoinHref("?coupon=TEST1").split("?")[1]);
+    const staleStored = new URLSearchParams(buildLiveDatabaseJoinHref("", storage({ coupon: "TEST1" }) as Storage).split("?")[1]);
+    const verified = new URLSearchParams(buildLiveDatabaseJoinHref("", undefined, undefined, "TEST1").split("?")[1]);
+    expect(urlOnly.get("coupon")).toBe("LIVE");
+    expect(staleStored.get("coupon")).toBe("LIVE");
+    expect(verified.get("coupon")).toBe("TEST1");
   });
 
   it("keeps the LIVE gift in every checkout CTA and never redirects this offer to a plain database checkout", () => {
@@ -100,6 +102,10 @@ describe("landing page experiment attribution", () => {
     expect(voucher).toContain("לא קוד כניסה ל־Zoom");
     expect(checkout).toContain('["LIVE", "TEST1"].includes');
     expect(register).toContain('promotionalCoupon === "LIVE"');
+    expect(databasePage).toContain('id="live-db-test-code"');
+    expect(databasePage).toContain('validateCoupon.mutateAsync({ code: "TEST1", product: "database"');
+    expect(livePage).toContain('showCoupon');
+    expect(livePage).not.toContain('prefillCoupon={params.get("coupon")');
   });
 
   it("tracks database_cta on real database-page clicks, not on join page load", () => {

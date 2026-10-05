@@ -62,12 +62,39 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
   }, [isLiveOffer]);
   const [scrolled, setScrolled] = useState(false);
   const search = useSearch();
-  const isTestOffer = isLiveOffer && new URLSearchParams(search).get("coupon")?.toUpperCase() === "TEST1";
+  const [testCode, setTestCode] = useState("");
+  const [testEmail, setTestEmail] = useState("");
+  const [testApplied, setTestApplied] = useState(false);
+  const [couponFeedback, setCouponFeedback] = useState("");
+  const validateCoupon = trpc.coupons.validate.useMutation();
+  const isTestOffer = isLiveOffer && testApplied;
   const isNowHolidayOffer = !isLiveOffer && new URLSearchParams(search).get("coupon")?.toUpperCase() === "NOW";
   const joinHref = useMemo(
-    () => (isLiveOffer ? buildLiveDatabaseJoinHref : buildDatabaseJoinHref)(search, window.sessionStorage, window.localStorage),
-    [isLiveOffer, search],
+    () => isLiveOffer
+      ? buildLiveDatabaseJoinHref(search, window.sessionStorage, window.localStorage, isTestOffer ? "TEST1" : undefined)
+      : buildDatabaseJoinHref(search, window.sessionStorage, window.localStorage),
+    [isLiveOffer, isTestOffer, search],
   );
+  const applyTestCode = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setCouponFeedback("");
+    setTestApplied(false);
+    if (testCode.trim().toUpperCase() !== "TEST1") {
+      setCouponFeedback("קוד זה אינו זמין בעמוד הזה. קוד LIVE כבר מצורף אוטומטית להצטרפות הרגילה.");
+      return;
+    }
+    try {
+      const result = await validateCoupon.mutateAsync({ code: "TEST1", product: "database", email: testEmail.trim() });
+      if (result.valid && result.fixedPrice === 1) {
+        setTestApplied(true);
+        setCouponFeedback("קוד הבדיקה אושר. ההרשמה תמשיך לקופה ב־1 ₪ ותפיק שובר בדיקה בלבד.");
+      } else {
+        setCouponFeedback("קוד הבדיקה אינו זמין למייל הזה או שכבר קיים עבורו שובר.");
+      }
+    } catch {
+      setCouponFeedback("לא הצלחנו לאמת את הקוד כרגע. נסו שוב לפני מעבר לתשלום.");
+    }
+  };
   // Never redirect a visitor on this gift page to a checkout without LIVE.
   const offerLocked = isLiveOffer && !liveGiftOpen;
   const actionHref = offerLocked ? "#live-offer" : joinHref;
@@ -180,6 +207,18 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
               <h2 id="live-offer-title" className="mt-3 text-3xl font-black leading-tight text-[#191265] md:text-4xl">אני רוצה להכיר אתכם במאגר. <span className="text-[#4e3eb4]">ואז לפגוש אתכם בלייב בזום.</span></h2>
               <p className="mt-4 text-base leading-8 text-[#625d78]">{isTestOffer ? "זהו מצב בדיקה לעמוד המתנה למאגר. תהליך התשלום יחייב 1 ₪ וייצור שובר בדיקה בלבד, בלי להפעיל חברות במאגר או כניסה לאירוע. אחרי הבדיקה אפשר לפתוח את העמוד הזה ללא קוד כדי לראות את ההצעה הרגילה." : <>בהצטרפות למאגר ב־299 ₪ ממלאים שאלון זוגי ופרופיל, ואני בוחנת חיבורים שיכולים להתאים. למצטרפים חדשים דרך העמוד הזה מחכה גם <strong className="text-[#191265]">כרטיס אחד במתנה למפגש אונליין בזום ב־31.10 בשעה 20:30</strong>. מחיר הכרטיס בנפרד הוא 149 ₪.</>}</p>
               <p className="mt-4 rounded-xl bg-[#f5efff] px-4 py-3 text-sm font-bold leading-6 text-[#191265]">{isTestOffer ? "מצב בדיקה: קוד TEST1 עובר אוטומטית לקופה ומוגבל למייל הבדיקה. לאחר תשלום 1 ₪ יופיע שובר בדיקה בדף התודה, ללא חברות פעילה או כניסה ללייב." : "אין צורך לזכור קוד. קוד LIVE עובר אוטומטית לקופה דרך העמוד הזה. לאחר שהתשלום למאגר יאושר, השובר האישי יופיע בדף התודה ובאזור האישי. קישור הכניסה למפגש יישלח בנפרד לקראת האירוע."}</p>
+              <form onSubmit={applyTestCode} className="mt-5 rounded-2xl border border-[#e4dcf2] bg-[#faf7ff] p-4" aria-label="הזנת קוד בדיקה">
+                <p className="text-sm font-black text-[#191265]">רוצים לבדוק את הקופה? מזינים כאן קוד ומייל בדיקה</p>
+                <p className="mt-1 text-xs leading-5 text-[#625d78]">מחיר של 1 ₪ יחול רק לאחר אימות הקוד והמייל. יש להמשיך להרשמה עם אותו מייל. זו עסקת בדיקה שאינה מעניקה חברות במאגר או כרטיס כניסה.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                  <label className="sr-only" htmlFor="live-db-test-email">מייל בדיקה</label>
+                  <input id="live-db-test-email" type="email" required autoComplete="email" value={testEmail} disabled={validateCoupon.isPending} onChange={event => { setTestEmail(event.target.value); setTestApplied(false); setCouponFeedback(""); }} placeholder="מייל הבדיקה" className="min-w-0 rounded-xl border border-[#d8cbe9] bg-white px-3 py-3 text-sm text-[#191265] outline-none focus:ring-2 focus:ring-[#b7a1e6]" />
+                  <label className="sr-only" htmlFor="live-db-test-code">קוד הטבה</label>
+                  <input id="live-db-test-code" type="text" required autoCapitalize="characters" value={testCode} disabled={validateCoupon.isPending} onChange={event => { setTestCode(event.target.value.toUpperCase()); setTestApplied(false); setCouponFeedback(""); }} placeholder="קוד הטבה" className="min-w-0 rounded-xl border border-[#d8cbe9] bg-white px-3 py-3 text-sm text-[#191265] outline-none focus:ring-2 focus:ring-[#b7a1e6]" />
+                  <button type="submit" disabled={validateCoupon.isPending} className="rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white disabled:opacity-50">{validateCoupon.isPending ? "בודקים..." : "החלת קוד"}</button>
+                </div>
+                {couponFeedback && <p role="status" className="mt-3 text-sm font-bold text-[#191265]">{couponFeedback}</p>}
+              </form>
               {offerLocked && <p className="mt-4 text-sm font-bold text-[#75591e]">{liveSales.isLoading ? "בודקים את זמינות ההטבה. עוד רגע אפשר יהיה להמשיך בהרשמה." : "ההטבה אינה זמינה כרגע. לא נבצע רכישה בלי הכרטיס במתנה מהעמוד הזה."}</p>}
               <div className="mt-6 flex flex-wrap items-center gap-4">
                 {liveGiftOpen ? <a href={joinHref} onClick={() => trackJoinClick("hero")} className="rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">{isTestOffer ? "לבדיקת תשלום 1 ₪" : "להצטרפות למאגר ולקבלת הכרטיס"}</a> : <span className="rounded-2xl border border-[#191265]/20 px-7 py-4 text-sm font-black text-[#191265]">ממתינים לאימות ההטבה</span>}

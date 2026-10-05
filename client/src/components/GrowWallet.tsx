@@ -213,7 +213,7 @@ interface GrowWalletProps {
   prefillPhone?: string;
   customerGender?: "female" | "male";
   prefillCoupon?: string;
-  onSuccess?: (response: any) => void;
+  onSuccess?: (response: any, appliedCouponCode?: string) => void;
   onFailure?: (response: any) => void;
   termsPath?: string;
   personalToken?: string;
@@ -263,6 +263,7 @@ export default function GrowWallet({
   const createProcessMutation = trpc.payment.createProcess.useMutation();
   const reportFailureMutation = trpc.payment.reportFailure.useMutation();
   const autoCouponKeyRef = useRef("");
+  const activeCheckoutCouponRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const requestedCode = prefillCoupon?.trim().toUpperCase();
@@ -381,6 +382,10 @@ export default function GrowWallet({
       toast.error("ממתינים לאימות קוד ההטבה. אין לבצע תשלום בלי שהקוד מופיע בקופה.");
       return;
     }
+    if (showCoupon && couponCode.trim() && couponApplied?.code !== couponCode.trim().toUpperCase()) {
+      toast.error("יש לאמת את הקוד שהוזן לפני פתיחת התשלום, או למחוק אותו כדי להמשיך במחיר הרגיל.");
+      return;
+    }
 
     const baseCheckoutPrice = PRODUCT_CONFIGS[product]?.sum ?? 0;
     const trackedCheckoutPrice = couponApplied?.fixedPrice
@@ -425,7 +430,7 @@ export default function GrowWallet({
         events: {
           onSuccess: (r: any) => {
             setWalletLoading(false);
-            callbacksRef.current.onSuccess?.(r);
+            callbacksRef.current.onSuccess?.(r, activeCheckoutCouponRef.current);
           },
           onFailure: (r: any) => {
             setWalletLoading(false);
@@ -573,6 +578,7 @@ export default function GrowWallet({
       });
 
       rememberPurchaseTrackingToken(result.purchaseTrackingToken);
+      activeCheckoutCouponRef.current = couponApplied?.code;
 
       if (result.url) {
         window.location.assign(result.url);
@@ -619,7 +625,7 @@ export default function GrowWallet({
         });
       }
     }
-  }, [name, email, phone, product, termsPath, termsAccepted, ageConfirmed, personalToken, boostMatchId, couponApplied, plusConsents]);
+  }, [name, email, phone, product, termsPath, termsAccepted, ageConfirmed, personalToken, boostMatchId, couponApplied, couponCode, showCoupon, prefillCoupon, plusConsents]);
 
   const hasAllDetails = prefillName && prefillEmail;
 
@@ -649,7 +655,7 @@ export default function GrowWallet({
               id={`gw-email-${instanceId}`}
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={e => { setEmail(e.target.value); setCouponApplied(null); setCouponError(""); }}
               placeholder="your@email.com"
               style={{ color: '#1a1a1a', backgroundColor: 'white' }}
               className="text-right placeholder:text-gray-400 border-gray-300 focus:border-[#191265]"
@@ -673,8 +679,10 @@ export default function GrowWallet({
       )}
 
       {/* Coupon field */}
-      {showCoupon && <div className="mb-4">
-        <p className="text-xs font-semibold text-[#727272] mb-1.5">{product === "database" ? "יש לך קוד הנחה לרכישה?" : "יש לך קוד קופון?"}</p>
+      {showCoupon && <div className={product === "live_october" ? "mb-4 rounded-xl border border-[#d8c695] bg-[#fffaf0] p-4" : "mb-4"}>
+        {couponApplied
+          ? <p className="mb-1.5 text-sm font-bold text-[#191265]">קוד ההטבה שלך</p>
+          : <label htmlFor={`gw-coupon-${instanceId}`} className="mb-1.5 block text-sm font-bold text-[#191265]">{product === "live_october" ? "יש לך קוד הטבה? מזינים אותו כאן" : product === "database" ? "יש לך קוד הנחה לרכישה?" : "יש לך קוד קופון?"}</label>}
         {couponApplied ? (
           <div className="flex items-center justify-between bg-green-50 border border-green-300 rounded-xl px-4 py-2.5">
             <span className="text-green-700 text-sm font-bold">
@@ -688,9 +696,10 @@ export default function GrowWallet({
         ) : (
           <div className="flex gap-2">
             <Input
+              id={`gw-coupon-${instanceId}`}
               type="text"
               value={couponCode}
-              onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponError(""); }}
+              onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponApplied(null); setCouponError(""); }}
               placeholder={product === "database" ? "הכנס/י קוד הנחה" : "הכנס קוד קופון"}
               className="text-right text-sm"
               style={{ color: '#1a1a1a', backgroundColor: 'white' }}

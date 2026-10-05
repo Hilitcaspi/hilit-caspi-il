@@ -30,14 +30,15 @@ export function buildDatabaseJoinHref(
   return `/join?${outgoing.toString()}`;
 }
 
-/** The gift is automatic. TEST1 is only allowed when explicitly supplied for a checkout test. */
+/** The LIVE gift is automatic; a validated checkout test may explicitly override it. */
 export function buildLiveDatabaseJoinHref(
   currentSearch: string,
   sessionStore?: ReadableStorage | null,
   localStore?: ReadableStorage | null,
+  appliedTestCode?: "TEST1",
 ): string {
   const params = new URLSearchParams(currentSearch);
-  params.set("coupon", params.get("coupon")?.toUpperCase() === "TEST1" ? "TEST1" : "LIVE");
+  params.set("coupon", appliedTestCode === "TEST1" ? "TEST1" : "LIVE");
   if (!params.has("utm_source")) params.set("utm_source", "site");
   if (!params.has("utm_medium")) params.set("utm_medium", "live_page");
   if (!params.has("utm_campaign")) params.set("utm_campaign", "live_october_2026");

@@ -197,7 +197,7 @@ export default function LiveEvent() {
   const needsFriendGuidance = hasPersonalLink && eligibilityQuery.isSuccess && !eligibility?.eligible;
 
   const scrollToTickets = () => document.getElementById("tickets")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  const goToThankYou = () => window.location.assign(params.get("coupon")?.toUpperCase() === "TEST1" ? "/live/thank-you?test=1" : "/live/thank-you");
+  const goToThankYou = (appliedCode?: string) => window.location.assign(appliedCode === "TEST1" ? "/live/thank-you?test=1" : "/live/thank-you");
 
   return (
     <main dir="rtl" className="min-h-screen overflow-x-hidden bg-[#f0eadc] font-rubik text-[#191265]">
@@ -391,7 +391,7 @@ export default function LiveEvent() {
                     buttonLabel="להמשך לתשלום המאובטח ב־49 ₪"
                     buttonClassName="!mt-6 !w-full !rounded-2xl !bg-[#191265] !py-4 !font-black !text-white hover:!bg-[#30247e]"
                     termsPath="/terms/live-october"
-                    onSuccess={goToThankYou}
+                    onSuccess={(_response, appliedCode) => goToThankYou(appliedCode)}
                   />
                 </div>
               </div>
@@ -401,16 +401,15 @@ export default function LiveEvent() {
                   <p className="text-xs font-black tracking-[.16em] text-[#4e3eb4]">כרטיס רגיל</p>
                   <h3 className="mt-2 text-2xl font-black text-[#191265]">מקום ללייב ב־149 ₪</h3>
                   <p className="mt-3 text-sm leading-7 text-[#625d78]">המחיר הרגיל פתוח לכל מי שרוצים להצטרף לשיחה. פרטי ההצטרפות יועברו לאחר אישור ההרשמה.</p>
-                  {params.get("coupon")?.toUpperCase() === "TEST1" && <p className="mt-3 rounded-xl bg-[#fff4d4] p-3 text-sm font-bold leading-6 text-[#191265]">קוד TEST1 מיועד לבדיקת הקופה ב־1 ₪ עם מייל הבדיקה המורשה בלבד. זו עסקת בדיקה אמיתית, והשובר שיופק אינו מקנה כניסה לאירוע.</p>}
+                  <p className="mt-3 rounded-xl bg-[#fff4d4] p-3 text-sm font-bold leading-6 text-[#191265]">יש לכם קוד הטבה? מזינים אותו בטופס כאן בעמוד אחרי פרטי הקשר ולוחצים על ״החל״. המחיר יתעדכן רק לאחר אימות המייל והקוד. תשלום בדיקה ב־1 ₪ מנפיק שובר בדיקה בלבד, לא כרטיס כניסה.</p>
                 </div>
                 <GrowWallet
                   product="live_october"
                   showCoupon
-                  prefillCoupon={params.get("coupon")?.toUpperCase() === "TEST1" ? "TEST1" : undefined}
                   buttonLabel="להמשך לתשלום המאובטח"
                   buttonClassName="!w-full !rounded-2xl !bg-[#191265] !py-4 !font-black !text-white hover:!bg-[#30247e]"
                   termsPath="/terms/live-october"
-                  onSuccess={goToThankYou}
+                  onSuccess={(_response, appliedCode) => goToThankYou(appliedCode)}
                 />
                 <p className="md:col-span-2 text-center text-xs leading-6 text-[#625d78]">כבר חברים במאגר? <a href="#friend-link" className="font-black text-[#191265] underline underline-offset-4">בקשו קישור אישי</a> כדי לראות את המחיר שלכם לפני התשלום.</p>
                 {needsFriendGuidance ? <div className="md:col-span-2 rounded-xl border border-[#d9c777] bg-[#fffaf0] p-4 text-center text-xs leading-6 text-[#625d78]"><strong className="text-[#191265]">הטבת FRIENDS לא נפתחה בקישור הזה.</strong> קוד FRIENDS אינו זמין ללא אימות חברות פעילה. כדי לבדוק זכאות או לקבל קישור אישי עדכני, אפשר <a href="#friend-link" className="font-black text-[#191265] underline underline-offset-4">לבקש קישור אישי</a>.</div> : null}
