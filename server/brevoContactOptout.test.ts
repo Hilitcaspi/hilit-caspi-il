@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { blacklistBrevoContactEmail } from "./brevo";
+import { blacklistBrevoContactEmail, resumeTransactionalEmail } from "./brevo";
 
 const originalApiKey = process.env.BREVO_API_KEY;
 const originalFetch = globalThis.fetch;
@@ -46,5 +46,21 @@ describe("Brevo CRM email opt-out", () => {
   it("reports provider errors rather than claiming synchronization", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(reply(503));
     expect(await blacklistBrevoContactEmail("person@example.com")).toBe("failed");
+  });
+
+  it("unblocks transactional email only, after the verified member has opted in", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(reply(204));
+    globalThis.fetch = fetchMock;
+    expect(await resumeTransactionalEmail(" Person@Example.com ")).toBe("unblocked");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/smtp\/blockedContacts\/person%40example\.com$/);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "DELETE" });
+    expect(fetchMock.mock.calls[0][0]).not.toContain("/contacts/");
+  });
+
+  it("is idempotent for an unblocked email and fails closed on provider errors", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(reply(404)).mockResolvedValueOnce(reply(503));
+    expect(await resumeTransactionalEmail("person@example.com")).toBe("already_unblocked");
+    expect(await resumeTransactionalEmail("person@example.com")).toBe("failed");
   });
 });

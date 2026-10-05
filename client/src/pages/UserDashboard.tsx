@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import DatabaseExpectations from "@/components/DatabaseExpectations";
 import LiveVoucherCard from "@/components/LiveVoucherCard";
+import EssentialEmailOptIn from "@/components/EssentialEmailOptIn";
 import GrowWallet from "@/components/GrowWallet";
 import AnonymousBoostSilhouette from "@/components/AnonymousBoostSilhouette";
 import { trpc } from "@/lib/trpc";
@@ -1228,6 +1229,8 @@ export default function UserDashboard() {
           ))}
         </div>
       </div>
+
+      <EssentialEmailOptIn email={email} token={token} />
 
       {/* Tabs */}
       <div className="max-w-2xl mx-auto px-4 mt-6">

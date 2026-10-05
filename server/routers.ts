@@ -25,7 +25,7 @@ import { notifyOwner } from "./_core/notification";
 import { startJourney, getJourneyKey } from "./automation";
 import { ga4GenerateLead, ga4SignUp, clientIdFromEmail } from "./_core/ga4";
 import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as buildMatchProposalEmailTemplate, buildContactRevealEmail as buildContactRevealEmailTemplate, buildMatchRejectionAckEmail, buildOwnerMatchApprovalEmail, buildConsolationEmail, WOMEN_MATCHMAKING_EMAIL_1, MEN_MATCHMAKING_EMAIL_1, DNA_PROFILES, buildMatchFollowUpEmail } from "./emailTemplates";
-import { sendEmail, blacklistBrevoContactEmail } from "./brevo";
+import { sendEmail, blacklistBrevoContactEmail, isPermanentlyBlockedEmail, resumeTransactionalEmail } from "./brevo";
 import { createPlusCheckoutReference } from "./plusCheckoutReference";
 import { activatePendingPlusAfterRegistration } from "./plusFulfillment";
 import { hasPlusPilotCapacity } from "./plusPilotCapacity";
@@ -2997,6 +2997,42 @@ export const appRouter = router({
           hasCompletedQuestionnaire: !!profile.questionnaireCompletedAt,
           questionnaireToken: profile.questionnaireToken,
         };
+      }),
+
+    /** Restore essential email only after the member requests it in the authenticated personal area. */
+    resumeEssentialEmails: publicProcedure
+      .input(z.object({
+        email: z.string().trim().email().max(320),
+        token: z.string().min(16).max(128),
+        explicitConsent: z.literal(true),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא ניתן לעדכן כרגע" });
+        const normalizedEmail = input.email.trim().toLowerCase();
+        const [member] = await db.select({ email: singles.email }).from(singles).where(and(
+          sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`,
+          eq(singles.questionnaireToken, input.token),
+          eq(singles.isPaid, true),
+          eq(singles.isActive, true),
+        )).limit(1);
+        if (!member?.email || isPermanentlyBlockedEmail(member.email)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "לא ניתן לעדכן את ההעדפה מהקישור הזה" });
+        }
+
+        // Record a first-party consent before requesting a change at the provider.
+        // Never update consentEmailMarketing or crmLeads.emailUnsubscribed here.
+        await db.insert(analyticsEvents).values({
+          eventType: "button_click", email: normalizedEmail,
+          page: "/my-profile/essential-email-opt-in",
+          metadata: JSON.stringify({ version: 1, scope: "access_and_matches", action: "explicit_request" }),
+          createdAt: Date.now(),
+        });
+        const result = await resumeTransactionalEmail(member.email);
+        if (result === "failed") {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא הצלחנו לעדכן כרגע. אפשר לנסות שוב מאוחר יותר." });
+        }
+        return { success: true as const };
       }),
 
     /**

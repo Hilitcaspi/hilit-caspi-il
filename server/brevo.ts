@@ -114,6 +114,20 @@ export async function blacklistBrevoContactEmail(email: string): Promise<"blackl
   }
 }
 
+/** Call only after an authenticated member explicitly opts back into essential emails. */
+export async function resumeTransactionalEmail(email: string): Promise<"unblocked" | "already_unblocked" | "failed"> {
+  const normalized = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return "failed";
+  try {
+    // The SMTP blocklist is separate from the marketing contact's emailBlacklisted flag.
+    const response = await brevoFetch(`/smtp/blockedContacts/${encodeURIComponent(normalized)}`, { method: "DELETE" });
+    if (response.status === 404) return "already_unblocked";
+    return response.ok ? "unblocked" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
 /**
  * Send a transactional email via Brevo
  */

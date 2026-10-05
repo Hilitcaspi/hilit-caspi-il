@@ -6,6 +6,7 @@ import { buildContactRevealEmail } from "./emailTemplates";
 const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), "utf8");
 const routersSource = read("server/routers.ts");
 const dashboardSource = read("client/src/pages/UserDashboard.tsx");
+const essentialEmailSource = read("client/src/components/EssentialEmailOptIn.tsx");
 const homeSource = read("client/src/pages/Home.tsx");
 const dashboardLinkProcedure = routersSource.slice(
   routersSource.indexOf("sendDashboardLink: publicProcedure"),
@@ -38,6 +39,23 @@ describe("personal area passwordless access", () => {
     expect(dashboardSource).toContain("sendLink.mutate({ email })");
     expect(dashboardSource).not.toContain("לא מצאנו חשבון עם כתובת המייל הזו");
     expect(homeSource.match(/href="\/my-profile"/g)?.length || 0).toBeGreaterThanOrEqual(3);
+  });
+
+  it("requires a verified member and a deliberate choice to resume essential messages", () => {
+    const start = routersSource.indexOf("resumeEssentialEmails: publicProcedure");
+    const stop = routersSource.indexOf("sendDashboardLink: publicProcedure", start);
+    const procedure = routersSource.slice(start, stop);
+    expect(start).toBeGreaterThan(0);
+    expect(procedure).toContain("explicitConsent: z.literal(true)");
+    expect(procedure).toContain("eq(singles.questionnaireToken, input.token)");
+    expect(procedure).toContain("eq(singles.isPaid, true)");
+    expect(procedure).toContain("eq(singles.isActive, true)");
+    expect(procedure).toContain("resumeTransactionalEmail(member.email)");
+    expect(procedure).not.toContain("consentEmailMarketing: true");
+    expect(procedure).not.toContain("emailUnsubscribed: false");
+    expect(dashboardSource).toContain("<EssentialEmailOptIn email={email} token={token} />");
+    expect(essentialEmailSource).toContain("disabled={!checked || resume.isPending}");
+    expect(essentialEmailSource).toContain("היא לא מחזירה ניוזלטרים");
   });
 });
 
