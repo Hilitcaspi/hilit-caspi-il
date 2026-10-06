@@ -1943,17 +1943,20 @@ export default function CRMMatchmaking() {
                       {(() => {
                         const bd = match.scoreBreakdown ? (() => { try { return JSON.parse(match.scoreBreakdown); } catch { return null; } })() : null;
                         const safeScore = (v: unknown) => typeof v === 'number' && !isNaN(v) ? Math.round(v) : null;
-                        // Build dims from whatever fields exist in the breakdown (v8.0 aware)
+                        // Keep legacy snapshots readable, but distinguish weighted dimensions from extra points.
                         const dims = bd ? [
-                            { label: "שלב חיים", score: safeScore(bd.lifeStage), icon: "🌱" },
-                            { label: "DNA", score: safeScore(bd.dna), icon: "🧬" },
-                            { label: "דתיות", score: safeScore(bd.religiosity), icon: "✨" },
-                            { label: "מעשי", score: safeScore(bd.practical), icon: "🏠" },
-                            { label: "השכלה", score: safeScore(bd.education), icon: "🎓" },
-                            { label: "בונוס", score: safeScore(bd.interactionBonus), icon: "⭐" },
-                            { label: "עיר", score: safeScore(bd.cityIntelligence), icon: "🏙️" },
-                            { label: "אסטרו", score: safeScore(bd.astrologyBonus) !== null ? Math.min(100, (safeScore(bd.astrologyBonus) ?? 0) * 20) : null, icon: "⭐️" },
-                          ].filter(d => d.score !== null) : null;
+                            { label: "שאלון זוגי", score: safeScore(bd.questionnaire), icon: "📋", weight: "40%" },
+                            { label: "שלב חיים", score: safeScore(bd.lifeStage), icon: "🌱", weight: "20%" },
+                            { label: "DNA", score: safeScore(bd.dna), icon: "🧬", weight: "13%" },
+                            { label: "דתיות", score: safeScore(bd.religiosity), icon: "✨", weight: "10%" },
+                            { label: "בונוס התאמה", score: safeScore(bd.interactionBonus), icon: "⭐", weight: "7%" },
+                            { label: "השכלה", score: safeScore(bd.education), icon: "🎓", weight: "5%" },
+                            { label: "מעשי", score: safeScore(bd.practical), icon: "🏠", weight: "5%" },
+                          ] : null;
+                        const extraPoints = bd ? [
+                          { label: "אסטרולוגיה", value: safeScore(bd.astrologyBonus) },
+                          { label: "טקסט חופשי", value: safeScore(bd.textBonus) },
+                        ].filter(item => item.value !== null && item.value > 0) : [];
                         const details: string[] = bd?.details ?? [];
                         return (
                           <div className="mb-4 bg-[#f8f6f0] rounded-xl p-3">
@@ -1961,9 +1964,10 @@ export default function CRMMatchmaking() {
                               <p className="text-xs font-bold text-[#191265]">📊 פירוט ציון תאימות</p>
                               {bd?.algorithm && <span className="text-[10px] text-[#727272] bg-white px-2 py-0.5 rounded-full border">{bd.algorithm}</span>}
                             </div>
+                            <p className="text-[11px] text-[#555] mb-2 leading-relaxed">זהו ציון דירוג של המערכת, לא הסתברות להצלחת זוגיות. יש לבדוק בנפרד את העדפות שני הצדדים לפני הצעת התאמה.</p>
                             {dims ? (
                               <div className="grid grid-cols-3 gap-2 mb-3">
-                                {dims.filter(d => d.score !== undefined).map(d => (
+                                {dims.filter(d => d.score !== null).map(d => (
                                   <div key={d.label} className="text-center bg-white rounded-lg p-2">
                                     <div className="text-base">{d.icon}</div>
                                     {d.score === null || d.score === undefined ? (
@@ -1979,11 +1983,18 @@ export default function CRMMatchmaking() {
                               </div>
                             )}
                                     <div className="text-[10px] text-[#727272] mt-0.5">{d.label}</div>
+                                    <div className="text-[10px] text-[#727272]">משקל בציון: {d.weight}</div>
                                   </div>
                                 ))}
                               </div>
                             ) : (
                               <p className="text-xs text-[#727272] mb-2">פירוט לא זמין, לחץ "חשב ציונים מחדש" כדי לעדכן</p>
+                            )}
+                            {dims?.some(d => d.label === "השכלה" && d.score !== null) && (
+                              <p className="text-[11px] text-[#555] mb-2">ציון ההשכלה מודד פער בין דרגות לימוד, לא דרישת השכלה שהגדירו המשתתפים. במקרה זה הוא תורם {((dims.find(d => d.label === "השכלה")?.score ?? 0) * 0.05).toFixed(1)} נקודות מתוך 100 למשקל הבסיסי.</p>
+                            )}
+                            {extraPoints.length > 0 && (
+                              <p className="text-[11px] text-[#555] mb-2">תוספות מעבר למשקלים: {extraPoints.map(item => `${item.label} +${item.value}`).join(" · ")}. התאמה בהרגלי עישון עשויה להוסיף עד 5 נקודות נוספות.</p>
                             )}
                             {details.length > 0 && (
                               <div className="border-t border-[#e9e8e8] pt-2 mb-2">
