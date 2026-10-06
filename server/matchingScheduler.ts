@@ -4,8 +4,8 @@
 /**
  * Tri-Daily Matchmaking Scheduler
  * Runs every 3 days at 09:00 Israel time.
- * Uses the FULL algorithm: computeFullScore (6 components) + open-text LLM scoring
- * + scoreBreakdown + autoExplanation, identical to the manual CRM "Run Algorithm" button.
+ * Uses the same weighted computeFullScore as the manual CRM, with full
+ * scoreBreakdown and a separate (non-scoring) explanation.
  *
  * Finds all compatible singles (90%+ score, or 80%+ if no 90% found),
  * inserts pending matches into the DB, and notifies Hilit via email.
@@ -18,28 +18,16 @@ import { sendSMS } from "./vibrate";
 import { buildMatchExpiredSmsMessage } from "./matchSms";
 import {
   computeFullScore,
-  scoreOpenText,
   MATCH_THRESHOLD,
 } from "./compatibility";
+import type { ScoreBreakdown } from "./compatibility";
 import { notifyOwner } from "./_core/notification";
 import { sendEmail } from "./brevo";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
 
 const ADMIN_EMAIL = "hilitcaspi@gmail.com";
 const HIGH_THRESHOLD = 90;
-const LOW_THRESHOLD = MATCH_THRESHOLD; // 80
-
-// ─── SCORE BREAKDOWN TYPE ────────────────────────────────────────────────────
-interface ScoreBreakdown {
-  questionnaire: number;
-  dna: number;
-  demographic: number;
-  practical: number;
-  lifeStage: number;
-  visual: number;
-  openText: number;
-  total: number;
-}
+const LOW_THRESHOLD = MATCH_THRESHOLD;
 
 // ─── BUILD EXPLANATION (same as routers.ts) ──────────────────────────────────
 async function buildMatchExplanation(
@@ -216,33 +204,13 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
       const answersAList: MatchAnswer[] = answersA ? JSON.parse(answersA.answersJson ?? "[]") : [];
       const answersBList: MatchAnswer[] = answersB ? JSON.parse(answersB.answersJson ?? "[]") : [];
 
-      // ── FULL SCORE (6 components) ──────────────────────────────────────────
+      // ── SAME RECIPROCAL SCORE AS MANUAL CRM ────────────────────────────────
       const structuredScore = computeFullScore(a, b, answersAList, answersBList);
       if (structuredScore.total === 0) continue; // failed hard filters
-
-      // ── OPEN TEXT SCORING ─────────────────────────────────────────────────
-      const openTextScore = await scoreOpenText(
-        a.partnerDescription,
-        b.about,
-        b.partnerDescription,
-        a.about
-      );
-
-      // ── FINAL SCORE (85% structured + 15% open text) ─────────────────────
-      const finalScore = Math.round(structuredScore.total * 0.85 + openTextScore * 0.15);
+      const finalScore = structuredScore.total;
 
       if (finalScore >= LOW_THRESHOLD) {
-        // ── SCORE BREAKDOWN (v5.0, use computeFullScore directly) ─────────
-        const breakdown: ScoreBreakdown = {
-          questionnaire: structuredScore.questionnaire,
-          dna: structuredScore.dna,
-          demographic: structuredScore.lifeStage,
-          practical: structuredScore.practical,
-          lifeStage: structuredScore.lifeStage,
-          visual: 50,
-          openText: openTextScore,
-          total: finalScore,
-        };
+        const breakdown: ScoreBreakdown = structuredScore;
 
         // ── AUTO EXPLANATION ──────────────────────────────────────────────────────────────────────
         const explanation = await buildMatchExplanation(a, b, breakdown, answersAList, answersBList);

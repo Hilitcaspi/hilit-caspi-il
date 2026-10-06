@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * HILIT CASPI, MATCHING ALGORITHM v8.0  "The Genius Engine"
+ * HILIT CASPI, MATCHING ALGORITHM v9.0  "The Genius Engine"
  * ═══════════════════════════════════════════════════════════════════════════════
  * COPYRIGHT NOTICE:
  * © 2024–2025 Hilit Caspi. All rights reserved.
@@ -23,28 +23,34 @@
  * 8. Life-stage-aware questionnaire weights
  * 9. Smart narrative generation (warm, personal, in Hilit's voice)
  *
+ * v9.0: questionnaire importance normalized to answered importance; degree
+ * proximity recalibrated; existing question responses and reciprocal preferences
+ * drive a bounded 100-point score. Legacy bonuses remain diagnostic only.
+ *
  * SCORING ARCHITECTURE (100 points total):
  *   Questionnaire Compatibility:  40 pts
  *   Life Stage & Demographics:    20 pts
- *   DNA Personality Synergy:      13 pts  (gender-aware)
- *   Religiosity & Values:         10 pts
+ *   DNA Personality Synergy:      15 pts  (gender-aware)
+ *   Religiosity & Values:          7 pts
  *   Interaction Bonuses:           7 pts
- *   Education & Ambition:          5 pts
+ *   Education proximity:           6 pts
  *   Location & Practical:          5 pts
  *                                ────────
  *                          Total: 100 pts (capped at 97)
- *   Astrology Bonus:              +0 to +5 (added on top, capped at 97)
+ *   Astrology, word overlap and smoking: diagnostics only, not extra points.
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 import type { Single } from "../drizzle/schema";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
 import { scoreLocation } from "../shared/cities";
+import { MATCH_SCORING_VERSION, MATCH_SCORE_WEIGHTS } from "../shared/matchScoringPolicy";
 
 export const MATCH_THRESHOLD = 55;
 export const MAX_MATCHES_PER_PERSON = 5;
 
 export type ScoreBreakdown = {
   total: number;
+  algorithm?: string;
   questionnaire: number;
   lifeStage: number;
   dna: number;
@@ -264,6 +270,9 @@ function scoreQuestion(
   ansB: MatchAnswer,
   weight: number
 ): { raw: number; weighted: number; maxWeighted: number } {
+  const impA = Math.max(0, Math.min(2, ansA.importance ?? 1)) + 1;
+  const impB = Math.max(0, Math.min(2, ansB.importance ?? 1)) + 1;
+  const effectiveImp = (impA + impB + Math.max(impA, impB)) / 3;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getVal = (ans: MatchAnswer) => {
     if (ans.myAnswer !== undefined) return ans.myAnswer;
@@ -275,11 +284,8 @@ function scoreQuestion(
     const rankA = Array.isArray(rawA_check) ? rawA_check : [];
     const rankB = Array.isArray(rawB_check) ? rawB_check : [];
     const raw = scoreLoveLanguageRank(rankA, rankB);
-    const impA = (ansA.importance ?? 1) + 1;
-    const impB = (ansB.importance ?? 1) + 1;
-    const effectiveImp = (impA + impB + Math.max(impA, impB)) / 3;
     const weighted = raw * weight * effectiveImp;
-    const maxWeighted = 100 * weight * 3;
+    const maxWeighted = 100 * weight * effectiveImp;
     return { raw, weighted, maxWeighted };
   }
   const valA = getVal(ansA);
@@ -320,11 +326,8 @@ function scoreQuestion(
     const dist = Math.abs(myA - myB);
     raw = Math.round(100 - (dist / maxOpt) * 70);
   }
-  const impA = (ansA.importance ?? 1) + 1;
-  const impB = (ansB.importance ?? 1) + 1;
-  const effectiveImp = (impA + impB + Math.max(impA, impB)) / 3;
   const weighted = raw * weight * effectiveImp;
-  const maxWeighted = 100 * weight * 3;
+  const maxWeighted = 100 * weight * effectiveImp;
   return { raw, weighted, maxWeighted };
 }
 
@@ -606,11 +609,15 @@ function scoreLocationV8(
   } else if ((locationPrefA === "close" || locationPrefB === "close") && km > 50) {
     base = Math.min(base, 30);
   }
-  if (locationPrefA === "anywhere" || locationPrefB === "anywhere") {
+  if ((locationPrefA === "anywhere" || locationPrefB === "anywhere") &&
+      locationPrefA !== "close" && locationPrefB !== "close") {
     base = Math.max(base, 50);
   }
   const bonusFromOriginal = result.score - (km <= 5 ? 100 : km <= 15 ? 90 : km <= 30 ? 75 : km <= 50 ? 58 : km <= 80 ? 38 : km <= 120 ? 20 : 5);
-  const final = Math.max(0, Math.min(100, base + Math.max(0, bonusFromOriginal)));
+  let final = Math.max(0, Math.min(100, base + Math.max(0, bonusFromOriginal)));
+  if (km > 50 && (locationPrefA === "close" || locationPrefB === "close")) {
+    final = Math.min(final, locationPrefA === "close" && locationPrefB === "close" ? 15 : 30);
+  }
   return { score: final, distanceKm: km, notes: [...notes, ...result.notes] };
 }
 
@@ -676,51 +683,41 @@ function religiosityScore(a: Single, b: Single): number {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SECTION 6: EDUCATION & AMBITION (5 points)
+// SECTION 6: EDUCATION PROXIMITY (6 points)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Education levels — ordered by academic tier
-// vocational (הכשרה מקצועית) and technician (הנדסאי) sit between high_school and bachelor
-// student (סטודנט) is treated as equivalent to bachelor (in-progress)
-const EDU_LEVEL: Record<string, number> = {
-  high_school: 1,
-  vocational: 2,   // הכשרה מקצועית / קורס / תעודה
-  technician: 2.5, // הנדסאי — practical degree, between vocational and bachelor
-  student: 3,      // סטודנט — treated as bachelor-in-progress
-  bachelor: 3,
-  other: 2,
-  master: 4,
-  phd: 5,
-};
-
-// Special bonus: technician+technician or vocational+vocational = same-track bonus
-const EDU_SAME_TRACK_BONUS: Record<string, string[]> = {
-  technician: ["technician", "vocational", "bachelor"],
-  vocational:  ["vocational", "technician"],
-  student:     ["student", "bachelor", "master"],
-};
-
-function educationScore(a: Single, b: Single): number {
-  if (!a.education || !b.education) return 60;
-  const levelA = EDU_LEVEL[a.education] ?? 2;
-  const levelB = EDU_LEVEL[b.education] ?? 2;
-  const diff = Math.abs(levelA - levelB);
-
-  // Same education type = perfect match
-  if (a.education === b.education) return 100;
-
-  // Same-track bonus: technician+bachelor, vocational+technician etc.
-  const trackA = EDU_SAME_TRACK_BONUS[a.education] ?? [];
-  const trackB = EDU_SAME_TRACK_BONUS[b.education] ?? [];
-  if (trackA.includes(b.education) || trackB.includes(a.education)) return 90;
-
-  // Numeric level difference scoring
-  if (diff <= 0.5) return 95;  // e.g. technician(2.5) vs bachelor(3)
-  if (diff <= 1)   return 80;
-  if (diff <= 1.5) return 70;
-  if (diff <= 2)   return 55;
-  if (diff <= 3)   return 35;
-  return 20;
+// Symmetric proximity heuristic, not a stated education requirement. Unknown
+// answers remain neutral: an unanswered field must not mean "no education".
+export function educationScore(a: Pick<Single, "education">, b: Pick<Single, "education">): number {
+  const first = a.education;
+  const second = b.education;
+  if (!first || !second || first === "other" || second === "other") return 60;
+  if (first === second) return 100;
+  const pair = [first, second].sort().join(":");
+  const proximity: Record<string, number> = {
+    "bachelor:master": 95,
+    "bachelor:phd": 90,
+    "master:phd": 95,
+    "bachelor:student": 90,
+    "master:student": 80,
+    "phd:student": 75,
+    "technician:vocational": 75,
+    "bachelor:technician": 50,
+    "master:technician": 25,
+    "phd:technician": 20,
+    "student:technician": 55,
+    "bachelor:vocational": 40,
+    "master:vocational": 25,
+    "phd:vocational": 20,
+    "student:vocational": 45,
+    "high_school:vocational": 65,
+    "high_school:technician": 50,
+    "high_school:student": 35,
+    "bachelor:high_school": 25,
+    "high_school:master": 15,
+    "high_school:phd": 10,
+  };
+  return proximity[pair] ?? 60;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1000,12 +997,6 @@ function computeInteractionBonuses(a: Single, b: Single): { score: number; detai
     }
   }
 
-  const nlp = scoreNLPCompatibility(a, b);
-  if (nlp.hints.length > 0) {
-    bonus += Math.round((nlp.score - 50) / 5);
-    details.push(...nlp.hints);
-  }
-
   if (a.relationshipPace && b.relationshipPace && a.relationshipPace === b.relationshipPace) {
     bonus += 10;
     details.push("קצב מערכת יחסים דומה");
@@ -1168,9 +1159,9 @@ export function passesHardFilters(a: Single, b: Single): { pass: boolean; reason
     return { pass: false, reason: "אחד לא רוצה ילדים נוספים והשני רוצה ילדים" };
 
   const locResult = scoreLocationV8(a.city, b.city, a.locationPreference, b.locationPreference);
-  if (a.locationPreference === "close" && b.locationPreference === "close" &&
+  if ((a.locationPreference === "close" || b.locationPreference === "close") &&
       locResult.distanceKm !== null && locResult.distanceKm > 50) {
-    return { pass: false, reason: `שניהם מחפשים קרוב אך מרחק ${locResult.distanceKm} ק"מ` };
+    return { pass: false, reason: `לפחות אחד מחפש קרוב אך המרחק ${locResult.distanceKm} ק"מ` };
   }
   // ── SMOKING hard filter ──────────────────────────────────────────────────
   const aSmokingStatus = (a as any).smokingStatus as string | null;
@@ -1280,6 +1271,22 @@ export function passesAnswerHardFilters(
   return { pass: true };
 }
 
+function weightedCompatibilityScore(parts: {
+  questionnaire: number;
+  lifeStage: number;
+  dna: number;
+  religiosity: number;
+  interactionBonus: number;
+  education: number;
+  practical: number;
+}): number {
+  const score = Object.entries(MATCH_SCORE_WEIGHTS).reduce(
+    (sum, [key, weight]) => sum + parts[key as keyof typeof MATCH_SCORE_WEIGHTS] * weight,
+    0,
+  );
+  return Math.max(12, Math.min(97, Math.round(score)));
+}
+
 export function computeFullScore(
   a: Single,
   b: Single,
@@ -1315,32 +1322,22 @@ export function computeFullScore(
   const relScore    = religiosityScore(a, b);
   const eduScore    = educationScore(a, b);
   const interaction = computeInteractionBonuses(a, b);
-  const astro       = scoreAstrology(a, b);
-  const textBon     = scoreTextBonus(a, b);
   const cityIntel   = scoreCityIntelligence(a, b);
   const smokingBon  = scoreSmokingCompatibility(a, b);
 
   details.push(...interaction.details);
-  if (astro.detail) details.push(astro.detail);
   if (cityIntel.narrativeHints.length > 0) details.push(...cityIntel.narrativeHints);
-  if (textBon.hints.length > 0) details.push(...textBon.hints);
   if (smokingBon.detail) details.push(smokingBon.detail);
 
-  let total = Math.round(
-    qScore      * 0.40 +
-    lsScore     * 0.20 +
-    dnaScore    * 0.13 +
-    relScore    * 0.10 +
-    interaction.score * 0.07 +
-    eduScore    * 0.05 +
-    prScore     * 0.05
-  );
-
-  total = Math.min(97, total + astro.bonus + textBon.bonus + smokingBon.bonus);
-  total = Math.max(12, Math.min(97, total));
+  const total = weightedCompatibilityScore({
+    questionnaire: qScore, lifeStage: lsScore, dna: dnaScore,
+    religiosity: relScore, interactionBonus: interaction.score,
+    education: eduScore, practical: prScore,
+  });
 
   return {
     total,
+    algorithm: MATCH_SCORING_VERSION,
     questionnaire: qScore,
     lifeStage: lsScore,
     dna: dnaScore,
@@ -1348,8 +1345,8 @@ export function computeFullScore(
     religiosity: relScore,
     education: eduScore,
     interactionBonus: interaction.score,
-    astrologyBonus: astro.bonus,
-    textBonus: textBon.bonus,
+    astrologyBonus: 0,
+    textBonus: 0,
     cityIntelligence: cityIntel.score,
     details,
   };
@@ -1377,29 +1374,20 @@ export function computeFullScoreAdmin(
   const relScore    = religiosityScore(a, b);
   const eduScore    = educationScore(a, b);
   const interaction = computeInteractionBonuses(a, b);
-  const astro       = scoreAstrology(a, b);
-  const textBon     = scoreTextBonus(a, b);
   const cityIntel   = scoreCityIntelligence(a, b);
   const smokingBon  = scoreSmokingCompatibility(a, b);
   const details: string[] = [];
   details.push(...interaction.details);
-  if (astro.detail) details.push(astro.detail);
   if (cityIntel.narrativeHints.length > 0) details.push(...cityIntel.narrativeHints);
-  if (textBon.hints.length > 0) details.push(...textBon.hints);
   if (smokingBon.detail) details.push(smokingBon.detail);
-  let total = Math.round(
-    qScore      * 0.40 +
-    lsScore     * 0.20 +
-    dnaScore    * 0.13 +
-    relScore    * 0.10 +
-    interaction.score * 0.07 +
-    eduScore    * 0.05 +
-    prScore     * 0.05
-  );
-  total = Math.min(97, total + astro.bonus + textBon.bonus + smokingBon.bonus);
-  total = Math.max(12, Math.min(97, total));
+  const total = weightedCompatibilityScore({
+    questionnaire: qScore, lifeStage: lsScore, dna: dnaScore,
+    religiosity: relScore, interactionBonus: interaction.score,
+    education: eduScore, practical: prScore,
+  });
   return {
     total,
+    algorithm: MATCH_SCORING_VERSION,
     questionnaire: qScore,
     lifeStage: lsScore,
     dna: dnaScore,
@@ -1407,8 +1395,8 @@ export function computeFullScoreAdmin(
     religiosity: relScore,
     education: eduScore,
     interactionBonus: interaction.score,
-    astrologyBonus: astro.bonus,
-    textBonus: textBon.bonus,
+    astrologyBonus: 0,
+    textBonus: 0,
     cityIntelligence: cityIntel.score,
     details,
     warnings,

@@ -22,6 +22,7 @@ import { AlarmClock, AlertTriangle, Users, Heart, Zap, Copy, RefreshCw, CheckCir
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getMatchTrackingSummary, hasMutualYes, isUnsuccessfulMatch, isWaitingForMatchResponses } from "@shared/matchLifecycle";
 import { wasMatchProposalSent } from "@shared/matchDelivery";
+import { LEGACY_MATCH_SCORE_WEIGHTS, MATCH_SCORING_VERSION, MATCH_SCORE_WEIGHTS } from "@shared/matchScoringPolicy";
 
 const RELIGIOSITY_LABELS: Record<string, string> = {
   secular:     "חילוני/ת",
@@ -1943,15 +1944,17 @@ export default function CRMMatchmaking() {
                       {(() => {
                         const bd = match.scoreBreakdown ? (() => { try { return JSON.parse(match.scoreBreakdown); } catch { return null; } })() : null;
                         const safeScore = (v: unknown) => typeof v === 'number' && !isNaN(v) ? Math.round(v) : null;
+                        const currentVersion = bd?.algorithm === MATCH_SCORING_VERSION;
+                        const weights = currentVersion ? MATCH_SCORE_WEIGHTS : LEGACY_MATCH_SCORE_WEIGHTS;
                         // Keep legacy snapshots readable, but distinguish weighted dimensions from extra points.
                         const dims = bd ? [
-                            { label: "שאלון זוגי", score: safeScore(bd.questionnaire), icon: "📋", weight: "40%" },
-                            { label: "שלב חיים", score: safeScore(bd.lifeStage), icon: "🌱", weight: "20%" },
-                            { label: "DNA", score: safeScore(bd.dna), icon: "🧬", weight: "13%" },
-                            { label: "דתיות", score: safeScore(bd.religiosity), icon: "✨", weight: "10%" },
-                            { label: "בונוס התאמה", score: safeScore(bd.interactionBonus), icon: "⭐", weight: "7%" },
-                            { label: "השכלה", score: safeScore(bd.education), icon: "🎓", weight: "5%" },
-                            { label: "מעשי", score: safeScore(bd.practical), icon: "🏠", weight: "5%" },
+                            { label: "שאלון זוגי", score: safeScore(bd.questionnaire), icon: "📋", weight: weights.questionnaire },
+                            { label: "שלב חיים", score: safeScore(bd.lifeStage), icon: "🌱", weight: weights.lifeStage },
+                            { label: "DNA", score: safeScore(bd.dna), icon: "🧬", weight: weights.dna },
+                            { label: "דתיות", score: safeScore(bd.religiosity), icon: "✨", weight: weights.religiosity },
+                            { label: "בונוס התאמה", score: safeScore(bd.interactionBonus), icon: "⭐", weight: weights.interactionBonus },
+                            { label: "השכלה", score: safeScore(bd.education), icon: "🎓", weight: weights.education },
+                            { label: "מעשי", score: safeScore(bd.practical), icon: "🏠", weight: weights.practical },
                           ] : null;
                         const extraPoints = bd ? [
                           { label: "אסטרולוגיה", value: safeScore(bd.astrologyBonus) },
@@ -1962,8 +1965,11 @@ export default function CRMMatchmaking() {
                           <div className="mb-4 bg-[#f8f6f0] rounded-xl p-3">
                             <div className="flex items-center justify-between mb-2">
                               <p className="text-xs font-bold text-[#191265]">📊 פירוט ציון תאימות</p>
-                              {bd?.algorithm && <span className="text-[10px] text-[#727272] bg-white px-2 py-0.5 rounded-full border">{bd.algorithm}</span>}
+                              {bd && <span className="text-[10px] text-[#727272] bg-white px-2 py-0.5 rounded-full border">{bd.algorithm ?? "נוסחה קודמת"}</span>}
                             </div>
+                            {bd && !currentVersion && (
+                              <p className="text-[11px] text-[#725c47] mb-2">זהו ציון היסטורי שנשמר לפני שינוי הנוסחה. הוא לא חושב מחדש, ולכן עשוי להיות שונה מציון חיפוש עדכני לאותו זוג.</p>
+                            )}
                             <p className="text-[11px] text-[#555] mb-2 leading-relaxed">זהו ציון דירוג של המערכת, לא הסתברות להצלחת זוגיות. יש לבדוק בנפרד את העדפות שני הצדדים לפני הצעת התאמה.</p>
                             {dims ? (
                               <div className="grid grid-cols-3 gap-2 mb-3">
@@ -1983,7 +1989,7 @@ export default function CRMMatchmaking() {
                               </div>
                             )}
                                     <div className="text-[10px] text-[#727272] mt-0.5">{d.label}</div>
-                                    <div className="text-[10px] text-[#727272]">משקל בציון: {d.weight}</div>
+                                    <div className="text-[10px] text-[#727272]">משקל בציון: {Math.round(d.weight * 100)}%</div>
                                   </div>
                                 ))}
                               </div>
@@ -1991,10 +1997,10 @@ export default function CRMMatchmaking() {
                               <p className="text-xs text-[#727272] mb-2">פירוט לא זמין, לחץ "חשב ציונים מחדש" כדי לעדכן</p>
                             )}
                             {dims?.some(d => d.label === "השכלה" && d.score !== null) && (
-                              <p className="text-[11px] text-[#555] mb-2">ציון ההשכלה מודד פער בין דרגות לימוד, לא דרישת השכלה שהגדירו המשתתפים. במקרה זה הוא תורם {((dims.find(d => d.label === "השכלה")?.score ?? 0) * 0.05).toFixed(1)} נקודות מתוך 100 למשקל הבסיסי.</p>
+                              <p className="text-[11px] text-[#555] mb-2">ציון ההשכלה מודד דמיון בין סוגי לימודים, לא דרישת תואר שהגדירו המשתתפים. במקרה זה הוא תורם {((dims.find(d => d.label === "השכלה")?.score ?? 0) * weights.education).toFixed(1)} נקודות מתוך 100 לציון הבסיסי.</p>
                             )}
                             {extraPoints.length > 0 && (
-                              <p className="text-[11px] text-[#555] mb-2">תוספות מעבר למשקלים: {extraPoints.map(item => `${item.label} +${item.value}`).join(" · ")}. התאמה בהרגלי עישון עשויה להוסיף עד 5 נקודות נוספות.</p>
+                              <p className="text-[11px] text-[#555] mb-2">{currentVersion ? "מידע אבחוני שאינו נכלל בציון:" : "תוספות מעבר למשקלים בנוסחה הקודמת:"} {extraPoints.map(item => `${item.label} +${item.value}`).join(" · ")}.{!currentVersion && " התאמה בהרגלי עישון עשויה להוסיף עד 5 נקודות נוספות."}</p>
                             )}
                             {details.length > 0 && (
                               <div className="border-t border-[#e9e8e8] pt-2 mb-2">
