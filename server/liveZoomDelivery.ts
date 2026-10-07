@@ -5,6 +5,7 @@ import { sendEmailBatch, isPermanentlyBlockedEmail } from "./brevo";
 import { hasActivePlusCouponEntitlement } from "./couponPolicy";
 import { getDb } from "./db";
 import { LIVE_OCTOBER_SLUG } from "./liveOctober";
+import { liveQuestionToken } from "./liveQuestionAccess";
 import { buildLiveZoomTicketEmail } from "./liveZoomTicketEmail";
 import { decryptZoomJoinUrl, encryptZoomJoinUrl, isZoomLiveDeliveryEnabled, registerApprovedLiveAttendee, zoomLiveConfig } from "./liveZoomApi";
 
@@ -86,7 +87,9 @@ export async function processLiveZoomTickets(limit = 2) {
         }).where(and(eq(liveOctoberTickets.id, id), isNull(liveOctoberTickets.revokedAt)));
       }
       const joinUrl = decryptZoomJoinUrl(encrypted, config.encryptionKey);
-      const email = buildLiveZoomTicketEmail({ name: ticket.name, joinUrl, source: ticket.source });
+      const email = buildLiveZoomTicketEmail({
+        name: ticket.name, joinUrl, source: ticket.source, questionToken: liveQuestionToken(ticket),
+      });
       // Persist a review-only state before the external call. Brevo's idempotency lasts only 30 minutes;
       // if a worker dies or the result is ambiguous, automatic retry could send a duplicate later.
       await db.update(liveOctoberTickets).set({ zoomLastError: "email_inflight" }).where(eq(liveOctoberTickets.id, id));

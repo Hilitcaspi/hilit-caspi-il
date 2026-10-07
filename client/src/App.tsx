@@ -328,6 +328,7 @@ function HeRouter() {
           <Route path={"/match/return-to-pool"} component={lazy(() => import("./pages/MatchReturnToPool"))} />
           <Route path={"/match/owner-approve"} component={MatchOwnerApprove} />
           <Route path={"/live/thank-you"} component={LiveEventThankYou} />
+          <Route path={"/live/question"} component={lazy(() => import("./pages/LiveQuestion"))} />
           <Route path={"/terms/live-october"} component={TermsLiveOctober} />
           <Route path={"/live/database"} component={LiveDatabaseOffer} />
           <Route path={"/live"} component={LiveEvent} />

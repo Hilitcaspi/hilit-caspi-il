@@ -86,7 +86,8 @@ describe("October Zoom ticket delivery", () => {
   });
 
   it("produces a Hebrew branded ticket, escaping names and using no common meeting passcode", () => {
-    const email = buildLiveZoomTicketEmail({ name: '<img src=x onerror=alert(1)>', joinUrl: fakeUrl, source: "database_live" });
+    const questionToken = `17.${"a".repeat(43)}`;
+    const email = buildLiveZoomTicketEmail({ name: '<img src=x onerror=alert(1)>', joinUrl: fakeUrl, source: "database_live", questionToken });
     expect(email.subject).toContain("כרטיס המתנה");
     expect(email.htmlContent).toContain("31.10.2026");
     expect(email.htmlContent).toContain("Rubik");
@@ -95,5 +96,11 @@ describe("October Zoom ticket delivery", () => {
     expect(email.htmlContent).toContain(fakeUrl.replace(/&/g, "&amp;"));
     expect(email.textContent).toContain(fakeUrl);
     expect(email.textContent).not.toContain("קוד כניסה");
+    expect(email.htmlContent).toContain(`/live/question#q=${questionToken}`);
+    expect(email.textContent).toContain(`/live/question#q=${questionToken}`);
+    expect(email.htmlContent).not.toContain("/my-profile");
+    const standalone = buildLiveZoomTicketEmail({ name: "דוגמה", joinUrl: fakeUrl, source: "standalone", questionToken });
+    expect(standalone.htmlContent).toContain(`/live/question#q=${questionToken}`);
+    expect(standalone.subject).not.toContain("מתנה");
   });
 });

@@ -22,8 +22,8 @@ export default function LiveEventThankYou() {
           <div className="rounded-2xl bg-white p-5 shadow-sm"><Clock3 className="h-5 w-5 text-[#191265]" /><p className="mt-2 font-black">שבת, 31.10.2026 · 20:30</p><p className="mt-1 text-xs leading-6 text-[#625d78]">מפגש אונליין בזום לפי שעון ישראל. אפשר להשתתף מכל מקום.</p></div>
           <div className="rounded-2xl bg-white p-5 shadow-sm"><Mail className="h-5 w-5 text-[#191265]" /><p className="mt-2 font-black">קישור Zoom יישלח בהמשך</p><p className="mt-1 text-xs leading-6 text-[#625d78]">לאחר הגדרת האירוע יישלח קישור אישי לכתובת ההרשמה, סמוך למועד הלייב.</p></div>
         </div>}
-        <p className="text-center text-xs leading-6 text-[#625d78]">לא רואים עדיין כרטיס? לפעמים האישור לוקח כמה רגעים. אם התשלום בוצע ממכשיר אחר, אפשר להיכנס לאזור האישי או ליצור קשר עם הצוות.</p>
-        <div className="flex flex-wrap justify-center gap-4 text-sm font-bold"><Link href="/live" className="underline underline-offset-4">חזרה לעמוד הלייב</Link><Link href="/my-profile" className="underline underline-offset-4">האזור האישי</Link></div>
+        <p className="text-center text-xs leading-6 text-[#625d78]">לא רואים עדיין כרטיס? לפעמים אישור התשלום לוקח כמה רגעים. אם התשלום בוצע ממכשיר אחר, אפשר לפנות אלינו לעזרה. אין צורך להיות חברי המאגר כדי לשלוח שאלה על הלייב.</p>
+        <div className="flex flex-wrap justify-center gap-4 text-sm font-bold"><Link href="/live" className="underline underline-offset-4">חזרה לעמוד הלייב</Link></div>
       </div>
     </main>
   );

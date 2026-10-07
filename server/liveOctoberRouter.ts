@@ -5,6 +5,7 @@ import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { liveOctoberQuestions, liveOctoberTickets } from "../drizzle/schema";
 import { ticketJoinUrl } from "./liveZoomDelivery";
+import { liveQuestionTicket } from "./liveQuestionAccess";
 import {
   LIVE_OCTOBER_SLUG, ensurePlusLiveTicket, existingLiveTicket,
   getVerifiedLiveMember, isLiveCheckoutOpen, liveTicketByReceipt, submitLiveQuestion,
@@ -38,19 +39,31 @@ export const liveOctoberRouter = router({
     } : null;
   }),
 
+  questionAccess: publicProcedure.input(z.object({ questionToken: z.string().max(80) })).query(async ({ input }) => {
+    const ticket = await liveQuestionTicket(input.questionToken);
+    if (!ticket) return null;
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [count] = await db.select({ total: sql<number>`count(*)` }).from(liveOctoberQuestions)
+      .where(eq(liveOctoberQuestions.ticketId, ticket.id));
+    return { remaining: Math.max(0, 3 - Number(count?.total ?? 0)) };
+  }),
+
   askQuestion: publicProcedure.input(z.object({
     email: z.string().email().optional(),
     token: z.string().min(16).max(200).optional(),
     trackingToken: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    questionToken: z.string().max(80).optional(),
     question: z.string().trim().min(8).max(1500),
   })).mutation(async ({ input }) => {
     let ticket = null;
-    if (input.email && input.token) {
+    if (input.questionToken) ticket = await liveQuestionTicket(input.questionToken);
+    else if (input.email && input.token) {
       const member = await getVerifiedLiveMember(input.email, input.token);
       if (member?.plus) ticket = await ensurePlusLiveTicket(input.email, input.token);
       else if (member) ticket = await existingLiveTicket(input.email);
     }
-    if (!ticket && input.trackingToken) ticket = await liveTicketByReceipt(input.trackingToken);
+    if (!input.questionToken && !ticket && input.trackingToken) ticket = await liveTicketByReceipt(input.trackingToken);
     if (!ticket) throw new TRPCError({ code: "FORBIDDEN", message: "אפשר לשלוח שאלה רק לאחר הרשמה מאומתת ללייב" });
     try {
       return await submitLiveQuestion(ticket.id, input.question);
