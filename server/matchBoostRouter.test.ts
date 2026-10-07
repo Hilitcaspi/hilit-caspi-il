@@ -1,9 +1,45 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, MIN_BOOST_SCORE, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, evaluateLoadedBoostContext, getBoostProfileReadiness, parseBoostCheckoutReference, selectOnDemandBoostCandidates } from "./matchBoostRouter";
+import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, MIN_BOOST_SCORE, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, evaluateLoadedBoostContext, getBoostProfileReadiness, isDuplicateBoostRequestError, parseBoostCheckoutReference, selectOnDemandBoostCandidates, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
 
 const NOW = new Date("2026-08-25T12:00:00Z").getTime();
+
+describe("Plus Boost dispatch and database errors", () => {
+  it("preserves delivery timestamp on rejection, but records fulfillment on approval", async () => {
+    const patches: Record<string, any>[] = [];
+    const db = { transaction: async (fn: (tx: any) => Promise<void>) => fn({
+      update: () => ({ set: (patch: Record<string, any>) => {
+        patches.push(patch);
+        return { where: async () => ({ affectedRows: 1 }) };
+      } }),
+    }) };
+    await syncBoostRequestAfterMatchDecision(db, { matchId: 101, decision: "rejected", now: NOW });
+    expect(patches[0]).toMatchObject({ status: "rejected", decidedAt: NOW });
+    expect(patches[0]).not.toHaveProperty("fulfilledAt");
+    patches.length = 0;
+    await syncBoostRequestAfterMatchDecision(db, { matchId: 102, decision: "approved", now: NOW });
+    expect(patches[0]).toMatchObject({ status: "approved", fulfilledAt: NOW });
+  });
+
+  it("detects duplicate keys wrapped by Drizzle and never treats another SQL failure as a duplicate", () => {
+    expect(isDuplicateBoostRequestError({ cause: { code: "ER_DUP_ENTRY", errno: 1062 } })).toBe(true);
+    expect(isDuplicateBoostRequestError({ code: "ER_DUP_ENTRY" })).toBe(true);
+    expect(isDuplicateBoostRequestError({ cause: { code: "ER_BAD_FIELD_ERROR" } })).toBe(false);
+  });
+
+  it("shows a used Plus benefit after a proposal has been sent even if the recipient rejects it", () => {
+    const cycleStart = NOW - 5 * 24 * 60 * 60 * 1000;
+    const state = evaluateBoostEligibility({
+      single: completeSingle(), memberMatches: [pendingMatch()], membership: activeMembership(),
+      plusMember: { status: "active", billingStatus: "active", billingCycleStartedAt: cycleStart },
+      boostRequests: [{ source: "plus_included", status: "rejected", matchId: 999,
+        plusBillingCycleStartedAt: cycleStart, fulfilledAt: NOW - 1000 }], now: NOW,
+    });
+    expect(state.plusBenefitAvailable).toBe(false);
+    expect(state.eligible).toBe(true); // Paid Boost remains available.
+  });
+});
 
 function completeSingle(overrides: Record<string, unknown> = {}) {
   return {

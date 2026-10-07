@@ -32,6 +32,14 @@ export const BOOST_CONSENT_VERSION = "2026-08-29-v2";
 const OPEN_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
 const REVIEWABLE_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
 
+export function isDuplicateBoostRequestError(error: unknown): boolean {
+  let current: any = error;
+  for (let depth = 0; depth < 4 && current; depth++, current = current.cause) {
+    if (current.code === "ER_DUP_ENTRY" || current.errno === 1062) return true;
+  }
+  return false;
+}
+
 function boostCheckoutSigningSecret() {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET unavailable for Boost checkout binding");
@@ -353,7 +361,9 @@ export async function syncBoostRequestAfterMatchDecision(
     await tx.update(matchBoostRequests).set({
       status: input.decision,
       decidedAt: now,
-      fulfilledAt: input.decision === "approved" ? now : null,
+      // Delivery, not the recipient's answer, consumes a Boost. Keep an existing
+      // fulfilledAt on rejection so the Plus benefit isn't offered twice.
+      ...(input.decision === "approved" ? { fulfilledAt: now } : {}),
       decisionReason: input.reason || (input.decision === "approved"
         ? "ההתאמה אושרה ונשלחה בזרימה הרגילה"
         : "ההתאמה נדחתה בבדיקת CRM"),
@@ -618,6 +628,9 @@ export async function preparePaidBoostCheckout(input: {
     await tx.update(matchBoostMemberships).set({ lastActiveAt: now, updatedAt: now })
       .where(eq(matchBoostMemberships.singleId, single.id));
     return Number((insertResult as any).insertId || 0);
+  }).catch((error: unknown) => {
+    if (error instanceof TRPCError) throw error;
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא ניתן לפתוח תשלום Boost כרגע. לא בוצע חיוב; נסו שוב מאוחר יותר.", cause: error });
   });
   if (!requestId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא ניתן היה לפתוח בקשת Boost" });
   return {
@@ -1319,12 +1332,15 @@ export const matchBoostRouter = router({
         });
         return await dispatchWithFailureRelease(requestId);
       } catch (error: any) {
-        if (error?.code === "ER_DUP_ENTRY") {
+        if (isDuplicateBoostRequestError(error)) {
           const [existing] = await db.select().from(matchBoostRequests)
             .where(eq(matchBoostRequests.idempotencyKey, idempotencyKey)).limit(1);
-          if (!existing) throw error;
+          if (!existing) throw new TRPCError({ code: "CONFLICT", message: "הבקשה כבר נרשמה. יש לרענן את האזור האישי לפני ניסיון נוסף." });
+          if (existing.fulfilledAt) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "ה־Boost הכלול ב־Plus כבר נשלח במחזור הנוכחי. אפשר לשלוח Boost נוסף בתשלום." });
+          }
           if (existing.status === "cancelled" && !existing.fulfilledAt) {
-            await db.update(matchBoostRequests).set({
+            const updateResult = await db.update(matchBoostRequests).set({
               matchId: selectedCandidate.id,
               status: "queued",
               requestedAt: now,
@@ -1333,11 +1349,15 @@ export const matchBoostRouter = router({
               decisionReason: "plus_boost_retry_after_delivery_failure",
               expiresAt: now + 7 * DAY_MS,
               updatedAt: now,
-            }).where(eq(matchBoostRequests.id, existing.id));
+            }).where(and(eq(matchBoostRequests.id, existing.id), eq(matchBoostRequests.status, "cancelled"), isNull(matchBoostRequests.fulfilledAt)));
+            const updated = Number((Array.isArray(updateResult) ? updateResult[0] : updateResult)?.affectedRows || 0);
+            if (!updated) throw new TRPCError({ code: "CONFLICT", message: "הבקשה כבר מטופלת. יש לרענן את האזור האישי." });
+            return await dispatchWithFailureRelease(existing.id);
           }
-          return await dispatchWithFailureRelease(existing.id);
+          throw new TRPCError({ code: "CONFLICT", message: "הבקשה הקודמת כבר טופלה או עדיין בתהליך. יש לרענן את האזור האישי." });
         }
-        throw error;
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא הצלחנו לפתוח את בקשת ה־Boost כרגע. לא בוצע חיוב; נסו שוב מאוחר יותר.", cause: error });
       }
     }),
 
