@@ -1952,3 +1952,13 @@
 **Cost:** לא זמין ברמת המשימה
 **Notes:** מדובר בהנחיה בלבד; אין שינוי מפגש דרך החיבור שאינו זמין. מקור: https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065026
 ---
+## Task: בדיקת מייל אישור הרשמה ל־Zoom
+**Category:** infrastructure/QA
+**Trigger:** reactive/production issue
+**Continuation of:** פישוט שאלות ההרשמה למפגש Zoom
+**Before:** במסך Email Settings מוצג מייל אישור אחרי אישור הרשמה ושפה לפי ברירת המחדל של הנמען. נדרש לוודא שזה אכן מאפשר שליחת קישור אישי, להבחין בין מייל Zoom לבין מייל כרטיס ממותג מהאתר, ולא להבטיח שפה עברית ללא בדיקה. אין לשמור כתובת איש קשר או פרטי התחברות ביומן.
+**After (completed 2026-10-07 13:53 IDT, duration 1m):** המסך מציג `Confirmation Email to Registrants: Send after registration approval`, התואם למסירת קישור אישי לאחר אישור ב־Zoom; אין הוכחה מהצילום שבוצעה רכישת בדיקה או שהמייל הגיע. שפת `Same as recipients' default language` עשויה להשתנות לפי שפת הנרשם, ולכן הומלץ לבדוק אפשרות עברית באמצעות Edit וללחוץ Send me a preview email. יש לוודא כתובת קשר נכונה. המייל של Zoom אינו מחליף כרטיס ממותג מהאתר שכולל הבטחת הטבה וקישור אישי רק לאחר חיבור זכאות; לא הוגדר חיבור כזה עדיין.
+**Status:** partially resolved
+**Cost:** לא זמין ברמת המשימה
+**Notes:** בדיקת תצורה בלבד, ללא משלוח בדיקה או שינוי באתר. מקור Zoom: https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065026
+---
