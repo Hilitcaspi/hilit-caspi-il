@@ -970,6 +970,23 @@ async function startServer() {
     }
   });
 
+  // October live delivery remains inert until the meeting, OAuth app and branded email are tested.
+  app.post("/api/scheduled/live-zoom-tickets", express.json(), async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req as any);
+      if (!user.isCron || !user.taskUid || !process.env.LIVE_ZOOM_HEARTBEAT_UID
+          || user.taskUid !== process.env.LIVE_ZOOM_HEARTBEAT_UID) {
+        res.status(403).json({ error: "cron-only" });
+        return;
+      }
+      const { processLiveZoomTickets } = await import("../liveZoomDelivery");
+      res.json(await processLiveZoomTickets(2));
+    } catch {
+      // Never log an upstream payload: it can contain personal Zoom links.
+      res.status(500).json({ error: "live-zoom-delivery-failed" });
+    }
+  });
+
   // ─── Team Member Login (form POST with redirect — Chrome mobile fallback) ──
   app.post("/api/team/login-form", async (req, res) => {
     try {

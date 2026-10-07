@@ -4,6 +4,7 @@ import { z } from "zod";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { liveOctoberQuestions, liveOctoberTickets } from "../drizzle/schema";
+import { ticketJoinUrl } from "./liveZoomDelivery";
 import {
   LIVE_OCTOBER_SLUG, ensurePlusLiveTicket, existingLiveTicket,
   getVerifiedLiveMember, isLiveCheckoutOpen, liveTicketByReceipt, submitLiveQuestion,
@@ -25,7 +26,7 @@ export const liveOctoberRouter = router({
       : await existingLiveTicket(input.email);
     return {
       eligible: true, plus: member.plus,
-      ticket: ticket ? { code: ticket.voucherCode, source: ticket.source } : null,
+      ticket: ticket ? { code: ticket.voucherCode, source: ticket.source, joinUrl: ticketJoinUrl(ticket) } : null,
     };
   }),
 
@@ -33,7 +34,7 @@ export const liveOctoberRouter = router({
     const ticket = await liveTicketByReceipt(input.trackingToken);
     return ticket ? {
       code: ticket.voucherCode, source: ticket.source,
-      name: ticket.name, issuedAt: ticket.issuedAt,
+      name: ticket.name, issuedAt: ticket.issuedAt, joinUrl: ticketJoinUrl(ticket),
     } : null;
   }),
 
@@ -84,7 +85,9 @@ export const liveOctoberRouter = router({
       id: liveOctoberTickets.id, name: liveOctoberTickets.name,
       email: liveOctoberTickets.email, source: liveOctoberTickets.source,
       voucherCode: liveOctoberTickets.voucherCode, amountAgorot: liveOctoberTickets.amountAgorot,
-      issuedAt: liveOctoberTickets.issuedAt,
+      issuedAt: liveOctoberTickets.issuedAt, zoomDeliveryState: liveOctoberTickets.zoomDeliveryState,
+      zoomAttemptCount: liveOctoberTickets.zoomAttemptCount, zoomLastError: liveOctoberTickets.zoomLastError,
+      zoomEmailSentAt: liveOctoberTickets.zoomEmailSentAt,
     }).from(liveOctoberTickets).where(and(
       eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG),
       sql`${liveOctoberTickets.revokedAt} is null`,

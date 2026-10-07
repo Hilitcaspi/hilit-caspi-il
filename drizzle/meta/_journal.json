@@ -253,6 +253,13 @@
       "when": 1791104972858,
       "tag": "0035_smart_shatterstar",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "5",
+      "when": 1791374120716,
+      "tag": "0036_unique_king_bedlam",
+      "breakpoints": true
     }
   ]
 }

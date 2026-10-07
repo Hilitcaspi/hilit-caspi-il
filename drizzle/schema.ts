@@ -766,10 +766,19 @@ export const liveOctoberTickets = mysqlTable("live_october_tickets", {
   providerTransactionId: varchar("provider_transaction_id", { length: 200 }),
   issuedAt: bigint("issued_at", { mode: "number" }).notNull(),
   revokedAt: bigint("revoked_at", { mode: "number" }),
+  zoomRegistrantId: varchar("zoom_registrant_id", { length: 120 }),
+  zoomJoinUrlEncrypted: text("zoom_join_url_encrypted"),
+  zoomDeliveryState: mysqlEnum("zoom_delivery_state", ["pending", "registered", "sent"]).notNull().default("pending"),
+  zoomClaimedUntil: bigint("zoom_claimed_until", { mode: "number" }),
+  zoomAttemptCount: int("zoom_attempt_count").notNull().default(0),
+  zoomLastError: varchar("zoom_last_error", { length: 80 }),
+  zoomEmailSentAt: bigint("zoom_email_sent_at", { mode: "number" }),
+  zoomEmailMessageId: varchar("zoom_email_message_id", { length: 160 }),
 }, (t) => ({
   eventEmailUnique: uniqueIndex("live_october_event_email_unique").on(t.eventSlug, t.email),
   voucherUnique: uniqueIndex("live_october_voucher_unique").on(t.voucherCode),
   sourceIdx: index("live_october_source_idx").on(t.source),
+  zoomDeliveryIdx: index("live_october_zoom_delivery_idx").on(t.zoomDeliveryState, t.zoomClaimedUntil),
 }));
 export type LiveOctoberTicket = typeof liveOctoberTickets.$inferSelect;
 
