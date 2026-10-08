@@ -198,7 +198,7 @@ export default function LiveEvent() {
     : "/my-profile";
   const needsFriendGuidance = hasPersonalLink && eligibilityQuery.isSuccess && !eligibility?.eligible;
 
-  const scrollToTickets = () => document.getElementById("tickets")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const scrollToTickets = () => document.getElementById("ticket-purchase")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
   const goToThankYou = (appliedCode?: string) => window.location.assign(appliedCode === "TEST1" ? "/live/thank-you?test=1" : "/live/thank-you");
 
   return (
@@ -208,7 +208,7 @@ export default function LiveEvent() {
         <div aria-hidden="true" className="absolute inset-0 -z-10 opacity-45 [background-image:linear-gradient(90deg,transparent_49.7%,rgba(255,255,255,.08)_50%,transparent_50.3%)] [background-size:84px_84px]" />
         <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
           <Link href="/" className="text-sm font-black text-white transition hover:text-[#ffe27c]">הילית כספי</Link>
-          <button type="button" onClick={scrollToTickets} className="rounded-full border border-[#ffe27c]/50 bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#191265] transition hover:bg-white sm:px-5 sm:text-sm">לפרטי הכרטיסים</button>
+          <button type="button" onClick={scrollToTickets} className="rounded-full border border-[#ffe27c]/50 bg-[#ffe27c] px-4 py-2 text-xs font-black text-[#191265] transition hover:bg-white sm:px-5 sm:text-sm">לרכישת כרטיס</button>
         </header>
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-9 px-5 pb-16 pt-7 sm:px-8 md:pb-24 lg:grid-cols-[1.08fr_.92fr] lg:gap-16 lg:px-10">
@@ -227,7 +227,7 @@ export default function LiveEvent() {
             </motion.p>
             <motion.p variants={fadeUp} className="mt-4 text-sm font-black text-[#ffe27c]">כרטיס ללייב ב־149 ₪. לחברי המאגר הכנתי מחיר מיוחד.</motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button type="button" onClick={scrollToTickets} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#ffe27c] px-8 py-4 text-base font-black text-[#191265] shadow-[0_16px_35px_rgba(0,0,0,.2)] transition hover:-translate-y-0.5 hover:bg-white active:scale-[.98]">לפרטי הכרטיסים וההטבות <ArrowLeft className="h-5 w-5" /></button>
+              <button type="button" onClick={scrollToTickets} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#ffe27c] px-8 py-4 text-base font-black text-[#191265] shadow-[0_16px_35px_rgba(0,0,0,.2)] transition hover:-translate-y-0.5 hover:bg-white active:scale-[.98]">{hasPlus ? "לכרטיס Plus שלי" : isFriendEligible ? "לרכישת כרטיס ב־49 ₪" : "לרכישת כרטיס ב־149 ₪"} <ArrowLeft className="h-5 w-5" /></button>
               <a href="#what-awaits" className="inline-flex items-center justify-center rounded-2xl border border-white/25 px-7 py-4 text-sm font-bold text-white transition hover:border-[#ffe27c] hover:text-[#ffe27c]">מה נפתח בלייב?</a>
             </motion.div>
             <motion.div variants={fadeUp} className="mt-9 flex flex-wrap gap-x-6 gap-y-3 border-t border-white/14 pt-6 text-xs font-bold text-white/72">
@@ -279,7 +279,7 @@ export default function LiveEvent() {
               <p>אני קוראת את הפרופיל, ההעדפות והתשובות לשאלון, ואז מסתכלת גם על האנשים שמאחורי הנתונים. בלייב אראה לכם איך כל החלקים האלה נפגשים בתהליך ההתאמה.</p>
               <p>אני גם רוצה לשמוע אתכם. מה נכון לכתוב בפרופיל? איך מחליטים אם לתת הזדמנות? מה אפשר ללמוד כבר מהשיחה הראשונה? אלה בדיוק השאלות שנביא לערב הזה.</p>
             </div>
-            <a href="#tickets" className="mt-8 inline-flex items-center gap-2 font-black text-[#191265] underline decoration-[#ffe27c] decoration-4 underline-offset-8 transition hover:text-[#4e3eb4]">לכרטיסים, להטבות ולשאלות מראש <ArrowLeft className="h-4 w-4" /></a>
+            <a href="#ticket-purchase" className="mt-8 inline-flex items-center gap-2 font-black text-[#191265] underline decoration-[#ffe27c] decoration-4 underline-offset-8 transition hover:text-[#4e3eb4]">לרכישת כרטיס ללייב <ArrowLeft className="h-4 w-4" /></a>
           </motion.div>
           <motion.figure variants={fadeUp} className="order-1 overflow-hidden rounded-[2rem] border border-[#191265]/10 bg-[#f0eadc] p-2 shadow-[0_24px_55px_rgba(25,18,101,.14)] lg:order-2">
             <img src={AUDIENCE_IMAGE} alt="הילית כספי מדברת מול קהל" loading="lazy" decoding="async" className="w-full rounded-[1.55rem]" />
@@ -306,58 +306,7 @@ export default function LiveEvent() {
 
       <section id="tickets" className="scroll-mt-8 bg-[#f0eadc] px-5 py-20 sm:px-8 md:py-28 lg:px-10">
         <Reveal className="mx-auto max-w-7xl">
-          <SectionHeading eyebrow="כרטיסים והטבות" title={<>מגיעים ללייב<br /><span className="text-[#4e3eb4]">בדרך שמתאימה לכם.</span></>} description="כרטיס רגיל עולה 149 ₪. כבר חברים במאגר? הכנתי לכם מחיר מיוחד, ואת הפרטים אפשר לראות בקישור האישי שלכם." />
-
-          <div className="mx-auto mt-12 grid max-w-6xl gap-6 lg:grid-cols-[1fr_1.1fr]">
-            <motion.article variants={fadeUp} className="rounded-[2rem] border border-[#191265]/12 bg-white p-6 text-right shadow-[0_18px_45px_rgba(25,18,101,.08)] sm:p-8">
-              <div className="flex items-start justify-between gap-4 border-b border-[#191265]/10 pb-5">
-                <div>
-                  <p className="text-xs font-black tracking-[.16em] text-[#4e3eb4]">כרטיס רגיל</p>
-                  <h3 className="mt-2 text-2xl font-black text-[#191265]">כניסה ללייב אונליין בזום</h3>
-                </div>
-                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#f0eadc] text-[#191265]"><Ticket className="h-5 w-5" /></span>
-              </div>
-              <ul className="mt-6 space-y-3 text-sm leading-6 text-[#625d78]">
-                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#4e3eb4]" />השתתפות מהבית בזום בשבת, 31 באוקטובר, ב־20:30</li>
-                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#4e3eb4]" />אפשרות לשליחת שאלה מראש לאחר ההרשמה</li>
-                <li className="flex gap-3"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#4e3eb4]" />פרטי הצטרפות בערוץ מאובטח לאחר אישור</li>
-              </ul>
-              <div className="mt-7 rounded-2xl bg-[#191265] p-5 text-center text-white shadow-lg">
-                <p className="text-xs font-bold text-white/70">מחיר כרטיס רגיל</p>
-                <p className="mt-1 text-5xl font-black text-[#ffe27c]">149 ₪</p>
-                <p className="mt-2 text-xs text-white/70">{salesOpen ? "תשלום חד־פעמי. אפשר להירשם כעת." : "תשלום חד־פעמי. ההרשמה תיפתח בקרוב."}</p>
-              </div>
-            </motion.article>
-
-            <motion.article variants={fadeUp} className="relative overflow-hidden rounded-[2rem] bg-[linear-gradient(140deg,#17105b,#30247e)] p-6 text-right text-white shadow-[0_23px_60px_rgba(25,18,101,.3)] sm:p-8">
-              <div aria-hidden="true" className="absolute -left-16 -top-20 h-56 w-56 rounded-full bg-[#ffe27c]/15 blur-3xl" />
-              <div className="relative flex items-start justify-between gap-4 border-b border-white/15 pb-5">
-                <div>
-                  <p className="text-xs font-black tracking-[.16em] text-[#ffe27c]">חברי המאגר</p>
-                  <h3 className="mt-2 text-2xl font-black">מחיר מיוחד לחברי המאגר</h3>
-                </div>
-                <span className="grid h-11 w-11 place-items-center rounded-2xl border border-[#ffe27c]/30 bg-white/10 text-[#ffe27c]"><Crown className="h-5 w-5" /></span>
-              </div>
-              <p className="relative mt-6 text-sm leading-7 text-white/78">אם אתם כבר במאגר, מגיע לכם מחיר מיוחד. בקשו קישור אישי למייל שאיתו נרשמתם, וההטבה תופיע שם אוטומטית אחרי בדיקת הזכאות.</p>
-              <a href="#friend-link" className="relative mt-5 inline-flex items-center gap-2 text-sm font-black text-[#ffe27c] underline underline-offset-4">לבדיקת ההטבה שלי <ArrowLeft className="h-4 w-4" /></a>
-              <div className="relative mt-6 rounded-2xl border border-white/15 bg-white/[.08] p-4 text-xs leading-6 text-white/74">
-                <span className="font-black text-[#ffe27c]">כבר ב־Plus?</span> מחכה לכם שובר ללייב ללא עלות נוספת באזור האישי.
-              </div>
-            </motion.article>
-          </div>
-
-          <motion.div variants={fadeUp} className="mx-auto mt-6 max-w-6xl rounded-[2rem] border border-[#d9c777] bg-[linear-gradient(115deg,#fffaf0,#f6edcd)] p-6 shadow-[0_16px_40px_rgba(117,91,11,.10)] sm:p-8">
-            <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
-              <div>
-                <p className="inline-flex items-center gap-2 text-xs font-black tracking-[.14em] text-[#796116]"><Sparkles className="h-4 w-4" />לא חברים במאגר עדיין?</p>
-                <h3 className="mt-2 text-2xl font-black text-[#191265]">מצטרפים למאגר ומקבלים כרטיס ללייב במתנה.</h3>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-[#625d78]">בהצטרפות למאגר ב־299 ₪ ממלאים שאלון, יוצרים פרופיל ונותנים לי להכיר אתכם מעבר לתמונה. כרטיס אחד ללייב יתווסף במתנה למצטרפים חדשים מעמוד ההטבה, וקוד LIVE יחול אוטומטית בקופה.</p>
-              </div>
-              <a href={databaseOfferHref} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#191265] px-6 py-4 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#30247e]">להכיר את המאגר ואת הטבת הלייב <ArrowLeft className="h-4 w-4" /></a>
-            </div>
-          </motion.div>
-
-          <motion.div variants={fadeUp} className="mx-auto mt-10 max-w-3xl">
+          <motion.div variants={fadeUp} id="ticket-purchase" className="mx-auto max-w-4xl scroll-mt-6">
             {hasPersonalLink && eligibilityQuery.isLoading ? (
               <div className="rounded-[1.75rem] border border-[#191265]/10 bg-white p-7 text-center shadow-sm">
                 <p className="font-black text-[#191265]">בודקים את הזכאות האישית שלך</p>
@@ -401,9 +350,12 @@ export default function LiveEvent() {
               <div className="grid gap-6 rounded-[1.9rem] border border-[#191265]/10 bg-white p-6 shadow-[0_18px_45px_rgba(25,18,101,.08)] md:grid-cols-[.9fr_1.1fr] md:items-center sm:p-8">
                 <div className="text-right">
                   <p className="text-xs font-black tracking-[.16em] text-[#4e3eb4]">כרטיס רגיל</p>
-                  <h3 className="mt-2 text-2xl font-black text-[#191265]">מקום ללייב ב־149 ₪</h3>
-                  <p className="mt-3 text-sm leading-7 text-[#625d78]">המחיר הרגיל פתוח לכל מי שרוצים להצטרף לשיחה. פרטי ההצטרפות יועברו לאחר אישור ההרשמה.</p>
-                  <p className="mt-3 rounded-xl bg-[#fff4d4] p-3 text-sm font-bold leading-6 text-[#191265]">יש לכם קוד הטבה? מזינים אותו בטופס כאן בעמוד אחרי פרטי הקשר ולוחצים על ״החל״. המחיר יתעדכן רק לאחר אימות המייל והקוד. תשלום בדיקה ב־1 ₪ מנפיק שובר בדיקה בלבד, לא כרטיס כניסה.</p>
+                  <h3 className="mt-2 text-2xl font-black text-[#191265]">רכישת כרטיס ללייב</h3>
+                  <p className="mt-3 text-5xl font-black text-[#191265]">149 ₪</p>
+                  <p className="mt-2 text-sm font-bold text-[#625d78]">תשלום חד־פעמי · כרטיס אחד ללייב בזום</p>
+                  <p className="mt-4 text-sm leading-7 text-[#625d78]">שבת, 31.10.2026 בשעה 20:30. אפשר לרכוש כרטיס גם בלי להיות חברים במאגר.</p>
+                  <p className="mt-2 text-sm leading-7 text-[#625d78]">ממלאים את הפרטים כאן וממשיכים לתשלום. אחרי אישור הרכישה אפשר לשלוח לי שאלה לקראת המפגש.</p>
+                  <p className="mt-3 rounded-xl bg-[#fff4d4] p-3 text-sm font-bold leading-6 text-[#191265]">יש קוד הטבה? מזינים אותו אחרי פרטי הקשר ולוחצים ״החל״. המחיר מתעדכן לאחר אימות הקוד והמייל.</p>
                 </div>
                 <GrowWallet
                   product="live_october"
@@ -418,6 +370,38 @@ export default function LiveEvent() {
               </div>
             )}
           </motion.div>
+
+          <div id="live-benefits" className="mt-14 border-t border-[#191265]/12 pt-12">
+            <SectionHeading eyebrow="הטבות הקהילה" title="עוד דרכים להצטרף ללייב" description="מצטרפים חדשים למאגר מקבלים כרטיס במתנה. לחברי המאגר הכנתי מחיר מיוחד, ולחברי Plus פעילים הכניסה כלולה ללא עלות נוספת." />
+          </div>
+          <div className="mx-auto mt-8 grid max-w-6xl gap-6 lg:grid-cols-2">
+            <motion.article variants={fadeUp} className="relative h-full rounded-[2rem] border border-[#d9c777] bg-[linear-gradient(115deg,#fffaf0,#f6edcd)] p-6 shadow-[0_16px_40px_rgba(117,91,11,.10)] sm:p-8">
+              <div className="flex h-full flex-col gap-6">
+                <div>
+                  <p className="inline-flex items-center gap-2 text-xs font-black tracking-[.14em] text-[#796116]"><Sparkles className="h-4 w-4" />לא חברים במאגר עדיין?</p>
+                  <h3 className="mt-2 text-2xl font-black text-[#191265]">מצטרפים למאגר ומקבלים כרטיס ללייב במתנה.</h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[#625d78]">בהצטרפות למאגר ב־299 ₪ ממלאים שאלון, יוצרים פרופיל ונותנים לי להכיר אתכם מעבר לתמונה. כרטיס אחד ללייב בשווי 149 ₪ יתווסף במתנה למצטרפים חדשים מעמוד ההטבה, וקוד LIVE יחול אוטומטית בקופה.</p>
+                </div>
+                <a href={databaseOfferHref} className="mt-auto inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#191265] px-6 py-4 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#30247e]">להכיר את המאגר ואת הטבת הלייב <ArrowLeft className="h-4 w-4" /></a>
+              </div>
+            </motion.article>
+
+            <motion.article variants={fadeUp} className="relative h-full overflow-hidden rounded-[2rem] bg-[linear-gradient(140deg,#17105b,#30247e)] p-6 text-right text-white shadow-[0_23px_60px_rgba(25,18,101,.3)] sm:p-8">
+              <div aria-hidden="true" className="absolute -left-16 -top-20 h-56 w-56 rounded-full bg-[#ffe27c]/15 blur-3xl" />
+              <div className="relative flex items-start justify-between gap-4 border-b border-white/15 pb-5">
+                <div>
+                  <p className="text-xs font-black tracking-[.16em] text-[#ffe27c]">חברי המאגר</p>
+                  <h3 className="mt-2 text-2xl font-black">מחיר מיוחד לחברי המאגר</h3>
+                </div>
+                <span className="grid h-11 w-11 place-items-center rounded-2xl border border-[#ffe27c]/30 bg-white/10 text-[#ffe27c]"><Crown className="h-5 w-5" /></span>
+              </div>
+              <p className="relative mt-6 text-sm leading-7 text-white/78">אם אתם כבר במאגר, מגיע לכם מחיר מיוחד. בקשו קישור אישי למייל שאיתו נרשמתם, וההטבה תופיע שם אוטומטית אחרי בדיקת הזכאות.</p>
+              <a href="#friend-link" className="relative mt-5 inline-flex items-center gap-2 text-sm font-black text-[#ffe27c] underline underline-offset-4">לבדיקת ההטבה שלי <ArrowLeft className="h-4 w-4" /></a>
+              <div className="relative mt-6 rounded-2xl border border-white/15 bg-white/[.08] p-4 text-xs leading-6 text-white/74">
+                <span className="font-black text-[#ffe27c]">כבר ב־Plus?</span> מחכה לכם שובר ללייב ללא עלות נוספת באזור האישי.
+              </div>
+            </motion.article>
+          </div>
 
           {(!hasPersonalLink || needsFriendGuidance) && !hasPlus ? <motion.div variants={fadeUp} className="mx-auto mt-6 max-w-3xl"><FriendLinkRequest /></motion.div> : null}
         </Reveal>
