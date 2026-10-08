@@ -130,6 +130,8 @@ export const singles = mysqlTable("singles", {
   // Status
   isActive: boolean("isActive").default(true).notNull(),
   isSeed: boolean("isSeed").default(false).notNull(),
+  // Owner/test accounts remain accessible but must never enter Boost candidate cards or dispatch.
+  boostExcluded: boolean("boostExcluded").default(false).notNull(),
   isPaid: boolean("isPaid").default(false).notNull(),
   paymentRef: varchar("paymentRef", { length: 100 }),
 

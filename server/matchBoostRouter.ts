@@ -21,6 +21,7 @@ import { buildMatchProposalEmail } from "./emailTemplates";
 import { normalizeEmail, normalizedEmailEquals } from "./emailNormalization";
 import { getMissingProfileFields } from "./matchmakingMetrics";
 import { sendInitialMatchSmsOnce } from "./matchSms";
+import { isBoostExcludedProfile, loadBoostExclusionAnchors, type BoostExclusionAnchors } from "./boostExclusions";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const BOOST_PRICE_AGOROT = 1990;
@@ -111,6 +112,7 @@ export function selectOnDemandBoostCandidates(input: {
   candidateProfiles: any[];
   memberships: any[];
   answersBySingle: Map<number, any[]>;
+  exclusions?: BoostExclusionAnchors;
   existingCandidateIds?: Set<number>;
   unavailableCandidateIds?: Set<number>;
   now?: number;
@@ -124,7 +126,7 @@ export function selectOnDemandBoostCandidates(input: {
 
   return input.candidateProfiles
     .flatMap((candidate: any) => {
-      if (!candidate || candidate.id === input.single.id || existingCandidateIds.has(candidate.id) || unavailableCandidateIds.has(candidate.id)) return [];
+      if (!candidate || candidate.id === input.single.id || isBoostExcludedProfile(candidate, input.exclusions) || existingCandidateIds.has(candidate.id) || unavailableCandidateIds.has(candidate.id)) return [];
       const membership = membershipBySingle.get(candidate.id);
       const recentActivityAt = Number(membership?.lastActiveAt || membership?.consentedAt || 0);
       if (
@@ -151,6 +153,8 @@ export function selectOnDemandBoostCandidates(input: {
 }
 
 export async function ensureBoostCandidatesForSingle(db: any, single: any, now = Date.now()) {
+  const exclusions = await loadBoostExclusionAnchors(db);
+  if (isBoostExcludedProfile(single, exclusions)) return 0;
   const [membershipRows, memberMatches] = await Promise.all([
     db.select().from(matchBoostMemberships).where(eq(matchBoostMemberships.singleId, single.id)).limit(1),
     db.select().from(matches).where(or(eq(matches.singleAId, single.id), eq(matches.singleBId, single.id))),
@@ -174,6 +178,7 @@ export async function ensureBoostCandidatesForSingle(db: any, single: any, now =
       inArray(singles.id, candidateIds),
       eq(singles.isActive, true),
       eq(singles.isPaid, true),
+      eq(singles.boostExcluded, false),
     )),
     db.select({ singleAId: matches.singleAId, singleBId: matches.singleBId }).from(matches).where(and(
       isNull(matches.returnedToPoolAt),
@@ -198,6 +203,7 @@ export async function ensureBoostCandidatesForSingle(db: any, single: any, now =
     candidateProfiles,
     memberships,
     answersBySingle,
+    exclusions,
     existingCandidateIds,
     unavailableCandidateIds,
     now,
@@ -401,6 +407,7 @@ export function evaluateBoostEligibility(input: {
   plusMember?: any | null;
   membership?: any | null;
   boostRequests?: any[];
+  exclusions?: BoostExclusionAnchors;
   now?: number;
 }) {
   const now = input.now ?? Date.now();
@@ -437,6 +444,7 @@ export function evaluateBoostEligibility(input: {
   );
 
   const blockers: string[] = [];
+  if (isBoostExcludedProfile(input.single, input.exclusions)) blockers.push("פרופיל בדיקה אינו משתתף במסלול Boost");
   if (!input.single.isPaid || !input.single.isActive) blockers.push("החברות במאגר אינה פעילה");
   if (missingFields.length > 0) blockers.push("יש להשלים את הפרופיל לפני הפעלת בוסט");
   if (!input.single.questionnaireCompletedAt) blockers.push("יש להשלים את השאלון המדעי");
@@ -469,6 +477,7 @@ export function evaluateLoadedBoostContext(input: {
     plusMember?: any | null;
     membership?: any | null;
     requests: any[];
+    exclusions?: BoostExclusionAnchors;
   };
   now?: number;
 }) {
@@ -478,6 +487,7 @@ export function evaluateLoadedBoostContext(input: {
     plusMember: input.context.plusMember,
     membership: input.context.membership,
     boostRequests: input.context.requests,
+    exclusions: input.context.exclusions,
     now: input.now,
   });
 }
@@ -489,7 +499,7 @@ function hasReusablePaidBoostCredit(request: any) {
 }
 
 async function loadBoostContext(db: any, single: any) {
-  const [rawMemberMatches, plusRows, requests, membershipRows] = await Promise.all([
+  const [rawMemberMatches, plusRows, requests, membershipRows, exclusions] = await Promise.all([
     db.select({
       id: matches.id,
       singleId: matches.singleId,
@@ -506,6 +516,7 @@ async function loadBoostContext(db: any, single: any) {
     // Do not truncate: the included Plus Boost can precede many paid Boosts in this cycle.
     db.select().from(matchBoostRequests).where(eq(matchBoostRequests.singleId, single.id)).orderBy(desc(matchBoostRequests.requestedAt)),
     db.select().from(matchBoostMemberships).where(eq(matchBoostMemberships.singleId, single.id)).limit(1),
+    loadBoostExclusionAnchors(db),
   ]);
   const candidateIds = Array.from(new Set(rawMemberMatches
     .filter((match: any) => match.status === "pending" && !match.returnedToPoolAt)
@@ -543,6 +554,7 @@ async function loadBoostContext(db: any, single: any) {
     const reverseHardFilterResult = profile ? passesHardFilters(profile, single) : { pass: false };
     const candidateEligible = Boolean(
       profile
+      && !isBoostExcludedProfile(profile, exclusions)
       && profile.isPaid
       && profile.isActive
       && getMissingBoostProfileFields(profile).length === 0
@@ -561,6 +573,7 @@ async function loadBoostContext(db: any, single: any) {
     plusMember: plusRows[0] || null,
     membership: membershipRows[0] || null,
     requests,
+    exclusions,
   };
 }
 
@@ -755,14 +768,18 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   if (!match || match.status !== "pending" || match.returnedToPoolAt) {
     throw new TRPCError({ code: "CONFLICT", message: "ההתאמה אינה זמינה עוד. לא תישלח הצעה." });
   }
-  const [singleA, singleB, memberships] = await Promise.all([
+  const [singleA, singleB, memberships, exclusions] = await Promise.all([
     db.select().from(singles).where(eq(singles.id, match.singleAId)).limit(1),
     db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1),
     db.select().from(matchBoostMemberships).where(inArray(matchBoostMemberships.singleId, [match.singleAId, match.singleBId])),
+    loadBoostExclusionAnchors(db),
   ]);
   const partyA = singleA[0];
   const partyB = singleB[0];
   if (!partyA || !partyB) throw new TRPCError({ code: "NOT_FOUND", message: "אחד הפרופילים אינו זמין" });
+  if (isBoostExcludedProfile(partyA, exclusions) || isBoostExcludedProfile(partyB, exclusions)) {
+    throw new TRPCError({ code: "CONFLICT", message: "פרופיל בדיקה הוחרג ממסלול Boost. לא תישלח הצעה; תשלום שכבר אושר יישמר כקרדיט." });
+  }
   const senderIsA = request.singleId === match.singleAId;
   if (!senderIsA && request.singleId !== match.singleBId) {
     throw new TRPCError({ code: "CONFLICT", message: "לא ניתן לזהות את שולח ה־Boost" });

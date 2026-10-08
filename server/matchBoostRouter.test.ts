@@ -138,6 +138,36 @@ describe("match boost eligibility", () => {
     expect(options.map(option => option.score)).toEqual([...options.map(option => option.score)].sort((a, b) => b - a));
   });
 
+  it("never creates a Boost option for an excluded profile or owner-contact duplicate, but preserves unrelated similar names", () => {
+    const single = completeSingle({ seekingGender: "male", religiosity: "secular" });
+    const candidateProfiles = [
+      completeSingle({ id: 20, gender: "male", seekingGender: "female", boostExcluded: true }),
+      completeSingle({ id: 21, email: "f.i.c.t.i.o.n.a.l.o.w.n.e.r+test@gmail.com", gender: "male", seekingGender: "female" }),
+      completeSingle({ id: 22, phone: "+972-50-123-4567", gender: "male", seekingGender: "female" }),
+      completeSingle({ id: 23, firstName: "הילית", email: "other@example.com", phone: "0500000000", gender: "male", seekingGender: "female" }),
+    ];
+    const options = selectOnDemandBoostCandidates({
+      single,
+      candidateProfiles,
+      memberships: candidateProfiles.map(candidate => ({ ...activeMembership(), singleId: candidate.id, lastActiveAt: NOW })),
+      answersBySingle: new Map(),
+      exclusions: { emails: new Set(["fictionalowner@gmail.com"]), phones: new Set(["0501234567"]) },
+      now: NOW,
+    });
+    expect(options.map(option => option.candidate.id)).toEqual([23]);
+  });
+
+  it("hides an older pending card for an excluded test profile before a checkout can be created", () => {
+    const state = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [pendingMatch({ candidateEligible: false })],
+      membership: activeMembership(),
+      now: NOW,
+    });
+    expect(state.candidates).toHaveLength(0);
+    expect(state.eligible).toBe(false);
+  });
+
   it("opens Boost choices at 60 percent and excludes scores below the threshold", () => {
     expect(MIN_BOOST_SCORE).toBe(60);
     const result = evaluateBoostEligibility({

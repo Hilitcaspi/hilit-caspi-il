@@ -1,0 +1,1 @@
+ALTER TABLE `singles` ADD `boostExcluded` boolean DEFAULT false NOT NULL;
