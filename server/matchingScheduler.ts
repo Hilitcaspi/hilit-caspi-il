@@ -24,6 +24,7 @@ import type { ScoreBreakdown } from "./compatibility";
 import { notifyOwner } from "./_core/notification";
 import { sendEmail } from "./brevo";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
+import { isInvalidMatchPlaceholder } from "./invalidMatchPlaceholder";
 
 const ADMIN_EMAIL = "hilitcaspi@gmail.com";
 const HIGH_THRESHOLD = 90;
@@ -146,6 +147,7 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
       and(
         eq(singles.isActive, true),
         eq(singles.consentMatchmaking, true),
+        eq(singles.consentDataSharing, true),
         isNotNull(singles.email),
         isNotNull(singles.gender)
       )
@@ -160,8 +162,11 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
   // Get existing matches to avoid duplicates
   const existingMatches = await db.select().from(matches);
   const existingPairs = new Set(
-    existingMatches.map(m => `${Math.min(m.singleAId, m.singleBId)}-${Math.max(m.singleAId, m.singleBId)}`)
+    existingMatches.filter(m => !isInvalidMatchPlaceholder(m))
+      .map(m => `${Math.min(m.singleAId, m.singleBId)}-${Math.max(m.singleAId, m.singleBId)}`)
   );
+  const placeholders = new Map(existingMatches.filter(isInvalidMatchPlaceholder)
+    .map(m => [`${Math.min(m.singleAId, m.singleBId)}-${Math.max(m.singleAId, m.singleBId)}`, m.id]));
 
   // Build set of singles who are currently UNAVAILABLE (in proposed or matched without return)
   const unavailableIds = new Set<number>();
@@ -243,16 +248,27 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
 
   // Insert into DB as "pending" (waiting for Hilit's approval)
   for (const m of matchesToInsert) {
-    await db.insert(matches).values({
-      singleAId: m.singleAId,
-      singleBId: m.singleBId,
-      score: m.score,
-      scoreBreakdown: m.scoreBreakdown,
-      autoExplanation: m.autoExplanation,
-      status: "pending",
-      updatedAt: Date.now(),
-    });
-    existingPairs.add(`${Math.min(m.singleAId, m.singleBId)}-${Math.max(m.singleAId, m.singleBId)}`);
+    const key = `${Math.min(m.singleAId, m.singleBId)}-${Math.max(m.singleAId, m.singleBId)}`;
+    const placeholderId = placeholders.get(key);
+    if (placeholderId) {
+      await db.update(matches).set({
+        score: m.score,
+        scoreBreakdown: m.scoreBreakdown,
+        autoExplanation: m.autoExplanation,
+        updatedAt: Date.now(),
+      }).where(eq(matches.id, placeholderId));
+    } else {
+      await db.insert(matches).values({
+        singleAId: m.singleAId,
+        singleBId: m.singleBId,
+        score: m.score,
+        scoreBreakdown: m.scoreBreakdown,
+        autoExplanation: m.autoExplanation,
+        status: "pending",
+        updatedAt: Date.now(),
+      });
+    }
+    existingPairs.add(key);
   }
 
   // Build summary for Hilit

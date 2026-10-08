@@ -70,6 +70,7 @@ import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
 import { wasMatchProposalSent } from "../shared/matchDelivery";
 import { blocksNewMatch, canSuggestNewMatch, matchPairKey } from "./unmatchedQueue";
 import { hashActor, recordSelfServiceEventSafely } from "./usageMetrics";
+import { isInvalidMatchPlaceholder } from "./invalidMatchPlaceholder";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -525,13 +526,13 @@ export function selectFreshCandidatesForRerun<T extends {
   existingCandidateIds: Set<number>,
   limit = 6,
 ): T[] {
-  const freshWithAnswers = allScored.filter(({ candidate, candidateAnswers }) =>
-    !existingCandidateIds.has(candidate.id) && candidateAnswers.length > 0
+  const freshWithAnswers = allScored.filter(({ candidate, candidateAnswers, breakdown }) =>
+    !existingCandidateIds.has(candidate.id) && candidateAnswers.length > 0 && breakdown.total > 0
   );
   const preferred = freshWithAnswers.filter(({ breakdown }) => breakdown.total >= 45).slice(0, limit);
   if (preferred.length > 0) return preferred;
   const fallback = freshWithAnswers.filter(({ breakdown }) => breakdown.total >= 30).slice(0, limit);
-  return fallback.length > 0 ? fallback : freshWithAnswers.slice(0, limit);
+  return fallback;
 }
 
 export async function generateMatchesForSingle(singleId: number, gender: "female" | "male") {
@@ -539,7 +540,8 @@ export async function generateMatchesForSingle(singleId: number, gender: "female
   if (!db) return;
 
   const [mySingle] = await db.select().from(singles).where(eq(singles.id, singleId));
-  if (!mySingle) return;
+  if (!mySingle || !mySingle.isPaid || !mySingle.isActive ||
+      !mySingle.consentMatchmaking || !mySingle.consentDataSharing) return;
 
   // Respect seekingGender: if not set, default to opposite gender
   const seekingGender = mySingle.seekingGender ?? (gender === "female" ? "male" : "female");
@@ -554,6 +556,7 @@ export async function generateMatchesForSingle(singleId: number, gender: "female
       eq(singles.isActive, true),
       eq(singles.isPaid, true),
       eq(singles.consentMatchmaking, true),
+      eq(singles.consentDataSharing, true),
       ne(singles.id, singleId)
     ));
 
@@ -580,6 +583,7 @@ export async function generateMatchesForSingle(singleId: number, gender: "female
   ));
   const existingCandidateIds = new Set<number>();
   for (const existingMatch of existingMatches) {
+    if (isInvalidMatchPlaceholder(existingMatch)) continue;
     for (const relatedId of [
       existingMatch.singleAId,
       existingMatch.singleBId,
@@ -611,9 +615,19 @@ export async function generateMatchesForSingle(singleId: number, gender: "female
         and(eq(matches.singleAId, candidate.id), eq(matches.singleBId, singleId))
       )
     ).limit(1);
-    if (existingMatch) continue;
+    if (existingMatch && !isInvalidMatchPlaceholder(existingMatch)) continue;
 
     const explanation = await buildMatchExplanation(mySingle, candidate, breakdown, myAnswers, candidateAnswers);
+    if (existingMatch) {
+      // Repair an unsent failed-filter placeholder in place; never re-send a prior proposal.
+      await db.update(matches).set({
+        score: breakdown.total,
+        scoreBreakdown: JSON.stringify(breakdown),
+        autoExplanation: explanation,
+        updatedAt: Date.now(),
+      }).where(eq(matches.id, existingMatch.id));
+      continue;
+    }
     await db.insert(matches).values({
       singleId: singleId,
       matchedSingleId: candidate.id,
@@ -2121,6 +2135,11 @@ export const appRouter = router({
               locationPreference: input.locationPreference,
               partnerDescription: input.partnerDescription,
               ...(photoUrl ? { photoUrl } : {}),
+              // Preserve explicit service choices from the registration form when
+              // upgrading a pre-payment draft or a Grow skeleton profile.
+              ...(input.consentMatchmaking !== undefined && input.consentMatchmaking !== null ? { consentMatchmaking: input.consentMatchmaking } : {}),
+              ...(input.consentDataSharing !== undefined && input.consentDataSharing !== null ? { consentDataSharing: input.consentDataSharing } : {}),
+              ...(input.consentEmailMarketing !== undefined && input.consentEmailMarketing !== null ? { consentEmailMarketing: input.consentEmailMarketing } : {}),
               isActive: hasValidFreeToken ? true : (existingProfile.isPaid || existingProfile.isActive),
               isPaid: hasValidFreeToken ? true : existingProfile.isPaid,
               updatedAt: now,
@@ -2466,6 +2485,9 @@ export const appRouter = router({
           partnerDescription: singles.partnerDescription,
           photoUrl: singles.photoUrl,
           questionnaireToken: singles.questionnaireToken,
+          consentMatchmaking: singles.consentMatchmaking,
+          consentDataSharing: singles.consentDataSharing,
+          consentEmailMarketing: singles.consentEmailMarketing,
           utmSource: singles.utmSource,
           utmMedium: singles.utmMedium,
           utmCampaign: singles.utmCampaign,

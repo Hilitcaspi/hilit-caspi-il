@@ -213,6 +213,9 @@ export default function Register() {
   const [interests, setInterests] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoError, setPhotoError] = useState("");
+  const [consentMatchmaking, setConsentMatchmaking] = useState(false);
+  const [consentDataSharing, setConsentDataSharing] = useState(false);
+  const [consentEmailMarketing, setConsentEmailMarketing] = useState(false);
 
   // Mini DNA quiz toggle (shown inside dna_select step)
   const [showMiniQuiz, setShowMiniQuiz] = useState(false);
@@ -427,6 +430,7 @@ export default function Register() {
         locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
         photoBase64, photoMime, origin: window.location.origin,
         freeToken: freeTokenFromUrl || undefined,
+        consentMatchmaking, consentDataSharing, consentEmailMarketing,
         utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
         utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
         utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
@@ -476,6 +480,7 @@ export default function Register() {
         locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
         photoBase64, photoMime, origin: window.location.origin,
         freeToken: freeTokenFromUrl || undefined,
+        consentMatchmaking, consentDataSharing, consentEmailMarketing,
         utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
         utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
         utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
@@ -563,6 +568,7 @@ export default function Register() {
         photoBase64: photoPreview || undefined, photoMime: photoFile?.type || undefined,
         origin: window.location.origin,
         freeToken: normalizedCode || undefined, // invite token → marks isPaid=true
+        consentMatchmaking, consentDataSharing, consentEmailMarketing,
         utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
         utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
         utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
@@ -663,6 +669,9 @@ export default function Register() {
     setInterests(draft.interests || "");
     setDnaFromQuiz(draft.dnaType || null);
     setPhotoPreview(draft.photoUrl || null);
+    setConsentMatchmaking(Boolean(draft.consentMatchmaking));
+    setConsentDataSharing(Boolean(draft.consentDataSharing));
+    setConsentEmailMarketing(Boolean(draft.consentEmailMarketing));
     setQuestionnaireToken(draft.questionnaireToken || "");
     setDraftSavedBeforePayment(true);
     setRegisterError("");
@@ -708,6 +717,9 @@ export default function Register() {
     locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
     photoBase64: photoPreview || undefined, photoMime: photoFile?.type || undefined,
     origin: window.location.origin,
+    consentMatchmaking,
+    consentDataSharing,
+    consentEmailMarketing,
     utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
     utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
     utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
@@ -1333,11 +1345,27 @@ export default function Register() {
                 <label className="flex items-start gap-3 cursor-pointer p-4 bg-[#f0eadc] rounded-xl">
                   <input
                     type="checkbox"
+                    checked={consentMatchmaking && consentDataSharing}
+                    onChange={event => {
+                      setConsentMatchmaking(event.target.checked);
+                      setConsentDataSharing(event.target.checked);
+                    }}
                     required
                     className="mt-0.5 w-5 h-5 accent-[#191265] flex-shrink-0"
                   />
                   <span className="text-sm text-[#444] leading-relaxed text-right">
-                    אני מסכימה/מסכים לקבל עדכונים ותוכן מהילית כספי בדואר אלקטרוני. אפשר להסיר מרשימת התפוצה בכל עת.
+                    אני מסכימה/מסכים להשתתף בשירות ההתאמות ולקבל הצעות אישיות. הפרטים שלי ייחשפו רק במסגרת תהליך התאמה ובהתאם למדיניות הפרטיות.
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer px-4 py-3 bg-white border border-[#e9e8e8] rounded-xl">
+                  <input
+                    type="checkbox"
+                    checked={consentEmailMarketing}
+                    onChange={event => setConsentEmailMarketing(event.target.checked)}
+                    className="mt-0.5 w-5 h-5 accent-[#191265] flex-shrink-0"
+                  />
+                  <span className="text-sm text-[#555] leading-relaxed text-right">
+                    אני רוצה לקבל גם תוכן, עדכונים והטבות מהילית כספי בדואר אלקטרוני. אפשר להסיר את ההסכמה הזו בכל עת.
                   </span>
                 </label>
                 <button type="submit" disabled={paymentLoading}
@@ -1782,6 +1810,7 @@ export default function Register() {
                       openToPartnerWithKids: (openToPartnerWithKids as any) || undefined,
                       locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
                       origin: window.location.origin,
+                      consentMatchmaking, consentDataSharing, consentEmailMarketing,
                     });
                   }}
                   className="bg-[#191265] text-white font-bold py-3 rounded-2xl hover:bg-[#1800ad] transition-all"

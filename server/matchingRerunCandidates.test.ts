@@ -24,4 +24,20 @@ describe("single-profile matching reruns", () => {
     ], new Set(), 6);
     expect(result.map((entry) => entry.candidate.id)).toEqual([2]);
   });
+
+  it("does not persist hard-filter failures scored as zero", () => {
+    const result = selectFreshCandidatesForRerun([
+      row(1, 0),
+      row(2, 0),
+    ], new Set(), 6);
+    expect(result).toEqual([]);
+  });
+
+  it("does not create weak fallback rows below the minimum review score", () => {
+    const result = selectFreshCandidatesForRerun([
+      row(1, 29),
+      row(2, 18),
+    ], new Set(), 6);
+    expect(result).toEqual([]);
+  });
 });
