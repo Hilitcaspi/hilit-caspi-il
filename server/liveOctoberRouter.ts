@@ -6,6 +6,7 @@ import { getDb } from "./db";
 import { liveOctoberQuestions, liveOctoberTickets } from "../drizzle/schema";
 import { ticketJoinUrl } from "./liveZoomDelivery";
 import { liveQuestionTicket } from "./liveQuestionAccess";
+import { confirmLiveAttendance, readLiveQuestionAccess } from "./liveAttendance";
 import {
   LIVE_OCTOBER_SLUG, ensurePlusLiveTicket, existingLiveTicket,
   getVerifiedLiveMember, isLiveCheckoutOpen, liveTicketByReceipt, submitLiveQuestion,
@@ -40,14 +41,22 @@ export const liveOctoberRouter = router({
   }),
 
   questionAccess: publicProcedure.input(z.object({ questionToken: z.string().max(80) })).query(async ({ input }) => {
-    const ticket = await liveQuestionTicket(input.questionToken);
-    if (!ticket) return null;
+    const access = await readLiveQuestionAccess(input.questionToken);
+    if (!access) return null;
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [count] = await db.select({ total: sql<number>`count(*)` }).from(liveOctoberQuestions)
-      .where(eq(liveOctoberQuestions.ticketId, ticket.id));
-    return { remaining: Math.max(0, 3 - Number(count?.total ?? 0)) };
+      .where(eq(liveOctoberQuestions.ticketId, access.ticket.id));
+    return {
+      remaining: Math.max(0, 3 - Number(count?.total ?? 0)), isPlus: access.isPlus,
+      attendanceConfirmed: access.attendanceConfirmedAt !== null,
+      attendanceConfirmedAt: access.attendanceConfirmedAt,
+    };
   }),
+
+  confirmAttendance: publicProcedure.input(z.object({
+    questionToken: z.string().max(80), attending: z.boolean(),
+  })).mutation(({ input }) => confirmLiveAttendance(input.questionToken, input.attending)),
 
   askQuestion: publicProcedure.input(z.object({
     email: z.string().email().optional(),
@@ -81,6 +90,7 @@ export const liveOctoberRouter = router({
       total: sql<number>`count(*)`,
       database: sql<number>`sum(case when ${liveOctoberTickets.source} = 'database_live' then 1 else 0 end)`,
       plus: sql<number>`sum(case when ${liveOctoberTickets.source} = 'plus' then 1 else 0 end)`,
+      confirmedPlus: sql<number>`sum(case when ${liveOctoberTickets.source} = 'plus' and ${liveOctoberTickets.attendanceConfirmedAt} is not null then 1 else 0 end)`,
       friends: sql<number>`sum(case when ${liveOctoberTickets.source} = 'friends' then 1 else 0 end)`,
       standalone: sql<number>`sum(case when ${liveOctoberTickets.source} = 'standalone' then 1 else 0 end)`,
     }).from(liveOctoberTickets).where(and(
@@ -101,6 +111,7 @@ export const liveOctoberRouter = router({
       issuedAt: liveOctoberTickets.issuedAt, zoomDeliveryState: liveOctoberTickets.zoomDeliveryState,
       zoomAttemptCount: liveOctoberTickets.zoomAttemptCount, zoomLastError: liveOctoberTickets.zoomLastError,
       zoomEmailSentAt: liveOctoberTickets.zoomEmailSentAt,
+      attendanceConfirmedAt: liveOctoberTickets.attendanceConfirmedAt,
     }).from(liveOctoberTickets).where(and(
       eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG),
       sql`${liveOctoberTickets.revokedAt} is null`,
@@ -117,7 +128,7 @@ export const liveOctoberRouter = router({
     return {
       totals: {
         total: Number(totals?.total || 0), database: Number(totals?.database || 0),
-        plus: Number(totals?.plus || 0), friends: Number(totals?.friends || 0),
+        plus: Number(totals?.plus || 0), confirmedPlus: Number(totals?.confirmedPlus || 0), friends: Number(totals?.friends || 0),
         standalone: Number(totals?.standalone || 0), questions: Number(questionTotal?.total || 0),
         test: Number(testCount?.total || 0),
       },

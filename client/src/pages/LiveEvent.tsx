@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import GrowWallet from "@/components/GrowWallet";
 import { trpc } from "@/lib/trpc";
+import { liveDatabaseOfferHref } from "@shared/liveCampaignLinks";
 
 const HERO_IMAGE = "/manus-storage/hilit-smiling-portrait_cddd0dfc.jpg";
 const AUDIENCE_IMAGE = "/manus-storage/hilit-speaking-to-audience_38bd148d.jpg";
@@ -181,6 +182,7 @@ export default function LiveEvent() {
   const salesOpen = salesStatus.data?.open === true;
   const databaseGiftOpen = salesStatus.data?.databaseGiftOpen === true;
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const databaseOfferHref = liveDatabaseOfferHref(window.location.search);
   const email = params.get("email")?.trim().toLowerCase() || "";
   const token = params.get("token") || "";
   const hasPersonalLink = Boolean(email && token);
@@ -351,7 +353,7 @@ export default function LiveEvent() {
                 <h3 className="mt-2 text-2xl font-black text-[#191265]">מצטרפים למאגר ומקבלים כרטיס ללייב במתנה.</h3>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-[#625d78]">בהצטרפות למאגר ב־299 ₪ ממלאים שאלון, יוצרים פרופיל ונותנים לי להכיר אתכם מעבר לתמונה. כרטיס אחד ללייב יתווסף במתנה למצטרפים חדשים מעמוד ההטבה, וקוד LIVE יחול אוטומטית בקופה.</p>
               </div>
-              <a href="/live/database" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#191265] px-6 py-4 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#30247e]">להכיר את המאגר ואת הטבת הלייב <ArrowLeft className="h-4 w-4" /></a>
+              <a href={databaseOfferHref} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#191265] px-6 py-4 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#30247e]">להכיר את המאגר ואת הטבת הלייב <ArrowLeft className="h-4 w-4" /></a>
             </div>
           </motion.div>
 

@@ -768,6 +768,8 @@ export const liveOctoberTickets = mysqlTable("live_october_tickets", {
   providerTransactionId: varchar("provider_transaction_id", { length: 200 }),
   issuedAt: bigint("issued_at", { mode: "number" }).notNull(),
   revokedAt: bigint("revoked_at", { mode: "number" }),
+  // Plus RSVP only: UTC milliseconds; null means attendance has not been confirmed.
+  attendanceConfirmedAt: bigint("attendance_confirmed_at", { mode: "number" }),
   zoomRegistrantId: varchar("zoom_registrant_id", { length: 120 }),
   zoomJoinUrlEncrypted: text("zoom_join_url_encrypted"),
   zoomDeliveryState: mysqlEnum("zoom_delivery_state", ["pending", "registered", "sent"]).notNull().default("pending"),

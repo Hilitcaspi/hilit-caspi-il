@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 export default function Unsubscribe() {
   const [token, setToken] = useState<string | null>(null);
   const [legacyEmail, setLegacyEmail] = useState<string | null>(null);
+  const [manualEmail, setManualEmail] = useState("");
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,16 +24,15 @@ export default function Unsubscribe() {
       setToken(t);
     } else if (email) {
       setLegacyEmail(email);
-    } else {
-      setError("לא הצלחנו לקרוא את קישור ההסרה. אפשר לפנות אלינו ונעזור מיד.");
     }
   }, []);
 
   const handleUnsubscribe = () => {
-    if (!token && !legacyEmail) return;
+    const email = legacyEmail || manualEmail.trim().toLowerCase();
+    if (!token && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
     unsubMutation.mutate({
       ...(token ? { token } : {}),
-      ...(legacyEmail ? { email: legacyEmail } : {}),
+      ...(!token ? { email } : {}),
     });
   };
 
@@ -75,13 +75,16 @@ export default function Unsubscribe() {
               <br />
               <span className="text-sm">לא יישלחו אליה עוד מיילים שיווקיים.</span>
             </p>
-            <button
-              onClick={handleUnsubscribe}
-              disabled={unsubMutation.isPending || (!token && !legacyEmail)}
-              className="w-full bg-[#191265] text-white font-bold py-4 rounded-xl hover:bg-[#1800ad] transition-all disabled:opacity-60"
-            >
-              {unsubMutation.isPending ? "הבקשה מתבצעת..." : "להסרה מרשימת התפוצה"}
-            </button>
+            <form onSubmit={event => { event.preventDefault(); handleUnsubscribe(); }}>
+              {!token && !legacyEmail && <div className="mb-5 text-right"><label htmlFor="unsubscribe-email" className="mb-2 block font-semibold text-[#191265]">כתובת המייל הרשומה אצלנו</label><input id="unsubscribe-email" type="email" autoComplete="email" required value={manualEmail} onChange={event => setManualEmail(event.target.value)} dir="ltr" className="w-full rounded-xl border border-[#191265]/20 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#191265]" /><p className="mt-2 text-xs leading-5 text-[#727272]">ההסרה תתבצע רק אחרי הזנת הכתובת ולחיצה על הכפתור.</p></div>}
+              <button
+                type="submit"
+                disabled={unsubMutation.isPending || (!token && !legacyEmail && !manualEmail.trim())}
+                className="w-full bg-[#191265] text-white font-bold py-4 rounded-xl hover:bg-[#1800ad] transition-all disabled:opacity-60"
+              >
+                {unsubMutation.isPending ? "הבקשה מתבצעת..." : "להסרה מרשימת התפוצה"}
+              </button>
+            </form>
             <a href="/" className="block mt-4 text-sm text-[#727272] hover:text-[#191265]">
               להשאיר אותי ברשימה
             </a>

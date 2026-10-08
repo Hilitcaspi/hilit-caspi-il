@@ -67,6 +67,7 @@ const LeadCall = lazy(() => import("@/pages/LeadCall"));
 const LiveEvent = lazy(() => import("@/pages/LiveEvent"));
 const LiveEventThankYou = lazy(() => import("@/pages/LiveEventThankYou"));
 const LiveDatabaseOffer = lazy(() => import("@/pages/LiveDatabase"));
+const LiveSmsRedirect = lazy(() => import("@/pages/LiveSmsRedirect"));
 const TermsLiveOctober = lazy(() => import("@/pages/TermsLiveOctober"));
 const SignsGuide = lazy(() => import("@/pages/SignsGuide"));
 const LaMekabel = lazy(() => import("@/pages/LaMekabel"));
@@ -278,6 +279,10 @@ function HeRouter() {
           <Route path={"/crm/blog"} component={BlogAdmin} />
           <Route path={"/crm"} component={CRM} />
           <Route path={"/unsubscribe"} component={Unsubscribe} />
+          <Route path={"/u"} component={Unsubscribe} />
+          <Route path={"/ld"} component={LiveSmsRedirect} />
+          <Route path={"/ll"} component={LiveSmsRedirect} />
+          <Route path={"/lp"} component={LiveSmsRedirect} />
           <Route path={"/course"} component={CourseSales} />
           <Route path={"/blog/:slug"} component={BlogPost} />
           <Route path={"/pages/:slug"} component={GeneratedLandingPage} />

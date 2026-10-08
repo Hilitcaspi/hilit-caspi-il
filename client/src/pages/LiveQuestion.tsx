@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, CircleCheck, MessageCircle, Send, TicketCheck } from "lucide-react";
+import { ArrowLeft, CalendarCheck, CircleCheck, MessageCircle, Send, TicketCheck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 export default function LiveQuestion() {
-  const [questionToken] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("q") || "");
+  const [linkParams] = useState(() => new URLSearchParams(window.location.hash.slice(1)));
+  const questionToken = linkParams.get("q") || "";
+  const rsvpRequested = linkParams.get("rsvp") === "1";
   const [question, setQuestion] = useState("");
   const [feedback, setFeedback] = useState("");
   const utils = trpc.useUtils();
@@ -19,6 +21,13 @@ export default function LiveQuestion() {
     },
     onError: (error) => setFeedback(error.message || "לא הצלחתי לשמור את השאלה כרגע. נסו שוב בעוד רגע."),
   });
+  const rsvp = trpc.liveOctober.confirmAttendance.useMutation({
+    onSuccess: async (result) => {
+      setFeedback(result.attending ? "איזה כיף, אישור ההגעה נשמר. מחכה לראות אותך בלייב!" : "אישור ההגעה בוטל.");
+      await utils.liveOctober.questionAccess.invalidate({ questionToken });
+    },
+    onError: (error) => setFeedback(error.message || "לא הצלחנו לעדכן את אישור ההגעה כרגע. נסו שוב."),
+  });
   const missing = !questionToken || access.isError || (access.isSuccess && !access.data);
 
   return (
@@ -30,8 +39,8 @@ export default function LiveQuestion() {
         <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_15%_40%,rgba(255,226,124,.23),transparent_40%)]" />
         <div className="relative mx-auto max-w-2xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#ffe27c]/60 px-4 py-2 text-xs font-bold text-[#ffe27c]"><TicketCheck size={16} /> סודות ההתאמה המושלמת</span>
-          <h1 className="mt-6 text-3xl font-black leading-tight sm:text-5xl">מה מסקרן אותך לקראת הלייב?</h1>
-          <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-white/85 sm:text-base">כאן אפשר לשאול אותי על ההתאמות, על הפרופיל שעובד עבורך, או על כל מה שמעניין אותך מאחורי הקלעים. אשמח לקרוא את השאלה לפני שניפגש.</p>
+          <h1 className="mt-6 text-3xl font-black leading-tight sm:text-5xl">{rsvpRequested ? "נפגשים בלייב?" : "מה מסקרן אותך לקראת הלייב?"}</h1>
+          <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-white/85 sm:text-base">{rsvpRequested ? "הכרטיס כלול בהטבת Plus שלך. אישור קצר יעזור לי להיערך למפגש. אין צורך להיכנס לאזור האישי או למלא פרטים מחדש." : "כאן אפשר לשאול אותי על ההתאמות, על הפרופיל שעובד עבורך, או על כל מה שמעניין אותך מאחורי הקלעים. אשמח לקרוא את השאלה לפני שניפגש."}</p>
         </div>
       </section>
       <section className="relative mx-auto -mt-12 max-w-xl px-5 pb-16">
@@ -47,6 +56,11 @@ export default function LiveQuestion() {
                 <div className="rounded-xl bg-[#191265] p-2.5 text-[#ffe27c]"><CircleCheck size={23} /></div>
                 <div><h2 className="text-lg font-black">הכרטיס שלך אומת</h2><p className="text-xs text-[#625d78]">אין צורך להיכנס לאזור האישי או למלא פרטים שוב.</p></div>
               </div>
+              {access.data!.isPlus && <section className="mb-6 rounded-2xl border border-[#d5bd78] bg-[#f7efd8] p-5" aria-labelledby="live-rsvp-title">
+                <div className="flex items-start gap-3"><CalendarCheck className="mt-0.5 shrink-0 text-[#191265]" size={22} /><div><h2 id="live-rsvp-title" className="font-black">אישור הגעה לחברי Plus</h2><p className="mt-1 text-sm font-bold">שבת 31.10.2026 · 20:30 · בזום</p><p className="mt-2 text-sm leading-6 text-[#625d78]">אשמח לדעת שמתכננים להגיע. אפשר גם לשלוח לי שאלה כאן למטה. קישור הכניסה לזום יישלח בנפרד לקראת האירוע.</p></div></div>
+                {access.data!.attendanceConfirmedAt ? <div className="mt-4"><p className="text-sm font-bold text-emerald-800">אישור ההגעה שלך נשמר. מחכה לראות אותך!</p><button type="button" disabled={rsvp.isPending} onClick={() => { setFeedback(""); rsvp.mutate({ questionToken, attending: false }); }} className="mt-3 rounded-full border border-[#191265] px-5 py-2 text-sm font-black text-[#191265] transition-transform active:scale-[.97] disabled:opacity-50">ביטול אישור הגעה</button></div>
+                  : <div className="mt-4"><button type="button" disabled={rsvp.isPending} onClick={() => { setFeedback(""); rsvp.mutate({ questionToken, attending: true }); }} className="mt-3 rounded-full bg-[#191265] px-5 py-2 text-sm font-black text-white transition-transform active:scale-[.97] disabled:opacity-50">{rsvp.isPending ? "מעדכנים..." : "כן, נפגשים בלייב"}</button></div>}
+              </section>}
               {access.data!.remaining > 0 ? <form onSubmit={e => { e.preventDefault(); setFeedback(""); send.mutate({ questionToken, question }); }}>
                 <label htmlFor="live-question-direct" className="block font-black">השאלה שלך להילית</label>
                 <p className="mt-1 text-xs leading-6 text-[#625d78]">אפשר לשלוח עד שלוש שאלות לכרטיס. נשארו לך {access.data!.remaining}. נשתדל לענות על נושאים שעולים, אך לא נוכל להתחייב למענה אישי לכל שאלה.</p>

@@ -10,7 +10,7 @@ const TOKEN_FORMAT = /^(?:[1-9]\d{0,9})\.[A-Za-z0-9_-]{43}$/;
 const QUESTION_DEADLINE = Date.parse(LIVE_START_ISO);
 
 type QuestionTicket = Pick<typeof liveOctoberTickets.$inferSelect,
-  "id" | "eventSlug" | "email" | "voucherCode" | "issuedAt" | "revokedAt" | "source" | "singleId">;
+  "id" | "eventSlug" | "email" | "voucherCode" | "issuedAt" | "revokedAt" | "source" | "singleId" | "attendanceConfirmedAt">;
 
 function questionKey(): Buffer | null {
   const secret = process.env.JWT_SECRET?.trim();

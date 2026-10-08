@@ -281,6 +281,13 @@
       "when": 1791447080572,
       "tag": "0039_watery_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1791453658067,
+      "tag": "0040_attendance_rsvp",
+      "breakpoints": true
     }
   ]
 }

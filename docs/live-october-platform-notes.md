@@ -30,3 +30,19 @@
 ## עדויות
 
 לא נמצאו במאגר רשומות `testimonial_records` מסוג success עם אישור צוות, הסכמה לטקסט, והרשאה לפרסום באתר (ספירה מצרפית: 0). אין להמציא סיפורי הצלחה אישיים או לפרסם פידבק ללא אישור נפרד. ניתן להוסיף ציטוטים רק לאחר תהליך הרשאה ואימות.
+
+## עדכון השקה · 8.10.2026
+
+- שני עמודי המכירה נבדקו באתר החי ונשארו פתוחים; אין שינוי במחירי 299/149/49 או בזכאות Plus. FRIENDS דורש getVerifiedLiveMember עם personalToken גם ב־Grow createProcess, ולא רק בדיקת מחיר/coupon.
+- `shared/liveCampaignLinks.ts` משמר whitelist של UTM ו־click IDs במעבר `/live` → `/live/database`, ללא העברת email/token/coupon. שלושה SMS aliases חדשים `/ld`, `/ll`, `/lp` מפנים ליעדים קבועים עם `live_oct2026`; אין open redirect.
+- `/u` משמש alias למסך ההסרה הקיים. כאשר אין token/email בקישור, מוצג טופס הזנת מייל מרצון. אין הסרה בטעינת המסך; לחיצה מפורשת משתמשת ב־unsubscribe.process הקיים, ללא הרחבת הרשאות API.
+- מיגרציה 0040 מוסיפה `attendance_confirmed_at` nullable בלבד בטבלת הכרטיסים. הוחלה ואומתה במסדי WebDev ו־LEGACY production; לא עודכנו אישורי כרטיסים בפועל.
+- `liveAttendance.ts` מאפשר Plus RSVP בלבד באמצעות signed questionToken הקיים. אימות זכאות חוזר אטומית ב־UPDATE, כולל source plus, active/grace Plus, non-TEST, non-revoked. confirm משתמש ב־coalesce למניעת כפילות; cancel מאפס timestamp. GET אינו משנה מצב, כדי למנוע אישור על ידי email scanners.
+- קישור המייל האישי של Plus הוא `/live/question?utm_source=newsletter&utm_medium=email&utm_campaign=live_oct2026&utm_content=plus_rsvp#q=<signed-ticket-token>&rsvp=1`. יש להשתמש בטוקן חתום מהכרטיס הקיים, בלי משלוח בשלב הכנת הטיוטה. דף השאלות מתפקד גם לרוכשי standalone שאינם חברי מאגר; רק Plus רואה RSVP.
+- CRM מציג `totals.confirmedPlus` ו־attendanceConfirmedAt לכל כרטיס. זו ספירת היערכות, לא ניהול מלאי/מושבים. קיבולת Zoom טרם אומתה, ואין טענת ״100 מקומות״ או הבטחת מושב קשיחה.
+- `liveLaunchEmailDrafts.ts` ו־`shared/liveLaunchSms.ts` מכילים טיוטות בלבד לשלושה קהלים נפרדים. אין queries של נמענים, תורים או שליחה. HTML preview של Plus מכיל token דמה שאסור להעתיק למשלוח אמיתי.
+- SMS drafts: 69/67/70 יחידות UTF-16, כולל אימוג׳י, קישור מידע וקישור הסרה. אין הסתמכות על 256 תווים. יש לאמת encoding/billing אצל הספק לפני משלוח, ולהימנע מהוספת שם פרטי או footer אוטומטי בלי מדידה חוזרת.
+- תוצרי השקה מחוץ לריפו: `/home/ubuntu/live-launch-2026-10-08/launch-kit.md`, שני story PNG ושלוש תצוגות HTML. ה־UTM אחיד `live_oct2026`, עם content נפרד לפי קהל/ערוץ/עמוד.
+- 763 בדיקות יחידה עברו; בדיקת טיפוסים ובנייה עברו. QA מובייל עם API מדומה אישר שאין RSVP בטעינה, לחיצה מפורשת מאשרת, ביטול עובד, וקישור הסרה דורש הזנה ואישור. שלושת SMS aliases נבדקו בסביבת הפיתוח.
+- לא נשלח מייל/SMS/WhatsApp, לא נוצר נרשם Zoom ולא הופעל heartbeat או LIVE_ZOOM_DELIVERY_ENABLED. מיילי כרטיס Zoom נשארים למועד נפרד לפני האירוע ובהרשאה מפורשת.
+- לא בוצעה עסקת TEST1 אמיתית במשימה. mocked tests וסקר מסכי Checkout אינם הוכחת flow של חיוב בפועל. פרסום התוספות מחייב checkpoint/Publish ובדיקת האתר החי; אין להסיק publication משמירת checkpoint בלבד.
