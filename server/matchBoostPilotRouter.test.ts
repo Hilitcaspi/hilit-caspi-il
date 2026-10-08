@@ -98,6 +98,22 @@ describe("Boost personal approval link funnel", () => {
     expect(email.textContent).toContain("האישור וההצטרפות ל־Boost אינם כרוכים בתשלום");
   });
 
+  it("uses the same tagged personal approval link in HTML and text", () => {
+    const email = buildBoostApprovalLinkEmail({
+      approvalUrl: "https://hilitcaspi.com/my-profile?token=fictional-test-token&tab=matches#boost-card",
+    });
+    const href = email.htmlContent.match(/<a href="([^"]+)"/)?.[1];
+    expect(href).toBeTruthy();
+    const url = new URL(href!);
+    expect(email.textContent).toContain(href!);
+    expect(url.searchParams.get("utm_source")).toBe("email");
+    expect(url.searchParams.get("utm_medium")).toBe("lifecycle");
+    expect(url.searchParams.get("utm_campaign")).toBe("boost_approval_link");
+    expect(url.searchParams.get("utm_content")).toBe("approve_boost");
+    expect(url.searchParams.get("token")).toBe("fictional-test-token");
+    expect(url.hash).toBe("#boost-card");
+  });
+
   it("adds Boost consent status to both active and incomplete CRM profile lists", () => {
     const activeList = rootRouterSource.slice(rootRouterSource.indexOf("listSingles:"), rootRouterSource.indexOf("createSingle:"));
     const inactiveList = rootRouterSource.slice(rootRouterSource.indexOf("listInactiveSingles:"), rootRouterSource.indexOf("reactivateSingle:"));

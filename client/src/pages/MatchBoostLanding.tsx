@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, Heart, Mail, Sparkles, UserRoundCheck, Zap } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { preserveBoostTracking } from "../../../shared/boostEntryChannel";
 
 const HILIT_PHOTO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
 
@@ -22,9 +23,9 @@ export default function MatchBoostLanding() {
 
   useEffect(() => {
     if (!isPersonalLink) return;
-    const dashboardUrl = `/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=matches#boost-card`;
+    const dashboardUrl = preserveBoostTracking(`/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=matches#boost-card`, params.toString());
     window.location.replace(dashboardUrl);
-  }, [isPersonalLink, personalEmail, personalToken]);
+  }, [isPersonalLink, personalEmail, personalToken, params]);
 
   const interest = trpc.matchBoostPilot.submitInterest.useMutation();
   const utils = trpc.useUtils();
@@ -134,7 +135,7 @@ export default function MatchBoostLanding() {
                     <CheckCircle2 className="mx-auto h-9 w-9" />
                     <h3 className="mt-3 text-lg font-black">שירות Boost פעיל בפרופיל שלכם</h3>
                     <p className="mt-2 text-sm leading-6">האישור נשמר והפרופיל עודכן. מעכשיו אפשר לשלוח ולקבל בקשות Boost.</p>
-                    <a href={`/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=matches#boost-card`} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white">כניסה לאפשרויות Boost באזור האישי<ArrowLeft className="h-4 w-4" /></a>
+                    <a href={preserveBoostTracking(`/my-profile?email=${encodeURIComponent(personalEmail)}&token=${encodeURIComponent(personalToken)}&tab=matches#boost-card`, params.toString())} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#191265] px-5 py-3 text-sm font-black text-white">כניסה לאפשרויות Boost באזור האישי<ArrowLeft className="h-4 w-4" /></a>
                   </div>
                 ) : (
                   <div>

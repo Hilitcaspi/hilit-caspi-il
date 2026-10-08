@@ -11,6 +11,7 @@ import {
 import { buildSignedUnsubscribeUrl, isEmailMarketingSuppressed } from "./emailUnsubscribe";
 import { getDb } from "./db";
 import { ensureBoostCandidatesForSingle, getEligibleBoostOpportunityForSingle } from "./matchBoostRouter";
+import { withBoostEmailTracking } from "../shared/boostEntryChannel";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SITE_BASE = "https://hilitcaspi.com";
@@ -140,7 +141,7 @@ export async function processBoostOpportunityEmails(options: { now?: number; que
     if (!option) continue;
 
     const score = Math.max(0, Math.min(100, Math.round(Number(option.score || 0))));
-    const link = `${SITE_BASE}/my-profile?email=${encodeURIComponent(single.email)}&token=${encodeURIComponent(single.questionnaireToken)}&tab=boost&boostMatch=${option.id}&utm_source=email&utm_medium=lifecycle&utm_campaign=boost_opportunity#boost-option-${option.id}`;
+    const link = withBoostEmailTracking(`${SITE_BASE}/my-profile?email=${encodeURIComponent(single.email)}&token=${encodeURIComponent(single.questionnaireToken)}&tab=boost&boostMatch=${option.id}#boost-option-${option.id}`, "boost_opportunity");
     const firstName = single.firstName || "";
     const subject = `${firstName}, יש לך Boost של ${score}% שמחכה באזור האישי`;
     const bodyHtml = lifecycleTemplate({

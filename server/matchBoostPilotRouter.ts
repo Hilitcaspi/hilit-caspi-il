@@ -12,6 +12,7 @@ import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { sendEmail } from "./brevo";
 import { normalizeEmail, normalizedEmailEquals } from "./emailNormalization";
+import { withBoostEmailTracking } from "../shared/boostEntryChannel";
 
 export const BOOST_INTEREST_CONSENT_VERSION = "2026-08-27-interest-v1";
 const BOOST_LINK_COOLDOWN_MS = 10 * 60 * 1000;
@@ -36,6 +37,7 @@ function escapeEmailHtml(value: string) {
 export function buildBoostApprovalLinkEmail(input: { firstName?: string | null; approvalUrl: string }) {
   const firstName = escapeEmailHtml(String(input.firstName || "").trim());
   const greeting = firstName ? `היי ${firstName},` : "היי,";
+  const approvalUrl = withBoostEmailTracking(input.approvalUrl, "boost_approval_link");
   const preheader = "אישור קצר יאפשר לך לשלוח ולקבל בקשות Boost דרך האזור האישי";
   const subject = "נפתחה עבורך האפשרות להצטרף ל־Boost";
   const htmlContent = `<!doctype html>
@@ -59,7 +61,7 @@ export function buildBoostApprovalLinkEmail(input: { firstName?: string | null; 
           <p style="margin:0;font-size:15px;line-height:1.7;">✓ ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.</p>
         </div>
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding:24px 0 10px;">
-          <a href="${input.approvalUrl}" style="display:inline-block;background:#ffe27c;color:#191265;text-decoration:none;padding:16px 30px;border-radius:14px;font-size:17px;font-weight:800;box-shadow:0 8px 20px rgba(25,18,101,.18);">כניסה לאזור האישי ואישור Boost</a>
+          <a href="${approvalUrl}" style="display:inline-block;background:#ffe27c;color:#191265;text-decoration:none;padding:16px 30px;border-radius:14px;font-size:17px;font-weight:800;box-shadow:0 8px 20px rgba(25,18,101,.18);">כניסה לאזור האישי ואישור Boost</a>
         </td></tr></table>
         <p style="margin:0 0 8px;text-align:center;font-size:12px;line-height:1.7;color:#7a6c82;">האישור וההצטרפות ל־Boost אינם כרוכים בתשלום.</p>
         <p style="margin:8px 0 0;text-align:center;font-size:13px;line-height:1.7;color:#7a6c82;">הקישור אישי ומאובטח. אין להעביר אותו לאחרים.</p>
@@ -71,7 +73,7 @@ export function buildBoostApprovalLinkEmail(input: { firstName?: string | null; 
     </table>
   </td></tr></table>
 </body></html>`;
-  const textContent = `${greeting}\n\nביקשתם יותר התאמות, ואני מקשיבה. Boost מאפשר לראות באזור האישי התאמות פוטנציאליות ולבחור אם לשלוח בקשת התאמה.\n\nחברי מאגר שיאשרו את שירות הבוסט יוכלו לשלוח ולקבל בקשות Boost. ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.\n\nלחצו על הכפתור במייל כדי להיכנס לאזור האישי ולאשר Boost.\n\nהאישור וההצטרפות ל־Boost אינם כרוכים בתשלום. הקישור אישי ומאובטח ואין להעביר אותו לאחרים.\n\nאם הכפתור אינו נפתח, אפשר להעתיק את הקישור הבא לדפדפן:\n${input.approvalUrl}`;
+  const textContent = `${greeting}\n\nביקשתם יותר התאמות, ואני מקשיבה. Boost מאפשר לראות באזור האישי התאמות פוטנציאליות ולבחור אם לשלוח בקשת התאמה.\n\nחברי מאגר שיאשרו את שירות הבוסט יוכלו לשלוח ולקבל בקשות Boost. ההתאמות נוצרות על ידי האלגוריתם ואינן עוברות אישור אישי של הילית.\n\nלחצו על הכפתור במייל כדי להיכנס לאזור האישי ולאשר Boost.\n\nהאישור וההצטרפות ל־Boost אינם כרוכים בתשלום. הקישור אישי ומאובטח ואין להעביר אותו לאחרים.\n\nאם הכפתור אינו נפתח, אפשר להעתיק את הקישור הבא לדפדפן:\n${approvalUrl}`;
   return { subject, preheader, htmlContent, textContent };
 }
 
