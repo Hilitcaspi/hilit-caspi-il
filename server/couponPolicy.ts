@@ -22,7 +22,7 @@ export function hasActivePlusCouponEntitlement(member: PlusEntitlement | null | 
   if (!member) return false;
   if (member.billingStatus === "active" && member.status === "active") return true;
   return member.billingStatus === "cancelled" &&
-    member.status === "churned" &&
+    (member.status === "churned" || member.status === "active") &&
     Boolean(member.billingCycleEndsAt && member.billingCycleEndsAt > now);
 }
 

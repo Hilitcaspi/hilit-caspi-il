@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  LIVE_LAUNCH_CAMPAIGN,
   LIVE_LAUNCH_SEND_EXPIRES_AT,
   LIVE_LAUNCH_SEND_NOT_BEFORE,
   canonicalEmail,
@@ -109,5 +110,96 @@ describe("live launch campaign safety", () => {
     expect(send).toHaveBeenCalledOnce();
     expect(send.mock.calls[0][0].versions[0].to[0].email).toBe("approved@example.com");
     expect(JSON.stringify(send.mock.calls)).not.toContain("new@example.com");
+  });
+
+  it("does not claim, write, or call either provider outside a named phase window", async () => {
+    const db = { execute: vi.fn(), insert: vi.fn(), update: vi.fn() };
+    const email = vi.fn();
+    const sms = vi.fn();
+    await expect(runLiveLaunchCampaign({
+      execute: true, dryRun: false, deliveryPhase: "sms20", now: Date.parse("2026-10-08T19:59:59+03:00"),
+      expiresAt: LIVE_LAUNCH_SEND_EXPIRES_AT, frozen: { email: { cold: 0, database: 0, plus: 0 }, recipientHashes: [] },
+    }, { readRawAudience: async () => raw(), getDb: async () => db as any, sendEmailBatch: email, sendSMSBulkDetailed: sms }))
+      .rejects.toThrow("phase window");
+    expect(db.execute).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(email).not.toHaveBeenCalled();
+    expect(sms).not.toHaveBeenCalled();
+  });
+
+  it("keeps an email delivery from suppressing the frozen cold SMS phase, sends SMS once, and never sends email", async () => {
+    const logs: any[] = [];
+    const db = {
+      execute: vi.fn(async () => [{ affectedRows: 1 }]),
+      insert: vi.fn(() => ({ values: async (values: any[]) => { logs.push(...values); } })),
+      update: vi.fn(() => ({ set: () => ({ where: async () => undefined }) })),
+    };
+    const provider = vi.fn().mockResolvedValue({ accepted: true, providerRunId: "protected-run-id", error: null });
+    const sendEmail = vi.fn();
+    const contacts = raw({
+      crm: [
+        { id: 1, email: "cold@example.com", phone: "0501111111", name: "Cold", status: "new_lead", emailUnsubscribed: 0, createdAt: now },
+        { id: 2, email: "database@example.com", phone: "0502222222", name: "Database", status: "new_lead", emailUnsubscribed: 0, createdAt: now },
+      ],
+      profiles: [
+        { id: 2, email: "database@example.com", phone: "0502222222", firstName: "Database", isActive: 1, isSeed: 0, boostExcluded: 0, isPaid: 1, consentEmailMarketing: 1, isCoachingClient: 0, questionnaireToken: "token", questionnaireCompletedAt: null, createdAt: now },
+      ],
+      paymentLeads: [{ email: "cold@example.com", product: "database", confirmedAt: null, createdAt: now }],
+      activity: [{ email: "cold@example.com", journeyKey: "live_launch26_cold", status: "sent", sentAt: now, clickedAt: null }],
+    });
+    const result = await runLiveLaunchCampaign({
+      execute: true, dryRun: false, deliveryPhase: "sms19", now: LIVE_LAUNCH_SEND_NOT_BEFORE + 1,
+      expiresAt: LIVE_LAUNCH_SEND_EXPIRES_AT,
+      allowedSegments: ["cold", "database", "plus"], limits: { cold: 1, smsTotal: 1 },
+      frozen: { email: { cold: 1, database: 0, plus: 0 }, smsTotal: 1, recipientHashes: [liveLaunchRecipientHash({ email: "cold@example.com", segment: "cold" })] },
+      smsConsent: async () => ({ permitted: true, provenance: "approved-test" }), buildSms: () => ({ message: "הודעת בדיקה" }),
+    }, {
+      readRawAudience: async () => contacts, getDb: async () => db as any, brevoSmtpBlocked: async () => false,
+      isPermanentlyBlockedEmail: () => false, sendEmailBatch: sendEmail, sendSMSBulkDetailed: provider,
+      getVibrateSmsBalance: async () => 10,
+    });
+    expect(result).toMatchObject({ sms: { accepted: 1, selected: 1 } });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(provider).toHaveBeenCalledOnce();
+    expect(provider.mock.calls[0][0].messages).toHaveLength(1);
+    expect(provider.mock.calls[0][0].campaignId).toBe(`${LIVE_LAUNCH_CAMPAIGN}:sms19`);
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({ journeyKey: "live_launch26_sms_cold", status: "processing", htmlBody: "", recipientName: null });
+    expect(JSON.stringify(logs)).not.toContain("0501111111");
+  });
+
+  it("treats active cancelled Plus as eligible through paid end but preserves marketing consent", () => {
+    const future = now + 60_000;
+    const audience = classifyLiveLaunchAudience(raw({
+      profiles: [
+        { id: 1, email: "eligible@example.com", phone: null, firstName: "Eligible", isActive: 1, isSeed: 0, boostExcluded: 0, isPaid: 1, consentEmailMarketing: 1, isCoachingClient: 0, questionnaireToken: "x", questionnaireCompletedAt: null, createdAt: now },
+        { id: 2, email: "no-consent@example.com", phone: null, firstName: "No", isActive: 1, isSeed: 0, boostExcluded: 0, isPaid: 1, consentEmailMarketing: 0, isCoachingClient: 0, questionnaireToken: "x", questionnaireCompletedAt: null, createdAt: now },
+      ],
+      plus: [
+        { singleId: 1, status: "active", billingStatus: "cancelled", billingCycleEndsAt: future },
+        { singleId: 2, status: "active", billingStatus: "cancelled", billingCycleEndsAt: future },
+      ],
+      tickets: [
+        { id: 1, eventSlug: "matching-secrets-2026-10-31", email: "eligible@example.com", voucherCode: "REAL", issuedAt: now, revokedAt: null, source: "plus", singleId: 1, attendanceConfirmedAt: null },
+        { id: 2, eventSlug: "matching-secrets-2026-10-31", email: "no-consent@example.com", voucherCode: "REAL", issuedAt: now, revokedAt: null, source: "plus", singleId: 2, attendanceConfirmedAt: null },
+      ],
+    }), now);
+    expect(audience.members.map(member => member.email)).toEqual(["eligible@example.com"]);
+    expect(audience.members[0].segment).toBe("plus");
+    expect(audience.suppressions.profile_marketing_consent).toBe(1);
+  });
+
+  it("allows a frozen runtime SMS cohort only to shrink after revalidation", async () => {
+    let call = 0;
+    const provider = vi.fn();
+    const db = { execute: vi.fn(async () => [{ affectedRows: 1 }]), insert: vi.fn(), update: vi.fn() };
+    const current = () => raw({ crm: [{ id: 1, email: "gone@example.com", phone: "0501111111", name: "Gone", status: "new_lead", emailUnsubscribed: call++ ? 1 : 0, createdAt: now }], paymentLeads: [{ email: "gone@example.com", product: "database", confirmedAt: null, createdAt: now }] });
+    const result = await runLiveLaunchCampaign({
+      execute: true, dryRun: false, deliveryPhase: "sms19", now: LIVE_LAUNCH_SEND_NOT_BEFORE + 1, expiresAt: LIVE_LAUNCH_SEND_EXPIRES_AT,
+      limits: { cold: 1, smsTotal: 1 }, frozen: { email: { cold: 1, database: 0, plus: 0 }, smsTotal: 1, recipientHashes: [liveLaunchRecipientHash({ email: "gone@example.com", segment: "cold" })] },
+      smsConsent: () => ({ permitted: true, provenance: "test" }), buildSms: () => ({ message: "בדיקה" }),
+    }, { readRawAudience: async () => current(), getDb: async () => db as any, brevoSmtpBlocked: async () => false, isPermanentlyBlockedEmail: () => false, sendSMSBulkDetailed: provider, getVibrateSmsBalance: async () => 1 });
+    expect(result).toMatchObject({ sms: { accepted: 0, selected: 0 } });
+    expect(provider).not.toHaveBeenCalled();
   });
 });

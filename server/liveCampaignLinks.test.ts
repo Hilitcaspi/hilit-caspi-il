@@ -18,5 +18,14 @@ describe("live campaign links", () => {
     expect(url.searchParams.get("utm_campaign")).toBe("live_oct2026");
     expect(url.searchParams.get("utm_content")).toBe(content);
   });
+  it.each(["19", "20", "21"])("tracks cold SMS wave %s without forwarding secrets", hour => {
+    const url = new URL(liveSmsAliasTarget("/ld", `?h=${hour}&email=private%40example.com&token=private&next=https://evil.example`)!, "https://hilitcaspi.com");
+    expect(url.searchParams.get("utm_content")).toBe(`cold_database_${hour}00`);
+    expect(url.search).not.toMatch(/private|token|next|evil/);
+  });
+  it("ignores arbitrary wave labels", () => {
+    const url = new URL(liveSmsAliasTarget("/ld", "?h=evil")!, "https://hilitcaspi.com");
+    expect(url.searchParams.get("utm_content")).toBe("cold_database");
+  });
   it("never redirects an arbitrary target", () => expect(liveSmsAliasTarget("https://evil.example")).toBeNull());
 });

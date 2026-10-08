@@ -13,10 +13,12 @@ export function liveDatabaseOfferHref(search: string): string {
 }
 
 /** First-party SMS aliases with fixed destinations: cannot act as an open redirect. */
-export function liveSmsAliasTarget(path: string): string | null {
+export function liveSmsAliasTarget(path: string, search = ""): string | null {
   const content = path === "/ld" ? "cold_database" : path === "/ll" ? "member_live" : path === "/lp" ? "plus_live" : null;
   if (!content) return null;
   const target = path === "/ld" ? "/live/database" : "/live";
-  const query = new URLSearchParams({ utm_source: "sms", utm_medium: "sms", utm_campaign: LIVE_LAUNCH_CAMPAIGN, utm_content: content });
+  const hour = new URLSearchParams(search).get("h");
+  const waveContent = path === "/ld" && ["19", "20", "21"].includes(hour || "") ? `${content}_${hour}00` : content;
+  const query = new URLSearchParams({ utm_source: "sms", utm_medium: "sms", utm_campaign: LIVE_LAUNCH_CAMPAIGN, utm_content: waveContent });
   return `${target}?${query.toString()}`;
 }

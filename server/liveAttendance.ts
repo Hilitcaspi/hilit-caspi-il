@@ -20,7 +20,7 @@ function confirmedPlusTicketWhere(ticketId: number, now: number) {
       where ${plusPilotMembers.singleId} = ${liveOctoberTickets.singleId}
         and (
           (${plusPilotMembers.status} = 'active' and ${plusPilotMembers.billingStatus} = 'active')
-          or (${plusPilotMembers.status} = 'churned' and ${plusPilotMembers.billingStatus} = 'cancelled'
+          or (${plusPilotMembers.status} in ('churned', 'active') and ${plusPilotMembers.billingStatus} = 'cancelled'
               and ${plusPilotMembers.billingCycleEndsAt} > ${now})
         )
     )`,

@@ -17,6 +17,9 @@ describe("PLUS50 coupon policy", () => {
   it("keeps the benefit until the paid period ends after cancellation", () => {
     expect(hasActivePlusCouponEntitlement({ status: "churned", billingStatus: "cancelled", billingCycleEndsAt: 2000 }, 1000)).toBe(true);
     expect(hasActivePlusCouponEntitlement({ status: "churned", billingStatus: "cancelled", billingCycleEndsAt: 500 }, 1000)).toBe(false);
+    expect(hasActivePlusCouponEntitlement({ status: "active", billingStatus: "cancelled", billingCycleEndsAt: 2000 }, 1000)).toBe(true);
+    expect(hasActivePlusCouponEntitlement({ status: "active", billingStatus: "cancelled", billingCycleEndsAt: 1000 }, 1000)).toBe(false);
+    expect(hasActivePlusCouponEntitlement({ status: "active", billingStatus: "cancelled", billingCycleEndsAt: null }, 1000)).toBe(false);
   });
 
   it("rejects waitlist, invited and past-due members", () => {

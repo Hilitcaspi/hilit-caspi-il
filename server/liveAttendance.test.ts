@@ -92,6 +92,7 @@ describe("live October Plus RSVP", () => {
     const whereSql = dialect.sqlToQuery((wheres[0] as any).getSQL());
     expect(whereSql.sql).toContain("`live_october_tickets`.`revoked_at` is null");
     expect(whereSql.sql).toContain("exists (");
+    expect(whereSql.sql).toContain("`plus_pilot_members`.`status` in ('churned', 'active')");
   });
 
   it("clears confirmation when a Plus member cancels", async () => {

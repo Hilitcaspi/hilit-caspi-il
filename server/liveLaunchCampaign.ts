@@ -17,8 +17,20 @@ import { getVibrateSmsBalance, normalizeIsraeliMobile, sendSMSBulkDetailed } fro
  */
 export const LIVE_LAUNCH_CAMPAIGN = "live_launch_2026_10_08";
 export const LIVE_LAUNCH_SEND_NOT_BEFORE = Date.parse("2026-10-08T19:00:00+03:00");
-export const LIVE_LAUNCH_SEND_EXPIRES_AT = Date.parse("2026-10-08T20:00:00+03:00");
+export const LIVE_LAUNCH_SEND_EXPIRES_AT = Date.parse("2026-10-08T21:30:00+03:00");
 export const LIVE_LAUNCH_SMS_DEFAULT_CAP = 200;
+
+export type LiveLaunchDeliveryPhase = "email19" | "sms19" | "email20" | "sms20" | "email21" | "sms21";
+export type LiveLaunchWaveContent = "launch_cold_1900" | "launch_cold_2000" | "launch_cold_2100" | "launch_cold_sms_combo_1900" | "launch_cold_sms_combo_2000" | "launch_cold_sms_combo_2100" | "plus_rsvp";
+const DELIVERY_PHASE_WINDOWS: Record<LiveLaunchDeliveryPhase, readonly [number, number]> = {
+  email19: [Date.parse("2026-10-08T19:00:00+03:00"), Date.parse("2026-10-08T19:30:00+03:00")],
+  sms19: [Date.parse("2026-10-08T19:00:00+03:00"), Date.parse("2026-10-08T19:30:00+03:00")],
+  email20: [Date.parse("2026-10-08T20:00:00+03:00"), Date.parse("2026-10-08T20:30:00+03:00")],
+  sms20: [Date.parse("2026-10-08T20:00:00+03:00"), Date.parse("2026-10-08T20:30:00+03:00")],
+  email21: [Date.parse("2026-10-08T21:00:00+03:00"), Date.parse("2026-10-08T21:30:00+03:00")],
+  sms21: [Date.parse("2026-10-08T21:00:00+03:00"), Date.parse("2026-10-08T21:30:00+03:00")],
+};
+const WAVE_CONTENT = new Set<LiveLaunchWaveContent>(["launch_cold_1900", "launch_cold_2000", "launch_cold_2100", "launch_cold_sms_combo_1900", "launch_cold_sms_combo_2000", "launch_cold_sms_combo_2100", "plus_rsvp"]);
 
 const DAY = 24 * 60 * 60 * 1000;
 const EMAIL_REST_WINDOW = 7 * DAY;
@@ -76,6 +88,8 @@ export type LiveLaunchMember = {
   plusTicket: LiveTicket | null;
   smsIntent: boolean;
   smsPreviouslySent: boolean;
+  /** Cold leads sharing a paid database/valid-Plus phone are email-only for this launch. */
+  smsBlockedByPaidPhone: boolean;
 };
 
 type LiveTicket = {
@@ -166,11 +180,17 @@ export type LiveLaunchOptions = {
   dryRun?: boolean;
   execute?: boolean;
   now?: number;
+  /** A phase is intentionally narrow; absent keeps the reviewed legacy single-run behavior. */
+  deliveryPhase?: LiveLaunchDeliveryPhase;
   /** Required on execution; must not outlive the Jerusalem night of 8 October. */
   expiresAt?: number;
   /** Frozen count-only result from the owner-reviewed dry run. Required on execution. */
   frozen?: { email: CountBySegment; smsTotal?: number; audienceDigest?: string; recipientHashes?: string[] };
   limits?: Partial<CountBySegment> & { smsTotal?: number };
+  /** Phase parents must opt in to the segments they approved; SMS remains cold-only regardless. */
+  allowedSegments?: LiveLaunchSegment[];
+  /** A reviewed UTM content label, optionally chosen per frozen recipient in memory. */
+  waveContent?: LiveLaunchWaveContent | ((member: Readonly<LiveLaunchMember>) => LiveLaunchWaveContent);
   /** Opt-in only. There is no first-party SMS consent column, so the default denies SMS. */
   smsConsent?: (member: Readonly<LiveLaunchMember>) => Promise<SmsConsentDecision> | SmsConsentDecision;
   /** Parent-owned copy only. No built-in/live hard-coded SMS copy is used. */
@@ -227,6 +247,7 @@ function increment(target: Record<string, number>, key: string, amount = 1) {
 
 function activePlus(row: RawPlus | undefined, now: number) {
   return Boolean(row && ((row.status === "active" && row.billingStatus === "active")
+    || (row.status === "active" && row.billingStatus === "cancelled" && Number(row.billingCycleEndsAt || 0) > now)
     || (row.status === "churned" && row.billingStatus === "cancelled" && Number(row.billingCycleEndsAt || 0) > now)));
 }
 
@@ -266,6 +287,7 @@ export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Dat
   const clickedRecently = new Set<string>();
   const recentlyMailed = new Set<string>();
   const priorSms = new Set<string>();
+  const paidPhones = new Set<string>();
   const ticketsByEmail = new Map<string, LiveTicket[]>();
 
   for (const profile of raw.profiles) {
@@ -287,6 +309,13 @@ export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Dat
     crmByEmail.set(email, existing);
   }
   for (const plus of raw.plus) plusBySingleId.set(Number(plus.singleId), plus);
+  // This is intentionally broader than the email candidates: a cold CRM lead can
+  // share a phone with a paid/Plus profile that is correctly suppressed from email.
+  // That never blocks the lead's email, but it must not make the phone SMS-eligible.
+  for (const profile of raw.profiles) {
+    const phone = canonicalPhone(profile.phone);
+    if (phone && (bool(profile.isPaid) || activePlus(plusBySingleId.get(Number(profile.id)), now))) paidPhones.add(phone);
+  }
   for (const payment of raw.completedPayments) {
     const email = canonicalEmail(payment.email);
     if (!email) continue;
@@ -307,7 +336,7 @@ export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Dat
       recentlyMailed.add(email);
     }
     if (Number(activity.clickedAt || 0) >= now - SMS_INTENT_CLICK_WINDOW) clickedRecently.add(email);
-    if ((activity.status === "sent" || activity.status === "processing") && (journey.includes("sms") || journey.startsWith("live_launch26_sms_"))) {
+    if ((activity.status === "sent" || activity.status === "processing" || activity.status === "failed") && journey.includes("sms")) {
       priorSms.add(email);
     }
   }
@@ -338,7 +367,6 @@ export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Dat
     const coachingOrNotRelevant = coachingEmails.has(email)
       || profiles.some(row => bool(row.isCoachingClient))
       || crm.some(row => ["client_coaching", "not_relevant"].includes(String(row.status || "")));
-    const hasRecentMarketingEmail = recentlyMailed.has(email);
     const paidDatabase = completedDatabaseEmails.has(email) || profiles.some(row => bool(row.isPaid));
     const profileWithPlus = profiles.find(row => activePlus(plusBySingleId.get(Number(row.id)), now));
     const activeDatabaseProfile = profiles.find(row => bool(row.isPaid) && bool(row.isActive));
@@ -351,7 +379,9 @@ export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Dat
     else if (boostExcluded) reason = "boost_excluded_owner_test";
     else if (anyNoMarketingConsent) reason = "profile_marketing_consent";
     else if (coachingOrNotRelevant) reason = "coaching_or_not_relevant";
-    else if (hasRecentMarketingEmail) reason = "recent_marketing_email";
+    // A current Plus entitlement is a permitted service/member exception to the
+    // seven-day marketing rest; every other consent and safety suppression remains.
+    else if (recentlyMailed.has(email) && !profileWithPlus) reason = "recent_marketing_email";
     if (reason) {
       increment(suppressions, reason);
       continue;
@@ -359,6 +389,10 @@ export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Dat
 
     const profile = profileWithPlus || activeDatabaseProfile || profiles[0];
     const phone = Array.from(emailsPhones).sort()[0] || null;
+    const smsBlockedByPaidPhone = Boolean(phone && paidPhones.has(phone));
+    const smsIntent = (uncompletedDatabaseCheckout.has(email) || clickedRecently.has(email)
+      || profiles.some(row => Number(row.questionnaireCompletedAt || 0) >= now - SMS_INTENT_REGISTRATION_WINDOW))
+      && !smsBlockedByPaidPhone;
     const base = {
       email: String(profile?.email || crm[0]?.email || email).trim().toLowerCase(),
       phone,
@@ -366,11 +400,11 @@ export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Dat
       leadId: crm.length ? Number(crm[0].id) : null,
       singleId: profile ? Number(profile.id) : null,
       questionnaireToken: String(profile?.questionnaireToken || "").trim() || null,
-      smsIntent: uncompletedDatabaseCheckout.has(email) || clickedRecently.has(email)
-        || profiles.some(row => Number(row.questionnaireCompletedAt || 0) >= now - SMS_INTENT_REGISTRATION_WINDOW),
+      smsIntent,
       smsIntentPriority: uncompletedDatabaseCheckout.has(email) ? 0 : clickedRecently.has(email) ? 1
         : profiles.some(row => Number(row.questionnaireCompletedAt || 0) >= now - SMS_INTENT_REGISTRATION_WINDOW) ? 2 : Number.MAX_SAFE_INTEGER,
       smsPreviouslySent: priorSms.has(email),
+      smsBlockedByPaidPhone,
     };
     if (profileWithPlus) {
       const ticket = tickets.find(row => row.source === "plus" && Number(row.singleId) === Number(profileWithPlus.id));
@@ -501,14 +535,24 @@ async function loadAuditedAudience(options: LiveLaunchOptions, dependencies: Liv
     }
     deliverable.push(member);
   }
-  const campaignLogged = new Set(raw.activity.filter(row => String(row.journeyKey || "").startsWith("live_launch26_")
-    && ["sent", "processing", "failed"].includes(String(row.status || ""))).map(row => canonicalEmail(row.email)).filter((v): v is string => Boolean(v)));
+  const smsChannel = Boolean(options.deliveryPhase?.startsWith("sms"));
+  const campaignLogged = new Set(raw.activity.filter(row => {
+    const journey = String(row.journeyKey || "").toLowerCase();
+    return journey.startsWith("live_launch26_")
+      && (smsChannel ? journey.includes("sms") : !journey.includes("sms"))
+      && ["sent", "processing", "failed"].includes(String(row.status || ""));
+  }).map(row => canonicalEmail(row.email)).filter((v): v is string => Boolean(v)));
   const fresh = deliverable.filter(member => {
     if (!campaignLogged.has(canonicalEmail(member.email) || "")) return true;
     increment(suppressions, "already_logged_for_campaign");
     return false;
   });
-  return { members: fresh.sort(stableMemberOrder), suppressions, plusMissingTicket: classified.plusMissingTicket, rsvpAlreadyConfirmed: classified.rsvpAlreadyConfirmed };
+  const allowed = new Set(options.allowedSegments || ["cold", "database", "plus"]);
+  if (smsChannel) { allowed.clear(); allowed.add("cold"); }
+  // The approved live waves are new/unpaid cold leads plus (email-only) Plus.
+  // Preserve database behavior only for legacy callers with no named phase.
+  if (options.deliveryPhase && !smsChannel) allowed.delete("database");
+  return { members: fresh.filter(member => allowed.has(member.segment)).sort(stableMemberOrder), suppressions, plusMissingTicket: classified.plusMissingTicket, rsvpAlreadyConfirmed: classified.rsvpAlreadyConfirmed };
 }
 
 /** Returns contacts only to a server-side caller. Never serialize this result to an admin/browser response. */
@@ -520,6 +564,64 @@ function audienceDigest(members: LiveLaunchMember[]) {
   return crypto.createHash("sha256").update(members.map(member => `${member.segment}:${member.email}`).sort().join("\n")).digest("hex");
 }
 
+function isSmsPhase(phase: LiveLaunchDeliveryPhase | undefined) {
+  return Boolean(phase?.startsWith("sms"));
+}
+
+function boundedPreviewMembers(members: LiveLaunchMember[], options: LiveLaunchOptions) {
+  const caps: CountBySegment = {
+    cold: options.limits?.cold ?? Infinity,
+    database: options.limits?.database ?? Infinity,
+    plus: options.limits?.plus ?? Infinity,
+  };
+  return members.filter(member => {
+    if (caps[member.segment] <= 0) return false;
+    caps[member.segment] -= 1;
+    return true;
+  });
+}
+
+function stableSmsOrder(phase: LiveLaunchDeliveryPhase | undefined, a: LiveLaunchMember, b: LiveLaunchMember) {
+  const hash = (member: LiveLaunchMember) => crypto.createHash("sha256")
+    .update(`${LIVE_LAUNCH_CAMPAIGN}:${phase || "legacy"}:${canonicalEmail(member.email) || member.email}`).digest("hex");
+  return a.smsIntentPriority - b.smsIntentPriority || hash(a).localeCompare(hash(b));
+}
+
+function smsCandidates(members: LiveLaunchMember[], phase: LiveLaunchDeliveryPhase | undefined) {
+  return members.filter(member => member.segment === "cold" && Boolean(member.phone) && member.smsIntent
+    && !member.smsPreviouslySent && !member.smsBlockedByPaidPhone).sort((a, b) => stableSmsOrder(phase, a, b));
+}
+
+function waveContentFor(options: LiveLaunchOptions, member: LiveLaunchMember): LiveLaunchWaveContent | undefined {
+  const value = typeof options.waveContent === "function" ? options.waveContent(member) : options.waveContent;
+  if (value !== undefined && !WAVE_CONTENT.has(value)) throw new Error("Unknown live-launch wave content label");
+  return value;
+}
+
+function setWaveContent(rawUrl: string, content: LiveLaunchWaveContent): string {
+  const htmlEscaped = rawUrl.includes("&amp;");
+  const decoded = htmlEscaped ? rawUrl.replace(/&amp;/g, "&") : rawUrl;
+  let parsed: URL;
+  try { parsed = new URL(decoded); } catch { return rawUrl; }
+  if (parsed.origin !== "https://hilitcaspi.com" || ["/unsubscribe", "/u"].includes(parsed.pathname) || parsed.pathname.startsWith("/api/email/")) return rawUrl;
+  const hashAt = decoded.indexOf("#");
+  const beforeHash = hashAt < 0 ? decoded : decoded.slice(0, hashAt);
+  const hash = hashAt < 0 ? "" : decoded.slice(hashAt);
+  const questionAt = beforeHash.indexOf("?");
+  const path = questionAt < 0 ? beforeHash : beforeHash.slice(0, questionAt);
+  const query = questionAt < 0 ? [] : beforeHash.slice(questionAt + 1).split("&").filter(part => !part.startsWith("utm_content="));
+  query.push(`utm_content=${encodeURIComponent(content)}`);
+  const output = `${path}?${query.join("&")}${hash}`;
+  return htmlEscaped ? output.replace(/&/g, "&amp;") : output;
+}
+
+function addWaveContent(draft: { subject: string; htmlContent: string; textContent: string; preheader: string }, content: LiveLaunchWaveContent | undefined) {
+  if (!content) return draft;
+  const htmlContent = draft.htmlContent.replace(/href="([^"]+)"/gi, (_match, url) => `href="${setWaveContent(url, content)}"`);
+  const textContent = draft.textContent.replace(/https:\/\/hilitcaspi\.com[^\s<>'"]+/g, url => setWaveContent(url, content));
+  return { ...draft, htmlContent, textContent };
+}
+
 export function liveLaunchRecipientHash(member: Pick<LiveLaunchMember, "segment" | "email">) {
   return crypto.createHash("sha256").update(`${LIVE_LAUNCH_CAMPAIGN}:${member.segment}:${canonicalEmail(member.email)}`).digest("hex");
 }
@@ -528,9 +630,10 @@ export function liveLaunchRecipientHash(member: Pick<LiveLaunchMember, "segment"
 export async function readLiveLaunchDryRun(options: LiveLaunchOptions = {}, dependencies: LiveLaunchDependencies = {}): Promise<LiveLaunchDryRun & { audienceDigest: string; recipientHashes: string[] }> {
   const now = options.now ?? Date.now();
   const audience = await loadAuditedAudience({ ...options, dryRun: true }, dependencies, now);
+  const previewMembers = boundedPreviewMembers(audience.members, options);
   const counts = emptySegmentCounts();
-  for (const member of audience.members) counts[member.segment] += 1;
-  const intent = audience.members.filter(member => member.phone && member.smsIntent && !member.smsPreviouslySent);
+  for (const member of previewMembers) counts[member.segment] += 1;
+  const intent = smsCandidates(previewMembers, options.deliveryPhase);
   const intentBySegment = emptySegmentCounts();
   for (const member of intent) intentBySegment[member.segment] += 1;
   const consented: LiveLaunchMember[] = [];
@@ -554,8 +657,8 @@ export async function readLiveLaunchDryRun(options: LiveLaunchOptions = {}, depe
       sms: "The schema has no first-party SMS-consent field. SMS stays disabled unless the caller supplies an explicit, auditable subscriber-rights decision; then it additionally requires verified high purchase intent, a canonical unique phone and no prior campaign SMS.",
       segmentation: "Segments are disjoint: active Plus with an existing non-revoked real ticket and no RSVP confirmation; then paid active database members with a questionnaire verification token and no ticket; then unpaid cold CRM/profile leads. Boost exclusion is a test/owner safeguard, never a marketing-consent signal.",
     },
-    audienceDigest: audienceDigest(audience.members),
-    recipientHashes: audience.members.map(liveLaunchRecipientHash),
+    audienceDigest: audienceDigest(previewMembers),
+    recipientHashes: previewMembers.map(liveLaunchRecipientHash),
   };
 }
 
@@ -579,9 +682,35 @@ function trackedHtml(html: string, logId: number) {
   }).replace("</body>", `${pixel}</body>`);
 }
 
-function withinExecutionWindow(now: number, expiresAt: number | undefined) {
-  return now >= LIVE_LAUNCH_SEND_NOT_BEFORE && now <= LIVE_LAUNCH_SEND_EXPIRES_AT
+function withinExecutionWindow(now: number, expiresAt: number | undefined, phase: LiveLaunchDeliveryPhase | undefined) {
+  const [notBefore, endsAt] = phase ? DELIVERY_PHASE_WINDOWS[phase] : [LIVE_LAUNCH_SEND_NOT_BEFORE, LIVE_LAUNCH_SEND_EXPIRES_AT];
+  return now >= notBefore && (phase ? now < endsAt : now <= endsAt)
     && Boolean(expiresAt && expiresAt >= now && expiresAt <= LIVE_LAUNCH_SEND_EXPIRES_AT);
+}
+
+function selectedPreviewMembers(members: LiveLaunchMember[], options: LiveLaunchOptions) {
+  if (!isSmsPhase(options.deliveryPhase)) return boundedPreviewMembers(members, options);
+  const cap = Math.min(options.limits?.cold ?? Infinity, options.limits?.smsTotal ?? LIVE_LAUNCH_SMS_DEFAULT_CAP, LIVE_LAUNCH_SMS_DEFAULT_CAP);
+  return smsCandidates(members, options.deliveryPhase).slice(0, cap);
+}
+
+function selectedExecutionMembers(members: LiveLaunchMember[], options: LiveLaunchOptions, approvedHashes: Set<string> | null) {
+  const caps: CountBySegment = {
+    cold: Math.min(options.limits?.cold ?? Infinity, options.frozen!.email.cold),
+    database: Math.min(options.limits?.database ?? Infinity, options.frozen!.email.database),
+    plus: Math.min(options.limits?.plus ?? Infinity, options.frozen!.email.plus),
+  };
+  const source = isSmsPhase(options.deliveryPhase) ? smsCandidates(members, options.deliveryPhase) : members;
+  const result: LiveLaunchMember[] = [];
+  for (const member of source) {
+    if (approvedHashes && !approvedHashes.has(liveLaunchRecipientHash(member))) continue;
+    if (caps[member.segment] <= 0) continue;
+    caps[member.segment] -= 1;
+    result.push(member);
+  }
+  if (!isSmsPhase(options.deliveryPhase)) return result;
+  const cap = Math.min(options.limits?.smsTotal ?? LIVE_LAUNCH_SMS_DEFAULT_CAP, options.frozen!.smsTotal ?? LIVE_LAUNCH_SMS_DEFAULT_CAP, LIVE_LAUNCH_SMS_DEFAULT_CAP);
+  return result.slice(0, cap);
 }
 
 /**
@@ -593,7 +722,7 @@ export async function runLiveLaunchCampaign(options: LiveLaunchOptions = {}, dep
   const dryRun = options.dryRun ?? true;
   if (dryRun || !options.execute) return readLiveLaunchDryRun({ ...options, dryRun: true }, dependencies);
   const now = options.now ?? Date.now();
-  if (!withinExecutionWindow(now, options.expiresAt)) throw new Error("Live launch execution is allowed only from 19:00 until the supplied same-night expiry in Jerusalem");
+  if (!withinExecutionWindow(now, options.expiresAt, options.deliveryPhase)) throw new Error("Live launch execution is allowed only in its approved Jerusalem phase window until the supplied same-night expiry");
   if (!options.frozen) throw new Error("A displayed frozen dry-run payload is required before execution");
   const review = await readLiveLaunchDryRun({ ...options, dryRun: true, verifyBrevoSmtpBlacklist: true }, dependencies);
   const approvedHashes = options.frozen.recipientHashes ? new Set(options.frozen.recipientHashes) : null;
@@ -603,71 +732,73 @@ export async function runLiveLaunchCampaign(options: LiveLaunchOptions = {}, dep
   }
 
   const audience = await loadAuditedAudience({ ...options, dryRun: true, verifyBrevoSmtpBlacklist: true }, dependencies, now);
-  const limits = { cold: Math.min(options.limits?.cold ?? Infinity, options.frozen.email.cold), database: Math.min(options.limits?.database ?? Infinity, options.frozen.email.database), plus: Math.min(options.limits?.plus ?? Infinity, options.frozen.email.plus) };
-  const selected = audience.members.filter(member => {
-    if (approvedHashes && !approvedHashes.has(liveLaunchRecipientHash(member))) return false;
-    if (limits[member.segment] <= 0) return false;
-    limits[member.segment] -= 1;
-    return true;
-  });
+  const selected = selectedExecutionMembers(audience.members, options, approvedHashes);
   const db = await (dependencies.getDb || getDb)();
   if (!db) throw new Error("Database unavailable");
-  const claim = await db.execute(sql`INSERT IGNORE INTO lifecycle_run_claims (run_key, status, started_at, result_json) VALUES (${LIVE_LAUNCH_CAMPAIGN}, 'running', ${now}, ${JSON.stringify({ state: "review_required_if_interrupted", approvedDigest: options.frozen.audienceDigest || null })})`);
+  const runKey = options.deliveryPhase ? `${LIVE_LAUNCH_CAMPAIGN}:${options.deliveryPhase}` : LIVE_LAUNCH_CAMPAIGN;
+  const claim = await db.execute(sql`INSERT IGNORE INTO lifecycle_run_claims (run_key, status, started_at, result_json) VALUES (${runKey}, 'running', ${now}, ${JSON.stringify({ state: "review_required_if_interrupted", phase: options.deliveryPhase || "legacy", approvedDigest: options.frozen.audienceDigest || null })})`);
   const claimResult = Array.isArray(claim) ? claim[0] : claim;
   if (Number((claimResult as any)?.affectedRows || 0) !== 1) throw new Error("Campaign already claimed; inspect provider results before any further action");
   const send = dependencies.sendEmailBatch || sendEmailBatch;
   const signedUnsubscribe = dependencies.buildSignedUnsubscribeUrl || buildSignedUnsubscribeUrl;
   const draftBuilder = dependencies.buildLiveLaunchEmailDraft || buildLiveLaunchEmailDraft;
   const tokenFactory = dependencies.liveQuestionToken || liveQuestionToken;
-  const result = { review, email: { sent: 0, suppressed: audience.members.length - selected.length, reviewRequired: 0 }, sms: { accepted: 0, selected: 0, providerUnits256: 0 } };
+  const result = { review, email: { sent: 0, suppressed: audience.members.length - selected.length, reviewRequired: 0 }, sms: { accepted: 0, selected: 0, providerUnits256: 0, reviewRequired: 0 } };
 
-  for (const segment of ["plus", "database", "cold"] as const) {
-    const segmentMembers = selected.filter(member => member.segment === segment);
-    for (let offset = 0; offset < segmentMembers.length; offset += 100) {
-      const batch = segmentMembers.slice(offset, offset + 100);
-      const records: Array<{ member: LiveLaunchMember; id: number; html: string; text: string; subject: string }> = [];
-      const emailLog = (await import("../drizzle/schema")).emailLog;
-      for (const member of batch) {
-        const unsubscribeUrl = signedUnsubscribe({ email: member.email, ...(member.leadId ? { leadId: member.leadId } : {}), ...(member.singleId ? { singleId: member.singleId } : {}) });
-        const draft = draftBuilder({ audience: segment as EmailAudience, firstName: member.firstName, unsubscribeUrl,
-          ...(segment === "plus" && member.plusTicket ? { rsvpUrl: rsvpUrl(member.plusTicket, tokenFactory) } : {}),
-          ...(segment === "database" ? { memberOfferUrl: options.buildMemberOfferUrl?.(member) || memberOfferUrl(member) } : {}),
-        });
-        records.push({ member, id: 0, html: draft.htmlContent, text: draft.textContent, subject: draft.subject });
+  // A named phase sends exactly one channel. The absent legacy phase preserves the
+  // original combined execution for previously reviewed callers.
+  if (!isSmsPhase(options.deliveryPhase)) {
+    for (const segment of ["plus", "database", "cold"] as const) {
+      const segmentMembers = selected.filter(member => member.segment === segment);
+      for (let offset = 0; offset < segmentMembers.length; offset += 100) {
+        const batch = segmentMembers.slice(offset, offset + 100);
+        const records: Array<{ member: LiveLaunchMember; id: number; html: string; text: string; subject: string; waveContent?: LiveLaunchWaveContent }> = [];
+        const emailLog = (await import("../drizzle/schema")).emailLog;
+        for (const member of batch) {
+          const unsubscribeUrl = signedUnsubscribe({ email: member.email, ...(member.leadId ? { leadId: member.leadId } : {}), ...(member.singleId ? { singleId: member.singleId } : {}) });
+          const waveContent = waveContentFor(options, member);
+          const draft = addWaveContent(draftBuilder({ audience: segment as EmailAudience, firstName: member.firstName, unsubscribeUrl,
+            ...(segment === "plus" && member.plusTicket ? { rsvpUrl: rsvpUrl(member.plusTicket, tokenFactory) } : {}),
+            ...(segment === "database" ? { memberOfferUrl: options.buildMemberOfferUrl?.(member) || memberOfferUrl(member) } : {}),
+          }), waveContent);
+          records.push({ member, id: 0, html: draft.htmlContent, text: draft.textContent, subject: draft.subject, waveContent });
+        }
+        await db.insert(emailLog).values(records.map(record => ({
+          leadId: record.member.leadId, recipientEmail: record.member.email, recipientName: record.member.firstName || null,
+          journeyKey: JOURNEY[segment], emailIndex: 1, subject: record.subject, htmlBody: record.html, textBody: record.text,
+          scheduledAt: now, sentAt: null, status: "processing" as const,
+          errorMessage: JSON.stringify({ campaign: LIVE_LAUNCH_CAMPAIGN, phase: options.deliveryPhase || "legacy", utmContent: record.waveContent || null, state: "inflight_review_if_uncertain" }), createdAt: now,
+        })));
+        const claimedRows = asRows<{ id: number; recipientEmail: string }>(await db.execute(sql`SELECT id, recipientEmail FROM email_log WHERE journeyKey = ${JOURNEY[segment]} AND status = 'processing' AND recipientEmail IN (${sql.join(batch.map(member => sql`${member.email}`), sql`, `)})`));
+        const idsByEmail = new Map(claimedRows.map(row => [row.recipientEmail, Number(row.id)]));
+        for (const record of records) {
+          record.id = idsByEmail.get(record.member.email) || 0;
+          if (!record.id) throw new Error("Unable to claim campaign email log row");
+          record.html = trackedHtml(record.html, record.id);
+        }
+        await db.execute(sql`UPDATE email_log SET htmlBody = CASE id ${sql.join(records.map(record => sql`WHEN ${record.id} THEN ${record.html}`), sql` `)} END WHERE id IN (${sql.join(records.map(record => sql`${record.id}`), sql`, `)})`);
+        const delivery = await send({ subject: records[0]?.subject || "", textContent: records[0]?.text, versions: records.map(record => ({ to: [{ email: record.member.email, name: record.member.firstName || undefined }], htmlContent: record.html, textContent: record.text })), idempotencyKey: liveLaunchUuid(`email:${segment}:${options.deliveryPhase || "legacy"}`, records.map(record => record.member.email)) });
+        if (!delivery.success) {
+          await db.update((await import("../drizzle/schema")).emailLog).set({ status: "failed", errorMessage: sql`JSON_SET(COALESCE(errorMessage, '{}'), '$.state', 'review_required_provider_result_uncertain')` }).where(sql`journeyKey = ${JOURNEY[segment]} AND status = 'processing' AND sentAt IS NULL`);
+          result.email.reviewRequired += records.length;
+          continue;
+        }
+        const ids = records.map(record => record.id);
+        await db.update((await import("../drizzle/schema")).emailLog).set({ status: "sent", sentAt: Date.now(), errorMessage: sql`JSON_SET(COALESCE(errorMessage, '{}'), '$.state', ${delivery.duplicate ? "provider_idempotent_duplicate" : "provider_accepted"})` }).where(sql`id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
+        result.email.sent += records.length;
       }
-      // Global run claim guarantees one writer. Processing rows cannot be picked up by generic schedulers.
-      await db.insert(emailLog).values(records.map(record => ({
-        leadId: record.member.leadId, recipientEmail: record.member.email, recipientName: record.member.firstName || null,
-        journeyKey: JOURNEY[segment], emailIndex: 1, subject: record.subject, htmlBody: record.html, textBody: record.text,
-        scheduledAt: now, sentAt: null, status: "processing" as const,
-        errorMessage: JSON.stringify({ campaign: LIVE_LAUNCH_CAMPAIGN, state: "inflight_review_if_uncertain" }), createdAt: now,
-      })));
-      const claimedRows = asRows<{ id: number; recipientEmail: string }>(await db.execute(sql`SELECT id, recipientEmail FROM email_log WHERE journeyKey = ${JOURNEY[segment]} AND status = 'processing' AND recipientEmail IN (${sql.join(batch.map(member => sql`${member.email}`), sql`, `)})`));
-      const idsByEmail = new Map(claimedRows.map(row => [row.recipientEmail, Number(row.id)]));
-      for (const record of records) {
-        record.id = idsByEmail.get(record.member.email) || 0;
-        if (!record.id) throw new Error("Unable to claim campaign email log row");
-        record.html = trackedHtml(record.html, record.id);
-      }
-      await db.execute(sql`UPDATE email_log SET htmlBody = CASE id ${sql.join(records.map(record => sql`WHEN ${record.id} THEN ${record.html}`), sql` `)} END WHERE id IN (${sql.join(records.map(record => sql`${record.id}`), sql`, `)})`);
-      const delivery = await send({ subject: records[0]?.subject || "", textContent: records[0]?.text, versions: records.map(record => ({ to: [{ email: record.member.email, name: record.member.firstName || undefined }], htmlContent: record.html, textContent: record.text })), idempotencyKey: liveLaunchUuid(`email:${segment}`, records.map(record => record.member.email)) });
-      if (!delivery.success) {
-        await db.update((await import("../drizzle/schema")).emailLog).set({ status: "failed", errorMessage: JSON.stringify({ campaign: LIVE_LAUNCH_CAMPAIGN, state: "review_required_provider_result_uncertain" }) }).where(sql`journeyKey = ${JOURNEY[segment]} AND status = 'processing' AND sentAt IS NULL`);
-        result.email.reviewRequired += records.length;
-        continue;
-      }
-      const ids = records.map(record => record.id);
-      await db.update((await import("../drizzle/schema")).emailLog).set({ status: "sent", sentAt: Date.now(), errorMessage: JSON.stringify({ campaign: LIVE_LAUNCH_CAMPAIGN, state: delivery.duplicate ? "provider_idempotent_duplicate" : "provider_accepted" }) }).where(sql`id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`);
-      result.email.sent += records.length;
     }
   }
-  // SMS intentionally remains opt-in and copy-less unless parent supplies both callbacks.
-  if (options.smsConsent && options.buildSms) {
+
+  if (isSmsPhase(options.deliveryPhase) || !options.deliveryPhase) {
+    // SMS remains opt-in/copy-less, and a phase is defensively cold-only even if a
+    // caller accidentally asks for database or Plus segments.
     const cap = Math.min(options.limits?.smsTotal ?? LIVE_LAUNCH_SMS_DEFAULT_CAP, options.frozen.smsTotal ?? LIVE_LAUNCH_SMS_DEFAULT_CAP, LIVE_LAUNCH_SMS_DEFAULT_CAP);
     const sms = [] as Array<{ member: LiveLaunchMember; message: string }>;
     const seenPhones = new Set<string>();
-    for (const member of selected) {
-      if (!member.phone || !member.smsIntent || member.smsPreviouslySent || seenPhones.has(member.phone) || sms.length >= cap) continue;
+    for (const member of (isSmsPhase(options.deliveryPhase) ? selected : smsCandidates(selected, options.deliveryPhase))) {
+      if (!member.phone || member.segment !== "cold" || !member.smsIntent || member.smsPreviouslySent || member.smsBlockedByPaidPhone || seenPhones.has(member.phone) || sms.length >= cap) continue;
+      if (!options.smsConsent || !options.buildSms) continue;
       const consent = await options.smsConsent(member);
       if (!consent.permitted) continue;
       seenPhones.add(member.phone);
@@ -677,11 +808,25 @@ export async function runLiveLaunchCampaign(options: LiveLaunchOptions = {}, dep
       const credits = sms.reduce((total, row) => total + smsUnitReport(row.message).providerUnits256, 0);
       const balance = await (dependencies.getVibrateSmsBalance || getVibrateSmsBalance)();
       if (balance === null || balance < credits) throw new Error("Unable to verify sufficient Vibrate SMS units");
-      const delivered = await (dependencies.sendSMSBulkDetailed || sendSMSBulkDetailed)({ messages: sms.map(row => ({ phone: row.member.phone!, message: row.message })), idempotencyKey: liveLaunchUuid("sms", sms.map(row => row.member.phone!)), campaignId: LIVE_LAUNCH_CAMPAIGN });
-      if (!delivered.accepted) throw new Error("SMS provider did not accept this explicitly approved campaign batch");
-      result.sms = { accepted: sms.length, selected: sms.length, providerUnits256: credits };
+      const emailLog = (await import("../drizzle/schema")).emailLog;
+      const smsContent = Array.from(new Set(sms.map(row => waveContentFor(options, row.member) || null)));
+      await db.insert(emailLog).values(sms.map(row => ({
+        leadId: row.member.leadId, recipientEmail: row.member.email, recipientName: null,
+        journeyKey: SMS_JOURNEY.cold, emailIndex: 1, subject: "SMS campaign delivery", htmlBody: "", textBody: null,
+        scheduledAt: now, sentAt: null, status: "processing" as const,
+        errorMessage: JSON.stringify({ campaign: LIVE_LAUNCH_CAMPAIGN, phase: options.deliveryPhase || "legacy", utmContent: waveContentFor(options, row.member) || null, state: "inflight_review_if_uncertain" }), createdAt: now,
+      })));
+      const phaseCampaignId = `${LIVE_LAUNCH_CAMPAIGN}:${options.deliveryPhase || "legacy"}`;
+      const delivered = await (dependencies.sendSMSBulkDetailed || sendSMSBulkDetailed)({ messages: sms.map(row => ({ phone: row.member.phone!, message: row.message })), idempotencyKey: liveLaunchUuid(`sms:${options.deliveryPhase || "legacy"}`, sms.map(row => row.member.phone!)), campaignId: phaseCampaignId });
+      if (!delivered.accepted) {
+        await db.update(emailLog).set({ status: "failed", errorMessage: sql`JSON_SET(COALESCE(errorMessage, '{}'), '$.state', 'review_required_provider_result_uncertain')` }).where(sql`journeyKey = ${SMS_JOURNEY.cold} AND status = 'processing' AND sentAt IS NULL`);
+        result.sms = { accepted: 0, selected: sms.length, providerUnits256: credits, reviewRequired: sms.length };
+      } else {
+        await db.update(emailLog).set({ status: "sent", sentAt: Date.now(), errorMessage: sql`JSON_SET(COALESCE(errorMessage, '{}'), '$.state', 'provider_accepted', '$.providerRunId', ${delivered.providerRunId})` }).where(sql`journeyKey = ${SMS_JOURNEY.cold} AND status = 'processing' AND sentAt IS NULL`);
+        result.sms = { accepted: sms.length, selected: sms.length, providerUnits256: credits, reviewRequired: 0 };
+      }
     }
   }
-  await db.execute(sql`UPDATE lifecycle_run_claims SET status = 'completed', completed_at = ${Date.now()}, result_json = ${JSON.stringify({ email: result.email, sms: result.sms })} WHERE run_key = ${LIVE_LAUNCH_CAMPAIGN}`);
+  await db.execute(sql`UPDATE lifecycle_run_claims SET status = 'completed', completed_at = ${Date.now()}, result_json = ${JSON.stringify({ email: result.email, sms: result.sms })} WHERE run_key = ${runKey}`);
   return result;
 }
