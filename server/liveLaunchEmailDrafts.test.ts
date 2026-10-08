@@ -19,6 +19,14 @@ describe("live launch drafts (no delivery)", () => {
     expect(draft.htmlContent).toContain("FRIENDS");
     expect(draft.htmlContent).toContain("אימות באמצעות הקישור האישי");
   });
+  it("offers verified members a direct personal checkout link without asking for a second login email", () => {
+    const memberOfferUrl = "https://hilitcaspi.com/live?coupon=FRIENDS&email=member%40example.com&token=example-personal-token&utm_source=newsletter#tickets";
+    const draft = buildLiveLaunchEmailDraft({ audience: "database", memberOfferUrl, unsubscribeUrl });
+    expect(draft.htmlContent).toContain("בלי לבקש קישור נוסף למייל");
+    expect(draft.textContent).toContain(memberOfferUrl);
+    expect(() => buildLiveLaunchEmailDraft({ audience: "cold", memberOfferUrl, unsubscribeUrl })).toThrow();
+    expect(() => buildLiveLaunchEmailDraft({ audience: "database", memberOfferUrl: "https://evil.example/live?coupon=FRIENDS&email=a&token=b", unsubscribeUrl })).toThrow();
+  });
   it("Plus gets only a direct personalized RSVP, never a paid or Zoom CTA", () => {
     const draft = buildLiveLaunchEmailDraft({ audience: "plus", rsvpUrl, unsubscribeUrl });
     expect(draft.htmlContent).toContain("ללא עלות נוספת");
@@ -35,9 +43,11 @@ describe("live launch drafts (no delivery)", () => {
     expect(d.htmlContent).not.toContain("<script>");
     expect(d.htmlContent).toContain("&lt;script&gt;");
   });
-  it.each(Object.entries(LIVE_LAUNCH_SMS))("keeps %s SMS within one 70-unit Unicode segment with opt-out", (_name, message) => {
-    expect(message.length).toBeLessThanOrEqual(70);
+  it.each(Object.entries(LIVE_LAUNCH_SMS))("keeps %s SMS within one documented Vibrate billing unit, including opt-out", (_name, message) => {
+    expect(message.length).toBeLessThanOrEqual(256);
     expect(message).toContain("💛");
-    expect(message).toContain("הסר hilitcaspi.com/u");
+    expect(message).toContain("להסרה: hilitcaspi.com/u");
+    expect(message).toContain("31.10 ב־20:30");
+    expect(message).toContain("סודות ההתאמה המושלמת");
   });
 });

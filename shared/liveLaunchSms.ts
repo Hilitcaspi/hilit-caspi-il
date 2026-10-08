@@ -1,6 +1,6 @@
-/** Drafts only. Sender must remain HilitCaspi; no sending or audience activation here. */
+/** Launch copy only. No provider calls or audience activation here. Vibrate bills each 256 UTF-16 units. */
 export const LIVE_LAUNCH_SMS = {
-  cold: "פרסומת 💛 מאגר ב299₪+לייב מתנה hilitcaspi.com/ld הסר hilitcaspi.com/u",
-  database: "פרסומת הילית💛 מאגר: לייב49₪ hilitcaspi.com/ll הסר hilitcaspi.com/u",
-  plus: "הילית💛 Plus: אישור ללייב במייל hilitcaspi.com/lp הסר hilitcaspi.com/u",
+  cold: "היי, כאן הילית 💛 לראשונה לייב איתי בזום: סודות ההתאמה המושלמת, 31.10 ב־20:30. מצטרפים למאגר ב־299 ₪ בתשלום חד־פעמי ומקבלים כרטיס מתנה בשווי 149 ₪. להצטרפות: hilitcaspi.com/ld\nפרסומת. להסרה: hilitcaspi.com/u",
+  database: "היי, כאן הילית 💛 אני מזמינה אותך ללייב סודות ההתאמה המושלמת, בזום ב־31.10 ב־20:30. לחברי המאגר כרטיס ב־49 ₪ במקום 149 ₪, עם קוד FRIENDS וכתובת המייל הרשומה במאגר. לפרטים ורכישה: hilitcaspi.com/ll\nפרסומת. להסרה: hilitcaspi.com/u",
+  plus: "היי, כאן הילית 💛 כחלק ממועדון Plus הסגור שלי, הכניסה ללייב סודות ההתאמה המושלמת כלולה ללא עלות נוספת. נפגשים בזום ב־31.10 ב־20:30. שלחתי לך במייל הזמנה אישית עם כפתור לאישור הגעה ושאלות. מחכה לך!\nלהסרה: hilitcaspi.com/u",
 } as const;

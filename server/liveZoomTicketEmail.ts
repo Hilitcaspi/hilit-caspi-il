@@ -6,15 +6,17 @@ function escapeHtml(text: string) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-export function buildLiveZoomTicketEmail(input: { name: string; joinUrl: string; source: string; questionToken: string }) {
+export function buildLiveZoomTicketEmail(input: { name: string; joinUrl: string; source: string; questionToken: string; registrationEmail?: string }) {
   const name = escapeHtml(input.name.trim().split(/\s+/)[0] || "");
   const joinUrl = escapeHtml(input.joinUrl);
   const questionUrl = `${SITE}/live/question#q=${encodeURIComponent(input.questionToken)}`;
+  const personalPolicy = "הכרטיס אישי ומיועד לשימושך בלבד. קישור הכניסה נוצר עבור הכרטיס שלך. אין להעביר את הכרטיס או את קישורי הכניסה והשאלות לאדם אחר.";
+  const registrationEmail = input.registrationEmail?.trim().toLowerCase();
   const gift = input.source === "database_live" || input.source === "plus";
   const headline = gift ? "כרטיס המתנה שלך ללייב מוכן" : "הכרטיס שלך ללייב מוכן";
   const subject = `${headline} | סודות ההתאמה המושלמת`;
   const intro = name ? `היי ${name},` : "היי,";
-  const textContent = `${intro}\n\n${headline}.\n\nסודות ההתאמה המושלמת עם הילית כספי\nשבת 31.10.2026 בשעה 20:30 לפי שעון ישראל, בשידור חי ב־Zoom.\n\nלכניסה למפגש: ${input.joinUrl}\n\nשמרו את ההודעה: קישור זה נוצר עבור הכרטיס שלכם. אין צורך בהרשמה נוספת ב־Zoom. אם תגיעו כמה דקות לפני תחילת המפגש, תוכלו להמתין עד שאפתח אותו.\n\nיש לכם שאלה על התאמות או על הפרופיל שלכם? שלחו לי אותה ישירות מכאן, בלי להיכנס לאזור האישי: ${questionUrl}\n\nנתראה שם,\nהילית כספי\n${SITE}/live`;
+  const textContent = `${intro}\n\n${headline}.\n\nסודות ההתאמה המושלמת עם הילית כספי\nשבת 31.10.2026 בשעה 20:30 לפי שעון ישראל, בשידור חי ב־Zoom.\n\n${registrationEmail ? `הכרטיס הונפק לכתובת ההרשמה: ${registrationEmail}\n` : ""}${personalPolicy}\n\nלכניסה למפגש: ${input.joinUrl}\n\nשמרו את ההודעה: אין צורך בהרשמה נוספת ב־Zoom. אם תגיעו כמה דקות לפני תחילת המפגש, תוכלו להמתין עד שאפתח אותו.\n\nיש שאלה על ההתאמות או על הפרופיל שלך? שליחת שאלה בלחיצה, בלי כניסה לאזור האישי ובלי להזין שוב מייל: ${questionUrl}\n\nנתראה שם,\nהילית כספי\n${SITE}/live`;
   const htmlContent = `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f0eadc;color:#191265;font-family:Rubik,Arial,sans-serif;direction:rtl;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">הכרטיס שלך לסודות ההתאמה המושלמת · שבת 31.10 בשעה 20:30 · Zoom</div>
@@ -30,10 +32,14 @@ export function buildLiveZoomTicketEmail(input: { name: string; joinUrl: string;
 <p style="font-size:12px;letter-spacing:2px;font-weight:700;color:#706045;margin:0 0 11px;">הכרטיס שלך · כניסה אחת</p>
 <p style="font-size:23px;line-height:1.35;font-weight:800;margin:0 0 14px;color:#191265;">סודות ההתאמה המושלמת</p>
 <p style="font-size:15px;line-height:1.7;margin:0;color:#49446a;">שבת, 31.10.2026&nbsp; · &nbsp;20:30 שעון ישראל<br>בשידור חי ב־Zoom</p>
+${registrationEmail ? `<p style="font-size:12px;line-height:1.7;color:#625b74;margin:16px 0 0;">הכרטיס הונפק לכתובת ההרשמה:<br><span dir="ltr" style="display:inline-block;font-weight:700;">${escapeHtml(registrationEmail)}</span></p>` : ""}
 </td></tr></table>
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr><td align="center" style="padding:26px 0 12px;"><a href="${joinUrl}" style="display:inline-block;background:#191265;border-radius:999px;padding:16px 34px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;">לכניסה אישית ללייב</a></td></tr></table>
 <p style="font-size:14px;line-height:1.75;color:#68617c;margin:0 0 18px;text-align:center;">כדאי לשמור את המייל. אין צורך להירשם שוב ב־Zoom.<br>אם תגיעו לפני שהתחלנו, תוכלו להמתין עד שאפתח את המפגש.</p>
-<p style="font-size:15px;line-height:1.75;color:#49446a;margin:0 0 18px;">יש שאלה שמסקרנת אתכם לקראת הלייב? <a href="${escapeHtml(questionUrl)}" style="color:#191265;font-weight:700;">שלחו לי אותה ישירות מכאן</a>, בלי להיכנס לאזור האישי.</p>
+<p style="font-size:13px;line-height:1.75;color:#625b74;margin:0 0 22px;padding:14px;background:#f5eedc;border-radius:12px;">${personalPolicy}</p>
+<p style="font-size:16px;line-height:1.75;color:#191265;margin:0 0 4px;font-weight:700;text-align:center;">יש שאלה שמסקרנת אותך לקראת הלייב?</p>
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr><td align="center" style="padding:12px 0;"><a href="${escapeHtml(questionUrl)}" style="display:inline-block;background:#ffe27c;border-radius:999px;padding:15px 28px;color:#191265;text-decoration:none;font-size:16px;font-weight:700;">שליחת שאלה להילית</a></td></tr></table>
+<p style="font-size:13px;line-height:1.7;color:#68617c;margin:0 0 24px;text-align:center;">הכפתור פותח ישירות את טופס השאלות.<br>בלי כניסה לאזור האישי ובלי להזין שוב מייל.</p>
 <p style="font-size:15px;line-height:1.7;margin:0;color:#191265;">נתראה שם,<br><strong>הילית</strong></p>
 </td></tr>
 <tr><td style="background:#191265;padding:20px 28px;color:#e9e4f5;text-align:center;font-size:12px;line-height:1.8;">הילית כספי · המפגש יתקיים אונליין בלבד<br><a href="${SITE}/live" style="color:#ffe27c;">פרטי המפגש באתר</a></td></tr>

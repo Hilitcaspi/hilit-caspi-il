@@ -6,11 +6,18 @@ const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").rep
 const utm = (path: string, content: string) => `${SITE}${path}?utm_source=newsletter&utm_medium=email&utm_campaign=live_oct2026&utm_content=${content}`;
 
 /** Content only: no provider calls, audience queries, queue inserts or automatic sending. */
-export function buildLiveLaunchEmailDraft(input: { audience: LiveLaunchAudience; firstName?: string; rsvpUrl?: string; unsubscribeUrl: string }) {
+export function buildLiveLaunchEmailDraft(input: { audience: LiveLaunchAudience; firstName?: string; rsvpUrl?: string; memberOfferUrl?: string; unsubscribeUrl: string }) {
   const plus = input.audience === "plus";
   const cold = input.audience === "cold";
   const greeting = input.firstName ? `היי ${escape(input.firstName.trim().split(/\s+/)[0])},` : "היי,";
-  const offerUrl = utm(cold ? "/live/database" : "/live", cold ? "launch_cold_database" : "launch_database_members");
+  let offerUrl = utm(cold ? "/live/database" : "/live", cold ? "launch_cold_database" : "launch_database_members");
+  if (input.memberOfferUrl) {
+    const memberOffer = new URL(input.memberOfferUrl);
+    if (input.audience !== "database" || memberOffer.origin !== SITE || memberOffer.pathname !== "/live"
+      || memberOffer.searchParams.get("coupon") !== "FRIENDS" || !memberOffer.searchParams.get("email")
+      || !memberOffer.searchParams.get("token")) throw new Error("Invalid personalized member offer URL");
+    offerUrl = memberOffer.href;
+  }
   if (plus) {
     const rsvp = new URL(input.rsvpUrl || "");
     if (rsvp.origin !== SITE || rsvp.pathname !== "/live/question" || !new URLSearchParams(rsvp.hash.slice(1)).get("q")) {
@@ -30,12 +37,12 @@ export function buildLiveLaunchEmailDraft(input: { audience: LiveLaunchAudience;
   ] : plus ? [
     "כשבניתי את Plus רציתי לתת לכם יותר מהצעות התאמה. רציתי ליצור מקום קרוב יותר, עם הזדמנויות, תוכן והטבות ששמורות לחברים שלי.",
     "לכן הכניסה ללייב הזה כלולה במנוי Plus פעיל. לא צריך לרכוש כרטיס, לא צריך להזין קופון, ולא צריך להירשם מחדש לזום.",
-    "כדי שאוכל להיערך למפגש, אשמח שתאשרו הגעה דרך הכפתור. הוא פותח את הכרטיס שלכם ישירות, בלי בקשת קישור נוסף למייל. אפשר גם לשלוח לי שם שאלה מראש.",
+    "מספר המשתתפים בזום מוגבל. כדי שאוכל להיערך למפגש, אשמח שתאשרו הגעה דרך הכפתור. הוא פותח את הכרטיס שלכם ישירות, בלי בקשת קישור נוסף למייל. אפשר גם לשלוח לי שם שאלה מראש.",
     "כרטיס עם קישור הכניסה לזום יישלח בנפרד לקראת האירוע. אישור ההגעה כאן הוא להיערכות למפגש, ולא שולח כעת קישור כניסה."
   ] : [
     "לא פעם שואלים אותי: איך בחרת דווקא את ההתאמה הזו? מה באמת אומר אחוז ההתאמה? והאם הפרופיל שלי מראה את מי שאני?",
     "לראשונה אני פותחת את מאחורי הקלעים בלייב בזום. אספר איך נולד המאגר, מה אני רואה בפרופילים שעובדים, ואיך אפשר לתת לחיבור טוב יותר סיכוי להתחיל. נקדיש מקום גם לשאלות שלכם.",
-    "לחברי המאגר הכרטיס הוא ב־49 ₪ במקום 149 ₪. מזינים FRIENDS ואת כתובת המייל הרשומה במאגר ומבצעים אימות באמצעות הקישור האישי, כדי שההטבה תהיה שמורה לחברים שלנו.",
+    input.memberOfferUrl ? "לחברי המאגר הכרטיס הוא ב־49 ₪ במקום 149 ₪. הכפתור האישי במייל כבר כולל את קוד FRIENDS ואת אימות החברות שלך, כך שאפשר להתקדם לרכישה בלי לבקש קישור נוסף למייל." : "לחברי המאגר הכרטיס הוא ב־49 ₪ במקום 149 ₪. מזינים FRIENDS ואת כתובת המייל הרשומה במאגר ומבצעים אימות באמצעות הקישור האישי, כדי שההטבה תהיה שמורה לחברים שלנו.",
     "אם המנוי שלך ל־Plus פעיל, אין צורך לקנות כרטיס: הכניסה כלולה ללא עלות נוספת. אישור הגעה יגיע בהזמנה נפרדת לחברי Plus."
   ];
   const primaryUrl = plus ? input.rsvpUrl! : offerUrl;

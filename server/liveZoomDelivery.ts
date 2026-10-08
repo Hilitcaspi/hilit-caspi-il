@@ -88,7 +88,7 @@ export async function processLiveZoomTickets(limit = 2) {
       }
       const joinUrl = decryptZoomJoinUrl(encrypted, config.encryptionKey);
       const email = buildLiveZoomTicketEmail({
-        name: ticket.name, joinUrl, source: ticket.source, questionToken: liveQuestionToken(ticket),
+        name: ticket.name, joinUrl, source: ticket.source, questionToken: liveQuestionToken(ticket), registrationEmail: ticket.email,
       });
       // Persist a review-only state before the external call. Brevo's idempotency lasts only 30 minutes;
       // if a worker dies or the result is ambiguous, automatic retry could send a duplicate later.
