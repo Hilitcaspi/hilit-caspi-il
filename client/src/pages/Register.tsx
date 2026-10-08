@@ -908,7 +908,9 @@ export default function Register() {
                   {promotionalCoupon === "LIVE" && (
                     <div className="mb-4 rounded-xl border border-[#ffe27c]/50 bg-[#ffe27c]/15 p-4 text-white">
                       <p className="font-black text-[#ffe27c]">כרטיס ללייב שלי במתנה</p>
-                      <p className="mt-1 text-sm leading-6">הצטרפות למאגר ב־299 ₪ כוללת כרטיס אחד למפגש סודות ההתאמה המושלמת ב־31.10. קוד LIVE כבר צורף להזמנה שלך ונבדק לפני התשלום.</p>
+                      <p className="mt-1 text-sm leading-6">הצטרפות למאגר ב־299 ₪ כוללת כרטיס אישי אחד במתנה ללייב ״סודות ההתאמה המושלמת״. נפגשים אונליין בזום בשבת 31.10 בשעה 20:30.</p>
+                      <p className="mt-2 text-sm leading-6">הכרטיס האישי ללייב יישלח לכתובת המייל שלך לאחר אישור התשלום. קישור הכניסה לזום יישלח לקראת המפגש. ההטבה כלולה אוטומטית, בלי צורך להזין קוד.</p>
+                      <p className="mt-2 text-sm font-bold text-[#ffe27c]">מספר המקומות בלייב מוגבל.</p>
                     </div>
                   )}
                   {promotionalCoupon === "TEST1" && <p className="mb-4 rounded-xl border border-[#ffe27c]/50 p-4 text-sm text-white">מסלול בדיקת תשלום ב־1 ₪ בלבד לכתובת הבדיקה המורשית. יונפק שובר מסומן לבדיקה, ללא חברות במאגר או כניסה לאירוע.</p>}

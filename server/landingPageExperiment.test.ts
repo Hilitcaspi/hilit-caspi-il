@@ -78,7 +78,7 @@ describe("landing page experiment attribution", () => {
     expect(params.get("utm_campaign")).toBe("live_october_2026");
   });
 
-  it("passes TEST1 only after the inline page verification, never just from a URL or storage", () => {
+  it("passes TEST1 only with an explicit verified override, never just from a URL or storage", () => {
     const urlOnly = new URLSearchParams(buildLiveDatabaseJoinHref("?coupon=TEST1").split("?")[1]);
     const staleStored = new URLSearchParams(buildLiveDatabaseJoinHref("", storage({ coupon: "TEST1" }) as Storage).split("?")[1]);
     const verified = new URLSearchParams(buildLiveDatabaseJoinHref("", undefined, undefined, "TEST1").split("?")[1]);
@@ -102,8 +102,10 @@ describe("landing page experiment attribution", () => {
     expect(voucher).toContain("לא קוד כניסה ל־Zoom");
     expect(checkout).toContain('["LIVE", "TEST1"].includes');
     expect(register).toContain('promotionalCoupon === "LIVE"');
-    expect(databasePage).toContain('id="live-db-test-code"');
-    expect(databasePage).toContain('validateCoupon.mutateAsync({ code: "TEST1", product: "database"');
+    expect(databasePage).not.toContain('id="live-db-test-code"');
+    expect(databasePage).not.toContain('validateCoupon.mutateAsync({ code: "TEST1", product: "database"');
+    expect(register).toContain("הכרטיס האישי ללייב יישלח לכתובת המייל שלך לאחר אישור התשלום");
+    expect(register).toContain("מספר המקומות בלייב מוגבל.");
     expect(livePage).toContain('showCoupon');
     expect(livePage).not.toContain('prefillCoupon={params.get("coupon")');
   });
