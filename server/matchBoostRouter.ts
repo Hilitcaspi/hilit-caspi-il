@@ -600,6 +600,7 @@ export async function preparePaidBoostCheckout(input: {
   email: string;
   token: string;
   termsAccepted: true;
+  entryChannel?: "email" | "personal_area" | "other" | "unknown";
   matchId?: number;
 }) {
   const { db, single } = await getVerifiedSingle(input.email, input.token);
@@ -619,6 +620,7 @@ export async function preparePaidBoostCheckout(input: {
       singleId: single.id,
       matchId: selectedCandidate.id,
       source: "paid",
+      entryChannel: input.entryChannel || "unknown",
       status: "awaiting_payment",
       amountAgorot: BOOST_PRICE_AGOROT,
       idempotencyKey,
@@ -1295,7 +1297,7 @@ export const matchBoostRouter = router({
     }),
 
   redeemPlusBoost: publicProcedure
-    .input(z.object({ email: z.string().email(), token: z.string().min(16), matchId: z.number().int().positive().optional() }))
+    .input(z.object({ email: z.string().email(), token: z.string().min(16), matchId: z.number().int().positive().optional(), entryChannel: z.enum(["email", "personal_area", "other", "unknown"]).optional() }))
     .mutation(async ({ input }) => {
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const context = await loadBoostContext(db, single);
@@ -1335,6 +1337,7 @@ export const matchBoostRouter = router({
             singleId: single.id,
             matchId: selectedCandidate.id,
             source: "plus_included",
+            entryChannel: input.entryChannel || "unknown",
             status: "queued",
             amountAgorot: 0,
             idempotencyKey,
@@ -1363,6 +1366,7 @@ export const matchBoostRouter = router({
               requestedAt: now,
               reviewStartedAt: null,
               decidedAt: null,
+              entryChannel: input.entryChannel || "unknown",
               decisionReason: "plus_boost_retry_after_delivery_failure",
               expiresAt: now + 7 * DAY_MS,
               updatedAt: now,
@@ -1379,7 +1383,7 @@ export const matchBoostRouter = router({
     }),
 
   redeemPaidCredit: publicProcedure
-    .input(z.object({ email: z.string().email(), token: z.string().min(16), matchId: z.number().int().positive().optional() }))
+    .input(z.object({ email: z.string().email(), token: z.string().min(16), matchId: z.number().int().positive().optional(), entryChannel: z.enum(["email", "personal_area", "other", "unknown"]).optional() }))
     .mutation(async ({ input }) => {
       const { db, single } = await getVerifiedSingle(input.email, input.token);
       const context = await loadBoostContext(db, single);
@@ -1405,6 +1409,7 @@ export const matchBoostRouter = router({
         matchId: selectedCandidate.id,
         status: "queued",
         requestedAt: now,
+        entryChannel: input.entryChannel || "unknown",
         decisionReason: "boost_credit_redeemed",
         updatedAt: now,
       }).where(and(eq(matchBoostRequests.id, credit.id), eq(matchBoostRequests.status, "refunded")));
@@ -1424,7 +1429,7 @@ export const matchBoostRouter = router({
     }),
 
   startPaidBoost: publicProcedure
-    .input(z.object({ email: z.string().email(), token: z.string().min(16), termsAccepted: z.literal(true), matchId: z.number().int().positive().optional() }))
+    .input(z.object({ email: z.string().email(), token: z.string().min(16), termsAccepted: z.literal(true), matchId: z.number().int().positive().optional(), entryChannel: z.enum(["email", "personal_area", "other", "unknown"]).optional() }))
     .mutation(async ({ input }) => {
       const prepared = await preparePaidBoostCheckout(input);
       return { configured: true, requestId: prepared.requestId, amountAgorot: BOOST_PRICE_AGOROT, product: "match_boost" as const };

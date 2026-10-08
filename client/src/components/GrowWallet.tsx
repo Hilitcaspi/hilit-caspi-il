@@ -1,3 +1,4 @@
+import { boostEntryChannelFromSearch } from "../../../shared/boostEntryChannel";
 /*
  * GrowWallet — Payment component using Grow Wallet SDK
  * ─────────────────────────────────────────────────────────────────────────────
@@ -571,6 +572,7 @@ export default function GrowWallet({
         personalToken,
         boostTermsAccepted: product === "match_boost" ? true : undefined,
         boostMatchId: product === "match_boost" ? boostMatchId : undefined,
+        boostEntryChannel: product === "match_boost" ? boostEntryChannelFromSearch(window.location.search) : undefined,
         plusRenewalAccepted: product === "plus" && plusConsents?.renewalAccepted ? true : undefined,
         plusTermsAccepted: product === "plus" && plusConsents?.termsAccepted ? true : undefined,
         plusBoostAccepted: product === "plus" && plusConsents?.boostAccepted ? true : undefined,

@@ -1134,6 +1134,7 @@ export const matchBoostRequests = mysqlTable("match_boost_requests", {
   amountAgorot: int("amount_agorot").default(1999).notNull(),
   idempotencyKey: varchar("idempotency_key", { length: 200 }).notNull().unique(),
   providerTransactionId: varchar("provider_transaction_id", { length: 200 }).unique(),
+  entryChannel: varchar("entry_channel", { length: 32 }).default("unknown").notNull(),
   plusBillingCycleStartedAt: bigint("plus_billing_cycle_started_at", { mode: "number" }),
   requestedAt: bigint("requested_at", { mode: "number" }).notNull(),
   paidAt: bigint("paid_at", { mode: "number" }),
@@ -1541,6 +1542,19 @@ export const selfServiceEvents = mysqlTable("self_service_events", {
 }));
 export type SelfServiceEvent = typeof selfServiceEvents.$inferSelect;
 export type InsertSelfServiceEvent = typeof selfServiceEvents.$inferInsert;
+
+/** Explicit, versioned first-party confirmation by a paid member; no email or bearer token stored. */
+export const matchmakingServiceConsentEvents = mysqlTable("matchmaking_service_consent_events", {
+  id: int("id").primaryKey().autoincrement(),
+  singleId: int("single_id").notNull(),
+  consentVersion: varchar("consent_version", { length: 32 }).notNull(),
+  source: varchar("source", { length: 64 }).notNull(),
+  priorMatchmaking: boolean("prior_matchmaking").notNull(),
+  priorDataSharing: boolean("prior_data_sharing").notNull(),
+  confirmedAt: bigint("confirmed_at", { mode: "number" }).notNull(),
+}, table => ({
+  singleDateIdx: index("matchmaking_service_consent_single_date_idx").on(table.singleId, table.confirmedAt),
+}));
 
 /**
  * Versioned drafts generated in the internal content studio. Published landing

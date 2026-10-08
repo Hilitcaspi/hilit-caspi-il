@@ -8,8 +8,8 @@ const source = readFileSync(
 );
 
 describe("matching scheduler consent guard", () => {
-  it("requires an active matchmaking consent before selecting candidates", () => {
+  it("uses shared regular matching access independently from Boost", () => {
     expect(source).toContain("eq(singles.isActive, true)");
-    expect(source).toContain("eq(singles.consentMatchmaking, true)");
+    expect(source).toContain("regularMatchingAccessSql()");
   });
 });

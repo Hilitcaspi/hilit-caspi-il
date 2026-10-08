@@ -1,3 +1,4 @@
+import { boostEntryChannelFromSearch } from "../../../shared/boostEntryChannel";
 /**
  * User Dashboard: /my-profile
  * Accessible via magic link: /my-profile?email=xxx&token=yyy
@@ -661,11 +662,11 @@ function MatchBoostCard({
 
                   <div className="mt-4">
                     {status.creditAvailable ? (
-                      <button type="button" disabled={!status.eligible || redeemCredit.isPending} onClick={() => redeemCredit.mutate({ email, token, matchId: option.matchId })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
+                      <button type="button" disabled={!status.eligible || redeemCredit.isPending} onClick={() => redeemCredit.mutate({ email, token, matchId: option.matchId, entryChannel: boostEntryChannelFromSearch(window.location.search) })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
                         {redeemCredit.isPending ? "מפעיל את הקרדיט..." : `מימוש קרדיט ושליחת Boost${status.creditCount > 1 ? ` · יישארו ${status.creditCount - 1}` : ""}`}
                       </button>
                     ) : status.plusBenefitAvailable ? (
-                      <button type="button" disabled={!status.eligible || redeemPlus.isPending} onClick={() => redeemPlus.mutate({ email, token, matchId: option.matchId })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
+                      <button type="button" disabled={!status.eligible || redeemPlus.isPending} onClick={() => redeemPlus.mutate({ email, token, matchId: option.matchId, entryChannel: boostEntryChannelFromSearch(window.location.search) })} className="w-full rounded-xl bg-[#ffe27c] px-5 py-3 font-black text-[#191265] disabled:cursor-not-allowed disabled:opacity-50">
                         {redeemPlus.isPending ? "שולח את ה־Boost..." : "שליחת Boost ללא עלות · הטבת Plus"}
                       </button>
                     ) : status.eligible ? (

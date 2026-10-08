@@ -7,7 +7,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { singles, dnaQuizResults, matches, matchDeliveryEvents, feedbackFollowups, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, completedPayments, plusPilotMembers, plusCheckoutIntents, matchBoostMemberships } from "../drizzle/schema";
+import { singles, dnaQuizResults, matches, matchDeliveryEvents, feedbackFollowups, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, completedPayments, plusPilotMembers, plusCheckoutIntents, matchBoostMemberships, matchBoostRequests } from "../drizzle/schema";
 import { dashboardRouter } from "./dashboardRouter";
 import { plusPilotRouter } from "./plusPilotRouter";
 import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, buildAnonymousBoostCard, cancelPaidBoostCheckout, matchBoostRouter, preparePaidBoostCheckout, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
@@ -64,6 +64,9 @@ import { dashboardAssistantRouter } from "./dashboardAssistantRouter";
 import { usageRouter } from "./usageRouter";
 import { courseCompassRouter } from "./courseCompassRouter";
 import { liveOctoberRouter } from "./liveOctoberRouter";
+import { hasRegularMatchingAccess, regularMatchingAccessSql } from "./regularMatchingEligibility";
+import { previewRegularCandidates } from "./regularMatchingSuggestions";
+import { loadBoostMonthlyStats } from "./boostMonthlyStats";
 import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivacy";
 import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYMENT_ATTRIBUTION_TTL_MS } from "./paymentAttribution";
 import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
@@ -540,8 +543,7 @@ export async function generateMatchesForSingle(singleId: number, gender: "female
   if (!db) return;
 
   const [mySingle] = await db.select().from(singles).where(eq(singles.id, singleId));
-  if (!mySingle || !mySingle.isPaid || !mySingle.isActive ||
-      !mySingle.consentMatchmaking || !mySingle.consentDataSharing) return;
+  if (!mySingle || !hasRegularMatchingAccess(mySingle)) return;
 
   // Respect seekingGender: if not set, default to opposite gender
   const seekingGender = mySingle.seekingGender ?? (gender === "female" ? "male" : "female");
@@ -555,8 +557,7 @@ export async function generateMatchesForSingle(singleId: number, gender: "female
         : eq(singles.gender, seekingGender as "female" | "male"),
       eq(singles.isActive, true),
       eq(singles.isPaid, true),
-      eq(singles.consentMatchmaking, true),
-      eq(singles.consentDataSharing, true),
+      regularMatchingAccessSql(),
       ne(singles.id, singleId)
     ));
 
@@ -3009,6 +3010,9 @@ export const appRouter = router({
             photoUrl: profile.photoUrl,
             dnaType: profile.dnaType,
             isActive: profile.isActive,
+            isPaid: profile.isPaid,
+            consentMatchmaking: profile.consentMatchmaking,
+            consentDataSharing: profile.consentDataSharing,
             questionnaireCompletedAt: profile.questionnaireCompletedAt,
             createdAt: profile.createdAt,
             email: profile.email,
@@ -3136,6 +3140,11 @@ export const appRouter = router({
   }),
   // ── Adminn ──────────────────────────────────────────────────────────────────
   admin: router({
+    getBoostMonthlyStats: teamProcedure.input(z.object({}).optional()).query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return loadBoostMonthlyStats();
+    }),
     checkCompatibility: teamProcedure
       .input(z.object({ idA: z.number(), idB: z.number() }))
       .mutation(async ({ ctx, input }) => {
@@ -5283,11 +5292,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         : [] as any[];
       const singleMap = new Map(singleRows.map(s => [s.id, s]));
 
+      const boostRequestRows = await db.select({ matchId: matchBoostRequests.matchId, singleId: matchBoostRequests.singleId, fulfilledAt: matchBoostRequests.fulfilledAt })
+        .from(matchBoostRequests).where(isNotNull(matchBoostRequests.fulfilledAt)).orderBy(desc(matchBoostRequests.fulfilledAt));
+      const boostSenderByMatch = new Map<number, number>();
+      for (const request of boostRequestRows) {
+        if (!boostSenderByMatch.has(request.matchId)) boostSenderByMatch.set(request.matchId, request.singleId);
+      }
       return allMatches.map(m => {
         const a = singleMap.get(m.singleAId);
         const b = singleMap.get(m.singleBId);
         return {
           ...m,
+          boostInitiatorId: boostSenderByMatch.get(m.id) ?? null,
           proposalSource: String(m.autoExplanation || "").startsWith("[BOOST]") || String(m.notes || "").startsWith("[BOOST_SENT]") ? "boost" as const : "regular" as const,
           outcomeFeedback: parseMatchOutcomeNotes(m.notes),
           singleAName: a ? `${a.firstName} ${a.lastName || ""}`.trim() : undefined,
@@ -5444,7 +5460,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           eq(singles.isActive, true),
           eq(singles.isPaid, true),
           eq(singles.isSeed, false),
-          eq(singles.consentMatchmaking, true),
+          regularMatchingAccessSql(),
           isNotNull(singles.questionnaireCompletedAt),
         ))
         .orderBy(asc(singles.createdAt)); // oldest first = waiting longest
@@ -5665,6 +5681,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         // Deduplicate by opponent ID, keep highest score
         const bestByOpponent = new Map<number, typeof allMatches[0]>();
         for (const m of allMatches) {
+          if (isInvalidMatchPlaceholder(m) || String(m.notes || "").includes(BOOST_CANDIDATE_NOTE_MARKER)) continue;
           const opponentId = m.singleAId === input.singleId ? m.singleBId : m.singleAId;
           const existing = bestByOpponent.get(opponentId);
           if (!existing || (m.score ?? 0) > (existing.score ?? 0)) {
@@ -5743,7 +5760,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const top9 = filteredMatches
           .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
           .slice(0, 9);
-        if (top9.length === 0) return [];
+        if (top9.length === 0) return previewRegularCandidates(input.singleId);
         // Enrich with opponent details
         const opponentIds = top9.map(m => m.singleAId === input.singleId ? m.singleBId : m.singleAId);
         const opponents = allOpponents.filter(o => opponentIds.includes(o.id));
@@ -7993,6 +8010,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         personalToken: z.string().min(16).max(200).optional(),
         boostTermsAccepted: z.literal(true).optional(),
         boostMatchId: z.number().int().positive().optional(),
+        boostEntryChannel: z.enum(["email", "personal_area", "other", "unknown"]).optional(),
         plusRenewalAccepted: z.literal(true).optional(),
         plusTermsAccepted: z.literal(true).optional(),
         plusBoostAccepted: z.literal(true).optional(),
@@ -8020,6 +8038,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             token: input.personalToken,
             termsAccepted: true,
             matchId: input.boostMatchId,
+            entryChannel: input.boostEntryChannel,
           });
           preparedBoostRequestId = prepared.requestId;
           preparedBoostCheckoutReference = prepared.checkoutReference;

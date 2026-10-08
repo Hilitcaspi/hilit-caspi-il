@@ -1,3 +1,4 @@
+import { regularMatchingAccessSql } from "./regularMatchingEligibility";
 // © 2024–2025 Hilit Caspi. All rights reserved. Proprietary and confidential.
 // שיטת ההתאמה, האלגוריתם והתכנים מוגנים בזכויות יוצרים ומהווים סוד מסחרי של הילית כספי.
 
@@ -146,8 +147,7 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
     .where(
       and(
         eq(singles.isActive, true),
-        eq(singles.consentMatchmaking, true),
-        eq(singles.consentDataSharing, true),
+        regularMatchingAccessSql(),
         isNotNull(singles.email),
         isNotNull(singles.gender)
       )

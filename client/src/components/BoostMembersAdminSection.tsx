@@ -24,6 +24,7 @@ export default function BoostMembersAdminSection() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("approved");
   const overview = trpc.matchmaking.boostMembersOverview.useQuery(undefined, { refetchInterval: 30000 });
+  const monthlyStats = trpc.admin.getBoostMonthlyStats.useQuery({}, { refetchInterval: 30000 });
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -39,6 +40,10 @@ export default function BoostMembersAdminSection() {
 
   const { counts, consentVersion } = overview.data;
   const exited = counts.optedOut + counts.removed;
+  const month = monthlyStats.data?.period
+    ? new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" })
+      .format(new Date(monthlyStats.data.period.startsAt))
+    : "החודש הנוכחי";
 
   return (
     <section className="rounded-2xl border border-fuchsia-200 bg-gradient-to-br from-[#fff8ff] via-white to-[#fffaf0] p-4 shadow-sm md:p-5" dir="rtl">
@@ -48,8 +53,8 @@ export default function BoostMembersAdminSection() {
           <h2 className="mt-1 text-xl font-black text-[#191265]">מאושרי Boost</h2>
           <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">המספר הראשי כולל רק חברים שאישורם בתוקף לפי נוסח ההסכמה הנוכחי. חשבונות ניסוי מוצגים בנפרד ואינם נספרים כלקוחות.</p>
         </div>
-        <button onClick={() => overview.refetch()} disabled={overview.isFetching} className="inline-flex items-center justify-center gap-2 rounded-xl border border-fuchsia-200 bg-white px-3 py-2 text-xs font-bold text-fuchsia-800 transition hover:bg-fuchsia-50 disabled:opacity-50">
-          <RefreshCw size={14} className={overview.isFetching ? "animate-spin" : ""} /> רענון
+        <button onClick={() => { overview.refetch(); monthlyStats.refetch(); }} disabled={overview.isFetching || monthlyStats.isFetching} className="inline-flex items-center justify-center gap-2 rounded-xl border border-fuchsia-200 bg-white px-3 py-2 text-xs font-bold text-fuchsia-800 transition hover:bg-fuchsia-50 disabled:opacity-50">
+          <RefreshCw size={14} className={overview.isFetching || monthlyStats.isFetching ? "animate-spin" : ""} /> רענון
         </button>
       </div>
 
@@ -73,6 +78,47 @@ export default function BoostMembersAdminSection() {
         <div className="rounded-xl bg-pink-50 p-2.5 text-pink-800"><strong>{counts.female}</strong> נשים עם אישור בתוקף</div>
         <div className="rounded-xl bg-blue-50 p-2.5 text-blue-800"><strong>{counts.male}</strong> גברים עם אישור בתוקף</div>
       </div>
+
+      <section className="mt-4 rounded-2xl border border-violet-100 bg-white/90 p-3.5 shadow-sm" aria-label="סטטיסטיקות Boost חודשיות">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-black text-[#191265]">ביצועי Boost · {month}</h3>
+            <p className="mt-1 text-[10px] leading-5 text-[#777]">נספר לפי התאמה ייחודית שנשלחה בפועל בחודש ישראל.</p>
+          </div>
+          {monthlyStats.isLoading && <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[9px] font-bold text-violet-700">טוענים נתונים…</span>}
+        </div>
+
+        {monthlyStats.data ? <>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-3 xl:grid-cols-6">
+            {[
+              ["נשלחו בפועל", monthlyStats.data.sent, "text-violet-800"],
+              ["יוזמות", monthlyStats.data.initiators.female, "text-pink-700"],
+              ["יוזמים", monthlyStats.data.initiators.male, "text-blue-700"],
+              ["שני הצדדים כן", monthlyStats.data.outcomes.bothApproved, "text-emerald-700"],
+              ["דחייה כלשהי", monthlyStats.data.outcomes.rejectedAny, "text-rose-700"],
+              ["דחייה מצד מי ששלח", monthlyStats.data.outcomes.initiatorDeclined, "text-amber-800"],
+            ].map(([label, value, color]) => (
+              <div key={String(label)} className="rounded-xl border border-violet-50 bg-[#fcfbff] p-2.5">
+                <div className={`text-xl font-black ${color}`}>{value}</div>
+                <div className="mt-0.5 text-[9px] leading-4 text-[#777]">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 rounded-xl bg-slate-50 p-3">
+            <div className="text-[10px] font-black text-[#4c456d]">מקור הכניסה של מי ששלח</div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-center text-[10px] sm:grid-cols-4">
+              <div className="rounded-lg bg-white p-2 text-slate-700"><strong className="block text-base text-[#191265]">{monthlyStats.data.arrivalChannels.email}</strong>מייל</div>
+              <div className="rounded-lg bg-white p-2 text-slate-700"><strong className="block text-base text-[#191265]">{monthlyStats.data.arrivalChannels.personalArea}</strong>אזור אישי</div>
+              <div className="rounded-lg bg-white p-2 text-slate-700"><strong className="block text-base text-[#191265]">{monthlyStats.data.arrivalChannels.other}</strong>אחר</div>
+              <div className="rounded-lg bg-white p-2 text-slate-700"><strong className="block text-base text-[#191265]">{monthlyStats.data.arrivalChannels.unknown}</strong>לא ידוע</div>
+            </div>
+            <p className="mt-2 text-[9px] leading-5 text-slate-500">{monthlyStats.data.attribution.note} המקור מתועד בזמן הפעולה; אין ייחוס בדיעבד ללא ראיה.</p>
+          </div>
+
+          <p className="mt-3 text-[9px] leading-5 text-[#888]">כל Boost שנשלח נספר פעם אחת, גם אם נדחה בהמשך. בקשות תשלום שלא הושלמו אינן נספרות. החודש מחושב לפי שעון ישראל.</p>
+        </> : !monthlyStats.isLoading ? <div className="mt-3 rounded-xl bg-amber-50 p-3 text-[10px] leading-5 text-amber-900">לא הצלחנו לטעון את הסטטיסטיקות כרגע. אפשר לנסות שוב בלחיצה על רענון.</div> : null}
+      </section>
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <label className="flex flex-1 items-center gap-2 rounded-xl border border-[#ddd] bg-white px-3 py-2.5">

@@ -668,6 +668,7 @@ export default function CRMMatchmaking() {
     autoExplanation?: string | null;
     notes?: string | null;
     proposalSource?: "regular" | "boost";
+    boostInitiatorId?: number | null;
     matchedAt?: number | null;
     followUpSentAt?: number | null;
     matchDetailStatus?: string | null;
@@ -737,11 +738,11 @@ export default function CRMMatchmaking() {
     return { aBlocked: !!aBlocked, bBlocked: !!bBlocked, blockedPersons, maxHoursLeft: Math.max(...blockedPersons.map(p => p.hoursLeft)) };
   };
   // Map: singleId -> proposals that were actually delivered or exposed to a participant.
-  const matchHistoryBySingleId = new Map<number, Array<{ matchId: number; opponentName: string; status: string; score?: number | null; proposedAt?: number | null; opponentPhotoUrl?: string | null; returnedToPoolAt?: number | null; proposalSource?: "regular" | "boost" }>>();
+  const matchHistoryBySingleId = new Map<number, Array<{ matchId: number; opponentName: string; status: string; score?: number | null; proposedAt?: number | null; opponentPhotoUrl?: string | null; returnedToPoolAt?: number | null; proposalSource?: "regular" | "boost"; sourceLabel: string }>>();
   typedMatches.filter(wasMatchProposalSent).forEach(m => {
     const addToHistory = (singleId: number, opponentName: string, opponentPhotoUrl: string | null | undefined) => {
       const existing = matchHistoryBySingleId.get(singleId) || [];
-      existing.push({ matchId: m.id, opponentName, status: m.status, score: m.score, proposedAt: m.proposedAt as number | null, opponentPhotoUrl, returnedToPoolAt: m.returnedToPoolAt, proposalSource: m.proposalSource });
+      existing.push({ matchId: m.id, opponentName, status: m.status, score: m.score, proposedAt: m.proposedAt as number | null, opponentPhotoUrl, returnedToPoolAt: m.returnedToPoolAt, proposalSource: m.proposalSource, sourceLabel: m.proposalSource === "boost" ? (m.boostInitiatorId ? (m.boostInitiatorId === singleId ? "Boost שנשלח" : "Boost שהתקבל") : "Boost · יוזם לא מתועד") : "התאמה מהילית" });
       matchHistoryBySingleId.set(singleId, existing);
     };
     addToHistory(m.singleAId, m.singleBName || "?", m.singleBPhotoUrl);
@@ -1403,7 +1404,7 @@ export default function CRMMatchmaking() {
                               {pageMatches.length > 0 && (
                                 <div className="grid grid-cols-3 gap-2 mb-2">
                                   {pageMatches.map((m: any, idx: number) => (
-                                    <div key={m.matchId} className="bg-[#f8f6f0] rounded-xl p-3 text-center relative">
+                                    <div key={m.matchId || `preview-${m.opponent?.id}`} className="bg-[#f8f6f0] rounded-xl p-3 text-center relative">
                                       <div className="absolute top-1.5 right-1.5 bg-[#ffe27c] text-[#191265] text-[10px] font-black px-1.5 py-0.5 rounded-full">
                                         #{startIdx + idx + 1}
                                       </div>
@@ -1469,6 +1470,16 @@ export default function CRMMatchmaking() {
                                       {m.opponent?.phone && (
                                         <div className="mt-1 text-[10px] text-[#727272]">📱 {m.opponent.phone}</div>
                                       )}
+                                      {m.status === "preview" && (
+                                        <div className="mt-2">
+                                          <p className="text-[10px] text-[#727272]">מועמדות לבדיקה בלבד, טרם נוצרה או נשלחה התאמה</p>
+                                          {m.warnings?.length > 0 && <p className="mt-1 text-[10px] font-bold text-amber-700">{m.warnings.join(" · ")}</p>}
+                                          <button type="button" onClick={() => {
+                                            setCompatPersonA(single.id); setCompatPersonB(m.opponent.id);
+                                            setCompatResult(null); setActiveTab("compatibility");
+                                          }} className="mt-2 w-full rounded-lg bg-[#191265] px-2 py-1.5 text-[10px] font-bold text-white">בדיקת התאמה לפני החלטה</button>
+                                        </div>
+                                      )}
                                       {(m.status === "pending" || m.status === "expired") && (
                                         <button
                                           onClick={() => {
@@ -1521,9 +1532,7 @@ export default function CRMMatchmaking() {
                                   {h.score != null && (
                                     <span className="bg-[#ffe27c] text-[#191265] font-black text-[10px] px-1.5 py-0.5 rounded-full">{Math.round(h.score)}%</span>
                                   )}
-                                  {h.proposalSource === "boost" && (
-                                    <span className="rounded-full bg-fuchsia-100 px-1.5 py-0.5 text-[10px] font-bold text-fuchsia-800">⚡ Boost</span>
-                                  )}
+                                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${h.proposalSource === "boost" ? "bg-fuchsia-100 text-fuchsia-800" : "bg-indigo-100 text-indigo-800"}`}>{h.sourceLabel}</span>
                                   {h.proposedAt && (
                                     <span className="text-[#727272] text-[10px]">{new Date(h.proposedAt as number).toLocaleDateString("he-IL")}</span>
                                   )}

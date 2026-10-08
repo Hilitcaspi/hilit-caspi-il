@@ -1,0 +1,1 @@
+ALTER TABLE `match_boost_requests` ADD `entry_channel` varchar(32) DEFAULT 'unknown' NOT NULL;
