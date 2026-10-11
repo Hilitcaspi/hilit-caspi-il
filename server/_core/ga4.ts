@@ -84,6 +84,11 @@ export const GA4_PRODUCTS: Record<string, { id: string; name: string; price: num
   session:   { id: "session",   name: "פגישה בודדת",          price: 500 },
   bundle_new_year: { id: "bundle_new_year", name: "חבילת שנה חדשה - מאגר + מדריך + קורס", price: 399 },
   match_boost: { id: "match_boost", name: "Boost - שליחת הצעת התאמה", price: 19.9 },
+  coaching_mas: { id: "coaching_mas", name: "ליווי אישי 12 פגישות", price: 4200 },
+  bundle_tubav: { id: "bundle_tubav", name: "חבילת טו באב - מאגר + מדריך", price: 349 },
+  plus: { id: "plus", name: "Database Plus", price: 99 },
+  live_event: { id: "live_event", name: "אירוע לייב", price: 99 },
+  live_october: { id: "live_october", name: "סודות ההתאמה המושלמת - לייב אוקטובר", price: 149 },
 };
 
 // ─── Convenience helpers ───────────────────────────────────────────────────────
@@ -105,10 +110,13 @@ export async function ga4Purchase(
   productKey: keyof typeof GA4_PRODUCTS,
   transactionId?: string,
   utm?: { utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string },
-  sessionId?: string
+  sessionId?: string,
+  actualAmount?: number,
 ): Promise<void> {
   const product = GA4_PRODUCTS[productKey];
   if (!product) return;
+  const value = actualAmount ?? product.price;
+  if (!Number.isFinite(value) || value <= 0) return;
 
   const events: GA4Event[] = [];
 
@@ -126,7 +134,7 @@ export async function ga4Purchase(
         ...(utm.utmContent  ? { campaign_content: utm.utmContent }  : {}),
       },
     });
-    console.log(`[GA4] Sending campaign_details: source=${utm.utmSource} session=${sessionId}`);
+    console.log("[GA4] Sending campaign_details with a stored session");
   } else if (utm?.utmSource) {
     // No session_id — log a warning but still try to send purchase with utm params
     console.warn(`[GA4] UTM source=${utm.utmSource} but no session_id — UTM may not appear in Acquisition reports`);
@@ -137,7 +145,7 @@ export async function ga4Purchase(
     name: "purchase",
     params: {
       transaction_id: transactionId ?? `${productKey}-${Date.now()}`,
-      value: product.price,
+      value,
       currency: "ILS",
       // Include session_id on purchase event too for better stitching
       ...(sessionId ? { session_id: sessionId } : {}),
@@ -145,7 +153,7 @@ export async function ga4Purchase(
         {
           item_id: product.id,
           item_name: product.name,
-          price: product.price,
+          price: value,
           quantity: 1,
         },
       ],

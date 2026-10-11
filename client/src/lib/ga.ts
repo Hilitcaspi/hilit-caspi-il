@@ -165,16 +165,18 @@ export function gaBeginCheckout(productKey: ProductKey) {
   });
 }
 
-/** purchase — fired on ThankYou page load (after successful payment) */
-export function gaPurchase(productKey: ProductKey, transactionId?: string) {
+/** Purchase from a confirmed server response; optional actual charge overrides list price. */
+export function gaPurchase(productKey: ProductKey, transactionId?: string, actualAmount?: number) {
   const product = GA_PRODUCTS[productKey];
+  const value = actualAmount ?? product.price;
+  if (!Number.isFinite(value) || value <= 0) return;
   push({
     event: "purchase",
     ecommerce: {
       transaction_id: transactionId || `${productKey}_${Date.now()}`,
       currency: product.currency,
-      value: product.price,
-      items: [{ ...product, quantity: 1 }],
+      value,
+      items: [{ ...product, price: value, quantity: 1 }],
     },
   });
 }

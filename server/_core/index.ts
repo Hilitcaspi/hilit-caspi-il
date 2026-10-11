@@ -255,7 +255,7 @@ async function startServer() {
   // Configure in Grow dashboard: Webhook URL → https://hilitcaspi.com/api/grow/webhook
   // Accept both JSON and form-encoded (Grow sends form-encoded from their servers)
   app.post("/api/grow/webhook", express.json(), express.urlencoded({ extended: true }), async (req, res) => {
-    res.status(200).json({ ok: true }); // Respond immediately so Grow doesn't retry
+    res.status(200).json({ ok: true }); // Preserve existing payment acknowledgement behavior.
     try {
       // Accept ALL webhooks — no key validation at all
       const webhookFieldNames = req.body && typeof req.body === "object"
@@ -967,6 +967,21 @@ async function startServer() {
         context: { url: req.originalUrl },
         timestamp: new Date().toISOString(),
       });
+    }
+  });
+
+  // Isolated measurement queue; no customer messages or campaign actions.
+  app.post("/api/scheduled/meta-purchase-delivery", express.json(), async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req as any);
+      if (!user.isCron || !user.taskUid) {
+        res.status(403).json({ error: "cron-only" });
+        return;
+      }
+      const { runScheduledMetaPurchaseDelivery } = await import("../metaPurchaseDelivery");
+      res.json({ ok: true, ...await runScheduledMetaPurchaseDelivery(user.taskUid) });
+    } catch {
+      res.status(500).json({ error: "measurement-delivery-failed" });
     }
   });
 

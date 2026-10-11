@@ -17,7 +17,7 @@ export default function VerifiedPurchaseTracker() {
   const confirmPurchase = trpc.payment.confirmPurchaseTracking.useMutation();
 
   useEffect(() => {
-    if (!location.startsWith("/thank-you/")) return;
+    if (!location.startsWith("/thank-you/") && location !== "/live/thank-you") return;
     const trackingToken = readPurchaseTrackingToken();
     if (!trackingToken) return;
 
@@ -42,7 +42,7 @@ export default function VerifiedPurchaseTracker() {
               content_name: catalogProduct.item_name,
               eventID: result.eventId,
             });
-            gaPurchase(product, result.transactionId);
+            gaPurchase(product, result.eventId, result.value);
             track({
               eventType: "purchase",
               page: location,
@@ -75,4 +75,3 @@ export default function VerifiedPurchaseTracker() {
 
   return null;
 }
-

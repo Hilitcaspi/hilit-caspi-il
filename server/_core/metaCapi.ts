@@ -1,158 +1,116 @@
-/**
- * Meta Conversions API (CAPI) — server-side event reporting
- * ─────────────────────────────────────────────────────────────────────────────
- * Sends Purchase events to Facebook/Meta after confirmed Grow payments.
- * Runs server-side to capture events that the browser pixel may miss
- * (ad blockers, iOS privacy, etc.) and to deduplicate with the browser pixel.
- *
- * Docs: https://developers.facebook.com/docs/marketing-api/conversions-api
- *
- * Required env vars:
- *   META_PIXEL_ID   — your Facebook Pixel ID (numeric string, e.g. "1234567890")
- *   META_CAPI_TOKEN — Conversions API access token (from Events Manager → Settings)
- */
-
-import crypto from "crypto";
+/** Confirmed Israeli purchases only. Payloads are encrypted in the delivery outbox. */
+import crypto from "node:crypto";
+import { ISRAEL_META_PIXEL_ID, isIsraeliProductionMeasurementRuntime } from "../../shared/metaPurchasePolicy";
 
 const CAPI_URL = "https://graph.facebook.com/v21.0";
-
-// ─── Product catalog ──────────────────────────────────────────────────────────
-const CAPI_PRODUCTS: Record<string, { name: string; price: number; currency: string }> = {
-  database:     { name: "מאגר רווקים",          price: 299,  currency: "ILS" },
-  guide:        { name: "מדריך לבחור נכון",      price: 149,  currency: "ILS" },
-  course:       { name: "קורס המסע",             price: 249,  currency: "ILS" },
-  coaching:     { name: "ליווי אישי 8 פגישות",   price: 2900, currency: "ILS" },
-  coaching_mas: { name: "ליווי המסע 12 פגישות",  price: 4200, currency: "ILS" },
-  session:      { name: "פגישה בודדת",           price: 500,  currency: "ILS" },
-  live_event:   { name: "אירוע לייב",             price: 99,   currency: "ILS" },
-  bundle_tubav: { name: "חבילת טו באב - מאגר + מדריך", price: 349, currency: "ILS" },
-  bundle_new_year: { name: "חבילת שנה חדשה - מאגר + מדריך + קורס", price: 399, currency: "ILS" },
-  match_boost: { name: "Boost - שליחת הצעת התאמה", price: 19.9, currency: "ILS" },
-  plus: { name: "Database Plus", price: 99, currency: "ILS" },
+export const CAPI_PRODUCTS: Record<string, { name: string; currency: string }> = {
+  database: { name: "מאגר רווקים", currency: "ILS" },
+  guide: { name: "מדריך לבחור נכון", currency: "ILS" },
+  course: { name: "קורס המסע", currency: "ILS" },
+  coaching: { name: "ליווי אישי 8 פגישות", currency: "ILS" },
+  coaching_mas: { name: "ליווי המסע 12 פגישות", currency: "ILS" },
+  session: { name: "פגישה בודדת", currency: "ILS" },
+  live_event: { name: "אירוע לייב", currency: "ILS" },
+  live_october: { name: "סודות ההתאמה המושלמת - לייב אוקטובר", currency: "ILS" },
+  bundle_tubav: { name: "חבילת טו באב - מאגר + מדריך", currency: "ILS" },
+  bundle_new_year: { name: "חבילת שנה חדשה - מאגר + מדריך + קורס", currency: "ILS" },
+  match_boost: { name: "Boost - שליחת הצעת התאמה", currency: "ILS" },
+  plus: { name: "Database Plus", currency: "ILS" },
 };
 
-// ─── Hashing helper (Meta requires SHA-256 of PII) ────────────────────────────
-function sha256(value: string): string {
+export type CapiPurchaseParams = {
+  email: string; name?: string; phone?: string; product: string;
+  /** Never substitute a list price for a confirmed charge. */
+  sum?: number; transactionId?: string; eventId?: string; paidAt: number;
+  fbp?: string; fbc?: string; ip?: string; userAgent?: string; utmSource?: string;
+};
+export type MetaPurchasePayload = {
+  data: [{ event_name: "Purchase"; event_time: number; event_id: string;
+    event_source_url: string; action_source: "website";
+    user_data: Record<string, string>;
+    custom_data: { value: number; currency: string; content_name: string;
+      content_ids: string[]; content_type: "product"; order_id: string } }];
+};
+function sha256(value: string) {
   return crypto.createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
 }
-
-// ─── Normalize phone to E.164 without + ──────────────────────────────────────
-function normalizePhone(phone: string): string {
+export function normalizeMetaPhone(phone: string): string | undefined {
   const digits = phone.replace(/\D/g, "");
-  // Israeli numbers: 05X → 9725X
-  if (digits.startsWith("05") && digits.length === 10) return "972" + digits.slice(1);
-  // Already has country code
-  if (digits.startsWith("972")) return digits;
-  return digits;
+  const normalized = digits.startsWith("00") ? digits.slice(2)
+    : digits.startsWith("0") && digits.length === 10 ? "972" + digits.slice(1) : digits;
+  return /^[1-9]\d{7,14}$/.test(normalized) ? normalized : undefined;
 }
-
-// ─── Main CAPI purchase event ─────────────────────────────────────────────────
-export async function capiPurchase(params: {
-  email: string;
-  name?: string;
-  phone?: string;
-  product: string;
-  /** Actual amount paid (ILS) — overrides catalog price if provided */
-  sum?: number;
-  transactionId?: string;
-  /** Stable identifier shared with the browser Pixel for deduplication. */
-  eventId?: string;
-  /** fbp cookie value (from _fbp cookie on the browser) */
-  fbp?: string;
-  /** fbc cookie value (from _fbc cookie or fbclid query param) */
-  fbc?: string;
-  /** Client IP address */
-  ip?: string;
-  /** User-Agent string */
-  userAgent?: string;
-  /** UTM source for attribution */
-  utmSource?: string;
-}): Promise<void> {
-  const pixelId = process.env.META_PIXEL_ID;
-  const token   = process.env.META_CAPI_TOKEN;
-
-  if (!pixelId || !token) {
-    console.warn("[MetaCAPI] META_PIXEL_ID or META_CAPI_TOKEN not set — skipping CAPI event");
-    return;
-  }
-
-  const product = CAPI_PRODUCTS[params.product];
-  if (!product) {
-    console.warn(`[MetaCAPI] Unknown product "${params.product}" — skipping`);
-    return;
-  }
-
-  const value = params.sum ?? product.price;
-  const eventId = resolvePurchaseEventId(params);
-
-  // Build user_data with hashed PII
-  const userData: Record<string, string | string[]> = {};
-  if (params.email) userData["em"] = sha256(params.email);
-  if (params.phone) {
-    const normalized = normalizePhone(params.phone);
-    if (normalized) userData["ph"] = sha256(normalized);
-  }
-  if (params.name) {
-    const parts = params.name.trim().split(/\s+/);
-    if (parts[0]) userData["fn"] = sha256(parts[0]);
-    if (parts[1]) userData["ln"] = sha256(parts.slice(1).join(" "));
-  }
-  if (params.fbp) userData["fbp"] = params.fbp;
-  if (params.fbc) userData["fbc"] = params.fbc;
-  if (params.ip)  userData["client_ip_address"] = params.ip;
-  if (params.userAgent) userData["client_user_agent"] = params.userAgent;
-
-  const payload = {
-    data: [
-      {
-        event_name: "Purchase",
-        event_time: Math.floor(Date.now() / 1000),
-        event_id: eventId,   // used for deduplication with browser pixel
-        event_source_url: "https://hilitcaspi.com",
-        action_source: "website",
-        user_data: userData,
-        custom_data: {
-          value,
-          currency: product.currency,
-          content_name: product.name,
-          content_ids: [params.product],
-          content_type: "product",
-          order_id: eventId,
-          ...(params.utmSource ? { utm_source: params.utmSource } : {}),
-        },
-      },
-    ],
-    // test_event_code: "TEST12345",  // uncomment to test in Events Manager
-  };
-
-  try {
-    const res = await fetch(`${CAPI_URL}/${pixelId}/events?access_token=${token}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await res.json() as any;
-
-    if (!res.ok) {
-      console.error(`[MetaCAPI] API error ${res.status}:`, JSON.stringify(json));
-      return;
-    }
-
-    const eventsReceived = json?.events_received ?? "?";
-    const quality = json?.messages?.[0] ?? "";
-    console.log(`[MetaCAPI] ✓ Purchase sent | product=${params.product} | value=${value} ILS | events_received=${eventsReceived} ${quality}`);
-  } catch (err) {
-    console.error("[MetaCAPI] Fetch failed:", err);
-  }
-}
-
 export function resolvePurchaseEventId(params: {
-  eventId?: string;
-  transactionId?: string;
-  product: string;
+  eventId?: string; transactionId?: string; product: string;
 }, now = Date.now()): string {
   return params.eventId || (params.transactionId
-    ? `grow-${params.transactionId}`
-    : `grow-${params.product}-${now}`);
+    ? `grow-${sha256(`israeli-purchase:${params.product}:${params.transactionId}`)}` : `grow-${params.product}-${now}`);
+}
+export function buildCapiPurchasePayload(params: CapiPurchaseParams): MetaPurchasePayload | null {
+  const product = CAPI_PRODUCTS[params.product];
+  if (!product || !Number.isFinite(params.sum) || (params.sum ?? 0) <= 0
+      || (!params.eventId && !params.transactionId)) return null;
+  const eventId = resolvePurchaseEventId(params);
+  const paidAt = params.paidAt;
+  if (!Number.isFinite(paidAt) || paidAt <= 0) return null;
+  const userData: Record<string, string> = {};
+  if (params.email.trim()) userData.em = sha256(params.email);
+  const phone = params.phone ? normalizeMetaPhone(params.phone) : undefined;
+  if (phone) userData.ph = sha256(phone);
+  const parts = params.name?.trim().split(/\s+/) ?? [];
+  if (parts[0]) userData.fn = sha256(parts[0]);
+  if (parts.length > 1) userData.ln = sha256(parts.slice(1).join(" "));
+  if (params.fbp) userData.fbp = params.fbp;
+  if (params.fbc) userData.fbc = params.fbc;
+  if (params.ip) userData.client_ip_address = params.ip;
+  if (params.userAgent) userData.client_user_agent = params.userAgent;
+  return { data: [{
+    event_name: "Purchase", event_time: Math.floor(paidAt / 1000), event_id: eventId,
+    event_source_url: "https://hilitcaspi.com", action_source: "website", user_data: userData,
+    custom_data: { value: Math.round(params.sum! * 100) / 100, currency: product.currency,
+      content_name: product.name, content_ids: [params.product], content_type: "product", order_id: eventId },
+  }] };
+}
+export type MetaDeliveryResult = {
+  state: "accepted" | "retryable" | "permanent" | "configuration_missing";
+  category: string; httpStatus?: number; eventsReceived?: number;
+};
+/** No response bodies, tokens, user identifiers or provider messages enter logs/storage. */
+export async function sendMetaPurchasePayload(payload: MetaPurchasePayload): Promise<MetaDeliveryResult> {
+  if (!isIsraeliProductionMeasurementRuntime(process.env.NODE_ENV)) {
+    return { state: "configuration_missing", category: "nonproduction_disabled" };
+  }
+  const pixelId = process.env.META_PIXEL_ID;
+  const token = process.env.META_CAPI_TOKEN;
+  if (!pixelId || !token) return { state: "configuration_missing", category: "configuration_missing" };
+  if (pixelId !== ISRAEL_META_PIXEL_ID) return { state: "configuration_missing", category: "israeli_pixel_mismatch" };
+  try {
+    const res = await fetch(`${CAPI_URL}/${pixelId}/events`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, access_token: token }), signal: AbortSignal.timeout(12_000),
+    });
+    const json = await res.json().catch(() => null) as any;
+    if (res.ok && json?.events_received === 1) {
+      return { state: "accepted", category: "accepted", httpStatus: res.status, eventsReceived: 1 };
+    }
+    if (res.status === 429 || res.status >= 500 || json?.error?.is_transient) {
+      return { state: "retryable", category: "provider_transient", httpStatus: res.status };
+    }
+    if (res.ok) return { state: "retryable", category: "acceptance_not_confirmed", httpStatus: res.status };
+    return { state: "permanent", category: "provider_rejected", httpStatus: res.status };
+  } catch {
+    // Retry preserves event_id and event_time; our local deadline is 24 hours.
+    return { state: "retryable", category: "network_uncertain" };
+  }
+}
+export async function capiPurchase(params: CapiPurchaseParams): Promise<void> {
+  if (!isIsraeliProductionMeasurementRuntime(process.env.NODE_ENV)) return;
+  const payload = buildCapiPurchasePayload(params);
+  if (!payload) { console.warn("[MetaCAPI] Purchase skipped: invalid verified amount/product/identity"); return; }
+  const { enqueueMetaPurchase } = await import("../metaPurchaseDelivery");
+  const state = await enqueueMetaPurchase(payload, params.product);
+  if (state === "not_configured") {
+    const result = await sendMetaPurchasePayload(payload);
+    console.info("[MetaCAPI] rollout immediate delivery", { state: result.state, category: result.category });
+  }
 }

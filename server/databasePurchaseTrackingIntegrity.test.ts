@@ -36,7 +36,7 @@ describe("database purchase tracking integrity", () => {
     expect(webhook).toContain("completedPayments");
     expect(webhook).toContain("capiPurchase({");
     expect(webhook).toContain("transactionId: transactionId || undefined");
-    expect(webhook).toContain("eventId: purchaseTracking?.purchaseEventId || undefined");
+    expect(webhook).toContain("eventId: measurementTracking?.purchaseEventId || undefined");
     expect(webhook).toContain("fbp:");
     expect(webhook).toContain("fbc:");
     expect(capi).toContain('event_name: "Purchase"');

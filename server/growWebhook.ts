@@ -46,6 +46,7 @@ import { verifyPlusCheckoutReference } from "./plusCheckoutReference";
 import { ensureDatabaseNowMatchTask } from "./databaseNowFulfillment";
 import { ensureLiveTicket, ensurePlusLiveTicket, LIVE_PRODUCT } from "./liveOctober";
 import { verifyLiveCheckoutReference } from "./liveCheckoutReference";
+import { isProductionPurchaseMeasurement, isPaidGrowMeasurementNotification, metaNotificationPaidAt, matchesMetaCheckout } from "../shared/metaPurchasePolicy";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -806,8 +807,11 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
 
   let purchaseTracking: {
     id: number;
+    name: string;
+    phone: string;
     couponCode: string | null;
     providerProcessToken: string | null;
+    confirmedTransactionId: string | null;
     utmSource: string | null;
     utmMedium: string | null;
     utmCampaign: string | null;
@@ -834,8 +838,11 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
           : and(eq(paymentLeads.email, email), eq(paymentLeads.product, product));
         const [row] = await db.select({
           id: paymentLeads.id,
+          name: paymentLeads.name,
+          phone: paymentLeads.phone,
           couponCode: paymentLeads.couponCode,
           providerProcessToken: paymentLeads.providerProcessToken,
+          confirmedTransactionId: paymentLeads.confirmedTransactionId,
           utmSource: paymentLeads.utmSource,
           utmMedium: paymentLeads.utmMedium,
           utmCampaign: paymentLeads.utmCampaign,
@@ -889,6 +896,36 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       throw new Error("Live payment or checkout not verified");
     }
   }
+
+  // Measurement is separate from legacy fulfillment lookup: never attach another checkout's cookies.
+  const measurementTracking = purchaseTracking && matchesMetaCheckout({
+    processToken: liveProcessToken, checkoutProcessToken: purchaseTracking.providerProcessToken,
+    confirmedTransactionId: purchaseTracking.confirmedTransactionId, transactionId,
+  }) ? purchaseTracking : null;
+  const measurementPaidAt = metaNotificationPaidAt(data.paymentDate, Date.now());
+  // Measurement runs before legacy dedupe so a provider retry can repair an enqueue failure.
+  // Test checkouts and zero-value gifts never train the purchase campaigns.
+  const measureProductionPurchase = isProductionPurchaseMeasurement({
+    amount: sum, couponCode: purchaseTracking?.couponCode,
+    testCheckout: Boolean(verifiedLiveTier?.endsWith("_test")),
+  });
+  const paidMeasurementNotification = isPaidGrowMeasurementNotification({
+    statusCode: data.statusCode, transactionId, transactionToken: String(data.transactionToken || ""), paymentDate: data.paymentDate,
+  });
+  if (paidMeasurementNotification && measureProductionPurchase && measurementPaidAt !== null) {
+    await capiPurchase({
+      email, name: name || measurementTracking?.name,
+      phone: phone || measurementTracking?.phone,
+      product, sum, transactionId: transactionId || undefined,
+      eventId: measurementTracking?.purchaseEventId || undefined,
+      paidAt: measurementPaidAt,
+      fbp: measurementTracking?.attributionExpiresAt && measurementTracking.attributionExpiresAt >= Date.now() ? measurementTracking.fbp || undefined : undefined,
+      fbc: measurementTracking?.attributionExpiresAt && measurementTracking.attributionExpiresAt >= Date.now() ? measurementTracking.fbc || undefined : undefined,
+      ip: measurementTracking?.attributionExpiresAt && measurementTracking.attributionExpiresAt >= Date.now() ? measurementTracking.clientIp || undefined : undefined,
+      userAgent: measurementTracking?.attributionExpiresAt && measurementTracking.attributionExpiresAt >= Date.now() ? measurementTracking.clientUserAgent || undefined : undefined,
+    }).catch(() => console.error("[MetaCAPI] durable measurement enqueue failed"));
+  }
+
 
   // ── Idempotency guard: skip duplicate webhook deliveries ─────────────────
   // Grow sends the webhook TWICE per purchase:
@@ -976,6 +1013,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       console.error("[PurchaseTracking] Failed to mark checkout confirmed before fulfillment", error);
     }
   }
+
 
   try {
     let businessActionAlreadyProcessed = false;
@@ -1113,29 +1151,13 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     }
 
     // Fire GA4 purchase event server-side via Measurement Protocol
-    const GA4_KEYS = ["guide", "course", "coaching", "coaching_mas", "session", "database", "bundle_tubav", "bundle_new_year", "match_boost", "plus"] as const;
+    const GA4_KEYS = ["guide", "course", "coaching", "coaching_mas", "session", "database", "bundle_tubav", "bundle_new_year", "match_boost", "plus", "live_event", "live_october"] as const;
     type GA4Key = typeof GA4_KEYS[number];
-    if (GA4_KEYS.includes(product as GA4Key) && !businessActionAlreadyProcessed) {
+    if (GA4_KEYS.includes(product as GA4Key) && !businessActionAlreadyProcessed && measureProductionPurchase && paidMeasurementNotification) {
       // Prefer the real browser client_id (from _ga cookie) for accurate DebugView stitching
       const ga4ClientId = storedGa4ClientId || clientIdFromEmail(email);
-      ga4Purchase(ga4ClientId, product as GA4Key, transactionId || undefined, utm, storedGa4SessionId).catch(() => {});
+      ga4Purchase(ga4ClientId, product as GA4Key, purchaseTracking?.purchaseEventId || transactionId || undefined, utm, storedGa4SessionId, sum).catch(() => {});
     }
-
-    // Fire Meta Conversions API Purchase event (server-side, deduplicates with browser pixel)
-    if (!businessActionAlreadyProcessed) capiPurchase({
-      email,
-      name,
-      phone,
-      product,
-      sum,
-      transactionId: transactionId || undefined,
-      eventId: purchaseTracking?.purchaseEventId || undefined,
-      fbp: purchaseTracking?.attributionExpiresAt && purchaseTracking.attributionExpiresAt >= Date.now() ? purchaseTracking.fbp || undefined : undefined,
-      fbc: purchaseTracking?.attributionExpiresAt && purchaseTracking.attributionExpiresAt >= Date.now() ? purchaseTracking.fbc || undefined : undefined,
-      ip: purchaseTracking?.attributionExpiresAt && purchaseTracking.attributionExpiresAt >= Date.now() ? purchaseTracking.clientIp || undefined : undefined,
-      userAgent: purchaseTracking?.attributionExpiresAt && purchaseTracking.attributionExpiresAt >= Date.now() ? purchaseTracking.clientUserAgent || undefined : undefined,
-      utmSource: utm.utmSource,
-    }).catch(err => console.error("[MetaCAPI] capiPurchase failed:", err));
 
     console.log(`[GrowWebhook] ✓ Processed ${product} for ${email}`);
   } catch (err) {

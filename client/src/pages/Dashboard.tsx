@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfitAndLossSection } from "@/components/ProfitAndLossSection";
+import { MetaPurchaseDeliveryStatus } from "@/components/MetaPurchaseDeliveryStatus";
 import {
   formatIsraelCalendarDate,
   formatIsraelDateRange,
@@ -202,6 +203,7 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[11px] text-blue-900">
           <span><strong>טווח:</strong> {rangeLabel}, שעון ישראל</span>
           <span>השוואה: {comparisonLabel}</span>
+          <span>Meta: דיווח לפי תאריכים בלבד בשעון חשבון הפרסום (America/Los_Angeles), לא לפי חלון שעות זהה לישראל.</span>
           {includesPartialToday && <span className="font-semibold text-amber-800">היום הנוכחי עדיין חלקי; להשוואת קצב נקייה עדיף לבחור ימים מלאים שהסתיימו.</span>}
           {c && !c.salesComparisonAvailable && <span className="font-semibold text-amber-800">השוואת לידים זמינה; השוואת Grow אינה מלאה לפני 22.8 ולכן אחוזי מכירות והכנסה אינם מוצגים.</span>}
         </div>
@@ -415,6 +417,7 @@ export default function Dashboard() {
         )}
 
         <ProfitAndLossSection startDate={startDate} endDate={endDate} />
+        <MetaPurchaseDeliveryStatus startDate={startDate} endDate={endDate} />
 
         {/* ═══════════════════════════════════════════════════════════════════════
             SECTION 2: CHANNEL BREAKDOWN — VISUAL
@@ -796,7 +799,7 @@ export default function Dashboard() {
                 <h3 className="font-bold text-gray-900">Meta Ads — תקציב ותוצאות מדווחות</h3>
                 <Badge className="bg-blue-100 text-blue-700 text-[10px]">{metaAds.data.status === "available" ? "זמין" : metaAds.data.status === "partial" ? "חלקי" : "לא זמין"}</Badge>
               </div>
-              <p className="mt-1 text-[10px] text-gray-500">לידים ורכישות בטבלה הם דיווחי הייחוס של Meta. הם אינם זהים בהכרח לחיובי Grow המאומתים, וערך/ROAS מוצגים רק כש־Meta מחזירה ערך רכישה.</p>
+              <p className="mt-1 text-[10px] text-gray-500">לידים ורכישות בטבלה הם דיווחי הייחוס של Meta. הם אינם זהים בהכרח לחיובי Grow המאומתים, וערך/ROAS מוצגים רק כש־Meta מחזירה ערך רכישה. Insights של Meta מקבלת תאריכים בלבד ומחשבת אותם בשעון החשבון (America/Los_Angeles), לכן אין כאן התאמת שעות מלאה מול נתוני ישראל.</p>
             </CardHeader>
             <CardContent>
               <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">

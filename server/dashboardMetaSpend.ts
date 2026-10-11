@@ -1,4 +1,14 @@
-export const DASHBOARD_META_TIMEZONE = "Asia/Jerusalem";
+/** Timezone used to label the dashboard's selected reporting dates. */
+export const DASHBOARD_REPORTING_TIMEZONE = "Asia/Jerusalem";
+
+/** @deprecated Use DASHBOARD_REPORTING_TIMEZONE for clarity. */
+export const DASHBOARD_META_TIMEZONE = DASHBOARD_REPORTING_TIMEZONE;
+
+/**
+ * Verified Meta ad-account timezone. Meta interprets date-only Insights ranges
+ * in this timezone, so those ranges cannot be treated as Israel-hour windows.
+ */
+export const META_ADS_ACCOUNT_TIMEZONE = "America/Los_Angeles";
 
 export type MetaAccountRole = "sales_acquisition" | "profile_boosts";
 export type MetaCampaignClassification = "sales_acquisition" | "profile_boosted_post";
@@ -34,7 +44,7 @@ export type MetaCampaignSummary = {
 
 export function formatMetaCalendarDate(
   timestamp: number,
-  timezone = DASHBOARD_META_TIMEZONE,
+  timezone = DASHBOARD_REPORTING_TIMEZONE,
 ): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,

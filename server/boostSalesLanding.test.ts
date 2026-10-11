@@ -39,7 +39,8 @@ describe("Boost sales landing and purchase measurement", () => {
     expect(wallet).toContain('match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית", sum: 19.90');
     const ga4KeysBlock = webhook.match(/const GA4_KEYS = \[([^\]]+)\] as const;/s)?.[1] ?? "";
     expect(ga4KeysBlock).toContain('"match_boost"');
-    expect(capi).toContain('match_boost: { name: "Boost - שליחת הצעת התאמה", price: 19.9');
+    expect(capi).toContain('match_boost: { name: "Boost - שליחת הצעת התאמה", currency: "ILS"');
+    expect(capi).toContain("Math.round(params.sum! * 100) / 100");
     expect(GA4_PRODUCTS.match_boost).toMatchObject({ id: "match_boost", price: 19.9 });
   });
 });

@@ -1,0 +1,2 @@
+ALTER TABLE `meta_purchase_delivery_settings` ADD `enabled` boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE `meta_purchase_delivery_settings` ADD CONSTRAINT `meta_purchase_schedule_uid_idx` UNIQUE(`schedule_cron_task_uid`);

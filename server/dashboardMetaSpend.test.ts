@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { formatMetaCalendarDate, normalizeMetaCampaign, summarizeMetaSpend } from "./dashboardMetaSpend";
+import {
+  DASHBOARD_REPORTING_TIMEZONE,
+  META_ADS_ACCOUNT_TIMEZONE,
+  formatMetaCalendarDate,
+  normalizeMetaCampaign,
+  summarizeMetaSpend,
+} from "./dashboardMetaSpend";
 
 describe("dashboard Meta spend", () => {
-  it("keeps the first day of the Israel month when UTC is still the previous day", () => {
+  it("keeps the Israel dashboard date label distinct from Meta's account calendar date", () => {
     const israelMonthStart = new Date("2026-08-31T21:00:00.000Z").getTime();
+    expect(DASHBOARD_REPORTING_TIMEZONE).toBe("Asia/Jerusalem");
+    expect(META_ADS_ACCOUNT_TIMEZONE).toBe("America/Los_Angeles");
     expect(formatMetaCalendarDate(israelMonthStart)).toBe("2026-09-01");
+    expect(formatMetaCalendarDate(israelMonthStart, META_ADS_ACCOUNT_TIMEZONE)).toBe("2026-08-31");
   });
 
   it("reports the main account, promoted posts account and combined spend separately", () => {

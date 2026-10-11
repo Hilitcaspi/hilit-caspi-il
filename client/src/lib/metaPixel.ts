@@ -1,6 +1,7 @@
 // Meta Pixel event tracking helpers
-// Pixel ID: 1993907891537316
+// Purchases are isolated to the verified Israeli campaign pixel.
 import { getUtmParams } from "./utils";
+import { ISRAEL_META_PIXEL_ID } from "@shared/metaPurchasePolicy";
 
 declare global {
   interface Window {
@@ -33,6 +34,7 @@ export function trackLead(params?: { content_name?: string; value?: number; curr
 }
 
 export function trackPurchase(params: { value: number; currency?: string; content_name?: string; eventID?: string }) {
+  if (!params.eventID || !Number.isFinite(params.value) || params.value <= 0) return;
   if (typeof window !== "undefined" && window.fbq) {
     const eventData = {
       value: params.value,
@@ -40,12 +42,7 @@ export function trackPurchase(params: { value: number; currency?: string; conten
       content_name: params.content_name,
       ...hiddenUtmFields(),
     };
-    if (params.eventID) {
-      // Pass eventID for deduplication with server-side CAPI event
-      window.fbq("track", "Purchase", eventData, { eventID: params.eventID });
-    } else {
-      window.fbq("track", "Purchase", eventData);
-    }
+    window.fbq("trackSingle", ISRAEL_META_PIXEL_ID, "Purchase", eventData, { eventID: params.eventID });
   }
 }
 

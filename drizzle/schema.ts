@@ -896,6 +896,34 @@ export const completedPayments = mysqlTable("completed_payments", {
 export type CompletedPayment = typeof completedPayments.$inferSelect;
 export type InsertCompletedPayment = typeof completedPayments.$inferInsert;
 
+/** Only new confirmed purchases enter this outbox. No historical backfill. */
+export const metaPurchaseDeliveries = mysqlTable("meta_purchase_deliveries", {
+  id: int("id").primaryKey().autoincrement(),
+  eventKey: varchar("event_key", { length: 64 }).notNull(),
+  product: varchar("product", { length: 50 }).notNull(),
+  amountAgorot: int("amount_agorot").notNull(),
+  eventTime: bigint("event_time", { mode: "number" }).notNull(),
+  payloadEncrypted: text("payload_encrypted"),
+  state: mysqlEnum("state", ["pending", "accepted", "failed", "expired"]).notNull().default("pending"),
+  attemptCount: int("attempt_count").notNull().default(0),
+  nextAttemptAt: bigint("next_attempt_at", { mode: "number" }).notNull(),
+  claimedUntil: bigint("claimed_until", { mode: "number" }),
+  lastCategory: varchar("last_category", { length: 60 }),
+  lastHttpStatus: int("last_http_status"),
+  eventsReceived: int("events_received"),
+  acceptedAt: bigint("accepted_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => ({
+  eventIdx: uniqueIndex("meta_purchase_event_idx").on(t.eventKey),
+  dueIdx: index("meta_purchase_due_idx").on(t.state, t.nextAttemptAt),
+}));
+export const metaPurchaseDeliverySettings = mysqlTable("meta_purchase_delivery_settings", {
+  id: int("id").primaryKey(),
+  scheduleCronTaskUid: varchar("schedule_cron_task_uid", { length: 65 }),
+  enabled: boolean("enabled").notNull().default(false),
+  enabledAt: bigint("enabled_at", { mode: "number" }).notNull(),
+}, (t) => ({ taskUidIdx: uniqueIndex("meta_purchase_schedule_uid_idx").on(t.scheduleCronTaskUid) }));
+
 /**
  * Business expenses entered by the team for the monthly P&L.
  * Amounts are stored in agorot to avoid floating-point rounding.

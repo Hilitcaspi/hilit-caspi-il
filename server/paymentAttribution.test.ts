@@ -32,7 +32,10 @@ describe("verified purchase attribution", () => {
 
   it("prefers the checkout event id shared with Pixel and falls back deterministically", () => {
     expect(resolvePurchaseEventId({ product: "database", eventId: "checkout-shared", transactionId: "tx-1" }, 123)).toBe("checkout-shared");
-    expect(resolvePurchaseEventId({ product: "database", transactionId: "tx-1" }, 123)).toBe("grow-tx-1");
+    const opaque = resolvePurchaseEventId({ product: "database", transactionId: "tx-1" }, 123);
+    expect(opaque).toMatch(/^grow-[a-f0-9]{64}$/);
+    expect(opaque).not.toContain("tx-1");
+    expect(opaque).toBe(resolvePurchaseEventId({ product: "database", transactionId: "tx-1" }, 456));
     expect(resolvePurchaseEventId({ product: "database" }, 123)).toBe("grow-database-123");
   });
 });

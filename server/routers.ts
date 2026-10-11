@@ -8413,9 +8413,20 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
       }),
 
+    measurementStatus: teamProcedure
+      .input(z.object({ startDate: z.number().int().nonnegative(), endDate: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        if (input.endDate <= input.startDate || input.endDate - input.startDate > 93 * 86_400_000) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid reporting range" });
+        }
+        const { metaPurchaseDeliverySummary } = await import("./metaPurchaseDelivery");
+        return metaPurchaseDeliverySummary(input.startDate, input.endDate);
+      }),
+
     confirmPurchaseTracking: publicProcedure
       .input(z.object({ trackingToken: z.string().regex(/^[a-f0-9]{64}$/) }))
       .mutation(async ({ input }) => {
+        if (process.env.NODE_ENV !== "production") return { status: "invalid" as const };
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -8428,6 +8439,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           confirmedAt: paymentLeads.confirmedAt,
           browserTrackedAt: paymentLeads.browserTrackedAt,
           attributionExpiresAt: paymentLeads.attributionExpiresAt,
+          couponCode: paymentLeads.couponCode,
         }).from(paymentLeads)
           .where(eq(paymentLeads.trackingToken, input.trackingToken))
           .limit(1);
@@ -8435,6 +8447,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!row || !row.attributionExpiresAt || row.attributionExpiresAt < Date.now()) {
           return { status: "invalid" as const };
         }
+        if (row.couponCode?.toUpperCase() === "TEST1") return { status: "invalid" as const };
         if (!row.confirmedAt || !row.confirmedTransactionId || !row.confirmedAmountAgorot || !row.purchaseEventId) {
           return { status: "pending" as const };
         }
