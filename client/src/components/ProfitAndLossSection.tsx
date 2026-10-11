@@ -52,7 +52,7 @@ function change(current: number, previous: number) {
   return Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10;
 }
 
-export function ProfitAndLossSection({ startDate, endDate }: { startDate: number; endDate: number }) {
+export function ProfitAndLossSection({ startDate, endDate, expensesOnly = false }: { startDate: number; endDate: number; expensesOnly?: boolean }) {
   const utils = trpc.useUtils();
   const pnl = trpc.dashboard.profitAndLoss.useQuery({ startDate, endDate });
   const [showForm, setShowForm] = useState(false);
@@ -78,6 +78,7 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
   const addExpense = trpc.dashboard.addBusinessExpense.useMutation({
     onSuccess: async () => {
       await utils.dashboard.profitAndLoss.invalidate();
+      await utils.dashboard.salesIntelligence.invalidate();
       setForm({ expenseDate: new Date().toISOString().slice(0, 10), category: "processing", description: "", vendor: "", amount: "", notes: "" });
       setShowForm(false);
       toast.success("ההוצאה נשמרה ב־P&L");
@@ -87,6 +88,7 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
   const deleteExpense = trpc.dashboard.deleteBusinessExpense.useMutation({
     onSuccess: async () => {
       await utils.dashboard.profitAndLoss.invalidate();
+      await utils.dashboard.salesIntelligence.invalidate();
       toast.success("ההוצאה נמחקה");
     },
     onError: error => toast.error(error.message || "לא הצלחנו למחוק"),
@@ -94,6 +96,7 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
   const addRecurringItem = trpc.dashboard.addBusinessRecurringItem.useMutation({
     onSuccess: async () => {
       await utils.dashboard.profitAndLoss.invalidate();
+      await utils.dashboard.salesIntelligence.invalidate();
       setRecurringForm({
         itemType: "expense",
         category: "campaign_management",
@@ -111,6 +114,7 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
   const deactivateRecurringItem = trpc.dashboard.deactivateBusinessRecurringItem.useMutation({
     onSuccess: async () => {
       await utils.dashboard.profitAndLoss.invalidate();
+      await utils.dashboard.salesIntelligence.invalidate();
       toast.success("הסעיף החודשי הופסק");
     },
     onError: error => toast.error(error.message || "לא הצלחנו להפסיק את הסעיף"),
@@ -175,8 +179,8 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
         <div className="flex items-center gap-3">
           <span className="rounded-xl bg-[#ffe27c] p-2 text-[#191265]"><Calculator size={20} /></span>
           <div>
-            <h2 className="font-black">מעקב רווחיות תפעולי</h2>
-            <p className="text-[11px] text-white/65">חיובי Grow מאומתים · כל הוצאות Meta · הוצאות שהוזנו ידנית</p>
+            <h2 className="font-black">{expensesOnly ? "ניהול הוצאות וסעיפים חודשיים" : "מעקב רווחיות תפעולי"}</h2>
+            <p className="text-[11px] text-white/65">{expensesOnly ? "עדכון הוצאות מתועדות. תמונת המכירות והיתרה מופיעה בראש הדאשבורד." : "דיווחי תשלום באתר · הוצאות Meta · הוצאות שהוזנו ידנית"}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -190,9 +194,9 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
       </header>
 
       <div className="p-5 space-y-5">
-        <div className={`rounded-xl border p-3 text-sm leading-6 ${current.dataQuality.isComplete ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800"}`}>
+        {!expensesOnly && <div className={`rounded-xl border p-3 text-sm leading-6 ${current.dataQuality.isComplete ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800"}`}>
           <strong>איכות הנתונים:</strong> {current.dataQuality.warning}
-        </div>
+        </div>}
 
         {showForm && (
           <form onSubmit={submitExpense} className="grid grid-cols-1 gap-3 rounded-2xl border border-[#e4e0d5] bg-[#faf9f6] p-4 md:grid-cols-3">
@@ -254,7 +258,7 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
           </form>
         )}
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+        {!expensesOnly && <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
           {[
             { label: "הכנסה לאחר זיכויים", value: current.netRevenue, sub: !pnl.data.salesComparisonAvailable ? "אין בסיס Grow מלא בתקופה הקודמת" : revenueChange == null ? "Grow מאומת + פעילות חיצונית שהוזנה" : `${revenueChange >= 0 ? "+" : ""}${revenueChange}% מול ${comparisonLabel}`, color: "text-emerald-700" },
             { label: "הוצאות Meta", value: current.metaSpend, sub: `מכירה ${money(current.metaSpendBreakdown.mainSpend)} · קידומים ${money(current.metaSpendBreakdown.boostsSpend)}`, color: "text-red-600" },
@@ -269,10 +273,10 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
               <p className="mt-1 text-[9px] text-gray-400">{item.sub}</p>
             </div>
           ))}
-        </div>
+        </div>}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-gray-100 p-4">
+        <div className={expensesOnly ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 gap-4 lg:grid-cols-3"}>
+          {!expensesOnly && <div className="rounded-xl border border-gray-100 p-4">
             <h3 className="flex items-center gap-2 text-sm font-black text-[#191265]"><WalletCards size={16} /> יחידת כלכלה</h3>
             <dl className="mt-3 space-y-2 text-xs">
               <div className="flex justify-between"><dt className="text-gray-500">הכנסה ממוצעת לרכישה</dt><dd className="font-black">{money(current.unitEconomics.averageRevenuePerPurchase)}</dd></div>
@@ -281,9 +285,9 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
               <div className="flex justify-between"><dt className="text-gray-500">יחס הכנסות מוצר / מדיה</dt><dd className="font-black">{current.unitEconomics.returnOnAdSpend.toFixed(2)}x</dd></div>
               <p className="pt-1 text-[9px] text-gray-400">שני היחסים כוללים את כל הוצאות Meta ואינם ייחוס קמפיין.</p>
             </dl>
-          </div>
+          </div>}
 
-          <div className="rounded-xl border border-gray-100 p-4">
+          {!expensesOnly && <div className="rounded-xl border border-gray-100 p-4">
             <h3 className="text-sm font-black text-[#191265]">הכנסה לפי מוצר</h3>
             <div className="mt-3 space-y-2 text-xs">
               {current.manualRevenue > 0 && <div className="flex items-center justify-between gap-3"><span className="text-gray-600">ליווי מחוץ לאתר</span><strong>{money(current.manualRevenue)}</strong></div>}
@@ -291,7 +295,7 @@ export function ProfitAndLossSection({ startDate, endDate }: { startDate: number
                 <div key={product.product} className="flex items-center justify-between gap-3"><span className="text-gray-600">{PRODUCT_LABELS[product.product] || product.product} · {product.purchases}</span><strong>{money(product.revenue)}</strong></div>
               )) : <p className="text-gray-400">אין עסקאות בתקופה</p>}
             </div>
-          </div>
+          </div>}
 
           <div className="rounded-xl border border-gray-100 p-4">
             <h3 className="text-sm font-black text-[#191265]">הוצאות לפי קטגוריה</h3>

@@ -31,6 +31,7 @@
  */
 
 import crypto from "crypto";
+import { captureAcquisitionIfMissing } from "../shared/acquisitionAttribution";
 import { and, desc as orderDesc, eq, gt, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusCheckoutIntents, paymentLeads, discountCodes } from "../drizzle/schema";
@@ -1128,25 +1129,27 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       }
     }
 
-    // Save UTM attribution to crmLeads if we have any UTM data
+    // Preserve acquisition in CRM. Checkout/closing UTM remains on the payment.
     if (utm.utmSource || utm.utmMedium || utm.utmCampaign) {
       try {
         const db = await getDb();
         if (db) {
-          const existingCrm = await db.select({ id: crmLeads.id })
+          const existingCrm = await db.select({ id: crmLeads.id, utmSource: crmLeads.utmSource, utmMedium: crmLeads.utmMedium, utmCampaign: crmLeads.utmCampaign, utmContent: crmLeads.utmContent, utmTerm: crmLeads.utmTerm, metaCampaignId: crmLeads.metaCampaignId, metaAdSetId: crmLeads.metaAdSetId, metaAdId: crmLeads.metaAdId })
             .from(crmLeads)
             .where(eq(crmLeads.email, email))
             .limit(1)
             .then(r => r[0] ?? null);
           if (existingCrm) {
-            await db.update(crmLeads)
-              .set({ utmSource: utm.utmSource, utmMedium: utm.utmMedium, utmCampaign: utm.utmCampaign, utmContent: utm.utmContent, updatedAt: Date.now() })
-              .where(eq(crmLeads.id, existingCrm.id));
-            console.log(`[GrowWebhook] UTM saved to crmLeads for ${email}: source=${utm.utmSource}`);
+            const acquisitionPatch = captureAcquisitionIfMissing(existingCrm, utm);
+            if (Object.keys(acquisitionPatch).length > 0) {
+              await db.update(crmLeads)
+                .set({ ...acquisitionPatch, updatedAt: Date.now() })
+                .where(eq(crmLeads.id, existingCrm.id));
+            }
           }
         }
       } catch (utmErr) {
-        console.error(`[GrowWebhook] Failed to save UTM for ${email}:`, utmErr);
+        console.error("[GrowWebhook] Acquisition attribution persistence unavailable");
       }
     }
 

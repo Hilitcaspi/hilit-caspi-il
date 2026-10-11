@@ -2,6 +2,7 @@
 // שיטת ההתאמה, האלגוריתם והתכנים מוגנים בזכויות יוצרים ומהווים סוד מסחרי של הילית כספי.
 
 import { COOKIE_NAME } from "../shared/const";
+import { captureAcquisitionIfMissing } from "../shared/acquisitionAttribution";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
@@ -1119,7 +1120,7 @@ export const appRouter = router({
 
         // Check if lead already exists for this email (upsert pattern)
         const [existingLead] = await db
-          .select({ id: crmLeads.id, status: crmLeads.status })
+          .select({ id: crmLeads.id, status: crmLeads.status, utmSource: crmLeads.utmSource, utmMedium: crmLeads.utmMedium, utmCampaign: crmLeads.utmCampaign, utmContent: crmLeads.utmContent, utmTerm: crmLeads.utmTerm, metaCampaignId: crmLeads.metaCampaignId, metaAdSetId: crmLeads.metaAdSetId, metaAdId: crmLeads.metaAdId })
           .from(crmLeads)
           .where(eq(crmLeads.email, input.email))
           .limit(1);
@@ -1136,14 +1137,7 @@ export const appRouter = router({
             gender: input.gender ?? undefined,
             dnaType: input.dnaType ?? undefined,
             quizSessionId: input.quizSessionId ?? undefined,
-            ...(input.utmSource ? { utmSource: input.utmSource } : {}),
-            ...(input.utmMedium ? { utmMedium: input.utmMedium } : {}),
-            ...(input.utmCampaign ? { utmCampaign: input.utmCampaign } : {}),
-            ...(input.utmContent ? { utmContent: input.utmContent } : {}),
-            ...(input.utmTerm ? { utmTerm: input.utmTerm } : {}),
-            ...(input.metaCampaignId ? { metaCampaignId: input.metaCampaignId } : {}),
-            ...(input.metaAdSetId ? { metaAdSetId: input.metaAdSetId } : {}),
-            ...(input.metaAdId ? { metaAdId: input.metaAdId } : {}),
+            ...captureAcquisitionIfMissing(existingLead, input),
             updatedAt: nowTs,
           }).where(eq(crmLeads.id, leadId));
         } else {
@@ -8245,14 +8239,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             if (existing) {
               await db.update(crmLeadsTable)
                 .set({
-                  utmSource: input.utmSource || existing.utmSource,
-                  utmMedium: input.utmMedium || existing.utmMedium,
-                  utmCampaign: input.utmCampaign || existing.utmCampaign,
-                  utmContent: input.utmContent || existing.utmContent,
-                  utmTerm: input.utmTerm || existing.utmTerm,
-                  metaCampaignId: input.metaCampaignId || existing.metaCampaignId,
-                  metaAdSetId: input.metaAdSetId || existing.metaAdSetId,
-                  metaAdId: input.metaAdId || existing.metaAdId,
+                  ...captureAcquisitionIfMissing(existing, input),
                   // Always overwrite ga4ClientId and ga4SessionId with the freshest browser values
                   ...(input.ga4ClientId ? { ga4ClientId: input.ga4ClientId } : {}),
                   ...(input.ga4SessionId ? { ga4SessionId: input.ga4SessionId } : {}),

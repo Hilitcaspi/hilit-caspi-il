@@ -1,6 +1,5 @@
 import { and, desc, eq, gte, lt } from "drizzle-orm";
 import {
-  completedPayments,
   crmLeads,
   dailyReportRuns,
   dailyReportSettings,
@@ -13,8 +12,6 @@ import { fetchMetaAdsInsights, fetchSocialInsights } from "./dashboardRouter";
 import { calculateMatchmakingMetrics, getMissingProfileFields } from "./matchmakingMetrics";
 import {
   buildHistoricalWeekdayWeights,
-  buildDailyReportMessage,
-  buildDailyReportMessages,
   DAILY_REPORT_TIMEZONE,
   getReportDateForMidnightRun,
   getReportDateRange,
@@ -23,6 +20,8 @@ import {
   type DailyReportTargets,
   type DailyReportWeightProfiles,
 } from "./dailyReportMetrics";
+import { buildSalesDailyDigest } from "./salesDailyDigest";
+import { getSalesIntelligence, type SalesIntelligence } from "./salesIntelligence";
 import { sendSMS } from "./vibrate";
 
 const SETTINGS_NAME = "israel-site-daily";
@@ -195,18 +194,28 @@ async function externalOrNull<T>(promise: Promise<T>): Promise<T | null> {
   }
 }
 
-function paymentAggregate(rows: Array<{ product: string; amountAgorot: number; paidAt: number; amountSource: "grow" | "estimated" }>, start: number, end: number) {
-  const inRange = rows.filter(row => row.paidAt >= start && row.paidAt < end);
-  const verified = inRange.filter(row => row.amountSource === "grow");
+/**
+ * Compatibility adapter for the CRM preview. Its historic field names remain
+ * intact, but every amount and count comes from the shared included-only
+ * ledger rows rather than a separate raw completed_payments aggregate.
+ */
+export function summarizeSalesIntelligenceForPreview(
+  data: SalesIntelligence,
+  start = data.startDate,
+  end = data.endDate,
+) {
+  const included = data.sales.filter(row => row.status === "included" && row.paidAt >= start && row.paidAt < end);
   const byProduct = (product: string) => {
-    const matches = verified.filter(row => row.product === product);
+    const matches = included.filter(row => row.product === product);
     return { count: matches.length, revenueAgorot: matches.reduce((sum, row) => sum + row.amountAgorot, 0) };
   };
-  const nonBoost = verified.filter(row => row.product !== "match_boost");
   return {
-    revenueAgorot: verified.reduce((sum, row) => sum + row.amountAgorot, 0),
-    salesPurchases: nonBoost.length,
-    estimatedExcluded: inRange.filter(row => row.amountSource === "estimated").length,
+    // Keep the legacy CRM preview fields aligned with the same included-only
+    // ledger total used in the daily digest. Review, test/tiny and estimated
+    // rows are never silently added to these figures.
+    revenueAgorot: included.reduce((sum, row) => sum + row.amountAgorot, 0),
+    salesPurchases: included.length,
+    estimatedExcluded: start === data.startDate && end === data.endDate ? data.summary.excludedEstimated : 0,
     database: byProduct("database"),
     boost: byProduct("match_boost"),
     bundle: byProduct("bundle_new_year"),
@@ -220,16 +229,9 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
   const historyEnd = range.monthStart;
   const historyStart = historyEnd - 60 * 24 * 60 * 60 * 1000;
 
-  const [paymentRows, leadRows, singleRows, matchRows, dayMeta, monthMeta, social] = await Promise.all([
-    db.select({
-      product: completedPayments.product,
-      amountAgorot: completedPayments.amountAgorot,
-      amountSource: completedPayments.amountSource,
-      paidAt: completedPayments.paidAt,
-    }).from(completedPayments).where(and(
-      gte(completedPayments.paidAt, historyStart),
-      lt(completedPayments.paidAt, range.dayEnd),
-    )),
+  const [daySalesIntelligence, monthSalesIntelligence, leadRows, singleRows, matchRows, dayMeta, monthMeta, social] = await Promise.all([
+    getSalesIntelligence(range.dayStart, range.dayEnd),
+    getSalesIntelligence(Math.min(range.monthStart, range.weekStart), range.dayEnd, { includeExpenses: false }),
     db.select({ createdAt: crmLeads.createdAt }).from(crmLeads).where(and(
       gte(crmLeads.createdAt, historyStart),
       lt(crmLeads.createdAt, range.dayEnd),
@@ -287,9 +289,9 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
     externalOrNull(fetchSocialInsights(range.dayStart - SOCIAL_FOLLOWER_LOOKBACK_MS, range.dayEnd)),
   ]);
 
-  const todayPayments = paymentAggregate(paymentRows, range.dayStart, range.dayEnd);
-  const weekPayments = paymentAggregate(paymentRows, range.weekStart, range.dayEnd);
-  const monthPayments = paymentAggregate(paymentRows, range.monthStart, range.dayEnd);
+  const todayPayments = summarizeSalesIntelligenceForPreview(daySalesIntelligence, range.dayStart, range.dayEnd);
+  const weekPayments = summarizeSalesIntelligenceForPreview(monthSalesIntelligence, range.weekStart, range.dayEnd);
+  const monthPayments = summarizeSalesIntelligenceForPreview(monthSalesIntelligence, range.monthStart, range.dayEnd);
   const activePaidSingles = singleRows.filter(single => single.isActive && single.isPaid && !single.isSeed);
   const matchmaking = calculateMatchmakingMetrics(singleRows as any, matchRows as any, {
     from: range.dayStart,
@@ -311,7 +313,12 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
   const metaConfigured = Boolean(process.env.META_ADS_TOKEN);
   const metaAvailable = Boolean(metaConfigured && dayMeta && monthMeta);
   const sources: DailyReportSourceStatus = {
-    payments: { available: true, label: "Grow תשלומים מאומתים", freshAt: Date.now(), note: "עסקאות amount_source=grow בלבד" },
+    payments: {
+      available: true,
+      label: "יומן תשלומים כלולים",
+      freshAt: daySalesIntelligence.generatedAt,
+      note: "עסקאות חשודות, בדיקה, test/tiny ואומדן אינן כלולות; דוח Grow טרם הוצלב",
+    },
     leads: { available: true, label: "CRM לידים", freshAt: Date.now() },
     matches: { available: true, label: "CRM התאמות", freshAt: Date.now() },
     profiles: { available: true, label: "מאגר פעיל", freshAt: Date.now(), note: "פעילים, משלמים וללא נתוני דמה" },
@@ -383,22 +390,19 @@ export async function collectDailyReportPreview(settings: DailyReportSettings, r
     excludedEstimatedPaymentsToday: todayPayments.estimatedExcluded,
   };
 
-  const historicalPayments = paymentRows.filter(row => row.amountSource === "grow" && row.paidAt >= historyStart && row.paidAt < historyEnd);
   const historicalLeads = leadRows.filter(row => row.createdAt >= historyStart && row.createdAt < historyEnd);
   const weekdayWeights: DailyReportWeightProfiles = {
-    database: buildHistoricalWeekdayWeights(historicalPayments.filter(row => row.product === "database").map(row => row.paidAt), historyStart, historyEnd) || undefined,
-    bundle: buildHistoricalWeekdayWeights(historicalPayments.filter(row => row.product === "bundle_new_year").map(row => row.paidAt), historyStart, historyEnd) || undefined,
-    boost: buildHistoricalWeekdayWeights(historicalPayments.filter(row => row.product === "match_boost").map(row => row.paidAt), historyStart, historyEnd) || undefined,
     leads: buildHistoricalWeekdayWeights(historicalLeads.map(row => row.createdAt), historyStart, historyEnd) || undefined,
   };
   const targets = targetsFromSettings(settings, weekdayWeights);
+  const digestMessages = buildSalesDailyDigest(daySalesIntelligence, reportDate);
   return {
     metrics,
     targets,
     sources,
-    message: buildDailyReportMessage(metrics, targets, sources),
-    messages: buildDailyReportMessages(metrics, targets, sources),
-    generatedAt: Date.now(),
+    message: digestMessages.map(part => part.message).join("\n\n"),
+    messages: digestMessages,
+    generatedAt: daySalesIntelligence.generatedAt,
   };
 }
 

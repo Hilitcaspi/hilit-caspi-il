@@ -11,6 +11,7 @@ import { getPaymentAbandonmentAudit } from "./paymentAbandonmentAudit";
 import { formatMetaCalendarDate, normalizeMetaCampaign, summarizeMetaSpend } from "./dashboardMetaSpend";
 import { hasVerifiedGrowCoverage, previousComparisonPeriod } from "./dashboardPeriods";
 import { getDailyReportMediaPlan } from "./dailyReportMetrics";
+import { getSalesIntelligence } from "./salesIntelligence";
 
 import { sendSMS } from "./vibrate";
 import crypto from "crypto";
@@ -195,7 +196,7 @@ function extractUtmCampaign(raw: string) {
 
 let metaDestinationsCache: { fetchedAt: number; data: Record<string, { labels: string[]; categories: string[]; utmCampaigns: string[]; activeAds: number; ads: number }> } | null = null;
 
-async function fetchMetaCampaignDestinations() {
+export async function fetchMetaCampaignDestinations() {
   if (metaDestinationsCache && Date.now() - metaDestinationsCache.fetchedAt < 10 * 60 * 1000) return metaDestinationsCache.data;
   const token = process.env.META_ADS_TOKEN;
   if (!token) return metaDestinationsCache?.data || {};
@@ -563,6 +564,28 @@ async function calculateProfitAndLossPeriod(startDate: number, endDate: number) 
 }
 
 export const dashboardRouter = router({
+  salesIntelligence: teamProcedure
+    .input(z.object({
+      startDate: z.number().finite(),
+      endDate: z.number().finite(),
+      includeExpenses: z.boolean().optional(),
+    }).refine(input => input.endDate > input.startDate, {
+      message: "טווח תאריכים לא תקין",
+    }).refine(input => input.endDate - input.startDate <= 93 * 24 * 60 * 60 * 1000, {
+      message: "טווח הדוח מוגבל ל־93 ימים",
+    }))
+    .query(async ({ ctx, input }) => {
+      guardAdmin(ctx);
+      try {
+        return await getSalesIntelligence(input.startDate, input.endDate, {
+          includeExpenses: input.includeExpenses,
+        });
+      } catch (error) {
+        console.error("[SalesIntelligence] unavailable", error instanceof Error ? error.name : "unknown");
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "נתוני המכירות אינם זמינים כרגע" });
+      }
+    }),
+
   profitAndLoss: teamProcedure
     .input(z.object({ startDate: z.number(), endDate: z.number() }))
     .query(async ({ ctx, input }) => {

@@ -1,922 +1,1369 @@
-import { useState, useMemo, Fragment } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  ArrowLeft,
+  CalendarRange,
+  ChevronDown,
+  ChevronUp,
+  CircleAlert,
+  CircleCheck,
+  CircleHelp,
+  RefreshCw,
+  Search,
+  WalletCards,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ProfitAndLossSection } from "@/components/ProfitAndLossSection";
 import { MetaPurchaseDeliveryStatus } from "@/components/MetaPurchaseDeliveryStatus";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
+  addCalendarDays,
+  endOfIsraelCalendarDate,
   formatIsraelCalendarDate,
   formatIsraelDateRange,
   getCurrentIsraelMonthStart,
-  getIsraelCalendarDaysStart,
-  endOfIsraelCalendarDate,
   parseIsraelCalendarDate,
 } from "@/lib/dashboardDateRange";
-import {
-  TrendingUp, Users, DollarSign, Mail, MousePointerClick,
-  ChevronDown, ChevronUp, ArrowLeft, BarChart3,
-  Target, Zap, ShoppingCart, ShoppingBag, Dna, Megaphone, Heart, Lightbulb,
-  Instagram, Facebook, MessageCircle, Send, ArrowUpRight, ArrowDownRight
-} from "lucide-react";
 
-const PRESETS = [
-  { label: "החודש", days: null },
-  { label: "7 ימים", days: 7 },
-  { label: "14 ימים", days: 14 },
-  { label: "30 ימים", days: 30 },
-  { label: "90 ימים", days: 90 },
-  { label: "הכל", days: 365 * 3 },
-] as const;
+type Preset =
+  | "today"
+  | "yesterday"
+  | "threeFullDays"
+  | "sevenFullDays"
+  | "month"
+  | "custom";
+type SaleStatusFilter = "all" | "included" | "review";
+type Confidence = string;
 
-function toDateStr(ts: number) { return formatIsraelCalendarDate(ts); }
-function fromDateStr(s: string) { return parseIsraelCalendarDate(s); }
-function fmt(n: number) { return `₪${Math.round(n).toLocaleString("he-IL")}`; }
-function fmtPct(n: number) { return `${n.toFixed(1)}%`; }
-function fmtDate(ts: number) { return new Date(ts).toLocaleDateString("he-IL", { day: "numeric", month: "short" }); }
-function fmtDateTime(ts: number) { return new Date(ts).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }); }
-function pctDelta(current: number, previous: number) {
-  if (previous <= 0) return 0;
-  return Math.round(((current - previous) / previous) * 100);
-}
-
-const PAYMENT_ATTEMPT_LABELS: Record<string, { label: string; className: string }> = {
-  sandbox_plus: { label: "ניסוי Plus", className: "bg-slate-100 text-slate-700" },
-  excluded_contact: { label: "לא לפנות", className: "bg-red-100 text-red-700" },
-  recovery_already_sent: { label: "כבר נשלח מסע", className: "bg-blue-100 text-blue-700" },
-  recovery_clicked: { label: "לחץ ולא השלים", className: "bg-amber-100 text-amber-800" },
-  repeat_purchase_abandoned: { label: "רכישה נוספת", className: "bg-purple-100 text-purple-700" },
-  abandoned_without_recovery: { label: "טרם טופל", className: "bg-orange-100 text-orange-800" },
+type SalesIntelligence = {
+  startDate: number;
+  endDate: number;
+  generatedAt: number;
+  partialToday: boolean;
+  summary: {
+    recordedCount: number;
+    recordedRevenueAgorot: number;
+    includedCount: number;
+    includedRevenueAgorot: number;
+    reviewCount: number;
+    reviewRevenueAgorot: number;
+    excludedTests: number;
+    excludedEstimated: number;
+    knownClosingCount: number;
+    knownAcquisitionCount: number;
+    metaSpendAgorot: number | null;
+    otherExpenseAgorot: number | null;
+    totalExpenseAgorot: number | null;
+    balanceAgorot: number | null;
+    expenseComplete: boolean;
+  };
+  sales: Sale[];
+  channels: Channel[];
+  products: Product[];
+  campaigns: Campaign[];
+  daily: Daily[];
+  insights: Insight[];
+  quality: Quality;
+};
+type Sale = {
+  order: number;
+  paidAt: number;
+  day: string;
+  product: string;
+  productLabel: string;
+  amountAgorot: number;
+  coupon: string | null;
+  status: "included" | "review";
+  paymentEvidence: string;
+  acquisition: {
+    channel: string;
+    campaign: string | null;
+    confidence: Confidence;
+  };
+  closing: { channel: string; campaign: string | null; confidence: Confidence };
+  emailAssist: { campaign: string; clicked: boolean; sameDay: boolean } | null;
+  lagDays: number | null;
+};
+type Channel = { channel: string; count: number; revenueAgorot: number };
+type Product = {
+  product: string;
+  label: string;
+  count: number;
+  revenueAgorot: number;
+};
+type Campaign = {
+  campaign: string;
+  channel: string;
+  count: number;
+  revenueAgorot: number;
+  emailClosedCount: number;
+  products: string[];
+  mapping: string;
+  spendAgorot: number | null;
+  metaPurchases: number | null;
+};
+type Daily = {
+  day: string;
+  count: number;
+  revenueAgorot: number;
+  reviewCount: number;
+};
+type Insight = {
+  title: string;
+  detail: string;
+  tone: "positive" | "warning" | "neutral";
+};
+type Quality = {
+  providerReconciled: false;
+  attributionNote: string;
+  expenseNote: string;
+  metaTimezone: string | null;
+  notes: string[];
 };
 
-function Change({ value, suffix = "%" }: { value: number | null | undefined; suffix?: string }) {
-  if (value == null || value === 0) return null;
-  const positive = value > 0;
+const PRESETS: { id: Exclude<Preset, "custom">; label: string }[] = [
+  { id: "today", label: "היום" },
+  { id: "yesterday", label: "אתמול" },
+  { id: "threeFullDays", label: "3 ימים מלאים" },
+  { id: "sevenFullDays", label: "7 ימים" },
+  { id: "month", label: "החודש" },
+];
+const ISRAEL_TIMEZONE = "Asia/Jerusalem";
+
+function money(valueAgorot: number | null | undefined) {
+  if (valueAgorot == null) return "לא זמין";
+  return new Intl.NumberFormat("he-IL", {
+    style: "currency",
+    currency: "ILS",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(valueAgorot / 100);
+}
+function count(value: number) {
+  return new Intl.NumberFormat("he-IL").format(value);
+}
+function dateTime(value: number) {
+  return new Intl.DateTimeFormat("he-IL", {
+    timeZone: ISRAEL_TIMEZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+function calendarDay(value: string) {
+  const timestamp = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? parseIsraelCalendarDate(value)
+    : new Date(value).getTime();
+  return new Intl.DateTimeFormat("he-IL", {
+    timeZone: ISRAEL_TIMEZONE,
+    day: "numeric",
+    month: "short",
+  }).format(new Date(timestamp));
+}
+function calendarDayCount(start: string, end: string) {
+  const [startYear, startMonth, startDay] = start.split("-").map(Number);
+  const [endYear, endMonth, endDay] = end.split("-").map(Number);
   return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${positive ? 'text-green-600' : 'text-red-500'}`}>
-      {positive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-      {positive ? '+' : ''}{value}{suffix}
-    </span>
+    Math.floor(
+      (Date.UTC(endYear, endMonth - 1, endDay) -
+        Date.UTC(startYear, startMonth - 1, startDay)) /
+        86_400_000
+    ) + 1
+  );
+}
+function fullDaysRange(days: number, today: string) {
+  const end = addCalendarDays(today, -1);
+  return {
+    startDate: parseIsraelCalendarDate(addCalendarDays(today, -days)),
+    endDate: endOfIsraelCalendarDate(end),
+  };
+}
+function toneClass(tone: Insight["tone"]) {
+  return tone === "positive"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+    : tone === "warning"
+      ? "border-amber-200 bg-amber-50 text-amber-950"
+      : "border-indigo-100 bg-indigo-50 text-indigo-950";
+}
+function ToneIcon({ tone }: { tone: Insight["tone"] }) {
+  return tone === "positive" ? (
+    <CircleCheck className="h-4 w-4 shrink-0" />
+  ) : tone === "warning" ? (
+    <CircleAlert className="h-4 w-4 shrink-0" />
+  ) : (
+    <CircleHelp className="h-4 w-4 shrink-0" />
   );
 }
 
-// Mini bar chart component
-function MiniBarChart({ data, color = "bg-blue-500", height = 64 }: { data: { label: string; value: number }[]; color?: string; height?: number }) {
-  const max = Math.max(...data.map(d => d.value), 1);
+function MetricCard({
+  label,
+  value,
+  detail,
+  highlight = "indigo",
+}: {
+  label: string;
+  value: string;
+  detail: ReactNode;
+  highlight?: "indigo" | "champagne" | "emerald";
+}) {
+  const accent = {
+    indigo: "border-indigo-200 bg-white",
+    champagne: "border-[#ead9ad] bg-[#fffdf8]",
+    emerald: "border-emerald-200 bg-white",
+  }[highlight];
   return (
-    <div className="flex items-end gap-[3px]" style={{ height }}>
-      {data.map((d, i) => (
-        <div key={i} className="flex-1 min-w-[6px] group relative flex flex-col items-center">
-          <div className="absolute -top-6 bg-gray-800 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10 pointer-events-none">
-            {d.label}: {d.value}
-          </div>
-          <div className={`w-full ${color} rounded-t-sm transition-all`} style={{ height: `${Math.max((d.value / max) * 100, d.value > 0 ? 4 : 0)}%` }} />
-        </div>
-      ))}
+    <section
+      className={`rounded-2xl border p-4 shadow-[0_10px_30px_rgba(25,18,101,0.06)] ${accent}`}
+    >
+      <p className="text-xs font-bold tracking-wide text-slate-600">{label}</p>
+      <p className="mt-2 text-2xl font-black tracking-tight text-[#191265] sm:text-3xl">
+        {value}
+      </p>
+      <div className="mt-2 min-h-5 text-xs leading-5 text-slate-500">
+        {detail}
+      </div>
+    </section>
+  );
+}
+function SectionTitle({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h2 className="text-lg font-black tracking-tight text-[#191265]">
+          {title}
+        </h2>
+        <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
+          {description}
+        </p>
+      </div>
+      {children}
+    </div>
+  );
+}
+function ChannelName({
+  channel,
+  campaign,
+}: {
+  channel: string;
+  campaign: string | null;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate font-semibold text-slate-900">
+        {channel || "ללא שיוך"}
+      </p>
+      {campaign && (
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">{campaign}</p>
+      )}
     </div>
   );
 }
 
 export default function Dashboard() {
-  const [preset, setPreset] = useState(0);
-  const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
-  const [showAllLeads, setShowAllLeads] = useState(false);
-  const [showPaymentAttempts, setShowPaymentAttempts] = useState(false);
+  const [preset, setPreset] = useState<Preset>("threeFullDays");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
-  const [useCustom, setUseCustom] = useState(false);
+  const [saleFilter, setSaleFilter] = useState<SaleStatusFilter>("all");
+  const [search, setSearch] = useState("");
+  const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  const [refreshedAt, setRefreshedAt] = useState(() => Date.now());
+  const [expensesOpen, setExpensesOpen] = useState(false);
+  const [measurementOpen, setMeasurementOpen] = useState(false);
+  const [qualityOpen, setQualityOpen] = useState(false);
 
-  const endDate = useMemo(() => {
-    if (useCustom && customEnd) return endOfIsraelCalendarDate(customEnd);
-    return Date.now();
-  }, [useCustom, customEnd]);
-  const startDate = useMemo(() => {
-    if (useCustom && customStart) return fromDateStr(customStart);
-    const selected = PRESETS[preset];
-    return selected.days == null ? getCurrentIsraelMonthStart() : getIsraelCalendarDaysStart(selected.days);
-  }, [useCustom, customStart, preset]);
-
-  const dateInput = useMemo(() => ({ startDate, endDate }), [startDate, endDate]);
-  const rangeLabel = useMemo(() => formatIsraelDateRange(startDate, endDate), [startDate, endDate]);
-  const showMonthlyTargets = !useCustom && preset === 0;
-  const includesPartialToday = toDateStr(endDate) === toDateStr(Date.now());
-
-  const comp = trpc.dashboard.overviewWithComparison.useQuery(dateInput);
-  const targets = trpc.dashboard.monthlyTargets.useQuery();
-  const channels = trpc.dashboard.channelBreakdown.useQuery(dateInput);
-  const metaAds = trpc.dashboard.metaAdsPerformance.useQuery(dateInput);
-  const campaignJourney = trpc.dashboard.campaignJourney.useQuery(dateInput);
-  const dailyFunnel = trpc.dashboard.dailyLeadFunnel.useQuery(dateInput);
-  const paymentAttempts = trpc.dashboard.paymentAbandonmentAudit.useQuery(dateInput, { enabled: showPaymentAttempts });
-  const demographics = trpc.dashboard.databaseDemographics.useQuery(dateInput);
-  const emailEngagement = trpc.dashboard.emailEngagement.useQuery(dateInput);
-  const socialInsights = trpc.dashboard.socialInsights.useQuery(dateInput);
-  const siteTraffic = trpc.dashboard.siteTraffic.useQuery(dateInput);
-  const dailyTrend = trpc.dashboard.dailyTrend.useQuery(dateInput);
-  const sendReport = trpc.dashboard.sendWeeklyReport.useMutation();
-  const sendCompletionSms = trpc.dashboard.sendCompletionSms.useMutation({
-    onSuccess: (data: any) => { alert(`נשלחו ${data.sent} SMS מתוך ${data.total} (${data.failed} נכשלו)`); },
-    onError: (err: any) => { alert("שגיאה: " + err.message); },
-  });
-
-  const isLoading = comp.isLoading;
-  const t = targets.data;
-  const c = comp.data;
-  const comparisonLabel = c?.comparisonBasis === "same_dates_previous_month"
-    ? "אותם תאריכים בחודש הקודם"
-    : "התקופה הקודמת באותו אורך, ללא חפיפה";
-  const campaignJourneyRows = useMemo(() => (campaignJourney.data?.rows || []), [campaignJourney.data]);
-  const campaignJourneyTotals = useMemo(() => {
-    const metaRows = campaignJourneyRows.filter((row: any) => row.spend !== null);
-    const totalSpend = metaRows.reduce((sum: number, row: any) => sum + Number(row.spend || 0), 0);
-    const totalGrowRevenue = metaRows.reduce((sum: number, row: any) => sum + Number(row.growRevenue || 0), 0);
-    const totalGrowBuyers = metaRows.reduce((sum: number, row: any) => sum + Number(row.growBuyers || 0), 0);
-    const totalEmailAssisted = metaRows.reduce((sum: number, row: any) => sum + Number(row.buyersWithEmailBeforePurchase || 0), 0);
-    const totalFirstTouchLeads = campaignJourneyRows.reduce((sum: number, row: any) => sum + Number(row.crmLeads || 0), 0);
-    const mappedFirstTouchLeads = metaRows.reduce((sum: number, row: any) => sum + Number(row.crmLeads || 0), 0);
-    const mappingCoveragePct = totalFirstTouchLeads > 0 ? Math.round(mappedFirstTouchLeads / totalFirstTouchLeads * 1000) / 10 : null;
-    const cohortMetricsReliable = mappingCoveragePct !== null && mappingCoveragePct >= 80;
-    const totalDirectPurchases = campaignJourneyRows.reduce((sum: number, row: any) => sum + Number(row.directGrowPurchases || 0), 0);
-    const totalDirectRevenue = campaignJourneyRows.reduce((sum: number, row: any) => sum + Number(row.directGrowRevenue || 0), 0);
-    const directMetaPurchases = metaRows.reduce((sum: number, row: any) => sum + Number(row.directGrowPurchases || 0), 0);
-    const directMetaRevenue = metaRows.reduce((sum: number, row: any) => sum + Number(row.directGrowRevenue || 0), 0);
+  const range = useMemo(() => {
+    const today = formatIsraelCalendarDate(refreshedAt);
+    if (preset === "today")
+      return {
+        startDate: parseIsraelCalendarDate(today),
+        endDate: refreshedAt,
+      };
+    if (preset === "yesterday") {
+      const yesterday = addCalendarDays(today, -1);
+      return {
+        startDate: parseIsraelCalendarDate(yesterday),
+        endDate: endOfIsraelCalendarDate(yesterday),
+      };
+    }
+    if (preset === "threeFullDays") return fullDaysRange(3, today);
+    if (preset === "sevenFullDays") return fullDaysRange(7, today);
+    if (preset === "month")
+      return {
+        startDate: getCurrentIsraelMonthStart(refreshedAt),
+        endDate: refreshedAt,
+      };
+    const safeStart = customStart || addCalendarDays(today, -2);
+    const safeEnd = customEnd || today;
     return {
-      totalSpend,
-      totalGrowRevenue,
-      totalGrowBuyers,
-      totalEmailAssisted,
-      totalFirstTouchLeads,
-      mappedFirstTouchLeads,
-      mappingCoveragePct,
-      cohortMetricsReliable,
-      totalDirectPurchases,
-      totalDirectRevenue,
-      directMetaPurchases,
-      directMetaRevenue,
-      directMetaCac: directMetaPurchases > 0 ? Math.round(totalSpend / directMetaPurchases * 100) / 100 : null,
-      directMetaRoas: totalSpend > 0 ? Math.round((directMetaRevenue / totalSpend) * 100) / 100 : null,
+      startDate: parseIsraelCalendarDate(safeStart),
+      endDate: endOfIsraelCalendarDate(safeEnd),
     };
-  }, [campaignJourneyRows]);
+  }, [customEnd, customStart, preset, refreshedAt]);
+  const dateInput = useMemo(() => range, [range]);
+  const rangeLabel = useMemo(
+    () => formatIsraelDateRange(range.startDate, range.endDate),
+    [range]
+  );
+  const selectedStart = useMemo(
+    () => formatIsraelCalendarDate(range.startDate),
+    [range.startDate]
+  );
+  const selectedEnd = useMemo(
+    () => formatIsraelCalendarDate(range.endDate),
+    [range.endDate]
+  );
+  const selectedDays = useMemo(
+    () => calendarDayCount(selectedStart, selectedEnd),
+    [selectedEnd, selectedStart]
+  );
+  const rangeIsValid = selectedDays >= 1 && selectedDays <= 93;
+  const intelligence = trpc.dashboard.salesIntelligence.useQuery(dateInput, {
+    enabled: rangeIsValid,
+  });
+  const data: SalesIntelligence | undefined = intelligence.data;
+  const filteredSales = useMemo(() => {
+    const needle = search.trim().toLocaleLowerCase("he-IL");
+    return [...(data?.sales ?? [])]
+      .sort((left, right) => right.paidAt - left.paidAt)
+      .filter(sale => saleFilter === "all" || sale.status === saleFilter)
+      .filter(
+        sale =>
+          !needle ||
+          [
+            sale.productLabel,
+            sale.product,
+            sale.acquisition.channel,
+            sale.acquisition.campaign,
+            sale.closing.channel,
+            sale.closing.campaign,
+            sale.emailAssist?.campaign,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLocaleLowerCase("he-IL")
+            .includes(needle)
+      );
+  }, [data?.sales, saleFilter, search]);
+  const setCustomDate = (field: "start" | "end", value: string) => {
+    setPreset("custom");
+    if (field === "start") setCustomStart(value);
+    else setCustomEnd(value);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50" dir="rtl">
-      {/* Header */}
-      <div className="bg-gradient-to-l from-[#191265] to-[#2d1f8a] text-white px-4 py-4 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3">
-            <a href="/crm" className="p-1.5 rounded-lg hover:bg-white/10 transition"><ArrowLeft size={18} /></a>
+    <main dir="rtl" className="min-h-screen bg-[#f7f7fb] text-slate-900">
+      <header className="sticky top-0 z-30 border-b border-indigo-950/15 bg-[#191265] text-white shadow-lg shadow-indigo-950/10">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-lg font-bold">דשבורד שיווק ומכירות</h1>
-              <p className="text-[10px] text-white/60">הילית כספי — ניתוח ביצועים</p>
+              <p className="text-[11px] font-semibold tracking-[0.14em] text-[#f6df9a]">
+                HILIT CASPI
+              </p>
+              <h1 className="text-lg font-black tracking-tight">
+                מרכז המכירות
+              </h1>
             </div>
+            <a
+              href="/crm"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6df9a]"
+            >
+              <ArrowLeft className="h-4 w-4" /> חזרה ל־CRM
+            </a>
           </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {PRESETS.map((p, i) => (
-              <button key={i} onClick={() => { setPreset(i); setUseCustom(false); }}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition ${preset === i && !useCustom ? "bg-white text-[#191265]" : "bg-white/10 text-white/80 hover:bg-white/20"}`}>
-                {p.label}
+          <div className="flex flex-col gap-2 lg:items-end">
+            <div className="flex flex-wrap gap-1.5">
+              {PRESETS.map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setPreset(item.id);
+                    setCustomStart("");
+                    setCustomEnd("");
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6df9a] ${preset === item.id ? "bg-[#fffaf0] text-[#191265]" : "bg-white/10 text-white/85 hover:bg-white/20"}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <CalendarRange className="h-4 w-4 text-[#f6df9a]" />
+              <input
+                aria-label="תחילת טווח מותאם"
+                type="date"
+                value={customStart || selectedStart}
+                onChange={event => setCustomDate("start", event.target.value)}
+                className="rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-white [color-scheme:dark]"
+              />
+              <span className="text-white/60">עד</span>
+              <input
+                aria-label="סיום טווח מותאם"
+                type="date"
+                value={customEnd || selectedEnd}
+                onChange={event => setCustomDate("end", event.target.value)}
+                className="rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-white [color-scheme:dark]"
+              />
+              <button
+                type="button"
+                aria-label="רענון נתוני מכירות"
+                onClick={() => {
+                  setRefreshedAt(Date.now());
+                  void intelligence.refetch();
+                }}
+                disabled={intelligence.isFetching || !rangeIsValid}
+                className="rounded-lg p-2 text-[#f6df9a] transition hover:bg-white/10 disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${intelligence.isFetching ? "animate-spin" : ""}`}
+                />
               </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <input type="date" value={customStart || toDateStr(startDate)} onChange={(e) => { setCustomStart(e.target.value); setUseCustom(true); }}
-              className="bg-white/10 text-white text-[11px] rounded-lg px-2 py-1 border border-white/20 [color-scheme:dark]" />
-            <span className="text-white/60 text-[11px]">—</span>
-            <input type="date" value={customEnd || toDateStr(Date.now())} onChange={(e) => { setCustomEnd(e.target.value); setUseCustom(true); }}
-              className="bg-white/10 text-white text-[11px] rounded-lg px-2 py-1 border border-white/20 [color-scheme:dark]" />
-            <button onClick={() => { if (confirm("לשלוח דוח שבועי עכשיו?")) sendReport.mutate(); }}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white/10 text-white/80 hover:bg-white/20 transition flex items-center gap-1 mr-2"
-              disabled={sendReport.isPending}>
-              <Send size={10} />{sendReport.isPending ? "..." : "דוח"}
-            </button>
-            <button onClick={() => { if (confirm("לשלוח SMS השלמת פרטים לכל מי שחסר?")) sendCompletionSms.mutate(); }}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-500/80 text-white hover:bg-amber-500 transition flex items-center gap-1"
-              disabled={sendCompletionSms.isPending}>
-              📱 {sendCompletionSms.isPending ? "שולח..." : "SMS השלמה"}
-            </button>
+            </div>
           </div>
         </div>
+      </header>
+      <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 lg:py-7">
+        {!rangeIsValid && (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+            ניתן לבחור טווח של יום אחד ועד 93 ימים. הטווח הנוכחי כולל{" "}
+            {count(Math.max(selectedDays, 0))} ימים, ולכן הנתונים לא נטענו.
+          </section>
+        )}
+        <section className="rounded-2xl border border-[#e5d7ae] bg-[#fffaf0] px-4 py-3 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-[#191265]">{rangeLabel}</p>
+              <p className="mt-0.5 text-xs text-slate-600">
+                {data
+                  ? `עודכן ${dateTime(data.generatedAt)}`
+                  : "הנתונים מוצגים לפי שעון ישראל"}
+              </p>
+            </div>
+            {data?.partialToday && (
+              <p className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-950">
+                היום עדיין חלקי
+              </p>
+            )}
+          </div>
+        </section>
+        {intelligence.isLoading && <DashboardSkeleton />}
+        {intelligence.error && (
+          <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm leading-6 text-red-900">
+            לא ניתן לטעון כרגע את נתוני המכירות. לא מוצגים אפסים במקום נתונים
+            חסרים. אפשר לנסות לרענן את הדף או לבחור טווח אחר.
+          </section>
+        )}
+        {data && (
+          <SalesCommandCenter
+            data={data}
+            filteredSales={filteredSales}
+            saleFilter={saleFilter}
+            setSaleFilter={setSaleFilter}
+            search={search}
+            setSearch={setSearch}
+            expandedOrder={expandedOrder}
+            setExpandedOrder={setExpandedOrder}
+          />
+        )}
+        <CollapsibleSection
+          title="ניהול הוצאות"
+          description="הוספת הוצאות מתבצעת כאן בלבד, לפי ההרשאות הקיימות. נתוני ההוצאות במרכז המכירות הם קריאה בלבד."
+          open={expensesOpen}
+          onToggle={() => setExpensesOpen(value => !value)}
+        >
+          <ProfitAndLossSection
+            startDate={range.startDate}
+            endDate={range.endDate}
+            expensesOnly
+          />
+        </CollapsibleSection>
+        <CollapsibleSection
+          title="מצב מדידה"
+          description="בדיקה טכנית של מסירת אירועי רכישה. היא אינה קובעת אם הייתה מכירה ואינה ייחוס לקמפיין."
+          open={measurementOpen}
+          onToggle={() => setMeasurementOpen(value => !value)}
+        >
+          <MetaPurchaseDeliveryStatus
+            startDate={range.startDate}
+            endDate={range.endDate}
+          />
+        </CollapsibleSection>
+        {data && (
+          <CollapsibleSection
+            title="הערות איכות נתונים"
+            description="פירוט מקור הנתונים והסתייגויות לתקופה הנבחרת."
+            open={qualityOpen}
+            onToggle={() => setQualityOpen(value => !value)}
+          >
+            <DataQuality data={data} />
+          </CollapsibleSection>
+        )}
       </div>
+    </main>
+  );
+}
 
-      <div className="max-w-7xl mx-auto px-4 py-5 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[11px] text-blue-900">
-          <span><strong>טווח:</strong> {rangeLabel}, שעון ישראל</span>
-          <span>השוואה: {comparisonLabel}</span>
-          <span>Meta: דיווח לפי תאריכים בלבד בשעון חשבון הפרסום (America/Los_Angeles), לא לפי חלון שעות זהה לישראל.</span>
-          {includesPartialToday && <span className="font-semibold text-amber-800">היום הנוכחי עדיין חלקי; להשוואת קצב נקייה עדיף לבחור ימים מלאים שהסתיימו.</span>}
-          {c && !c.salesComparisonAvailable && <span className="font-semibold text-amber-800">השוואת לידים זמינה; השוואת Grow אינה מלאה לפני 22.8 ולכן אחוזי מכירות והכנסה אינם מוצגים.</span>}
-        </div>
-
-        <Card id="campaign-journey" className="border-0 shadow-md ring-2 ring-indigo-100/80">
-          <CardHeader className="pb-2">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="mb-1 inline-flex rounded-full bg-indigo-100 px-3 py-1 text-[10px] font-bold text-indigo-800">המעקב החדש שסיכמנו</div>
-                <h3 className="text-base font-black text-indigo-950">מסע הקמפיין: Meta ← עמוד יעד ← ליד CRM ← מייל מסייע ← רכישת Grow</h3>
-                <p className="mt-1 max-w-5xl text-[11px] leading-5 text-gray-600">זה המקטע שמחבר כל קמפיין למסע המלא. “מקור ראשון (קוהורט)” בודק אם ליד שנכנס מהקמפיין הפך בהמשך לרוכש. “רכישה ישירה” משייכת את העסקה לקישור האחרון שנרשם לפני התשלום, ואינה הוכחה שסיבת הרכישה הייתה המודעה האחרונה. “מייל מסייע” אומר שנשלח מייל לפני הרכישה; הספירה אינה טוענת שהמייל לבדו יצר את המכירה.</p>
-              </div>
-              <Badge className="bg-white text-indigo-700 text-[10px]">Grow מאומת · Meta מופרד</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {campaignJourney.isLoading && <Skeleton className="h-40 w-full rounded-xl" />}
-            {campaignJourney.error && <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">מפת המסע אינה זמינה כרגע; שאר מדדי הדשבורד עדיין מוצגים.</div>}
-            {campaignJourney.data && (
-              <>
-                <div className={`mb-3 rounded-lg border p-3 text-[11px] leading-5 ${campaignJourneyTotals.cohortMetricsReliable ? "border-emerald-100 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
-                  <strong>איכות מיפוי מקור ראשון: {campaignJourneyTotals.mappingCoveragePct ?? 0}%.</strong>{" "}
-                  {campaignJourneyTotals.cohortMetricsReliable
-                    ? "רוב לידי המקור הראשון בטווח נושאים UTM שמתחבר לקמפיין, ולכן מדדי הקוהורט שימושיים לצד רכישות Grow הישירות."
-                    : "רק חלק מלידי המקור הראשון בטווח נושאים UTM שמתחבר לקמפיין. בתקופה הזאת אין להסתמך על המרת ליד או CAC קוהורטי; רכישות והכנסות Grow הישירות עדיין מאומתות."}
-                </div>
-                <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
-                  <div className="rounded-lg bg-indigo-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-indigo-700">{campaignJourneyTotals.totalGrowBuyers}</div><div className="text-[9px] text-gray-500">לידים שהפכו לרוכשים בקוהורט</div></div>
-                  <div className="rounded-lg bg-emerald-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-emerald-700">{fmt(campaignJourneyTotals.totalGrowRevenue)}</div><div className="text-[9px] text-gray-500">הכנסה מאומתת מהקוהורט</div></div>
-                  <div className="rounded-lg bg-amber-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-amber-700">{campaignJourneyTotals.totalEmailAssisted}</div><div className="text-[9px] text-gray-500">רוכשים שקיבלו מייל לפני הקנייה</div></div>
-                  <div className="rounded-lg bg-teal-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-teal-700">{campaignJourneyTotals.totalDirectPurchases}</div><div className="text-[9px] text-gray-500">כל רכישות Grow בטווח · {fmt(campaignJourneyTotals.totalDirectRevenue)}</div></div>
-                  <div className="rounded-lg bg-blue-50 p-2.5 text-center shadow-sm"><div className="text-lg font-bold text-blue-700">{campaignJourneyTotals.directMetaRoas !== null ? `${campaignJourneyTotals.directMetaRoas}x` : '—'}</div><div className="text-[9px] text-gray-500">ROAS ישיר שמופה ל־Meta</div><div className="text-[9px] text-gray-400">CAC ישיר {campaignJourneyTotals.directMetaCac !== null ? fmt(campaignJourneyTotals.directMetaCac) : '—'}</div></div>
-                </div>
-
-                <div className="space-y-2 md:hidden">
-                  {campaignJourneyRows.slice(0, 24).map((row: any, index: number) => (
-                    <div key={`mobile-${row.campaignId || row.campaignName}-${index}`} className="rounded-xl border border-indigo-100 bg-white p-3 shadow-sm">
-                      <div className="font-semibold leading-5 text-gray-900">{row.campaignName}</div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {row.status === 'active' && <Badge className="bg-green-100 text-green-700 text-[9px]">פעיל</Badge>}
-                        {row.attributionBasis === 'utm_creative' && <Badge className="bg-indigo-100 text-indigo-700 text-[9px]">UTM מהמודעה</Badge>}
-                        {row.attributionBasis === 'utm_name_fallback' && <Badge className="bg-amber-100 text-amber-800 text-[9px]">מיפוי לפי שם · לבדיקה</Badge>}
-                        {row.attributionBasis === 'website_only' && <Badge className="bg-gray-100 text-gray-600 text-[9px]">UTM באתר בלבד</Badge>}
-                        {row.attributionBasis === 'meta_only' && <Badge className="bg-amber-100 text-amber-800 text-[9px]">Meta בלבד</Badge>}
-                        {row.landingLabels.map((label: string) => <Badge key={label} className="bg-blue-100 text-blue-700 text-[9px]">{label}</Badge>)}
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                        <div className="rounded-lg bg-red-50 p-2"><div className="text-[9px] text-gray-500">הוצאה Meta</div><div className="font-bold text-red-600">{row.spend !== null ? fmt(row.spend) : '—'}</div></div>
-                        <div className="rounded-lg bg-gray-50 p-2"><div className="text-[9px] text-gray-500">לידים CRM / Meta</div><div className="font-bold">{row.crmLeads || '—'} <span className="font-normal text-gray-400">/ {row.metaLeads || '—'}</span></div></div>
-                        <div className="rounded-lg bg-green-50 p-2"><div className="text-[9px] text-gray-500">לידים שהפכו לרוכשים</div><div className="font-bold text-green-700">{row.growBuyers || '—'}</div></div>
-                        <div className="rounded-lg bg-amber-50 p-2"><div className="text-[9px] text-gray-500">מייל לפני רכישה</div><div className="font-bold text-amber-700">{row.buyersWithEmailBeforePurchase || '—'}</div>{row.buyersWithEmailClickBeforePurchase > 0 && <div className="text-[9px] text-gray-400">{row.buyersWithEmailClickBeforePurchase} גם הקליקו</div>}</div>
-                        <div className="rounded-lg bg-emerald-50 p-2"><div className="text-[9px] text-gray-500">רכישה ישירה · Grow</div><div className="font-bold text-emerald-700">{row.directGrowPurchases || '—'}</div>{row.directGrowRevenue > 0 && <div className="text-[9px] text-gray-500">{fmt(row.directGrowRevenue)}</div>}{row.directGrowCac !== null && <div className="text-[9px] text-gray-400">CAC ישיר {fmt(row.directGrowCac)}</div>}</div>
-                        <div className="rounded-lg bg-indigo-50 p-2"><div className="text-[9px] text-gray-500">המרת ליד / CAC קוהורט</div><div className="font-bold text-indigo-700">{campaignJourneyTotals.cohortMetricsReliable && row.leadToBuyerRate !== null ? `${row.leadToBuyerRate}%` : '—'}</div><div className="text-[9px] text-gray-400">{campaignJourneyTotals.cohortMetricsReliable ? `CAC ${row.growCac !== null ? fmt(row.growCac) : '—'}` : 'לא מוצג · כיסוי UTM חלקי'}</div></div>
-                        <div className="col-span-2 rounded-lg bg-blue-50 p-2"><div className="text-[9px] text-gray-500">ROAS ישיר</div><div className="font-bold text-blue-700">{row.directGrowRoas !== null ? `${row.directGrowRoas}x` : '—'}</div></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[1080px] text-xs">
-                    <thead><tr className="border-b border-indigo-100 text-[10px] text-gray-500">
-                      <th className="pb-2 text-right">קמפיין</th>
-                      <th className="pb-2 text-right">עמוד יעד</th>
-                      <th className="pb-2 text-center">הוצאה Meta</th>
-                      <th className="pb-2 text-center">לידים CRM / Meta</th>
-                      <th className="pb-2 text-center">לידים שהפכו לרוכשים</th>
-                      <th className="pb-2 text-center">מייל לפני רכישה</th>
-                      <th className="pb-2 text-center">רכישה / CAC ישיר · Grow</th>
-                      <th className="pb-2 text-center">המרת ליד / CAC קוהורט</th>
-                      <th className="pb-2 text-center">ROAS ישיר</th>
-                    </tr></thead>
-                    <tbody>{campaignJourneyRows.slice(0, 24).map((row: any, index: number) => (
-                      <tr key={`${row.campaignId || row.campaignName}-${index}`} className="border-b border-indigo-50 align-top hover:bg-indigo-50/40">
-                        <td className="max-w-[230px] py-2 pl-2 text-right">
-                          <div className="font-semibold text-gray-900" title={row.campaignName}>{row.campaignName}</div>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {row.status === 'active' && <Badge className="bg-green-100 text-green-700 text-[9px]">פעיל</Badge>}
-                            {row.attributionBasis === 'utm_creative' && <Badge className="bg-indigo-100 text-indigo-700 text-[9px]">UTM מהמודעה</Badge>}
-                            {row.attributionBasis === 'utm_name_fallback' && <Badge className="bg-amber-100 text-amber-800 text-[9px]">מיפוי לפי שם · לבדיקה</Badge>}
-                            {row.attributionBasis === 'website_only' && <Badge className="bg-gray-100 text-gray-600 text-[9px]">UTM באתר בלבד</Badge>}
-                            {row.attributionBasis === 'meta_only' && <Badge className="bg-amber-100 text-amber-800 text-[9px]">Meta בלבד</Badge>}
-                          </div>
-                        </td>
-                        <td className="max-w-[150px] py-2 text-right">
-                          <div className="flex flex-wrap gap-1">{row.landingLabels.map((label: string) => <Badge key={label} className="bg-blue-100 text-blue-700 text-[9px]">{label}</Badge>)}</div>
-                          {row.activeAds > 0 && <div className="mt-1 text-[9px] text-gray-400">{row.activeAds} מודעות פעילות</div>}
-                        </td>
-                        <td className="py-2 text-center font-medium text-red-600">{row.spend !== null ? fmt(row.spend) : '—'}</td>
-                        <td className="py-2 text-center"><strong>{row.crmLeads || '—'}</strong><span className="text-gray-400"> / {row.metaLeads || '—'}</span></td>
-                        <td className="py-2 text-center">{row.growBuyers > 0 ? <Badge className="bg-green-100 text-green-700 text-[10px]">{row.growBuyers}</Badge> : '—'}</td>
-                        <td className="py-2 text-center"><strong>{row.buyersWithEmailBeforePurchase || '—'}</strong>{row.buyersWithEmailClickBeforePurchase > 0 && <div className="text-[9px] text-gray-400">{row.buyersWithEmailClickBeforePurchase} גם הקליקו</div>}</td>
-                        <td className="py-2 text-center"><strong className="text-emerald-700">{row.directGrowPurchases || '—'}</strong>{row.directGrowRevenue > 0 && <div className="text-[9px] text-gray-500">{fmt(row.directGrowRevenue)}</div>}{row.directGrowCac !== null && <div className="text-[9px] text-gray-400">CAC ישיר {fmt(row.directGrowCac)}</div>}</td>
-                        <td className="py-2 text-center"><div>{campaignJourneyTotals.cohortMetricsReliable && row.leadToBuyerRate !== null ? `${row.leadToBuyerRate}%` : '—'}</div><div className="text-[9px] text-gray-400">{campaignJourneyTotals.cohortMetricsReliable ? `CAC ${row.growCac !== null ? fmt(row.growCac) : '—'}` : 'לא מוצג · כיסוי UTM חלקי'}</div></td>
-                        <td className="py-2 text-center font-bold text-indigo-700">{row.directGrowRoas !== null ? `${row.directGrowRoas}x` : '—'}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                </div>
-                <p className="mt-2 text-[9px] leading-4 text-gray-500">הקוהורט מתחיל מלידים שנוצרו בטווח שנבחר. רכישה נספרת רק אם Grow אישר אותה, ורק עד סוף הטווח. עמודי היעד ותגי ה־UTM של קמפיין פעיל נלקחים מהמודעות הפעילות בלבד; היסטוריית מודעות כבויות אינה מעורבבת במסע הנוכחי. אם קמפיין מופיע כ־“Meta בלבד”, חסר לו תג UTM שמאפשר לחבר אותו לאתר — וזה פער מדידה שדורש תיקון, לא אפס מכירות.</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ═══════════════════════════════════════════════════════════════════════
-            SECTION 1: TOP KPIs — THE BIG PICTURE
-        ═══════════════════════════════════════════════════════════════════════ */}
-        {isLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
-        ) : c && (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {/* Revenue */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-green-500">
-                <div className="flex items-center gap-2 mb-1">
-                  <DollarSign size={14} className="text-green-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">הכנסות ברוטו · Grow מאומת</span>
-                </div>
-                <div className="text-2xl font-black text-gray-900">{fmt(c.current.revenue)}</div>
-                <Change value={c.change.revenue} />
-                {showMonthlyTargets && t && <div className="mt-1 w-full bg-gray-100 rounded-full h-1.5"><div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${Math.min((c.current.revenue / t.revenue) * 100, 100)}%` }} /></div>}
-                {showMonthlyTargets && t && <div className="text-[9px] text-gray-400 mt-0.5">יעד חודשי: {fmt(t.revenue)}</div>}
-              </div>
-              {/* Purchases */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-purple-500">
-                <div className="flex items-center gap-2 mb-1">
-                  <ShoppingCart size={14} className="text-purple-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">רכישות · Grow מאומת</span>
-                </div>
-                <div className="text-2xl font-black text-gray-900">{c.current.purchases}</div>
-                <Change value={c.change.purchases} />
-                {showMonthlyTargets && t && <div className="mt-1 w-full bg-gray-100 rounded-full h-1.5"><div className="h-full rounded-full bg-purple-500 transition-all" style={{ width: `${Math.min((c.current.trackedTargetPurchases / t.purchases) * 100, 100)}%` }} /></div>}
-                {showMonthlyTargets && t && <div className="text-[9px] text-gray-400 mt-0.5">מוצרי היעד: {c.current.trackedTargetPurchases}/{t.purchases}</div>}
-              </div>
-              {/* Leads */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-blue-500">
-                <div className="flex items-center gap-2 mb-1">
-                  <Users size={14} className="text-blue-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">לידים חדשים · CRM</span>
-                </div>
-                <div className="text-2xl font-black text-gray-900">{c.current.leads}</div>
-                <Change value={c.change.leads} />
-                {showMonthlyTargets && t && <div className="mt-1 w-full bg-gray-100 rounded-full h-1.5"><div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min((c.current.leads / t.leads) * 100, 100)}%` }} /></div>}
-              </div>
-              {/* Spend */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-red-500">
-                <div className="flex items-center gap-2 mb-1">
-                  <Megaphone size={14} className="text-red-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">הוצאות Meta · כל החשבונות</span>
-                </div>
-                <div className="text-2xl font-black text-gray-900">
-                  {metaAds.data && metaAds.data.status !== "unavailable" ? fmt(metaAds.data.accountTotals.totalSpend) : '—'}
-                </div>
-                {metaAds.data && metaAds.data.status !== "unavailable" && (
-                  <div className="text-[10px] text-gray-500 mt-0.5">
-                    מכירה ולידים: {fmt(metaAds.data.accountTotals.mainSpend)} · קידומי פרופיל/פוסטים: {fmt(metaAds.data.accountTotals.boostsSpend)}
-                  </div>
-                )}
-                {showMonthlyTargets && t && t.budget !== null && metaAds.data && metaAds.data.status !== "unavailable" && (
-                  <div className="text-[9px] text-gray-400 mt-0.5">בפועל {fmt(metaAds.data.accountTotals.totalSpend)} מתוך תוכנית {fmt(t.budget)} · {t.sourceLabel}</div>
-                )}
-                {metaAds.data && metaAds.data.status !== "unavailable" && c.current.revenue > 0 && (
-                  <div className="text-[10px] text-gray-500">יחס הכנסות Grow לכל הוצאות Meta: <span className="font-bold text-green-600">{(c.current.revenue / Math.max(metaAds.data.accountTotals.totalSpend, 1)).toFixed(1)}x</span> <span className="text-gray-400">(לא ייחוס)</span></div>
-                )}
-              </div>
-              {/* Database members */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-r-amber-500">
-                <div className="flex items-center gap-2 mb-1">
-                  <Heart size={14} className="text-amber-600" />
-                  <span className="text-[11px] text-gray-500 font-medium">חברי מאגר פעילים כיום</span>
-                </div>
-                <div className="text-2xl font-black text-gray-900">{demographics.data?.total.count || '—'}</div>
-                <div className="text-[10px] text-gray-500">
-                  {demographics.data ? `${demographics.data.total.males}♂ / ${demographics.data.total.females}♀` : ''}
-                </div>
-              </div>
-            </div>
-
-            {/* Daily trend chart */}
-            {!dailyTrend.data && dailyTrend.isLoading && (
-              <Card className="border-0 shadow-sm p-4">
-                <h3 className="text-sm font-bold text-gray-700 mb-3">📈 מגמה יומית — לידים ורכישות</h3>
-                <Skeleton className="h-32 w-full rounded-lg" />
-              </Card>
-            )}
-            {dailyTrend.data && dailyTrend.data.leads.length > 0 && (
-              <div className="bg-white rounded-xl p-4 shadow-sm">
-                <h3 className="text-sm font-bold text-gray-700 mb-3">📈 מגמה יומית — לידים ורכישות</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-[10px] text-gray-500 mb-1 font-medium">לידים</div>
-                    <MiniBarChart
-                      data={dailyTrend.data.leads.map((d: any) => ({ label: new Date(d.day).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' }), value: d.count }))}
-                      color="bg-blue-400"
-                      height={56}
-                    />
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-gray-500 mb-1 font-medium">רכישות</div>
-                    <MiniBarChart
-                      data={dailyTrend.data.purchases.map((d: any) => ({ label: new Date(d.day).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' }), value: d.count }))}
-                      color="bg-green-400"
-                      height={56}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-3">
+        {[0, 1, 2].map(item => (
+          <Skeleton key={item} className="h-32 rounded-2xl" />
+        ))}
+      </div>
+      <Skeleton className="h-72 rounded-2xl" />
+      <Skeleton className="h-96 rounded-2xl" />
+    </div>
+  );
+}
+function CollapsibleSection({
+  title,
+  description,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  description: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(25,18,101,0.04)]">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-right transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-600"
+      >
+        <span>
+          <span className="block font-black text-[#191265]">{title}</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-600">
+            {description}
+          </span>
+        </span>
+        {open ? (
+          <ChevronUp className="h-5 w-5 shrink-0 text-[#191265]" />
+        ) : (
+          <ChevronDown className="h-5 w-5 shrink-0 text-[#191265]" />
         )}
+      </button>
+      {open && (
+        <div className="border-t border-slate-100 p-4 sm:p-5">{children}</div>
+      )}
+    </section>
+  );
+}
 
-        <ProfitAndLossSection startDate={startDate} endDate={endDate} />
-        <MetaPurchaseDeliveryStatus startDate={startDate} endDate={endDate} />
-
-        {/* ═══════════════════════════════════════════════════════════════════════
-            SECTION 2: CHANNEL BREAKDOWN — VISUAL
-        ═══════════════════════════════════════════════════════════════════════ */}
-        {!channels.data && channels.isLoading && (
-          <Card className="border-0 shadow-sm p-6">
-            <h3 className="font-bold text-gray-900 mb-4">📊 ערוצי שיווק</h3>
-            <Skeleton className="h-48 w-full rounded-lg" />
-          </Card>
-        )}
-        {channels.data && channels.data.length > 0 && (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <BarChart3 size={18} className="text-emerald-600" />
-                <h3 className="font-bold text-gray-900">שיוך לפי ערוץ ו־UTM</h3>
-                <Badge className="bg-gray-100 text-gray-600 text-[10px]">מול {comparisonLabel}</Badge>
-              </div>
-              <p className="mt-1 text-[10px] text-gray-500">הרכישות הן חיובי Grow מאומתים ששויכו לליד האחרון של אותו מייל שנוצר לפני התשלום. זהו שיוך תפעולי, לא הוכחה סיבתית.</p>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-gray-500 text-[11px]">
-                      <th className="text-right py-2 font-medium">ערוץ</th>
-                      <th className="text-center py-2 font-medium">לידים</th>
-                      <th className="text-center py-2 font-medium">רכישות ששויכו</th>
-                      <th className="text-center py-2 font-medium">הכנסות ששויכו</th>
-                      <th className="text-center py-2 font-medium">תקציב מכירה Meta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {channels.data.map((ch: any) => {
-                      const leadChange = ch.prevLeads > 0 ? Math.round((ch.leads - ch.prevLeads) / ch.prevLeads * 100) : 0;
-                      const purchaseChange = ch.salesComparisonAvailable && ch.prevPurchases > 0 ? Math.round((ch.purchases - ch.prevPurchases) / ch.prevPurchases * 100) : null;
-                      const isExpanded = expandedChannel === ch.channel;
-                      return (
-                        <Fragment key={ch.channel}>
-                          <tr className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedChannel(isExpanded ? null : ch.channel)}>
-                            <td className="py-2.5 font-semibold text-gray-900">
-                              <span className="text-[10px] ml-1">{isExpanded ? '▼' : '▶'}</span>{ch.channel}
-                            </td>
-                            <td className="text-center py-2.5">
-                              <span className="font-bold">{ch.leads}</span>
-                              {leadChange !== 0 && <span className={`block text-[10px] ${leadChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{leadChange > 0 ? '↑' : '↓'}{Math.abs(leadChange)}%</span>}
-                            </td>
-                            <td className="text-center py-2.5">
-                              <span className="font-bold">{ch.purchases}</span>
-                              {purchaseChange !== null && purchaseChange !== 0 && <span className={`block text-[10px] ${purchaseChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{purchaseChange > 0 ? '↑' : '↓'}{Math.abs(purchaseChange)}%</span>}
-                            </td>
-                            <td className="text-center py-2.5 font-bold text-emerald-700">₪{ch.revenue.toLocaleString()}</td>
-                            <td className="text-center py-2.5">
-                              {ch.spend !== null && ch.spend > 0 ? <span className="font-bold text-red-600">₪{ch.spend.toLocaleString()}</span> : <span className="text-gray-300">—</span>}
-                            </td>
-                          </tr>
-                          {isExpanded && (
-                            <tr><td colSpan={5} className="bg-blue-50/50 p-3 border-b">
-                              <div className="text-xs text-gray-700">
-                                {ch.campaigns && ch.campaigns.length > 0 && (
-                                  <div className="space-y-1">
-                                    {ch.campaigns.slice(0, 5).map((camp: any) => (
-                                      <div key={camp.name} className="flex justify-between items-center bg-white rounded-lg px-3 py-1.5 shadow-sm">
-                                        <span className="font-medium truncate max-w-[200px]">{camp.name}</span>
-                                        <span className="text-gray-500">{camp.leads} לידים · {camp.purchases} רכישות משויכות · ₪{camp.revenue.toLocaleString()}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </td></tr>
-                          )}
-                        </Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════════
-            SECTION 3: DAILY CRM, GROW AND META ACTIVITY
-        ═══════════════════════════════════════════════════════════════════════ */}
-        {!dailyFunnel.data && dailyFunnel.isLoading && (
-          <Card className="border-0 shadow-sm p-6">
-            <h3 className="font-bold text-gray-900 mb-4">פעילות יומית: לידים ומכירות</h3>
-            <div className="text-sm text-gray-500 mb-3">טוען נתונים...</div>
-            <Skeleton className="h-64 w-full rounded-lg" />
-          </Card>
-        )}
-        {dailyFunnel.data && dailyFunnel.data.days.length > 0 && (() => {
-          const days = dailyFunnel.data.days;
-          const totals = dailyFunnel.data.totals;
-          const maxLeads = Math.max(...days.map(d => d.campaignLeads), 1);
-          const maxPurchases = Math.max(...days.map(d => d.databasePurchases), 1);
-          return (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Target size={18} className="text-blue-600" />
-                    <div>
-                      <h3 className="font-bold text-gray-900">פעילות יומית: CRM, Grow ו־Meta</h3>
-                      <p className="mt-0.5 text-[10px] text-gray-500">אלה מדדים מקבילים לפי יום, לא משפך ולא ייחוס סיבתי. המכירות מבוססות על חיובי Grow שהושלמו; תקציבי Meta מפוצלים לפי החשבון שממנו יצאו.</p>
-                    </div>
-                </div>
-                {totals && (
-                  <div className="text-[11px] text-gray-500">
-                    ממוצע: <span className="font-bold text-blue-600">{totals.avgDailyLeads}</span> לידי DNA ביום ·
-                    <span className="font-bold text-green-600"> {totals.avgDailyPurchases}</span> רכישות מאגר ביום
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Summary cards */}
-              {totals && (
-               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-                 <div className="bg-blue-50 rounded-lg p-3 text-center">
-                   <div className="text-xl font-bold text-blue-600">{totals.totalCampaign}</div>
-                   <div className="text-[10px] text-gray-500">לידי DNA ב־CRM</div>
-                    {(totals as any).leadsChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).leadsChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).leadsChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).leadsChange)}% מול {comparisonLabel}</div>}
-                 </div>
-                 <div className="bg-green-50 rounded-lg p-3 text-center">
-                   <div className="text-xl font-bold text-green-600">{totals.totalPurchases}</div>
-                   <div className="text-[10px] text-gray-500">רכישות מאגר</div>
-                    {typeof (totals as any).purchChange === 'number' && (totals as any).purchChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).purchChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).purchChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).purchChange)}% מול {comparisonLabel}</div>}
-                 </div>
-                 <div className="bg-amber-50 rounded-lg p-3 text-center">
-                   <div className="text-xl font-bold text-amber-600">{totals.totalLeads}</div>
-                   <div className="text-[10px] text-gray-500">כל הלידים ב־CRM</div>
-                 </div>
-                 <div className="bg-purple-50 rounded-lg p-3 text-center">
-                   <div className="text-xl font-bold text-purple-600">{totals.metaSpendStatus === 'available' ? '₪' + Math.round(totals.totalSalesSpend).toLocaleString() : '—'}</div>
-                   <div className="text-[10px] text-gray-500">קמפייני מכירה ולידים</div>
-                 </div>
-                 <div className="bg-pink-50 rounded-lg p-3 text-center">
-                   <div className="text-xl font-bold text-pink-600">{totals.metaSpendStatus === 'available' ? '₪' + Math.round(totals.totalProfileBoostSpend).toLocaleString() : '—'}</div>
-                   <div className="text-[10px] text-gray-500">קידומי פרופיל/פוסטים</div>
-                 </div>
-                 <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                   <div className="text-xl font-bold text-emerald-600">₪{totals.totalRevenue.toLocaleString()}</div>
-                   <div className="text-[10px] text-gray-500">מכירות ברוטו מאומתות</div>
-                    {typeof (totals as any).revenueChange === 'number' && (totals as any).revenueChange !== 0 && <div className={`text-[10px] font-bold ${(totals as any).revenueChange > 0 ? 'text-green-600' : 'text-red-500'}`}>{(totals as any).revenueChange > 0 ? '↑' : '↓'}{Math.abs((totals as any).revenueChange)}% מול {comparisonLabel}</div>}
-                 </div>
-               </div>
-              )}
-
-              {/* Daily table with inline bar chart */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b-2 border-gray-200 text-gray-600 text-[11px]">
-                   <th className="py-2 text-right font-semibold">תאריך</th>
-                   <th className="py-2 text-center font-semibold">לידי DNA / כל CRM</th>
-                   <th className="py-2 text-center font-semibold w-28">גרף</th>
-                   <th className="py-2 text-center font-semibold">רכישות</th>
-                    <th className="py-2 text-center font-semibold">הכנסות מאגר</th>
-                    <th className="py-2 text-center font-semibold">תקציב מכירה</th>
-                    <th className="py-2 text-center font-semibold">קידומי פרופיל</th>
-                    <th className="py-2 text-center font-semibold">Grow כל המוצרים</th>
-                  </tr></thead>
-                  <tbody>
-                    {days.map((day, i) => {
-                      const leadsWidth = (day.campaignLeads / maxLeads) * 100;
-                      const purchWidth = (day.databasePurchases / maxPurchases) * 100;
-                      const dayName = new Date(day.date).toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'numeric' });
-                      return (
-                      <tr key={i} className="border-b border-gray-100 hover:bg-blue-50/30 transition-colors">
-                        <td className="py-2 text-right text-gray-700 font-medium">{dayName}</td>
-                        <td className="py-2 text-center"><span className="text-blue-600 font-bold">{day.campaignLeads}</span> <span className="text-gray-400 text-[10px]">({day.totalLeads})</span></td>
-                        <td className="py-2 px-1">
-                          <div className="flex flex-col gap-[2px]">
-                            <div className="h-[6px] bg-blue-200 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${leadsWidth}%` }} /></div>
-                            <div className="h-[6px] bg-green-200 rounded-full overflow-hidden"><div className="h-full bg-green-500 rounded-full" style={{ width: `${purchWidth}%` }} /></div>
-                          </div>
-                        </td>
-                        <td className="py-2 text-center"><span className="text-green-600 font-bold">{day.databasePurchases}</span></td>
-                        <td className="py-2 text-center text-amber-700 font-medium">₪{day.databaseRevenue.toLocaleString()}</td>
-                        <td className="py-2 text-center text-purple-600 font-medium">{day.salesSpend > 0 ? fmt(day.salesSpend) : '—'}</td>
-                        <td className="py-2 text-center text-pink-600 font-medium">{day.profileBoostSpend > 0 ? fmt(day.profileBoostSpend) : '—'}</td>
-                        <td className="py-2 text-center text-emerald-600 font-semibold">₪{day.revenue.toLocaleString()}</td>
-                      </tr>
-                      );
-                    })}
-                  </tbody>
-                  {totals && (
-                  <tfoot>
-                    <tr className="border-t-2 border-gray-300 bg-gray-50 font-bold text-[11px]">
-                      <td className="py-2 text-right">סה״כ</td>
-                      <td className="py-2 text-center text-blue-700">{totals.totalCampaign}</td>
-                      <td></td>
-                      <td className="py-2 text-center text-green-700">{totals.totalPurchases}</td>
-                      <td className="py-2 text-center text-amber-700">₪{totals.totalDatabaseRevenue.toLocaleString()}</td>
-                      <td className="py-2 text-center text-purple-700">{totals.metaSpendStatus === 'available' ? fmt(totals.totalSalesSpend) : '—'}</td>
-                      <td className="py-2 text-center text-pink-700">{totals.metaSpendStatus === 'available' ? fmt(totals.totalProfileBoostSpend) : '—'}</td>
-                      <td className="py-2 text-center text-emerald-700">₪{totals.totalRevenue.toLocaleString()}</td>
-                    </tr>
-                  </tfoot>
-                  )}
-                </table>
-              </div>
-
-              {/* Insights */}
-              {dailyFunnel.data.insights.length > 0 && (
-                <div className="mt-3 bg-blue-50 rounded-lg p-3">
-                  <div className="text-[11px] text-blue-800 space-y-1">
-                    {dailyFunnel.data.insights.map((insight, i) => <p key={i}>💡 {insight}</p>)}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          );
-        })()}
-
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-2">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <ShoppingCart size={18} className="text-orange-600" />
-                <div>
-                  <h3 className="font-bold text-gray-900">ניסיונות תשלום שלא הושלמו</h3>
-                  <p className="mt-0.5 text-[10px] text-gray-500">רשימה לקריאה בלבד. פתיחת תשלום אינה הוכחה לכשל: רוב האנשים משלימים בתוך דקות, וניסיונות חוזרים נשמרים כרשומה אחת.</p>
-                </div>
-              </div>
-              <Button variant="outline" size="sm" className="bg-white" onClick={() => setShowPaymentAttempts(value => !value)}>
-                {showPaymentAttempts ? "הסתר רשימה" : "הצג פירוט לכל אדם"}
-              </Button>
-            </div>
-          </CardHeader>
-          {showPaymentAttempts && (
-            <CardContent>
-              {paymentAttempts.isLoading && <Skeleton className="h-40 w-full rounded-lg" />}
-              {paymentAttempts.error && <div className="rounded-lg bg-red-50 p-3 text-xs text-red-700">לא ניתן לטעון כרגע את בדיקת ניסיונות התשלום.</div>}
-              {paymentAttempts.data && (
+function SalesCommandCenter({
+  data,
+  filteredSales,
+  saleFilter,
+  setSaleFilter,
+  search,
+  setSearch,
+  expandedOrder,
+  setExpandedOrder,
+}: {
+  data: SalesIntelligence;
+  filteredSales: Sale[];
+  saleFilter: SaleStatusFilter;
+  setSaleFilter: (value: SaleStatusFilter) => void;
+  search: string;
+  setSearch: (value: string) => void;
+  expandedOrder: number | null;
+  setExpandedOrder: (value: number | null) => void;
+}) {
+  const summary = data.summary;
+  const rawOnlyAmount = Math.max(
+    0,
+    summary.recordedRevenueAgorot -
+      summary.includedRevenueAgorot -
+      summary.reviewRevenueAgorot
+  );
+  return (
+    <>
+      <section className="grid gap-3 md:grid-cols-3">
+        <MetricCard
+          label="הכנסה ללא רשומות חשודות"
+          value={money(summary.includedRevenueAgorot)}
+          highlight="emerald"
+          detail={
+            <>
+              {count(summary.includedCount)} מכירות שנכללו
+              {data.products.length > 0 && (
                 <>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 mb-4">
-                    <div className="rounded-lg bg-gray-50 p-3 text-center"><div className="text-xl font-bold">{paymentAttempts.data.summary.started}</div><div className="text-[10px] text-gray-500">פתחו תשלום</div></div>
-                    <div className="rounded-lg bg-green-50 p-3 text-center"><div className="text-xl font-bold text-green-700">{paymentAttempts.data.summary.completedLater}</div><div className="text-[10px] text-gray-500">השלימו אחר כך</div></div>
-                    <div className="rounded-lg bg-orange-50 p-3 text-center"><div className="text-xl font-bold text-orange-700">{paymentAttempts.data.summary.unresolved}</div><div className="text-[10px] text-gray-500">לא השלימו מוצר זה</div></div>
-                    <div className="rounded-lg bg-blue-50 p-3 text-center"><div className="text-xl font-bold text-blue-700">{paymentAttempts.data.summary.reviewReady}</div><div className="text-[10px] text-gray-500">לבדיקה ידנית</div></div>
-                    <div className="rounded-lg bg-slate-50 p-3 text-center"><div className="text-xl font-bold text-slate-700">{paymentAttempts.data.summary.sandboxPlus + paymentAttempts.data.summary.excluded}</div><div className="text-[10px] text-gray-500">לא לפנות</div></div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[920px] text-xs">
-                      <thead><tr className="border-b text-gray-500">
-                        <th className="py-2 text-right font-medium">אדם</th>
-                        <th className="py-2 text-right font-medium">מוצר</th>
-                        <th className="py-2 text-right font-medium">ניסיון אחרון</th>
-                        <th className="py-2 text-right font-medium">מצב</th>
-                        <th className="py-2 text-center font-medium">מסע נטישה</th>
-                        <th className="py-2 text-right font-medium">מה נכון לעשות</th>
-                      </tr></thead>
-                      <tbody>
-                        {paymentAttempts.data.unresolved.map(item => {
-                          const status = PAYMENT_ATTEMPT_LABELS[item.classification] || { label: item.classification, className: "bg-gray-100 text-gray-700" };
-                          return (
-                            <tr key={item.id} className="border-b border-gray-100 align-top">
-                              <td className="py-3 pl-3">
-                                <div className="font-semibold text-gray-900">{item.name}</div>
-                                <div className="text-[10px] text-gray-500">{item.email}</div>
-                                {item.phone && <div className="text-[10px] text-gray-400">{item.phone}</div>}
-                              </td>
-                              <td className="py-3 pl-3 font-medium">{item.productLabel}</td>
-                              <td className="py-3 pl-3 whitespace-nowrap">{fmtDateTime(item.startedAt)}</td>
-                              <td className="py-3 pl-3"><Badge className={`${status.className} border-0 text-[10px]`}>{status.label}</Badge></td>
-                              <td className="py-3 pl-3 text-center">
-                                {item.recoveryEmailsSent > 0 ? `${item.recoveryEmailsSent} נשלחו${item.recoveryClicked ? " · נלחץ" : ""}` : "לא נשלח"}
-                              </td>
-                              <td className="py-3 leading-5 text-gray-700">{item.recommendation}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="mt-3 rounded-lg bg-amber-50 p-3 text-[11px] leading-5 text-amber-900">
-                    אין כאן כפתור שליחה. לפני כל פנייה יש לבדוק שוב שלא בוצעה רכישה, שהמוצר עדיין זמין ושאין הסרת דיוור. שגיאות תשלום ישנות לא נשמרו בעבר בטבלה ייעודית, ולכן היעדר שגיאה מתועדת אינו הוכחה שלא הייתה תקלה נקודתית.
-                  </div>
+                  {" "}
+                  ·{" "}
+                  {data.products
+                    .slice(0, 2)
+                    .map(item => `${item.label} ${count(item.count)}`)
+                    .join(" · ")}
                 </>
               )}
-            </CardContent>
-          )}
-        </Card>
-
-        {/* ═══════════════════════════════════════════════════════════════════════
-            SECTION 4: DEMOGRAPHICS — VISUAL
-        ═══════════════════════════════════════════════════════════════════════ */}
-        {!demographics.data && demographics.isLoading && (
-          <Card className="border-0 shadow-sm p-6">
-            <h3 className="font-bold text-gray-900 mb-4">👥 דמוגרפיה — מי במאגר?</h3>
-            <Skeleton className="h-48 w-full rounded-lg" />
-          </Card>
-        )}
-        {demographics.data && (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Users size={18} className="text-pink-600" />
-                <h3 className="font-bold text-gray-900">דמוגרפיה: מצבה כיום מול נרשמים בטווח</h3>
-                <Badge className="bg-pink-100 text-pink-700 text-[10px]">{demographics.data.total.count} פעילים</Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Gender split - visual bar */}
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-gray-600">חלוקת מגדר</span>
-                </div>
-                <div className="flex h-8 rounded-lg overflow-hidden shadow-sm">
-                  <div className="bg-blue-500 flex items-center justify-center text-white text-xs font-bold" style={{ width: `${demographics.data.total.count > 0 ? (demographics.data.total.males / demographics.data.total.count * 100) : 50}%` }}>
-                    ♂ {demographics.data.total.males} ({demographics.data.total.count > 0 ? Math.round(demographics.data.total.males / demographics.data.total.count * 100) : 0}%)
-                  </div>
-                  <div className="bg-pink-500 flex items-center justify-center text-white text-xs font-bold" style={{ width: `${demographics.data.total.count > 0 ? (demographics.data.total.females / demographics.data.total.count * 100) : 50}%` }}>
-                    ♀ {demographics.data.total.females} ({demographics.data.total.count > 0 ? Math.round(demographics.data.total.females / demographics.data.total.count * 100) : 0}%)
-                  </div>
-                </div>
-              </div>
-
-              {/* Age groups - horizontal bars */}
-              <div className="mb-4">
-                <h4 className="text-xs font-semibold text-gray-600 mb-2">התפלגות גילאים בקרב הנרשמים בטווח ({demographics.data.period.count})</h4>
-                <div className="space-y-2">
-                  {demographics.data.ageGroups.filter((a: any) => a.group !== 'לא צוין' && a.count > 0).map((ag: any) => {
-                    const maxCount = Math.max(...demographics.data!.ageGroups.filter((x: any) => x.group !== 'לא צוין').map((x: any) => x.count), 1);
-                    return (
-                      <div key={ag.group} className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium text-gray-600 w-12 text-left">{ag.group}</span>
-                        <div className="flex-1 flex h-5 rounded overflow-hidden bg-gray-100">
-                          <div className="bg-blue-400 h-full" style={{ width: `${(ag.males / maxCount) * 100}%` }} />
-                          <div className="bg-pink-400 h-full" style={{ width: `${(ag.females / maxCount) * 100}%` }} />
-                        </div>
-                        <span className="text-[10px] text-gray-500 w-14 text-right">{ag.count} ({ag.males}♂/{ag.females}♀)</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Top areas */}
-              {demographics.data.areas.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-xs font-semibold text-gray-600 mb-2">ערים מובילות בקרב הנרשמים בטווח</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {demographics.data.areas.slice(0, 10).map((a: any) => (
-                      <div key={a.city} className="bg-gray-50 rounded-lg px-3 py-1.5 text-xs border">
-                        <span className="font-semibold">{a.city}</span> <span className="text-gray-500">{a.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Insights */}
-              {demographics.data.insights.length > 0 && (
-                <div className="bg-pink-50 rounded-lg p-3">
-                  <h4 className="text-xs font-bold text-pink-800 mb-1">💡 תובנות שיווקיות</h4>
-                  {demographics.data.insights.map((ins: string, i: number) => (
-                    <p key={i} className="text-xs text-gray-700 mb-0.5">{ins}</p>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════════
-            SECTION 5: META ADS + VERIFIED UTM ATTRIBUTION
-        ═══════════════════════════════════════════════════════════════════════ */}
-        {metaAds.error && <Card className="border border-red-100 bg-red-50 p-4 text-sm text-red-800">נתוני Meta אינם זמינים כרגע. לא מוצגים אפסים במקום נתונים חסרים.</Card>}
-        {metaAds.data?.status === "unavailable" && <Card className="border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">נתוני Meta אינם זמינים כרגע. לא מוצגים אפסים במקום נתונים חסרים.</Card>}
-        {metaAds.data && metaAds.data.status !== "unavailable" && (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Megaphone size={18} className="text-blue-600" />
-                <h3 className="font-bold text-gray-900">Meta Ads — תקציב ותוצאות מדווחות</h3>
-                <Badge className="bg-blue-100 text-blue-700 text-[10px]">{metaAds.data.status === "available" ? "זמין" : metaAds.data.status === "partial" ? "חלקי" : "לא זמין"}</Badge>
-              </div>
-              <p className="mt-1 text-[10px] text-gray-500">לידים ורכישות בטבלה הם דיווחי הייחוס של Meta. הם אינם זהים בהכרח לחיובי Grow המאומתים, וערך/ROAS מוצגים רק כש־Meta מחזירה ערך רכישה. Insights של Meta מקבלת תאריכים בלבד ומחשבת אותם בשעון החשבון (America/Los_Angeles), לכן אין כאן התאמת שעות מלאה מול נתוני ישראל.</p>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                <div className="rounded-lg bg-blue-50 p-3 text-center"><div className="text-xl font-bold text-blue-700">{fmt(metaAds.data.accountTotals.mainSpend)}</div><div className="text-[10px] text-gray-500">מכירה ולידים</div></div>
-                <div className="rounded-lg bg-pink-50 p-3 text-center"><div className="text-xl font-bold text-pink-700">{fmt(metaAds.data.accountTotals.boostsSpend)}</div><div className="text-[10px] text-gray-500">קידומי פרופיל/פוסטים</div></div>
-                <div className="rounded-lg bg-purple-50 p-3 text-center"><div className="text-xl font-bold text-purple-700">{metaAds.data.totals.metaReportedLeads}</div><div className="text-[10px] text-gray-500">לידים מדווחי Meta</div></div>
-                <div className="rounded-lg bg-green-50 p-3 text-center"><div className="text-xl font-bold text-green-700">{metaAds.data.totals.metaReportedPurchases}</div><div className="text-[10px] text-gray-500">Purchase מדווח Meta</div></div>
-              </div>
-
-              {metaAds.data.boosts.length > 0 && (
-                <div className="overflow-x-auto rounded-xl border border-pink-100 bg-pink-50/30 p-3">
-                  <h4 className="mb-2 text-xs font-bold text-pink-800">קידומי פרופיל ופוסטים · לא נכללים בטבלת המכירה</h4>
-                  <table className="w-full text-xs">
-                    <thead><tr className="border-b text-[10px] text-gray-500"><th className="pb-1.5 text-right">קידום</th><th className="pb-1.5 text-center">הוצאה</th><th className="pb-1.5 text-center">חשיפה</th><th className="pb-1.5 text-center">Reach</th><th className="pb-1.5 text-center">קליקים</th><th className="pb-1.5 text-center">מעורבות</th></tr></thead>
-                    <tbody>{metaAds.data.boosts.map((boost, i) => <tr key={i} className="border-b border-pink-100"><td className="max-w-[260px] truncate py-1.5 font-medium" title={boost.name}>{boost.name}</td><td className="py-1.5 text-center text-red-600">{fmt(boost.spend)}</td><td className="py-1.5 text-center">{boost.impressions.toLocaleString()}</td><td className="py-1.5 text-center">{boost.reach.toLocaleString()}</td><td className="py-1.5 text-center">{boost.clicks.toLocaleString()}</td><td className="py-1.5 text-center">{boost.postEngagement.toLocaleString()}</td></tr>)}</tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════════
-            SECTION 6: EMAIL + SOCIAL + SEO (collapsed)
-        ═══════════════════════════════════════════════════════════════════════ */}
-        {emailEngagement.data && emailEngagement.data.totals.sent > 0 && (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2"><Mail size={18} className="text-amber-500" /><h3 className="font-bold text-gray-900">מיילים ומסעות · נשלחו בטווח</h3></div>
-              <p className="mt-1 text-[10px] text-gray-500">פתיחות וקליקים מתעדכנים לאחר השליחה, ולכן ימים אחרונים עשויים עדיין להשתנות.</p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-amber-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-amber-600">{emailEngagement.data.totals.sent}</div><div className="text-[10px] text-gray-500">נשלחו</div></div>
-                <div className="bg-green-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-green-600">{emailEngagement.data.totals.openRate}%</div><div className="text-[10px] text-gray-500">פתיחה</div></div>
-                <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-blue-600">{emailEngagement.data.totals.clickRate}%</div><div className="text-[10px] text-gray-500">קליקים</div></div>
-                <div className="bg-purple-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-purple-600">{emailEngagement.data.totals.clickToOpenRate}%</div><div className="text-[10px] text-gray-500">Click-to-Open</div></div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {socialInsights.isLoading && <Card className="border-0 shadow-sm p-6"><Skeleton className="h-40 w-full rounded-lg" /></Card>}
-        {socialInsights.error && <Card className="border border-red-100 bg-red-50 p-4 text-sm text-red-800">נתוני הסושיאל אינם זמינים כרגע. לא מוצג 0 במקום שגיאת API.</Card>}
-        {socialInsights.data === null && !socialInsights.isLoading && !socialInsights.error && <Card className="border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">נתוני הסושיאל אינם זמינים כרגע. לא מוצג 0 במקום נתון חסר.</Card>}
-        {socialInsights.data && (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2"><Instagram size={18} className="text-pink-500" /><h3 className="font-bold text-gray-900">סושיאל · Instagram ו־Facebook</h3></div>
-              <p className="mt-1 text-[10px] text-gray-500">{socialInsights.data.note}</p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-pink-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-pink-600">{socialInsights.data.instagram.followers.toLocaleString()}</div><div className="text-[10px] text-gray-500">עוקבי IG כעת</div><div className="text-[9px] text-gray-400">אין עדיין בסיס אמין לשינוי נטו</div></div>
-                <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-blue-600">{socialInsights.data.facebook.followers.toLocaleString()}</div><div className="text-[10px] text-gray-500">עוקבי Facebook כעת</div></div>
-                <div className="bg-purple-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-purple-600">{socialInsights.data.instagram.totalInteractions.toLocaleString()}</div><div className="text-[10px] text-gray-500">אינטראקציות בטווח</div><Change value={pctDelta(socialInsights.data.instagram.totalInteractions, socialInsights.data.instagram.previousTotalInteractions)} /></div>
-                <div className="bg-green-50 rounded-lg p-3 text-center"><div className="text-xl font-bold text-green-600">{socialInsights.data.instagram.accountsEngaged.toLocaleString()}</div><div className="text-[10px] text-gray-500">חשבונות מעורבים</div><Change value={pctDelta(socialInsights.data.instagram.accountsEngaged, socialInsights.data.instagram.previousAccountsEngaged)} /></div>
-              </div>
-              <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[10px] text-gray-600">
-                <div className="rounded-lg bg-gray-50 p-2"><strong className="block text-sm text-gray-900">{socialInsights.data.instagram.likes}</strong>לייקים</div>
-                <div className="rounded-lg bg-gray-50 p-2"><strong className="block text-sm text-gray-900">{socialInsights.data.instagram.comments}</strong>תגובות</div>
-                <div className="rounded-lg bg-gray-50 p-2"><strong className="block text-sm text-gray-900">{socialInsights.data.instagram.shares}</strong>שיתופים</div>
-                <div className="rounded-lg bg-gray-50 p-2"><strong className="block text-sm text-gray-900">{socialInsights.data.instagram.saves}</strong>שמירות</div>
-              </div>
-              {socialInsights.data.instagram.dailyReach.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-[10px] text-gray-500 mb-1">Reach יומי משוער, כולל פעילות ממומנת; הימים האחרונים עשויים להיות חלקיים</div>
-                  <MiniBarChart data={socialInsights.data.instagram.dailyReach.map((d: any) => ({ label: d.date, value: d.value }))} color="bg-pink-400" height={48} />
-                </div>
-              )}
-              {socialInsights.data.instagram.topPosts.length > 0 && (
-                <div className="mt-4 overflow-x-auto">
-                  <h4 className="mb-2 text-xs font-bold text-gray-700">פוסטים מהטווח לפי לייקים ותגובות</h4>
-                  <table className="w-full text-xs"><thead><tr className="border-b text-[10px] text-gray-500"><th className="py-1.5 text-right">פוסט</th><th className="py-1.5 text-center">תאריך</th><th className="py-1.5 text-center">לייקים</th><th className="py-1.5 text-center">תגובות</th></tr></thead><tbody>
-                    {socialInsights.data.instagram.topPosts.map((post: any) => <tr key={post.id} className="border-b border-gray-50"><td className="max-w-[420px] py-2"><a className="font-medium text-blue-700 hover:underline" href={post.permalink || '#'} target="_blank" rel="noreferrer">{post.caption || post.mediaType}</a></td><td className="py-2 text-center text-gray-500">{post.timestamp ? new Date(post.timestamp).toLocaleDateString('he-IL') : '—'}</td><td className="py-2 text-center">{post.likes}</td><td className="py-2 text-center">{post.comments}</td></tr>)}
-                  </tbody></table>
-                  <p className="mt-2 text-[9px] text-gray-400">הטבלה משווה תגובות ולייקים של תוכן Instagram. ייחוס לידים או מכירות לפוסט יוצג רק כשיש קישור/מודעה מזוהים.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {siteTraffic.data && (
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2"><BarChart3 size={18} className="text-indigo-500" /><h3 className="font-bold text-gray-900">SEO ותנועה</h3><Badge className="bg-indigo-100 text-indigo-700 text-[10px]">{siteTraffic.data.uniqueVisitors} מבקרים</Badge></div>
-            </CardHeader>
-            <CardContent>
-              {/* Funnel */}
-              <div className="flex items-center justify-center gap-2 flex-wrap mb-4">
-                {[
-                  { label: "ביקור", value: siteTraffic.data.funnel.pageViews, color: "bg-indigo-500" },
-                  { label: "DNA", value: siteTraffic.data.funnel.dnaStarts, color: "bg-blue-500" },
-                  { label: "השלמה", value: siteTraffic.data.funnel.dnaCompletes, color: "bg-purple-500" },
-                  { label: "פתיחת תשלום", value: siteTraffic.data.funnel.paymentStarts, color: "bg-green-500" },
-                ].map((step, i, arr) => (
-                  <div key={i} className="flex items-center gap-1">
-                    <div className="text-center">
-                      <div className={`${step.color} text-white rounded-lg px-4 py-2`}><div className="text-lg font-bold">{step.value}</div></div>
-                      <div className="text-[9px] text-gray-500 mt-0.5">{step.label}</div>
-                    </div>
-                    {i < arr.length - 1 && <div className="text-gray-300 text-sm">·</div>}
-                  </div>
-                ))}
-              </div>
-              {/* Daily traffic */}
-              {siteTraffic.data.dailyViews.length > 0 && (
+            </>
+          }
+        />
+        <MetricCard
+          label="הוצאות מתועדות"
+          value={
+            summary.totalExpenseAgorot == null
+              ? "לא זמין"
+              : money(summary.totalExpenseAgorot)
+          }
+          highlight="champagne"
+          detail={
+            summary.expenseComplete
+              ? "הסכום כולל את כל ההוצאות שזמינות לתקופה"
+              : "חסרים נתוני הוצאות, לכן אין להניח שהסכום מלא"
+          }
+        />
+        <MetricCard
+          label="יתרה לפי הנתונים הקיימים"
+          value={
+            summary.balanceAgorot == null
+              ? "לא זמין"
+              : money(summary.balanceAgorot)
+          }
+          detail="אינדיקציה חשבונאית לפי הנתונים הזמינים; לא רווח סופי."
+        />
+      </section>
+      <section className="rounded-2xl border border-amber-200 bg-[#fffaf0] p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="font-black text-[#191265]">תמונת מצב קצרה</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-700">
+              דיווחי תשלום שהתקבלו באתר: {count(summary.recordedCount)} בסך{" "}
+              {money(summary.recordedRevenueAgorot)}.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs sm:min-w-72">
+            <div className="rounded-xl bg-white px-3 py-2 text-slate-700">
+              <strong className="block text-[#191265]">
+                {money(summary.reviewRevenueAgorot)}
+              </strong>
+              רשומות לבדיקה
+            </div>
+            <div className="rounded-xl bg-white px-3 py-2 text-slate-700">
+              <strong className="block text-[#191265]">
+                {count(summary.excludedTests + summary.excludedEstimated)}
+              </strong>
+              טסטים או הערכות שהוחרגו
+            </div>
+          </div>
+        </div>
+        <p className="mt-3 border-t border-amber-100 pt-3 text-xs leading-5 text-amber-950">
+          סכום הגלם הוא {money(summary.recordedRevenueAgorot)}.{" "}
+          {summary.reviewCount > 0
+            ? `מתוכו ${count(summary.reviewCount)} רשומות בסך ${money(summary.reviewRevenueAgorot)} מסומנות לבדיקה ואינן בהכנסה המרכזית.`
+            : "אין כרגע רשומות שסומנו לבדיקה."}{" "}
+          {rawOnlyAmount > 0
+            ? `פער נוסף של ${money(rawOnlyAmount)} אינו מסווג כהכנסה שנכללה.`
+            : ""}{" "}
+          ההתאמה העצמאית ל־Grow עדיין אינה מאושרת.
+        </p>
+      </section>
+      {data.insights.length > 0 && (
+        <section className="grid gap-3 lg:grid-cols-3">
+          {data.insights.map((insight, index) => (
+            <article
+              key={`${insight.title}-${index}`}
+              className={`rounded-2xl border p-4 shadow-sm ${toneClass(insight.tone)}`}
+            >
+              <div className="flex gap-2">
+                <ToneIcon tone={insight.tone} />
                 <div>
-                  <div className="text-[10px] text-gray-500 mb-1">תנועה יומית</div>
-                  <MiniBarChart data={siteTraffic.data.dailyViews.map((d: any) => ({ label: d.day, value: d.views }))} color="bg-indigo-400" height={40} />
+                  <h2 className="text-sm font-black">{insight.title}</h2>
+                  <p className="mt-1 text-xs leading-5 opacity-90">
+                    {insight.detail}
+                  </p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(25,18,101,0.04)] sm:p-5">
+        <SectionTitle
+          title="מכירות לאורך זמן"
+          description="עסקאות מדווחות לפי יום בישראל. הסכום אינו כולל רשומות לבדיקה."
+        />
+        {data.daily.length === 0 ? (
+          <EmptyState text="אין מכירות להצגה בטווח שנבחר." />
+        ) : (
+          <DailyChart daily={data.daily} />
         )}
+      </section>
+      <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(25,18,101,0.04)] sm:p-5">
+          <SectionTitle
+            title="מוצרים שנמכרו"
+            description="פירוט ההכנסה שנכללה לפי מוצר."
+          />
+          {data.products.length === 0 ? (
+            <EmptyState text="אין מוצרים שנמכרו בטווח שנבחר." />
+          ) : (
+            <div className="space-y-2">
+              {data.products.map(product => (
+                <div
+                  key={product.product}
+                  className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-900">
+                      {product.label}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {count(product.count)} מכירות
+                    </p>
+                  </div>
+                  <strong className="whitespace-nowrap text-sm text-[#191265]">
+                    {money(product.revenueAgorot)}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(25,18,101,0.04)] sm:p-5">
+          <SectionTitle
+            title="שתי עדשות שיוך"
+            description="מציגים מקור גיוס וסגירה בנפרד — לא מחברים ביניהם לסך הכנסה נוסף."
+          />
+          <div className="grid gap-4 md:grid-cols-2">
+            <SalesAttributionList sales={data.sales} lens="acquisition" />
+            <SalesAttributionList sales={data.sales} lens="closing" />
+          </div>
+          <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+            אותה מכירה עשויה לקבל קרדיט בכל עדשה, אך ההכנסה נספרת פעם אחת בלבד.
+            מודל האתר אינו זהה לייחוס ב־Ads Manager.
+          </p>
+        </section>
+      </section>
+      <Campaigns campaigns={data.campaigns} />
+      <AllSales
+        sales={filteredSales}
+        allSalesCount={data.sales.length}
+        saleFilter={saleFilter}
+        setSaleFilter={setSaleFilter}
+        search={search}
+        setSearch={setSearch}
+        expandedOrder={expandedOrder}
+        setExpandedOrder={setExpandedOrder}
+      />
+    </>
+  );
+}
+function EmptyState({ text }: { text: string }) {
+  return (
+    <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+      {text}
+    </p>
+  );
+}
+function DailyChart({ daily }: { daily: Daily[] }) {
+  const chartData = daily.map(day => ({
+    ...day,
+    label: calendarDay(day.day),
+    revenueShekels: day.revenueAgorot / 100,
+  }));
+  return (
+    <div className="h-64" dir="ltr">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={chartData}
+          margin={{ top: 8, right: 8, left: 0, bottom: 4 }}
+        >
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="#e2e8f0"
+          />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: "#64748b", fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            yAxisId="amount"
+            orientation="right"
+            tick={{ fill: "#64748b", fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={55}
+          />
+          <YAxis
+            yAxisId="count"
+            orientation="left"
+            allowDecimals={false}
+            tick={{ fill: "#64748b", fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={28}
+          />
+          <Tooltip content={<DailyTooltip />} />
+          <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+          <Bar
+            yAxisId="amount"
+            dataKey="revenueShekels"
+            name="הכנסה שנכללה"
+            fill="#312e81"
+            radius={[5, 5, 0, 0]}
+          />
+          <Line
+            yAxisId="count"
+            type="monotone"
+            dataKey="count"
+            name="מכירות"
+            stroke="#c59b3c"
+            strokeWidth={2.5}
+            dot={{ r: 3 }}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+function DailyTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: { payload: Daily }[];
+  label?: string;
+}) {
+  if (!active || !payload?.[0]) return null;
+  const day = payload[0].payload;
+  return (
+    <div
+      dir="rtl"
+      className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-lg"
+    >
+      <strong>{label}</strong>
+      <p className="mt-1">הכנסה שנכללה: {money(day.revenueAgorot)}</p>
+      <p>מכירות: {count(day.count)}</p>
+      {day.reviewCount > 0 && (
+        <p className="text-amber-800">לבדיקה: {count(day.reviewCount)}</p>
+      )}
+    </div>
+  );
+}
+function AttributionList({ title, rows }: { title: string; rows: Channel[] }) {
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-black text-[#191265]">{title}</h3>
+      {rows.length === 0 ? (
+        <p className="text-xs text-slate-500">אין שיוך מקור בטווח.</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map(row => (
+            <div
+              key={row.channel}
+              className="flex items-center justify-between gap-2 rounded-xl bg-indigo-50/60 p-3"
+            >
+              <div>
+                <p className="text-sm font-bold text-slate-900">
+                  {row.channel}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {count(row.count)} מכירות
+                </p>
+              </div>
+              <strong className="text-sm text-[#191265]">
+                {money(row.revenueAgorot)}
+              </strong>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function SalesAttributionList({ sales, lens }: { sales: Sale[]; lens: "acquisition" | "closing" }) {
+  const rows = useMemo(() => {
+    const grouped = new Map<string, { count: number; revenueAgorot: number }>();
+    sales
+      .filter(sale => sale.status === "included")
+      .forEach(sale => {
+        const key = sale[lens].channel || "ללא שיוך";
+        const prior = grouped.get(key) ?? { count: 0, revenueAgorot: 0 };
+        grouped.set(key, {
+          count: prior.count + 1,
+          revenueAgorot: prior.revenueAgorot + sale.amountAgorot,
+        });
+      });
+    return Array.from(grouped, ([channel, value]) => ({
+      channel,
+      ...value,
+    })).sort((a, b) => b.revenueAgorot - a.revenueAgorot);
+  }, [sales, lens]);
+  return <AttributionList title={lens === "acquisition" ? "מקור הגיוס" : "ערוץ הסגירה"} rows={rows} />;
+}
+
+function Campaigns({ campaigns }: { campaigns: Campaign[] }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(25,18,101,0.04)] sm:p-5">
+      <SectionTitle
+        title="קמפיין הגיוס → הרכישה"
+        description="הקמפיין והערוץ משקפים את שיוך האתר. ההמרות של Meta מוצגות בנפרד, ואין להסיק מהן שהן אותן מכירות."
+      />
+      {campaigns.length === 0 ? (
+        <EmptyState text="אין קמפיינים משויכים בטווח שנבחר." />
+      ) : (
+        <>
+          <div className="space-y-3 md:hidden">
+            {campaigns.map((campaign, index) => (
+              <CampaignCard
+                key={`${campaign.campaign}-${index}`}
+                campaign={campaign}
+              />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[970px] text-right text-xs">
+              <thead className="border-b border-slate-200 text-slate-500">
+                <tr>
+                  <th className="p-3 font-bold">קמפיין</th>
+                  <th className="p-3 font-bold">ערוץ</th>
+                  <th className="p-3 text-center font-bold">רכישות</th>
+                  <th className="p-3 font-bold">מוצרים</th>
+                  <th className="p-3 text-center font-bold">הכנסה</th>
+                  <th className="p-3 text-center font-bold">
+                    סגירות לאחר מייל
+                  </th>
+                  <th className="p-3 text-center font-bold">
+                    המרות ש־Meta ייחסה
+                  </th>
+                  <th className="p-3 text-center font-bold">הוצאה</th>
+                  <th className="p-3 font-bold">אופן מיפוי</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaigns.map((campaign, index) => (
+                  <tr
+                    key={`${campaign.campaign}-${index}`}
+                    className="border-b border-slate-100 align-top hover:bg-slate-50"
+                  >
+                    <td className="max-w-48 p-3 font-bold text-slate-900">
+                      {campaign.campaign}
+                    </td>
+                    <td className="p-3">{campaign.channel}</td>
+                    <td className="p-3 text-center font-bold">
+                      {count(campaign.count)}
+                    </td>
+                    <td className="max-w-48 p-3 leading-5">
+                      {campaign.products.length
+                        ? campaign.products.join(" · ")
+                        : "—"}
+                    </td>
+                    <td className="p-3 text-center font-bold text-[#191265]">
+                      {money(campaign.revenueAgorot)}
+                    </td>
+                    <td className="p-3 text-center">
+                      {count(campaign.emailClosedCount)}
+                    </td>
+                    <td className="p-3 text-center">
+                      {campaign.metaPurchases == null
+                        ? "לא זמין"
+                        : count(campaign.metaPurchases)}
+                    </td>
+                    <td className="p-3 text-center">
+                      {campaign.spendAgorot == null
+                        ? "לא זמין"
+                        : money(campaign.spendAgorot)}
+                    </td>
+                    <td className="max-w-52 p-3 leading-5 text-slate-600">
+                      {campaign.mapping}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+function CampaignCard({ campaign }: { campaign: Campaign }) {
+  return (
+    <article className="rounded-xl border border-slate-200 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-bold text-slate-900">{campaign.campaign}</h3>
+          <p className="mt-1 text-xs text-slate-500">{campaign.channel}</p>
+        </div>
+        <strong className="whitespace-nowrap text-[#191265]">
+          {money(campaign.revenueAgorot)}
+        </strong>
       </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-lg bg-slate-50 p-2">
+          <strong>{count(campaign.count)}</strong>
+          <span className="block mt-0.5 text-slate-500">רכישות</span>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-2">
+          <strong>{count(campaign.emailClosedCount)}</strong>
+          <span className="block mt-0.5 text-slate-500">סגירות לאחר מייל</span>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-2">
+          <strong>
+            {campaign.metaPurchases == null
+              ? "לא זמין"
+              : count(campaign.metaPurchases)}
+          </strong>
+          <span className="block mt-0.5 text-slate-500">
+            המרות ש־Meta ייחסה
+          </span>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-2">
+          <strong>
+            {campaign.spendAgorot == null
+              ? "לא זמין"
+              : money(campaign.spendAgorot)}
+          </strong>
+          <span className="block mt-0.5 text-slate-500">הוצאה</span>
+        </div>
+      </div>
+      {campaign.products.length > 0 && (
+        <p className="mt-3 text-xs leading-5 text-slate-600">
+          <strong>מוצרים:</strong> {campaign.products.join(" · ")}
+        </p>
+      )}
+      <p className="mt-2 text-[11px] leading-5 text-slate-500">
+        {campaign.mapping}
+      </p>
+    </article>
+  );
+}
+
+function AllSales({
+  sales,
+  allSalesCount,
+  saleFilter,
+  setSaleFilter,
+  search,
+  setSearch,
+  expandedOrder,
+  setExpandedOrder,
+}: {
+  sales: Sale[];
+  allSalesCount: number;
+  saleFilter: SaleStatusFilter;
+  setSaleFilter: (value: SaleStatusFilter) => void;
+  search: string;
+  setSearch: (value: string) => void;
+  expandedOrder: number | null;
+  setExpandedOrder: (value: number | null) => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(25,18,101,0.04)] sm:p-5">
+      <SectionTitle
+        title="כל המכירות"
+        description={`מוצגות ${count(sales.length)} מתוך ${count(allSalesCount)} מכירות. ללא שמות, כתובות דוא״ל או מזהי לקוחות.`}
+      >
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <WalletCards className="h-4 w-4" /> לפי סדר כרונולוגי
+        </div>
+      </SectionTitle>
+      <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-1.5" aria-label="סינון סטטוס מכירות">
+          {(
+            [
+              ["all", "הכול"],
+              ["included", "נכללו"],
+              ["review", "לבדיקה"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setSaleFilter(value)}
+              className={`rounded-lg px-3 py-2 text-xs font-bold transition ${saleFilter === value ? "bg-[#191265] text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="relative block w-full lg:w-80">
+          <Search className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="חיפוש מוצר, ערוץ או קמפיין"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2 pr-9 pl-3 text-xs outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+        </label>
+      </div>
+      {sales.length === 0 ? (
+        <EmptyState text="אין מכירות התואמות לסינון שבחרת." />
+      ) : (
+        <>
+          <div className="space-y-3 md:hidden">
+            {sales.map((sale, index) => (
+              <SaleCard
+                key={`${sale.order}-${index}`}
+                sale={sale}
+                number={index + 1}
+                expanded={expandedOrder === sale.order}
+                onToggle={() =>
+                  setExpandedOrder(
+                    expandedOrder === sale.order ? null : sale.order
+                  )
+                }
+              />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[1010px] text-right text-xs">
+              <thead className="border-b border-slate-200 text-slate-500">
+                <tr>
+                  <th className="p-3">#</th>
+                  <th className="p-3">תאריך ושעה</th>
+                  <th className="p-3">מוצר</th>
+                  <th className="p-3">סכום</th>
+                  <th className="p-3">מקור גיוס</th>
+                  <th className="p-3">ערוץ סגירה</th>
+                  <th className="p-3">סטטוס</th>
+                  <th className="p-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map((sale, index) => (
+                  <SaleRow
+                    key={`${sale.order}-${index}`}
+                    sale={sale}
+                    number={index + 1}
+                    expanded={expandedOrder === sale.order}
+                    onToggle={() =>
+                      setExpandedOrder(
+                        expandedOrder === sale.order ? null : sale.order
+                      )
+                    }
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+function SaleStatus({ status }: { status: Sale["status"] }) {
+  return status === "included" ? (
+    <span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-bold text-emerald-800">
+      נכללה
+    </span>
+  ) : (
+    <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-900">
+      לבדיקה
+    </span>
+  );
+}
+function SaleCard({
+  sale,
+  number,
+  expanded,
+  onToggle,
+}: {
+  sale: Sale;
+  number: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <article
+      className={`rounded-xl border p-3 ${sale.status === "review" ? "border-amber-200 bg-amber-50/45 opacity-75" : "border-slate-200"}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] text-slate-500">
+            #{number} · {dateTime(sale.paidAt)}
+          </p>
+          <h3 className="mt-1 font-bold text-slate-900">{sale.productLabel}</h3>
+        </div>
+        <div className="text-left">
+          <strong className="block text-[#191265]">
+            {money(sale.amountAgorot)}
+          </strong>
+          <span className="mt-1 inline-block">
+            <SaleStatus status={sale.status} />
+          </span>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-slate-50 p-2">
+          <p className="text-[10px] text-slate-500">גיוס</p>
+          <ChannelName
+            channel={sale.acquisition.channel}
+            campaign={sale.acquisition.campaign}
+          />
+        </div>
+        <div className="rounded-lg bg-slate-50 p-2">
+          <p className="text-[10px] text-slate-500">סגירה</p>
+          <ChannelName
+            channel={sale.closing.channel}
+            campaign={sale.closing.campaign}
+          />
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="mt-3 flex w-full items-center justify-between rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-[#191265]"
+      >
+        פרטי שיוך ותשלום{" "}
+        {expanded ? (
+          <ChevronUp className="h-4 w-4" />
+        ) : (
+          <ChevronDown className="h-4 w-4" />
+        )}
+      </button>
+      {expanded && <SaleDetails sale={sale} />}
+    </article>
+  );
+}
+function SaleRow({
+  sale,
+  number,
+  expanded,
+  onToggle,
+}: {
+  sale: Sale;
+  number: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <tr
+        className={`border-b border-slate-100 align-top ${sale.status === "review" ? "bg-amber-50/50 opacity-75" : "hover:bg-slate-50"}`}
+      >
+        <td className="p-3 text-slate-500">{number}</td>
+        <td className="whitespace-nowrap p-3">{dateTime(sale.paidAt)}</td>
+        <td className="p-3 font-bold">{sale.productLabel}</td>
+        <td className="whitespace-nowrap p-3 font-bold text-[#191265]">
+          {money(sale.amountAgorot)}
+        </td>
+        <td className="p-3">
+          <ChannelName
+            channel={sale.acquisition.channel}
+            campaign={sale.acquisition.campaign}
+          />
+        </td>
+        <td className="p-3">
+          <ChannelName
+            channel={sale.closing.channel}
+            campaign={sale.closing.campaign}
+          />
+        </td>
+        <td className="p-3">
+          <SaleStatus status={sale.status} />
+        </td>
+        <td className="p-3">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={`פרטי מכירה ${number}`}
+            className="rounded-lg p-1.5 text-[#191265] hover:bg-indigo-100"
+          >
+            {expanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="border-b border-slate-100 bg-slate-50">
+          <td colSpan={8} className="p-3">
+            <SaleDetails sale={sale} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+function SaleDetails({ sale }: { sale: Sale }) {
+  return (
+    <dl className="mt-3 grid gap-2 rounded-lg bg-white/80 p-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+      <Detail label="אסמכתת תשלום" value={sale.paymentEvidence} />
+      <Detail label="ביטחון מקור" value={sale.acquisition.confidence} />
+      <Detail label="ביטחון סגירה" value={sale.closing.confidence} />
+      <Detail
+        label="סיוע מייל"
+        value={
+          sale.emailAssist
+            ? `${sale.emailAssist.campaign}${sale.emailAssist.clicked ? " · נלחץ" : ""}${sale.emailAssist.sameDay ? " · באותו יום" : ""}`
+            : "לא תועד"
+        }
+      />
+      {sale.lagDays != null && (
+        <Detail
+          label="הפרש מגיוס לרכישה"
+          value={`${count(sale.lagDays)} ימים`}
+        />
+      )}
+    </dl>
+  );
+}
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] font-bold text-slate-500">{label}</dt>
+      <dd className="mt-0.5 break-words text-slate-800">{value}</dd>
+    </div>
+  );
+}
+function DataQuality({ data }: { data: SalesIntelligence }) {
+  return (
+    <div className="space-y-3 rounded-xl bg-slate-50 p-4 text-xs leading-5 text-slate-700">
+      <p>
+        <strong>התאמת ספק תשלומים:</strong>{" "}
+        {data.quality.providerReconciled ? "בוצעה" : "טרם אושרה"}
+      </p>
+      <p>
+        <strong>שיוך:</strong> {data.quality.attributionNote}
+      </p>
+      <p>
+        <strong>הוצאות:</strong> {data.quality.expenseNote}
+      </p>
+      {data.quality.metaTimezone && (
+        <p>
+          <strong>אזור זמן Meta:</strong> {data.quality.metaTimezone}
+        </p>
+      )}
+      {data.quality.notes.length > 0 && (
+        <ul className="list-disc space-y-1 pr-5">
+          {data.quality.notes.map((note, index) => (
+            <li key={index}>{note}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

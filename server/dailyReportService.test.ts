@@ -10,7 +10,94 @@ import {
   maskRecipients,
   parseRecipientPhones,
   sendDailyReportMessages,
+  summarizeSalesIntelligenceForPreview,
 } from "./dailyReportService";
+import type { SalesIntelligence } from "./salesIntelligence";
+
+function salesDataForPreview(): SalesIntelligence {
+  return {
+    startDate: 1_000,
+    endDate: 3_000,
+    generatedAt: 4_000,
+    partialToday: false,
+    summary: {
+      recordedCount: 4,
+      recordedRevenueAgorot: 100_000,
+      includedCount: 2,
+      includedRevenueAgorot: 59_800,
+      reviewCount: 1,
+      reviewRevenueAgorot: 29_900,
+      excludedTests: 1,
+      excludedEstimated: 0,
+      knownClosingCount: 0,
+      knownAcquisitionCount: 0,
+      metaSpendAgorot: null,
+      otherExpenseAgorot: null,
+      totalExpenseAgorot: null,
+      balanceAgorot: null,
+      expenseComplete: false,
+    },
+    sales: [
+      {
+        order: 1,
+        paidAt: 1_200,
+        day: "2026-10-10",
+        product: "database",
+        productLabel: "מאגר רווקים",
+        amountAgorot: 29_900,
+        coupon: null,
+        status: "included",
+        paymentEvidence: "דיווח תשלום באתר; טרם הוצלב בדוח Grow",
+        acquisition: { channel: "ישיר / לא ידוע", campaign: "ללא מקור מתועד", confidence: "unknown" },
+        closing: { channel: "ישיר / לא ידוע", campaign: "ללא מקור מתועד", confidence: "unknown" },
+        emailAssist: null,
+        lagDays: null,
+      },
+      {
+        order: 2,
+        paidAt: 2_200,
+        day: "2026-10-10",
+        product: "plus",
+        productLabel: "Database Plus",
+        amountAgorot: 29_900,
+        coupon: null,
+        status: "included",
+        paymentEvidence: "דיווח תשלום באתר; טרם הוצלב בדוח Grow",
+        acquisition: { channel: "ישיר / לא ידוע", campaign: "ללא מקור מתועד", confidence: "unknown" },
+        closing: { channel: "ישיר / לא ידוע", campaign: "ללא מקור מתועד", confidence: "unknown" },
+        emailAssist: null,
+        lagDays: null,
+      },
+      {
+        order: 3,
+        paidAt: 2_400,
+        day: "2026-10-10",
+        product: "database",
+        productLabel: "מאגר רווקים",
+        amountAgorot: 29_900,
+        coupon: null,
+        status: "review",
+        paymentEvidence: "דיווח תשלום באתר; טרם הוצלב בדוח Grow",
+        acquisition: { channel: "ישיר / לא ידוע", campaign: "ללא מקור מתועד", confidence: "unknown" },
+        closing: { channel: "ישיר / לא ידוע", campaign: "ללא מקור מתועד", confidence: "unknown" },
+        emailAssist: null,
+        lagDays: null,
+      },
+    ],
+    channels: [],
+    products: [],
+    campaigns: [],
+    daily: [],
+    insights: [],
+    quality: {
+      providerReconciled: false,
+      attributionNote: "",
+      expenseNote: "",
+      metaTimezone: "America/Los_Angeles",
+      notes: [],
+    },
+  };
+}
 
 describe("daily report delivery safeguards", () => {
   it("classifies Meta campaigns into the approved budget families", () => {
@@ -91,5 +178,14 @@ describe("daily report delivery safeguards", () => {
     expect(calls).toHaveLength(6);
     expect(deliveries).toHaveLength(6);
     expect(deliveries.filter(delivery => delivery.accepted)).toHaveLength(5);
+  });
+
+  it("uses only included shared-ledger rows for CRM preview amount, count and product cards", () => {
+    const summary = summarizeSalesIntelligenceForPreview(salesDataForPreview());
+
+    expect(summary.revenueAgorot).toBe(59_800);
+    expect(summary.salesPurchases).toBe(2);
+    expect(summary.database).toEqual({ count: 1, revenueAgorot: 29_900 });
+    expect(summary).not.toMatchObject({ revenueAgorot: 89_700 });
   });
 });

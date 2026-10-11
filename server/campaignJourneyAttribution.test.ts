@@ -1,10 +1,19 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { inferCampaignUtmAliases, normalizeLandingCategory } from "./dashboardRouter";
+import {
+  inferCampaignUtmAliases,
+  normalizeLandingCategory,
+} from "./dashboardRouter";
 
-const routerSource = readFileSync(resolve(process.cwd(), "server/dashboardRouter.ts"), "utf8");
-const dashboardSource = readFileSync(resolve(process.cwd(), "client/src/pages/Dashboard.tsx"), "utf8");
+const routerSource = readFileSync(
+  resolve(process.cwd(), "server/dashboardRouter.ts"),
+  "utf8"
+);
+const dashboardSource = readFileSync(
+  resolve(process.cwd(), "client/src/pages/Dashboard.tsx"),
+  "utf8"
+);
 
 function campaignJourneySection() {
   const start = routerSource.indexOf("campaignJourney: teamProcedure");
@@ -25,7 +34,9 @@ describe("campaign journey attribution", () => {
   it("uses first CRM touch for the lead cohort and only counts email sent before payment", () => {
     const source = campaignJourneySection();
     expect(source).toContain("PARTITION BY LOWER(TRIM(cl_inner.email))");
-    expect(source).toContain("ORDER BY cl_inner.createdAt ASC, cl_inner.id ASC");
+    expect(source).toContain(
+      "ORDER BY cl_inner.createdAt ASC, cl_inner.id ASC"
+    );
     expect(source).toContain("email_any.sentAt <= cp.paid_at");
     expect(source).toContain("email_click.clickedAt <= cp.paid_at");
   });
@@ -46,45 +57,68 @@ describe("campaign journey attribution", () => {
   });
 
   it("prefers UTM values read from Meta creatives over name-based fallback aliases", () => {
-    expect(inferCampaignUtmAliases("קהל קר לידים", ["creative_tag"])).toEqual(["creative_tag"]);
-    expect(inferCampaignUtmAliases("קהל קר לידים", [])).toEqual(expect.arrayContaining(["lead_cold_measure", "lead_cold_120"]));
+    expect(inferCampaignUtmAliases("קהל קר לידים", ["creative_tag"])).toEqual([
+      "creative_tag",
+    ]);
+    expect(inferCampaignUtmAliases("קהל קר לידים", [])).toEqual(
+      expect.arrayContaining(["lead_cold_measure", "lead_cold_120"])
+    );
   });
 
   it("drops generic page tags when an active creative also has a campaign-specific UTM", () => {
-    expect(inferCampaignUtmAliases("קהל חם לידים", ["database", "lead_warm_30d", "dna-quiz"])).toEqual(["lead_warm_30d"]);
-    expect(inferCampaignUtmAliases("קהל חם לידים", ["database"])).toEqual(["database"]);
+    expect(
+      inferCampaignUtmAliases("קהל חם לידים", [
+        "database",
+        "lead_warm_30d",
+        "dna-quiz",
+      ])
+    ).toEqual(["lead_warm_30d"]);
+    expect(inferCampaignUtmAliases("קהל חם לידים", ["database"])).toEqual([
+      "database",
+    ]);
   });
 
   it("never exposes technical UTM fragments as landing-page labels", () => {
-    expect(normalizeLandingCategory("/utm_source=facebook&utm_campaign=lead_cold")).toEqual({ category: "unknown", label: "לא זוהה" });
-    expect(normalizeLandingCategory("https://hilitcaspi.com/dna-quiz?utm_campaign=lead_cold")).toEqual({ category: "dna_quiz", label: "שאלון DNA" });
+    expect(
+      normalizeLandingCategory("/utm_source=facebook&utm_campaign=lead_cold")
+    ).toEqual({ category: "unknown", label: "לא זוהה" });
+    expect(
+      normalizeLandingCategory(
+        "https://hilitcaspi.com/dna-quiz?utm_campaign=lead_cold"
+      )
+    ).toEqual({ category: "dna_quiz", label: "שאלון DNA" });
   });
 
-  it("labels source-first, direct Grow and email assistance as distinct concepts in the UI", () => {
-    expect(dashboardSource).toContain("מקור ראשון (קוהורט)");
-    expect(dashboardSource).toContain("רכישה ישירה · Grow");
-    expect(dashboardSource).toContain("אינה טוענת שהמייל לבדו יצר את המכירה");
-    expect(dashboardSource).toContain("אינה הוכחה שסיבת הרכישה הייתה המודעה האחרונה");
+  it("labels acquisition, closing and email assistance as distinct concepts in the UI", () => {
+    expect(dashboardSource).toContain("מקור הגיוס");
+    expect(dashboardSource).toContain("ערוץ הסגירה");
+    expect(dashboardSource).toContain("סיוע מייל");
+    expect(dashboardSource).toContain("אותה מכירה עשויה לקבל קרדיט בכל עדשה");
   });
 
-  it("shows the campaign journey once, before the general KPI sections", () => {
-    expect(dashboardSource.match(/id="campaign-journey"/g)).toHaveLength(1);
-    expect(dashboardSource.indexOf('id="campaign-journey"')).toBeLessThan(
-      dashboardSource.indexOf("SECTION 1: TOP KPIs"),
+  it("shows campaign, product and sales detail in the sales command center", () => {
+    expect(dashboardSource).toContain("קמפיין הגיוס → הרכישה");
+    expect(dashboardSource).toContain("מוצרים שנמכרו");
+    expect(dashboardSource).toContain("כל המכירות");
+    expect(dashboardSource).toContain("המרות ש־Meta ייחסה");
+  });
+
+  it("keeps data-quality caveats visible without claiming Ads Manager equals the website model", () => {
+    expect(dashboardSource).toContain("הערות איכות נתונים");
+    expect(dashboardSource).toContain(
+      "מודל האתר אינו זהה לייחוס ב־Ads Manager"
     );
-    expect(dashboardSource).toContain("המעקב החדש שסיכמנו");
-  });
-
-  it("warns about partial UTM coverage and hides cohort CAC when coverage is weak", () => {
-    expect(dashboardSource).toContain("איכות מיפוי מקור ראשון");
-    expect(dashboardSource).toContain("cohortMetricsReliable");
-    expect(dashboardSource).toContain("לא מוצג · כיסוי UTM חלקי");
-    expect(dashboardSource).toContain("היום הנוכחי עדיין חלקי");
+    expect(dashboardSource).toContain("היום עדיין חלקי");
+    expect(dashboardSource).toContain("אופן מיפוי");
   });
 
   it("uses destination labels and UTM tags from active ads when a campaign is active", () => {
     expect(routerSource).toContain("activeUtmCampaigns");
-    expect(routerSource).toContain("value.activeAds > 0 ? value.activeUtmCampaigns : value.utmCampaigns");
-    expect(routerSource).toContain("value.activeAds > 0 ? value.activeLabels : value.labels");
+    expect(routerSource).toContain(
+      "value.activeAds > 0 ? value.activeUtmCampaigns : value.utmCampaigns"
+    );
+    expect(routerSource).toContain(
+      "value.activeAds > 0 ? value.activeLabels : value.labels"
+    );
   });
 });
