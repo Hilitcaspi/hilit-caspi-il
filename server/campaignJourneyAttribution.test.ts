@@ -89,27 +89,11 @@ describe("campaign journey attribution", () => {
     ).toEqual({ category: "dna_quiz", label: "שאלון DNA" });
   });
 
-  it("labels acquisition, closing and email assistance as distinct concepts in the UI", () => {
-    expect(dashboardSource).toContain("מקור הגיוס");
-    expect(dashboardSource).toContain("ערוץ הסגירה");
-    expect(dashboardSource).toContain("סיוע מייל");
-    expect(dashboardSource).toContain("אותה מכירה עשויה לקבל קרדיט בכל עדשה");
-  });
-
-  it("shows campaign, product and sales detail in the sales command center", () => {
-    expect(dashboardSource).toContain("קמפיין הגיוס → הרכישה");
-    expect(dashboardSource).toContain("מוצרים שנמכרו");
-    expect(dashboardSource).toContain("כל המכירות");
-    expect(dashboardSource).toContain("המרות ש־Meta ייחסה");
-  });
-
-  it("keeps data-quality caveats visible without claiming Ads Manager equals the website model", () => {
-    expect(dashboardSource).toContain("הערות איכות נתונים");
-    expect(dashboardSource).toContain(
-      "מודל האתר אינו זהה לייחוס ב־Ads Manager"
-    );
-    expect(dashboardSource).toContain("היום עדיין חלקי");
-    expect(dashboardSource).toContain("אופן מיפוי");
+  it("removes the confusing journey UI but keeps the backend attribution contract", () => {
+    expect(dashboardSource).not.toContain('id="campaign-journey"');
+    expect(dashboardSource).not.toContain("campaignJourney.useQuery");
+    expect(dashboardSource).toContain("SalesSourcesTable");
+    expect(dashboardSource).toContain("Meta Ads — תקציב ותוצאות מדווחות");
   });
 
   it("uses destination labels and UTM tags from active ads when a campaign is active", () => {

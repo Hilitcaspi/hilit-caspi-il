@@ -576,9 +576,11 @@ export const dashboardRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       guardAdmin(ctx);
+      ctx.res.setHeader("Cache-Control", "private, no-store");
       try {
         return await getSalesIntelligence(input.startDate, input.endDate, {
           includeExpenses: input.includeExpenses,
+          includeBuyerNames: true,
         });
       } catch (error) {
         console.error("[SalesIntelligence] unavailable", error instanceof Error ? error.name : "unknown");

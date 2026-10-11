@@ -57,6 +57,8 @@ export type SalesIntelligence = {
   };
   sales: Array<{
     order: number;
+    buyerName?: string | null;
+    creative?: string | null;
     paidAt: number;
     day: string;
     product: string;
@@ -154,6 +156,7 @@ type InternalAttribution = {
   channelSource: string;
   medium: string;
   campaignRaw: string;
+  creative?: string;
   confidence: string;
   at: number | null;
   metaCampaignId: string | null;
@@ -319,6 +322,7 @@ function internalAttribution(
     channelSource: utmSource || explicitSource,
     medium: text(row.utmMedium),
     campaignRaw: text(row.utmCampaign),
+    creative: text(row.utmContent),
     confidence,
     at,
     metaCampaignId: text(options.metaCampaignId) || null,
@@ -611,12 +615,24 @@ async function queryByEmailChunks<T>(
   return output;
 }
 
-export type SalesIntelligenceOptions = { includeExpenses?: boolean };
+/** Buyer names are opt-in at the guarded staff route only; digests/QA stay anonymous. */
+export type SalesIntelligenceOptions = { includeExpenses?: boolean; includeBuyerNames?: boolean };
+
+export function chooseStaffBuyerName(payment: PaymentRow, contacts: Array<{ email: string; name: string; confirmedTransactionId?: string | null; product?: string | null; kind: string }>): string | null {
+  const matching = contacts.filter(contact => normalizedEmail(contact.email) === normalizedEmail(payment.email));
+  const unique = (rows: typeof contacts) => {
+    const names = Array.from(new Set(rows.map(row => sanitizeSalesLabel(row.name, "")).filter(Boolean)));
+    return names.length === 1 ? names[0]! : null;
+  };
+  return unique(matching.filter(row => row.kind === "payment" && row.product === payment.product && exactTransactionMatch(row.confirmedTransactionId, payment.transactionId)))
+    || unique(matching.filter(row => row.kind === "single"))
+    || unique(matching.filter(row => row.kind === "crm"));
+}
 
 export async function getSalesIntelligence(
   startDate: number,
   endDate: number,
-  { includeExpenses = true }: SalesIntelligenceOptions = {},
+  { includeExpenses = true, includeBuyerNames = false }: SalesIntelligenceOptions = {},
 ): Promise<SalesIntelligence> {
   if (!Number.isFinite(startDate) || !Number.isFinite(endDate) || endDate <= startDate) throw new Error("Invalid sales intelligence date range");
   const db = await getDb();
@@ -669,6 +685,18 @@ export async function getSalesIntelligence(
   const commercialGrowRows = selectedRows.filter(row => row.amountSource === "grow" && !isTestOrTiny(row));
   const duplicateReviewIds = findConservativeDuplicateReviewIds(paymentRows);
   const emails = Array.from(new Set(commercialGrowRows.map(row => normalizedEmail(row.email)).filter(Boolean)));
+
+  const buyerContacts = includeBuyerNames ? await queryByEmailChunks(emails, async chunk => {
+    const inEmails = sql.join(chunk.map(value => sql`${value}`), sql`, `);
+    const [rows] = await db.execute(sql`
+      SELECT email, name, confirmed_transaction_id AS confirmedTransactionId, product, 'payment' AS kind FROM payment_leads WHERE LOWER(TRIM(email)) IN (${inEmails})
+      UNION ALL
+      SELECT email, CONCAT_WS(' ', firstName, NULLIF(lastName, '')) AS name, NULL AS confirmedTransactionId, NULL AS product, 'single' AS kind FROM singles WHERE LOWER(TRIM(email)) IN (${inEmails})
+      UNION ALL
+      SELECT email, name, NULL AS confirmedTransactionId, NULL AS product, 'crm' AS kind FROM crm_leads WHERE LOWER(TRIM(email)) IN (${inEmails})
+    `) as any;
+    return rows as Array<{ email: string; name: string; confirmedTransactionId: string | null; product: string | null; kind: string }>;
+  }) : [];
 
   const [crmRows, legacyRows, singleRows, paymentLeadRows, plusIntentRows, analyticsRows, emailRows, boostRows, plusPaymentRows] = await Promise.all([
     queryByEmailChunks(emails, async chunk => {
@@ -903,6 +931,8 @@ export async function getSalesIntelligence(
     .sort((a, b) => a.payment.paidAt - b.payment.paidAt || a.payment.id - b.payment.id)
     .map((row, index) => ({
       order: index + 1,
+      ...(includeBuyerNames ? { buyerName: chooseStaffBuyerName(row.payment, buyerContacts) } : {}),
+      creative: row.closing.creative ? sanitizeSalesLabel(row.closing.creative, "לא תועד") : null,
       paidAt: row.payment.paidAt,
       day: israelDateKey(row.payment.paidAt),
       product: productForOutput(row.payment.product),
