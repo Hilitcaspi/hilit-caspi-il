@@ -194,14 +194,14 @@ function extractUtmCampaign(raw: string) {
   try { return decodeURIComponent(match[1].replace(/\+/g, " ")).trim(); } catch { return match[1].trim(); }
 }
 
-let metaDestinationsCache: { fetchedAt: number; data: Record<string, { labels: string[]; categories: string[]; utmCampaigns: string[]; activeAds: number; ads: number }> } | null = null;
+let metaDestinationsCache: { fetchedAt: number; data: Record<string, { labels: string[]; categories: string[]; utmCampaigns: string[]; activeAds: number; ads: number; campaignName: string; adReferences: Array<{ id: string; name: string }> }> } | null = null;
 
 export async function fetchMetaCampaignDestinations() {
   if (metaDestinationsCache && Date.now() - metaDestinationsCache.fetchedAt < 10 * 60 * 1000) return metaDestinationsCache.data;
   const token = process.env.META_ADS_TOKEN;
   if (!token) return metaDestinationsCache?.data || {};
   const accountId = "act_254697595735216";
-  const fields = "campaign_id,campaign_name,effective_status,creative{object_story_spec,asset_feed_spec,url_tags}";
+  const fields = "id,name,campaign{id,name},effective_status,creative{object_story_spec,asset_feed_spec,url_tags}";
   const byCampaign: Record<string, {
     labels: Set<string>;
     categories: Set<string>;
@@ -211,6 +211,8 @@ export async function fetchMetaCampaignDestinations() {
     activeUtmCampaigns: Set<string>;
     activeAds: number;
     ads: number;
+    campaignName: string;
+    adReferences: Array<{ id: string; name: string }>;
   }> = {};
   try {
     let next: string | null = `https://graph.facebook.com/v25.0/${accountId}/ads?fields=${fields}&limit=200&access_token=${token}`;
@@ -219,7 +221,7 @@ export async function fetchMetaCampaignDestinations() {
       const payload: any = await res.json();
       if (!res.ok || payload.error) throw new Error(payload.error?.message || `Meta HTTP ${res.status}`);
       for (const ad of payload.data || []) {
-        const id = String(ad.campaign_id || "");
+        const id = String(ad.campaign?.id || "");
         if (!id) continue;
         if (!byCampaign[id]) byCampaign[id] = {
           labels: new Set(),
@@ -230,7 +232,10 @@ export async function fetchMetaCampaignDestinations() {
           activeUtmCampaigns: new Set(),
           activeAds: 0,
           ads: 0,
+          campaignName: String(ad.campaign?.name || ""),
+          adReferences: [],
         };
+        if (ad.id) byCampaign[id].adReferences.push({ id: String(ad.id), name: String(ad.name || "") });
         byCampaign[id].ads += 1;
         const isActive = ad.effective_status === "ACTIVE";
         if (isActive) byCampaign[id].activeAds += 1;
@@ -266,6 +271,8 @@ export async function fetchMetaCampaignDestinations() {
     utmCampaigns: Array.from(value.activeAds > 0 ? value.activeUtmCampaigns : value.utmCampaigns).filter(Boolean).slice(0, 8),
     activeAds: value.activeAds,
     ads: value.ads,
+    campaignName: value.campaignName,
+    adReferences: value.adReferences,
   }]));
   metaDestinationsCache = { fetchedAt: Date.now(), data };
   return data;

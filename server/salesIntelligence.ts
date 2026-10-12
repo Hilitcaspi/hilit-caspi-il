@@ -169,6 +169,7 @@ type ResolvedAttribution = {
   confidence: string;
   mapping: string;
   metaCampaignId: string | null;
+  creative?: string;
 };
 
 type InternalSale = {
@@ -192,6 +193,7 @@ type MetaContext = {
   campaigns: Map<string, MetaCampaign>;
   uniqueUtmCampaigns: Map<string, string>;
   activeCampaignIds: Set<string>;
+  adReferences?: Map<string, { campaignId: string; name: string }>;
 };
 
 function text(value: unknown): string {
@@ -342,16 +344,27 @@ function unknownAttribution(confidence: string): InternalAttribution {
   };
 }
 
-function resolveAttribution(value: InternalAttribution, meta: MetaContext): ResolvedAttribution {
+export function resolveAttribution(value: InternalAttribution, meta: MetaContext): ResolvedAttribution {
   const rawCampaign = text(value.campaignRaw);
   const rawCampaignKey = lower(rawCampaign);
   const channel = classifyChannel(value.channelSource, value.medium);
   // An Email click remains Email even if its generic UTM happens to resemble a
   // Meta creative. Only explicit paid evidence may bridge it to Meta.
   const isEmailLayer = channel === "Email";
+  const isMetaLayer = /^(?:meta|meta_ads|fb|facebook|ig|instagram|facebook_shabek|meta_lead_guide|meta_lead_dna|meta_lead_call)$/.test(lower(value.channelSource));
+  const adReference = isMetaLayer && !isEmailLayer ? meta.adReferences?.get(text(value.creative)) : undefined;
+  const byExactAd = adReference ? meta.campaigns.get(adReference.campaignId) : undefined;
+  if (byExactAd) return {
+    channel: "Meta Ads (ממומן)",
+    campaign: sanitizeSalesLabel(byExactAd.name, "קמפיין Meta לא מזוהה"),
+    confidence: `${value.confidence}; מזהה מודעה תואם`,
+    mapping: "מזהה מודעת Meta תואם",
+    metaCampaignId: byExactAd.id,
+    creative: sanitizeSalesLabel(adReference!.name, "מודעת Meta"),
+  };
   const byId = !isEmailLayer && value.metaCampaignId ? meta.campaigns.get(value.metaCampaignId) : undefined;
   const byRawId = !isEmailLayer && rawCampaign ? meta.campaigns.get(rawCampaign) : undefined;
-  const byUniqueUtmId = !isEmailLayer && rawCampaignKey ? meta.uniqueUtmCampaigns.get(rawCampaignKey) : undefined;
+  const byUniqueUtmId = isMetaLayer && !isEmailLayer && rawCampaignKey ? meta.uniqueUtmCampaigns.get(rawCampaignKey) : undefined;
   const mapped = byId || byRawId || (byUniqueUtmId ? meta.campaigns.get(byUniqueUtmId) : undefined);
   if (mapped) {
     const mapping = byId || byRawId
@@ -584,7 +597,11 @@ async function getMetaContext(startDate: number, endDate: number): Promise<MetaC
     // eligible. Names and generic aliases are deliberately never inferred.
     const candidateUtmIds = new Map<string, Set<string>>();
     const activeCampaignIds = new Set<string>();
+    const adReferences = new Map<string, { campaignId: string; name: string }>();
     for (const [id, destination] of Object.entries(destinations || {})) {
+      // Historical ads remain valid source evidence even without period spend.
+      if (!campaigns.has(id)) campaigns.set(id, { id, name: destination.campaignName, spend: 0, purchases: 0 });
+      for (const ad of destination.adReferences) adReferences.set(ad.id, { campaignId: id, name: ad.name });
       if (destination.activeAds > 0) activeCampaignIds.add(id);
       for (const utm of destination.utmCampaigns) {
         const key = lower(utm);
@@ -600,7 +617,7 @@ async function getMetaContext(startDate: number, endDate: number): Promise<MetaC
       if (ids.size === 1 && id) uniqueUtmCampaigns.set(utm, id);
     }
     for (const campaign of Array.from(campaigns.values())) if (campaign.spend > 0) activeCampaignIds.add(campaign.id);
-    return { status: insights.status, campaigns, uniqueUtmCampaigns, activeCampaignIds };
+    return { status: insights.status, campaigns, uniqueUtmCampaigns, activeCampaignIds, adReferences };
   } catch {
     return { status: "unavailable", campaigns: new Map(), uniqueUtmCampaigns: new Map(), activeCampaignIds: new Set() };
   }
@@ -932,7 +949,7 @@ export async function getSalesIntelligence(
     .map((row, index) => ({
       order: index + 1,
       ...(includeBuyerNames ? { buyerName: chooseStaffBuyerName(row.payment, buyerContacts) } : {}),
-      creative: row.closing.creative ? sanitizeSalesLabel(row.closing.creative, "לא תועד") : null,
+      creative: row.closingResolved.creative || (row.closing.creative ? sanitizeSalesLabel(row.closing.creative, "לא תועד") : null),
       paidAt: row.payment.paidAt,
       day: israelDateKey(row.payment.paidAt),
       product: productForOutput(row.payment.product),
