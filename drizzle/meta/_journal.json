@@ -316,6 +316,13 @@
       "when": 1791887309157,
       "tag": "0044_wise_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "5",
+      "when": 1791903459133,
+      "tag": "0045_gorgeous_iron_lad",
+      "breakpoints": true
     }
   ]
 }

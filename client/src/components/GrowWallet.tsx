@@ -26,6 +26,7 @@ import { isGrowPaymentRendererReady, isGrowWalletVisible } from "@/lib/growSdkRe
 import { normalizeIsraeliPhone } from "@shared/profileValidation";
 import { getMetaBrowserIdentifiers, rememberPurchaseTrackingToken } from "@/lib/purchaseTracking";
 import { isExpectedCheckoutRejection } from "@shared/paymentFailureClassification";
+import { getFirstTouchAcquisition, getLastUtmAcquisition } from "@/lib/acquisitionTracking";
 
 // ─── Grow config from VITE env vars ──────────────────────────────────────────
 const GROW_ENV = "PRODUCTION" as string; // "DEV" for sandbox, "PRODUCTION" for live
@@ -292,26 +293,6 @@ export default function GrowWallet({
   // Server-side step logger for debugging payment flow on mobile
   const logStepMutation = trpc.payment.logStep.useMutation();
 
-  // Capture UTM params from URL on mount and persist to sessionStorage
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
-    utmKeys.forEach(key => {
-      const val = params.get(key);
-      if (val) sessionStorage.setItem(key, val);
-    });
-    // Also check referrer for organic sources
-    if (!sessionStorage.getItem('utm_source') && document.referrer) {
-      try {
-        const ref = new URL(document.referrer);
-        if (ref.hostname.includes('google')) sessionStorage.setItem('utm_source', 'google');
-        else if (ref.hostname.includes('facebook') || ref.hostname.includes('fb.com')) sessionStorage.setItem('utm_source', 'facebook');
-        else if (ref.hostname.includes('instagram')) sessionStorage.setItem('utm_source', 'instagram');
-        else if (ref.hostname.includes('tiktok')) sessionStorage.setItem('utm_source', 'tiktok');
-      } catch {}
-    }
-  }, []);
-
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
     const normalizedCode = couponCode.trim();
@@ -499,18 +480,9 @@ export default function GrowWallet({
           finalPrice = Math.max(1, Math.round(basePrice * (1 - couponApplied.discountPercent / 100)));
         }
       }
-      // Collect UTM data from sessionStorage or localStorage
-      const utmSource = sessionStorage.getItem('utm_source') || localStorage.getItem('utm_source') || undefined;
-      const utmMedium = sessionStorage.getItem('utm_medium') || localStorage.getItem('utm_medium') || undefined;
-      const utmCampaign = sessionStorage.getItem('utm_campaign') || localStorage.getItem('utm_campaign') || undefined;
-      const utmContent = sessionStorage.getItem('utm_content') || localStorage.getItem('utm_content') || undefined;
-      const utmTerm = sessionStorage.getItem('utm_term') || localStorage.getItem('utm_term') || undefined;
-      const metaCampaignId = sessionStorage.getItem('meta_campaign_id') || localStorage.getItem('meta_campaign_id') || undefined;
-      const metaAdSetId = sessionStorage.getItem('meta_adset_id') || localStorage.getItem('meta_adset_id') || undefined;
-      const metaAdId = sessionStorage.getItem('meta_ad_id') || localStorage.getItem('meta_ad_id') || undefined;
-      const metaPlacement = sessionStorage.getItem('meta_placement') || localStorage.getItem('meta_placement') || undefined;
-      const metaSiteSource = sessionStorage.getItem('site_source_name') || localStorage.getItem('site_source_name') || undefined;
-      const attributionTerm = [utmTerm, metaPlacement, metaSiteSource].filter(Boolean).join('|').slice(0, 200) || undefined;
+      const lastUtm = getLastUtmAcquisition();
+      const { utmSource, utmMedium, utmCampaign, utmContent, utmTerm, metaCampaignId, metaAdSetId, metaAdId, metaPlacement, siteSourceName } = lastUtm || {};
+      const attributionTerm = [utmTerm, metaPlacement, siteSourceName].filter(Boolean).join("|").slice(0, 200) || undefined;
 
       // Extract GA4 client_id from _ga cookie (format: GA1.1.XXXXXXXX.XXXXXXXXXX)
       // The client_id is the last two dot-separated segments: "XXXXXXXX.XXXXXXXXXX"
@@ -565,6 +537,7 @@ export default function GrowWallet({
         metaCampaignId,
         metaAdSetId,
         metaAdId,
+        firstTouch: getFirstTouchAcquisition(),
         ga4ClientId,
         ga4SessionId,
         fbp,

@@ -7,6 +7,7 @@
  */
 
 import { getUtmParams } from "@/lib/utils";
+import { getFirstTouchAcquisition } from "@/lib/acquisitionTracking";
 import { track } from "@/lib/track";
 import { useState, useEffect, useRef } from "react";
 import { motion, useInView, AnimatePresence, LazyMotion, domAnimation } from "framer-motion";
@@ -76,7 +77,7 @@ function FreeGuideForm() {
     if (!name || !email || !consent) return;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) return;
-    submitLead.mutate({ name, email, ...getUtmParams() });
+    submitLead.mutate({ name, email, ...getUtmParams(), firstTouch: getFirstTouchAcquisition() });
   };
   if (submitLead.isSuccess) {
     return (
@@ -128,7 +129,7 @@ function PaidGuideForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !consent) return;
-    submitPaidGuide.mutate({ name, email, origin: window.location.origin, ...getUtmParams() });
+    submitPaidGuide.mutate({ name, email, origin: window.location.origin, ...getUtmParams(), firstTouch: getFirstTouchAcquisition() });
   };
   if (submitPaidGuide.isSuccess) {
     return (

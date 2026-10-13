@@ -10,6 +10,7 @@ import { trpc } from "@/lib/trpc";
 import { track } from "@/lib/track";
 import { trackLead } from "@/lib/metaPixel";
 import { getUtmParams } from "@/lib/utils";
+import { getFirstTouchAcquisition } from "@/lib/acquisitionTracking";
 
 const HILIT_PROFILE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
 
@@ -174,7 +175,7 @@ export default function SignsGuide() {
     e.preventDefault();
     setError("");
     if (!name.trim() || !email.trim()) return;
-    submitLead.mutate({ name: name.trim(), email: email.trim(), ...getUtmParams() });
+    submitLead.mutate({ name: name.trim(), email: email.trim(), ...getUtmParams(), firstTouch: getFirstTouchAcquisition() });
   };
 
   return (

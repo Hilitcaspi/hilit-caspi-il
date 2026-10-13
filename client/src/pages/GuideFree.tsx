@@ -4,6 +4,7 @@
  * Route: /guide-free
  */
 import { getUtmParams } from "@/lib/utils";
+import { getFirstTouchAcquisition } from "@/lib/acquisitionTracking";
 import { useState, useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import { Link } from "wouter";
@@ -77,7 +78,7 @@ export default function GuideFree() {
     e.preventDefault();
     setError("");
     if (!name.trim() || !email.trim()) return;
-    submitLead.mutate({ name: name.trim(), email: email.trim(), ...getUtmParams() });
+    submitLead.mutate({ name: name.trim(), email: email.trim(), ...getUtmParams(), firstTouch: getFirstTouchAcquisition() });
   };
 
   return (

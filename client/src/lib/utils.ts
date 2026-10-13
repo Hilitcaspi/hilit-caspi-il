@@ -1,30 +1,44 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { getLastUtmAcquisition } from "./acquisitionTracking";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 /**
- * Read UTM parameters from:
- * 1. Current URL params (highest priority)
- * 2. sessionStorage (persisted across in-app navigation)
- * 3. localStorage (survives cross-domain redirects like Grow payment page)
+ * Read only the separate last explicit UTM snapshot. First-touch attribution is
+ * intentionally not reconstructed here; qualifying consumers send it under
+ * `firstTouch` via getFirstTouchAcquisition().
  */
 export function getUtmParams() {
   if (typeof window === "undefined") return {};
-  const p = new URLSearchParams(window.location.search);
-  const get = (key: string) =>
-    p.get(key) ??
-    sessionStorage.getItem(key) ??
-    localStorage.getItem(key) ??
-    undefined;
+  const isUsOrEnglishPage = window.location.hostname === "matchbyhilit.com"
+    || window.location.hostname === "www.matchbyhilit.com"
+    || window.location.pathname === "/en"
+    || window.location.pathname.startsWith("/en/");
+  if (isUsOrEnglishPage) {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const get = (key: string) => params.get(key) ?? sessionStorage.getItem(key) ?? localStorage.getItem(key) ?? undefined;
+      return {
+        utmSource: get("utm_source"),
+        utmMedium: get("utm_medium"),
+        utmCampaign: get("utm_campaign"),
+        utmContent: get("utm_content"),
+        utmTerm: get("utm_term"),
+      };
+    } catch {
+      return {};
+    }
+  }
+  const lastUtm = getLastUtmAcquisition();
   return {
-    utmSource: get("utm_source"),
-    utmMedium: get("utm_medium"),
-    utmCampaign: get("utm_campaign"),
-    utmContent: get("utm_content"),
-    utmTerm: get("utm_term"),
+    utmSource: lastUtm?.utmSource,
+    utmMedium: lastUtm?.utmMedium,
+    utmCampaign: lastUtm?.utmCampaign,
+    utmContent: lastUtm?.utmContent,
+    utmTerm: lastUtm?.utmTerm,
   };
 }
 

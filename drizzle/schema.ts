@@ -1648,3 +1648,18 @@ export const growPaymentReceipts = mysqlTable("grow_payment_receipts", {
   identityIdx: uniqueIndex("grow_receipt_identity_idx").on(table.receiptKey),
   dateStateIdx: index("grow_receipt_date_state_idx").on(table.receivedAt, table.state),
 }));
+
+// Future-only first identifiable acquisition. actorKey is a scoped HMAC, never a raw email.
+export const acquisitionFirstTouches = mysqlTable("acquisition_first_touches", {
+  actorKey: varchar("actor_key", { length: 64 }).primaryKey(),
+  utmSource: varchar("utm_source", { length: 200 }),
+  utmMedium: varchar("utm_medium", { length: 200 }),
+  utmCampaign: varchar("utm_campaign", { length: 200 }),
+  utmContent: varchar("utm_content", { length: 200 }),
+  utmTerm: varchar("utm_term", { length: 200 }),
+  metaCampaignId: varchar("meta_campaign_id", { length: 100 }),
+  metaAdSetId: varchar("meta_adset_id", { length: 100 }),
+  metaAdId: varchar("meta_ad_id", { length: 100 }),
+  capturedAt: bigint("captured_at", { mode: "number" }).notNull(),
+  recordedAt: bigint("recorded_at", { mode: "number" }).notNull(),
+});

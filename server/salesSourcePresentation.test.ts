@@ -13,11 +13,11 @@ describe("human-readable purchase sources", () => {
     expect(result.original).toBeNull();
   });
   it("does not call an untyped Instagram link organic or paid", () => {
-    expect(presentSalesSource(sale("Instagram (אורגני/לא ידוע)")).title).toBe("אינסטגרם · ממומן או אורגני לא זוהה");
+    expect(presentSalesSource(sale("Instagram (אורגני/לא ידוע)")).title).toBe("אינסטגרם · סוג הקישור לא נשמר");
   });
   it("explains a generic email tag and shows a recorded email click separately", () => {
     const result = presentSalesSource({ ...sale("Email"), emailAssist: { campaign: "הצעד הראשון לנשים", clicked: true, sameDay: true } });
-    expect(result.title).toBe("מייל · הצעד הראשון לנשים");
+    expect(result.title).toBe("מייל");
     expect(result.detail).toContain("קליק במייל לפני הרכישה: הצעד הראשון לנשים");
     expect(result.original).toBeNull();
   });
@@ -26,7 +26,8 @@ describe("human-readable purchase sources", () => {
   });
   it("retains known email campaigns", () => {
     const result = presentSalesSource(sale("Email", "השקת מאגר עם מתנת לייב"));
-    expect(result.title).toContain("השקת מאגר עם מתנת לייב");
+    expect(result.title).toBe("מייל");
+    expect(result.original).toBeNull();
   });
   it("does not treat a CRM paid status as an acquisition channel", () => {
     for (const channel of ["ישיר / לא ידוע", "paid_database", "שאלון DNA / מקור לא ידוע"]) {
@@ -60,6 +61,11 @@ describe("acquisition summary and collapsed journey", () => {
     const input = { ...counted("Email"), acquisition: source("Meta Ads (ממומן)", "קמפיין", "מקור בעסקה; לא נמצא מקור קודם") };
     expect(salesSourceJourney(input)).toMatchObject({ group: "email", acquisitionRecorded: false, acquisitionCampaign: null });
   });
+  it("does not use a recorded email touch as the source that recruited someone to email", () => {
+    const input = { ...counted("Email"), acquisition: source("Email", "מייל קודם", "מקור ראשוני נפרד שנשמר בהרשמה") };
+    expect(salesSourceJourney(input)).toMatchObject({ group: "email", acquisitionRecorded: false, acquisitionCampaign: null, emailClosed: true });
+    expect(summarizeSalesSources([input])[0]).toMatchObject({ count: 1, emailClosedCount: 1, closingOnlyCount: 1 });
+  });
   it("groups a documented Instagram acquisition with a subsequent email close", () => {
     const input = { ...counted("Email"), acquisition: source("Instagram (אורגני/לא ידוע)") };
     expect(salesSourceJourney(input)).toMatchObject({ group: "instagram", emailClosed: true, acquisitionCampaign: null });
@@ -90,8 +96,8 @@ describe("acquisition summary and collapsed journey", () => {
 describe("plain-language evidence", () => {
   it("explains Facebook with a raw tag without inventing a paid campaign", () => {
     const input = sale("Facebook (אורגני/לא ידוע)", "database", "rem_db");
-    expect(presentSalesSource(input).title).toBe("פייסבוק · ממומן או אורגני לא זוהה");
-    expect(explainSalesSourceEvidence(input)).toContain("לא ניתן להבחין");
+    expect(presentSalesSource(input).title).toBe("פייסבוק · סוג הקישור לא נשמר");
+    expect(explainSalesSourceEvidence(input)).toContain("אינה מסווגת");
     expect(presentSalesSource(input).creative).toBe("rem_db");
     expect(salesSourceJourney(input).acquisitionRecorded).toBe(false);
   });
@@ -110,8 +116,8 @@ describe("plain-language evidence", () => {
 describe("specific social link and visible source labels", () => {
   it("shows exact email journey without opening details", () => {
     const input = { ...sale("Email"), emailAssist: { campaign: "הצעד הראשון לגברים", clicked: true, sameDay: true } };
-    expect(salesSourceJourney(input).primaryLabel).toBe("מייל · הצעד הראשון לגברים");
-    expect(salesSourceJourney({...input,acquisition:source("Email")} ).primaryLabel).toBe("מייל · הצעד הראשון לגברים");
+    expect(salesSourceJourney(input).primaryLabel).toBe("מייל");
+    expect(salesSourceJourney({...input,acquisition:source("Email")} ).primaryLabel).toBe("מייל");
   });
   it("distinguishes explicit organic posts, stories, reels, bio and social reply", () => {
     for (const [medium, content, expected] of [
@@ -129,7 +135,7 @@ describe("specific social link and visible source labels", () => {
   });
   it("does not make generic social or retargeting-looking names proof of organic or paid", () => {
     const input = { ...sale("Facebook (אורגני/לא ידוע)", "rem_db", "rem_db"), closing: {...source("Facebook (אורגני/לא ידוע)","rem_db"),medium:"social"} };
-    expect(presentSalesSource(input).title).toBe("פייסבוק · ממומן או אורגני לא זוהה");
+    expect(presentSalesSource(input).title).toBe("פייסבוק · סוג הקישור לא נשמר");
     expect(salesSourceJourney(input).primaryCampaign).toBeNull();
   });
   it("keeps a mapped paid story a paid ad, not an organic story", () => {

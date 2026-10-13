@@ -3,6 +3,7 @@
 
 import { COOKIE_NAME } from "../shared/const";
 import { captureAcquisitionIfMissing } from "../shared/acquisitionAttribution";
+import { acquisitionInputSchema, recordAcquisitionSafely } from "./acquisitionCapture";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
@@ -764,6 +765,7 @@ export const appRouter = router({
         name: z.string().min(1),
         email: z.string().email(),
         phone: z.string().optional(),
+        firstTouch: acquisitionInputSchema.optional(),
         utmSource: z.string().optional(),
         utmMedium: z.string().optional(),
         utmCampaign: z.string().optional(),
@@ -774,6 +776,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        if (input.lang !== "en") await recordAcquisitionSafely(input.email, input.firstTouch);
         await db.insert(leads).values({
           name: input.name,
           email: input.email,
@@ -828,6 +831,7 @@ export const appRouter = router({
         name: z.string().min(1),
         email: z.string().email(),
         origin: z.string().optional(),
+        firstTouch: acquisitionInputSchema.optional(),
         utmSource: z.string().optional(),
         utmMedium: z.string().optional(),
         utmCampaign: z.string().optional(),
@@ -878,6 +882,7 @@ export const appRouter = router({
         name: z.string().min(1),
         email: z.string().email(),
         origin: z.string().optional(),
+        firstTouch: acquisitionInputSchema.optional(),
         utmSource: z.string().optional(),
         utmMedium: z.string().optional(),
         utmCampaign: z.string().optional(),
@@ -887,6 +892,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await recordAcquisitionSafely(input.email, input.firstTouch);
         // Save as lead
         await db.insert(leads).values({
           name: input.name,
@@ -1103,6 +1109,7 @@ export const appRouter = router({
         dnaType: z.enum(["leader", "romantic", "free_spirit", "anchor"]).optional(),
         quizSessionId: z.string().optional(),
         source: z.enum(["dna_quiz", "guide_form", "direct", "referral", "instagram", "podcast", "meta_lead_guide", "meta_lead_dna", "meta_lead_call", "press_article"]).optional(),
+        firstTouch: acquisitionInputSchema.optional(),
         utmSource: z.string().max(100).optional(),
         utmMedium: z.string().max(100).optional(),
         utmCampaign: z.string().max(200).optional(),
@@ -1165,6 +1172,8 @@ export const appRouter = router({
           });
           leadId = (inserted as any)[0].insertId as number;
         }
+
+        await recordAcquisitionSafely(input.email, input.firstTouch);
 
         // notifyOwner removed, DNA lead notifications disabled
 
@@ -1716,6 +1725,7 @@ export const appRouter = router({
           photoMime: z.string().optional(),
           crmLeadId: z.number().optional(),
           source: z.enum(["dna_quiz", "guide_form", "direct", "referral", "instagram", "podcast", "meta_lead_guide", "meta_lead_dna", "meta_lead_call", "press_article"]).optional(),
+          firstTouch: acquisitionInputSchema.optional(),
           utmSource: z.string().optional(),
           utmMedium: z.string().optional(),
           utmCampaign: z.string().optional(),
@@ -1735,6 +1745,7 @@ export const appRouter = router({
           photoUrl = result.url;
         }
 
+        await recordAcquisitionSafely(input.email, input.firstTouch);
         const inserted = await db.insert(singles).values({
           firstName: input.firstName,
           lastName: input.lastName,
@@ -1967,6 +1978,7 @@ export const appRouter = router({
           photoMime: z.string().nullish(),
           origin: z.string().nullish(),
           freeToken: z.string().nullish(),
+          firstTouch: acquisitionInputSchema.optional(),
           utmSource: z.string().nullish(),
           utmMedium: z.string().nullish(),
           utmCampaign: z.string().nullish(),
@@ -1987,6 +1999,8 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        if (input.market !== "us") await recordAcquisitionSafely(input.email, input.firstTouch);
 
         // Normalize email and phone to match Grow webhook storage format
         const normalizedEmail = input.email.trim().toLowerCase();
@@ -7986,6 +8000,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         // Client passes coupon code; server validates and computes final price
         couponCode: z.string().max(50).optional(),
         // UTM tracking
+        firstTouch: acquisitionInputSchema.optional(),
         utmSource: z.string().max(100).optional(),
         utmMedium: z.string().max(100).optional(),
         utmCampaign: z.string().max(200).optional(),
@@ -8279,6 +8294,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             console.error("[createProcess] Failed to save UTM/GA4 to CRM:", e);
           }
         }
+
+        await recordAcquisitionSafely(normalizedCheckoutEmail, input.firstTouch);
 
         // Save short-lived browser attribution before opening Grow. The row is
         // reset on every new attempt and can become a Purchase only after the

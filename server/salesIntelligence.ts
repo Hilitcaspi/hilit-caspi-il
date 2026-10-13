@@ -5,6 +5,7 @@ import {
 } from "../drizzle/schema";
 import { prorateMonthlyAmountAgorot } from "./businessFinance";
 import { getDb } from "./db";
+import { acquisitionActorKey } from "./acquisitionCapture";
 import { META_ADS_ACCOUNT_TIMEZONE } from "./dashboardMetaSpend";
 import { israelDateKey } from "./dashboardRevenue";
 
@@ -119,8 +120,9 @@ type HistoricalTouch = SourceFields & {
   email: string;
   createdAt: number;
   updatedAt?: number | null;
-  sourceKind: "crm" | "legacy" | "single" | "payment" | "plus_intent" | "analytics";
+  sourceKind: "crm" | "legacy" | "single" | "payment" | "plus_intent" | "analytics" | "first_touch";
   metaCampaignId?: string | null;
+  metaAdId?: string | null;
   transactionId?: string | null;
   product?: string | null;
   confirmedTransactionId?: string | null;
@@ -288,7 +290,8 @@ export function findConservativeDuplicateReviewIds(rows: PaymentRow[]): Set<numb
 }
 
 function classifyChannel(sourceInput: unknown, mediumInput: unknown): string {
-  const source = lower(sourceInput);
+  const rawSource = lower(sourceInput);
+  const source = /(^|\.)facebook\.com$/.test(rawSource) ? "facebook" : /(^|\.)instagram\.com$/.test(rawSource) ? "instagram" : rawSource;
   const medium = lower(mediumInput);
   const paidMedium = /(?:^|[_\s-])(paid|cpc|ppc|paid_social|social_paid)(?:$|[_\s-])/.test(medium);
   if (!source || ["direct", "unknown", "(direct)", "none"].includes(source)) return "ישיר / לא ידוע";
@@ -454,6 +457,8 @@ function exactTransactionMatch(value: unknown, transactionId: string): boolean {
 
 export function chooseAcquisition(payment: PaymentRow, history: HistoricalTouch[]): InternalAttribution {
   const before = history.filter(row => numberValue(row.createdAt) > 0 && numberValue(row.createdAt) <= payment.paidAt);
+  const snapshot = before.filter(row => row.sourceKind === "first_touch").sort((a, b) => a.createdAt - b.createdAt)[0];
+  if (snapshot) return internalAttribution({ ...snapshot, utmContent: snapshot.metaAdId || snapshot.utmContent }, "מקור ראשוני נפרד שנשמר בהרשמה", snapshot.createdAt, { metaCampaignId: snapshot.metaCampaignId });
   const immutableAnalytics = before
     .filter(row => row.sourceKind === "analytics" && hasSourceFields(row))
     .sort((a, b) => a.createdAt - b.createdAt)[0];
@@ -803,7 +808,21 @@ export async function getSalesIntelligence(
     }),
   ]);
 
+  const capturedSources = process.env.JWT_SECRET ? await queryByEmailChunks(emails, async chunk => {
+    const lookup = new Map(chunk.map(email => [acquisitionActorKey(email), email]));
+    try {
+      const [rows] = await db.execute(sql`SELECT actor_key AS actorKey, utm_source AS utmSource,
+        utm_medium AS utmMedium, utm_campaign AS utmCampaign, utm_content AS utmContent,
+        meta_campaign_id AS metaCampaignId, meta_ad_id AS metaAdId, captured_at AS createdAt
+        FROM acquisition_first_touches WHERE actor_key IN (${sql.join(Array.from(lookup.keys()).map(key => sql`${key}`), sql`, `)})
+          AND captured_at < ${endDate}`) as any;
+      return rows.map((row: any) => ({ ...row, email: lookup.get(row.actorKey), sourceKind: "first_touch" as const }));
+    } catch { return []; } // Missing new table must never erase historical sales.
+  }) : [];
+
   const history = byEmail<HistoricalTouch>([
+    ...capturedSources,
+
     ...crmRows.map((row: any) => ({ ...row, email: text(row.email), createdAt: numberValue(row.createdAt), sourceKind: "crm" as const, metaCampaignId: text(row.metaCampaignId) || null })),
     ...legacyRows.map((row: any) => ({ ...row, email: text(row.email), createdAt: numberValue(row.createdAt), sourceKind: "legacy" as const })),
     ...singleRows.map((row: any) => ({ ...row, email: text(row.email), createdAt: numberValue(row.createdAt), sourceKind: "single" as const })),

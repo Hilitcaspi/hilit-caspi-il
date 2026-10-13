@@ -2,6 +2,7 @@ import { useEffect, lazy, Suspense } from "react";
 import { useRef } from "react";
 import { trackPageView } from "@/lib/track";
 import { initBehaviorTracker, resetBehaviorTracker } from "@/lib/behaviorTracker";
+import { captureAcquisition } from "@/lib/acquisitionTracking";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
@@ -113,48 +114,63 @@ const EnThankYouCourse = lazy(() => import("@/pages/en/ThankYouCourse"));
 const EnThankYouSession = lazy(() => import("@/pages/en/ThankYouSession"));
 const EnThankYouDigital = lazy(() => import("@/pages/en/ThankYouDigital"));
 
-// Detect press article referrer on first visit and save to localStorage.
-// Also persist UTM params to sessionStorage so they survive navigation within the site
-// (e.g. user lands on home with ?utm_source=instagram, then navigates to /guide).
+const isLegacyAttributionPage = () =>
+  isUsDomain() || window.location.pathname === "/en" || window.location.pathname.startsWith("/en/");
+
+// Israel-only canonical acquisition capture. The helper tolerates blocked
+// browser storage and never sends a network request.
 function ReferrerDetector() {
   useEffect(() => {
+    if (isLegacyAttributionPage()) {
+      try {
+        const ref = document.referrer || "";
+        const params = new URLSearchParams(window.location.search);
+        const utmSource = params.get("utm_source") || "";
+        if ((ref.includes("atmag.co.il") || utmSource === "atmag") && !localStorage.getItem("traffic_source")) {
+          localStorage.setItem("traffic_source", "press_article");
+          localStorage.setItem("traffic_source_detail", "atmag_april2026");
+        }
+        const utmKeys = [
+          "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
+          "meta_campaign_id", "meta_adset_id", "meta_ad_id", "meta_placement", "site_source_name",
+        ];
+        let capturedAny = false;
+        utmKeys.forEach(key => {
+          const value = params.get(key);
+          if (!value) return;
+          sessionStorage.setItem(key, value);
+          localStorage.setItem(key, value);
+          capturedAny = true;
+        });
+        if (capturedAny) localStorage.setItem("utm_captured_at", String(Date.now()));
+
+        // Preserve the legacy source inference on US and /en pages only.
+        if (!sessionStorage.getItem("utm_source") && ref) {
+          const hostname = new URL(ref).hostname.toLowerCase();
+          if (hostname.includes("google")) sessionStorage.setItem("utm_source", "google");
+          else if (hostname.includes("facebook") || hostname.includes("fb.com")) sessionStorage.setItem("utm_source", "facebook");
+          else if (hostname.includes("instagram")) sessionStorage.setItem("utm_source", "instagram");
+          else if (hostname.includes("tiktok")) sessionStorage.setItem("utm_source", "tiktok");
+        }
+      } catch {
+        // Legacy attribution is non-blocking when referrer or storage is unavailable.
+      }
+      return;
+    }
+
+    captureAcquisition();
+    // Compatibility for the existing press journey; this is not used as paid
+    // attribution and stores no referrer URL or personal data.
     try {
-      const ref = document.referrer || "";
-      const p = new URLSearchParams(window.location.search);
-      const utm = p.get("utm_source") || "";
-      if ((ref.includes("atmag.co.il") || utm === "atmag") && !localStorage.getItem("traffic_source")) {
+      const referrerHostname = document.referrer ? new URL(document.referrer).hostname.toLowerCase() : "";
+      const utmSource = new URLSearchParams(window.location.search).get("utm_source")?.trim().toLowerCase();
+      if ((referrerHostname === "atmag.co.il" || referrerHostname.endsWith(".atmag.co.il") || utmSource === "atmag") && !localStorage.getItem("traffic_source")) {
         localStorage.setItem("traffic_source", "press_article");
         localStorage.setItem("traffic_source_detail", "atmag_april2026");
       }
-      // Persist UTM params to BOTH sessionStorage AND localStorage
-      // localStorage survives cross-domain redirects (e.g. Grow payment page → back to site)
-      // sessionStorage is cleared when user leaves the domain
-      const utmKeys = [
-        "utm_source",
-        "utm_medium",
-        "utm_campaign",
-        "utm_content",
-        "utm_term",
-        "meta_campaign_id",
-        "meta_adset_id",
-        "meta_ad_id",
-        "meta_placement",
-        "site_source_name",
-      ];
-      let capturedAny = false;
-      utmKeys.forEach(key => {
-        const val = p.get(key);
-        if (val) {
-          sessionStorage.setItem(key, val);
-          localStorage.setItem(key, val);
-          capturedAny = true;
-        }
-      });
-      if (capturedAny) {
-        // Store timestamp so we can expire old UTM after 30 days
-        localStorage.setItem("utm_captured_at", String(Date.now()));
-      }
-    } catch {}
+    } catch {
+      // Storage/referrer access can be blocked; acquisition must remain non-blocking.
+    }
   }, []);
   return null;
 }

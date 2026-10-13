@@ -44,10 +44,10 @@ export function describeSourceLink(attribution: Attribution, creative?: string |
     else if (token(content, "reel|reels") || token(medium, "reel|reels")) placement = "רילס";
     else if (token(content, "post|feed") || token(medium, "post|feed")) placement = "פוסט";
     return {
-      title: placement ? `${platform}${organic ? " אורגני" : ""} · ${placement}` : organic ? `${platform} אורגני · סוג התוכן לא תועד` : `${platform} · ממומן או אורגני לא זוהה`,
+      title: placement ? `${platform}${organic ? " אורגני" : ""} · ${placement}` : organic ? `${platform} אורגני · סוג התוכן לא תועד` : `${platform} · סוג הקישור לא נשמר`,
       type: organic ? "organic" : placement ? "tagged_social" : "untyped_social",
       detail: null,
-      note: placement ? `הקישור מתויג כ${placement}. לא ניתן להסיק ממנו איך הגיעו לפרופיל קודם.` : organic ? "הקישור מתויג כאורגני, אך לא נשמר אם הגיע מפוסט, סטורי או ביו." : "נשמר שם הרשת בלבד. לא ניתן להבחין בין מודעה בתשלום, פוסט, סטורי או ביו.",
+      note: placement ? `הקישור מתויג כ${placement}. לא ניתן להסיק ממנו איך הגיעו לפרופיל קודם.` : organic ? "הקישור מתויג כאורגני, אך לא נשמר אם הגיע מפוסט, סטורי או ביו." : "התיוג מציין פייסבוק או אינסטגרם, אך לא מציין מאיזה קישור: מודעה בתשלום, פוסט, סטורי או ביו. לכן הרכישה אינה מסווגת כממומנת או כאורגנית.",
     };
   }
   const titles: Record<string, string> = {
@@ -69,10 +69,10 @@ export function presentSalesSource(sale: SaleSource) {
   if (link.type === "unknown") { detail = link.note; creative = null; }
   else if (closing.channel === "Email") {
     const named = !genericCampaign(closing.campaign) ? closing.campaign : sale.emailAssist?.clicked ? sale.emailAssist.campaign : null;
-    title = named ? `מייל · ${named}` : "מייל · המייל המדויק לא זוהה";
+    title = "מייל";
     detail = sale.emailAssist?.clicked
       ? `קליק במייל לפני הרכישה: ${sale.emailAssist.campaign}`
-      : "נשמר תיוג של קישור ממייל; לא נשמר איזה מייל.";
+      : named ? `קישור ממייל: ${named}` : "נשמר תיוג של קישור ממייל; לא נשמר איזה מייל.";
   } else if (["organic", "tagged_social", "untyped_social"].includes(link.type)) {
     detail = link.note;
     if (link.type !== "untyped_social") creative = null;
@@ -112,13 +112,14 @@ function sourceGroup(channel: string): SalesSourceGroup {
 /** Summary lens: original acquisition if documented, otherwise the closing link. */
 export function salesSourceJourney(sale: SaleSource) {
   const hasRecordedAcquisition = !unknownChannel(sale.acquisition.channel)
-    && !sale.acquisition.confidence.includes("לא נמצא מקור קודם");
+    && !sale.acquisition.confidence.includes("לא נמצא מקור קודם")
+    && !(sale.closing.channel === "Email" && sale.acquisition.channel === "Email");
   const attribution = hasRecordedAcquisition ? sale.acquisition : sale.closing;
   const group = sourceGroup(attribution.channel);
   const display = presentSalesSource(sale);
   const acquisition = describeSourceLink(sale.acquisition, sale.acquisition.creative);
   const primary = hasRecordedAcquisition ? describeSourceLink(attribution, sale.acquisition.creative) : describeSourceLink(attribution, sale.creative);
-  const primaryLabel = group === "email" ? (!genericCampaign(attribution.campaign) && hasRecordedAcquisition ? `מייל · ${attribution.campaign}` : display.title) : primary.title;
+  const primaryLabel = group === "email" ? "מייל" : primary.title;
   return {
     group, label: groupNames[group], primaryLabel,
     primaryCampaign: !genericCampaign(attribution.campaign) && primary.type !== "untyped_social" && primary.type !== "organic" && primary.type !== "tagged_social" ? attribution.campaign : null,
@@ -128,6 +129,7 @@ export function salesSourceJourney(sale: SaleSource) {
     acquisitionLabel: hasRecordedAcquisition ? acquisition.title : "מקור ההיכרות הקודם לא מתועד",
     acquisitionCampaign: hasRecordedAcquisition && !genericCampaign(sale.acquisition.campaign) ? sale.acquisition.campaign : null,
     closingLabel: display.title, closingDetail: display.detail,
+    acquisitionCreative: group === "meta" && hasRecordedAcquisition && attribution.confidence.includes("מזהה מודעה תואם") ? sale.acquisition.creative || null : null,
     distinctAcquisition: !!display.original,
     evidence: hasRecordedAcquisition ? sale.acquisition.confidence : sale.closing.confidence,
   };

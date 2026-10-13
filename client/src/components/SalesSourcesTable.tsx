@@ -31,8 +31,10 @@ function SourceDetails({ sale }: { sale: Sale }) {
   return <details className="group mt-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs">
     <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400"><ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" />מסלול הרכישה</summary>
     <div className="mt-3 space-y-2 leading-5">
-      {journey.distinctAcquisition && <p><span className="text-gray-500">מקור ההיכרות המתועד: </span><strong>{journey.acquisitionLabel}</strong>{journey.acquisitionCampaign && <span> · {journey.acquisitionCampaign}</span>}</p>}
+      {(journey.distinctAcquisition || journey.emailClosed) && <p><span className="text-gray-500">המקור הראשוני: </span><strong>{journey.acquisitionRecorded ? journey.acquisitionLabel : "לא נשמר מאיפה הגיעו לרשימת המיילים"}</strong>{journey.acquisitionCampaign && <span> · {journey.acquisitionCampaign}</span>}</p>}
+      {journey.acquisitionCreative && <p>מודעת הגיוס: {journey.acquisitionCreative}</p>}
       <p><span className="text-gray-500">הקישור האחרון לפני הרכישה: </span><strong>{journey.closingLabel}</strong></p>
+      {journey.emailClosed && display.detail && <p className="text-gray-500">{display.detail}</p>}
       {sale.closing.channel === "Meta Ads (ממומן)" && display.detail && <p>קמפיין: {display.detail}</p>}
       {sale.closing.channel === "Meta Ads (ממומן)" && sale.closing.confidence.includes("מזהה מודעה תואם") && display.creative && <p>מודעה: {display.creative}</p>}
       <p className="text-gray-600">{explainSalesSourceEvidence(sale)}</p>
@@ -49,11 +51,18 @@ function SourceDetails({ sale }: { sale: Sale }) {
 }
 function SourceBadge({ sale }: { sale: Sale }) {
   const journey = salesSourceJourney(sale);
+  const title = journey.emailClosed ? "מייל" : journey.primaryLabel;
+  const badgeGroup = journey.emailClosed ? "email" : journey.group;
   return <div className="space-y-1 leading-5">
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${palettes[journey.group].badge}`}><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${palettes[journey.group].dot}`} aria-hidden="true" />{journey.primaryLabel}</span>
-    {journey.primaryCampaign && journey.group !== "email" && <p className="font-medium text-gray-700">קמפיין: <bdi>{journey.primaryCampaign}</bdi></p>}
-    {journey.primaryCreative && <p className="text-gray-600">מודעה: <bdi>{journey.primaryCreative}</bdi></p>}
-    {journey.emailClosed && journey.group !== "email" && <p className="font-medium text-violet-700">← {journey.closingLabel}</p>}
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${palettes[badgeGroup].badge}`}><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${palettes[badgeGroup].dot}`} aria-hidden="true" />{title}</span>
+    {journey.emailClosed ? <>
+      <p className="font-medium text-gray-700">מקור ראשוני: {journey.acquisitionRecorded ? journey.acquisitionLabel : "לא נשמר"}</p>
+      {journey.acquisitionCampaign && journey.group !== "email" && <p className="text-gray-700">קמפיין: <bdi>{journey.acquisitionCampaign}</bdi></p>}
+      {journey.acquisitionCreative && <p className="text-gray-600">מודעה: <bdi>{journey.acquisitionCreative}</bdi></p>}
+    </> : <>
+      {journey.primaryCampaign && journey.group !== "email" && <p className="font-medium text-gray-700">קמפיין: <bdi>{journey.primaryCampaign}</bdi></p>}
+      {journey.primaryCreative && <p className="text-gray-600">מודעה: <bdi>{journey.primaryCreative}</bdi></p>}
+    </>}
   </div>;
 }
 export function SalesSourcesTable({ data, loading, error }: { data?: SalesIntelligence; loading: boolean; error: boolean }) {
@@ -86,7 +95,7 @@ export function SalesSourcesTable({ data, loading, error }: { data?: SalesIntell
           </select>
         </div>
       </div>
-      <p className="text-xs leading-5 text-gray-500">מקור ההיכרות מופיע בכותרת אם הוא מתועד. כשמייל הוא הקישור האחרון, שמו מוצג מתחת. ממומן, אורגני ופוסט או סטורי מסומנים רק לפי מידע שנשמר; כל רכישה נספרת פעם אחת.</p>
+      <p className="text-xs leading-5 text-gray-500">כשמייל סגר את הרכישה, הכותרת היא ״מייל״ ומתחת מופיעים הערוץ והקמפיין המקוריים, אם נשמרו. הסיכום למעלה משייך כל רכישה למקור המתועד שלה. ממומן, אורגני ופוסט או סטורי מסומנים רק לפי מידע שנשמר; כל רכישה נספרת פעם אחת.</p>
       {data && totals.length > 0 && <section aria-label="סיכום רכישות לפי מקור" className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {totals.map(total => <button key={total.group} type="button" aria-pressed={effectiveGroup === total.group} onClick={() => setSelectedGroup(effectiveGroup === total.group ? null : total.group)} className={`min-w-0 rounded-xl border p-3 text-right transition-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 ${palettes[total.group].card} ${effectiveGroup === total.group ? "ring-2 ring-indigo-400" : "hover:shadow-sm"}`}>
           <span className="flex items-center gap-2 text-xs font-semibold"><span className={`h-2 w-2 shrink-0 rounded-full ${palettes[total.group].dot}`} aria-hidden="true" />{total.label}</span>

@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { recordAcquisitionSafely } from "../acquisitionCapture";
+import { fetchMetaLeadDetails, metaAcquisitionSnapshot } from "../metaAcquisitionSnapshot";
 import express from "express";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
@@ -433,7 +435,7 @@ async function startServer() {
             continue;
           }
 
-          const leadRes = await fetch(
+          const leadRes = await fetchMetaLeadDetails(
             `https://graph.facebook.com/v20.0/${leadgenId}?access_token=${accessToken}`
           );
           if (!leadRes.ok) {
@@ -521,6 +523,8 @@ async function startServer() {
             if (phone) {
             }
           }
+
+          await recordAcquisitionSafely(email, metaAcquisitionSnapshot(leadData));
 
           // Start email journey
           const nameParts = name.trim().split(" ");
@@ -1321,7 +1325,7 @@ async function startServer() {
         // Fetch leads created after last check
         const sinceTs = Math.floor(metaLastCheckedAt / 1000);
         const url = `https://graph.facebook.com/v20.0/${form.id}/leads?access_token=${accessToken}&limit=50&fields=id,created_time,field_data&filtering=[{"field":"time_created","operator":"GREATER_THAN","value":${sinceTs}}]`;
-        const res = await fetch(url);
+        const res = await fetchMetaLeadDetails(url);
         if (!res.ok) continue;
         const data = await res.json() as any;
         const leads = data?.data || [];
@@ -1338,7 +1342,10 @@ async function startServer() {
 
           // Check if already exists
           const [existing] = await db.select({ id: crmLeadsTable.id }).from(crmLeadsTable).where(eqOp(crmLeadsTable.email, email)).limit(1);
-          if (existing) continue;
+          if (existing) {
+            await recordAcquisitionSafely(email, metaAcquisitionSnapshot(lead));
+            continue;
+          }
 
           const nowTs = Date.now();
           const inserted = await db.insert(crmLeadsTable).values({
@@ -1347,6 +1354,7 @@ async function startServer() {
             createdAt: nowTs, updatedAt: nowTs,
           });
           const leadId = (inserted as any)[0].insertId as number;
+          await recordAcquisitionSafely(email, metaAcquisitionSnapshot(lead));
           console.log(`[MetaPoller] New lead: ${name} (${email}), form: ${form.id}`);
 
           await notifyOwner({

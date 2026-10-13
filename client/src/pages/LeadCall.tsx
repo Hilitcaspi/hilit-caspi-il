@@ -10,6 +10,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { trackLead } from "@/lib/metaPixel";
 import { gaGenerateLead } from "@/lib/ga";
+import { getFirstTouchAcquisition } from "@/lib/acquisitionTracking";
 
 const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
 const HERO_IMG    = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-hero_30e4b53c.png";
@@ -49,6 +50,7 @@ export default function LeadCall() {
       phone: phone.trim(),
       gender: "female",
       source: "meta_lead_call",
+      firstTouch: getFirstTouchAcquisition(),
     });
   };
 

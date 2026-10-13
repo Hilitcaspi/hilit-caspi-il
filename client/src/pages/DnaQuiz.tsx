@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { trackLead } from "@/lib/metaPixel";
 import { gaGenerateLead, gaQuizComplete } from "@/lib/ga";
+import { getFirstTouchAcquisition, getLastUtmAcquisition } from "@/lib/acquisitionTracking";
 type DnaType = "leader" | "romantic" | "free_spirit" | "anchor";
 type Gender = "female" | "male";
 
@@ -194,21 +195,8 @@ export default function DnaQuiz() {
   // return_to=join: came from /join form, return with DNA result instead of showing payment CTA
   const returnTo = urlParams.get("return_to"); // "join" | null
   const returnFreeToken = urlParams.get("free_token"); // pass-through if present
-  // UTM tracking: URL > sessionStorage > localStorage (localStorage survives cross-domain redirects)
-  const utmSource = urlParams.get("utm_source") || sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined;
-  const utmMedium = urlParams.get("utm_medium") || sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined;
-  const utmCampaign = urlParams.get("utm_campaign") || sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined;
-  const utmContent = urlParams.get("utm_content") || sessionStorage.getItem("utm_content") || localStorage.getItem("utm_content") || undefined;
-  const utmTerm = urlParams.get("utm_term") || sessionStorage.getItem("utm_term") || localStorage.getItem("utm_term") || undefined;
-  const metaCampaignId = urlParams.get("meta_campaign_id") || sessionStorage.getItem("meta_campaign_id") || localStorage.getItem("meta_campaign_id") || undefined;
-  const metaAdSetId = urlParams.get("meta_adset_id") || sessionStorage.getItem("meta_adset_id") || localStorage.getItem("meta_adset_id") || undefined;
-  const metaAdId = urlParams.get("meta_ad_id") || sessionStorage.getItem("meta_ad_id") || localStorage.getItem("meta_ad_id") || undefined;
-  // Persist UTMs in both sessionStorage and localStorage so they survive page reloads and cross-domain redirects
-  if (urlParams.get("utm_source")) { sessionStorage.setItem("utm_source", urlParams.get("utm_source") as string); localStorage.setItem("utm_source", urlParams.get("utm_source") as string); }
-  if (urlParams.get("utm_medium")) { sessionStorage.setItem("utm_medium", urlParams.get("utm_medium") as string); localStorage.setItem("utm_medium", urlParams.get("utm_medium") as string); }
-  if (urlParams.get("utm_campaign")) { sessionStorage.setItem("utm_campaign", urlParams.get("utm_campaign") as string); localStorage.setItem("utm_campaign", urlParams.get("utm_campaign") as string); }
-  if (urlParams.get("utm_content")) { sessionStorage.setItem("utm_content", urlParams.get("utm_content") as string); localStorage.setItem("utm_content", urlParams.get("utm_content") as string); }
-  if (urlParams.get("utm_term")) { sessionStorage.setItem("utm_term", urlParams.get("utm_term") as string); localStorage.setItem("utm_term", urlParams.get("utm_term") as string); }
+  const lastUtm = getLastUtmAcquisition();
+  const { utmSource, utmMedium, utmCampaign, utmContent, utmTerm, metaCampaignId, metaAdSetId, metaAdId } = lastUtm || {};
   const [phase, setPhase] = useState<"gender" | "quiz" | "tiebreaker" | "capture" | "result">("gender");
 
   // Scroll to top on every phase change
@@ -590,6 +578,7 @@ export default function DnaQuiz() {
           metaCampaignId,
           metaAdSetId,
           metaAdId,
+          firstTouch: getFirstTouchAcquisition(),
         });
         gaGenerateLead("dna_quiz_capture");
       } catch {

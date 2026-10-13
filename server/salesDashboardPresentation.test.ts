@@ -22,7 +22,7 @@ describe("restored dashboard presentation", () => {
     expect(dashboardSource).toContain('label: "3 ימים מלאים"');
     expect(dashboardSource).toContain("setRefreshedAt(Date.now())");
     expect(dashboardSource).toContain("SalesSourcesTable");
-    for (const label of ["מאיפה הגיעה כל רכישה", "רוכש", "מוצר", "סכום", "מסלול הרכישה", "מקור ההיכרות המתועד", "סיכום רכישות לפי מקור"]) expect(tableSource).toContain(label);
+    for (const label of ["מאיפה הגיעה כל רכישה", "רוכש", "מוצר", "סכום", "מסלול הרכישה", "המקור הראשוני", "סיכום רכישות לפי מקור"]) expect(tableSource).toContain(label);
     expect(tableSource).toContain("sale.closing.channel");
     expect(tableSource).toContain("sale.acquisition.campaign");
     expect(tableSource).toContain('timeZone: "Asia/Jerusalem"');

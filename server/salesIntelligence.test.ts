@@ -81,4 +81,16 @@ describe("sales intelligence safety rules", () => {
     expect(chooseClosing(payment(), [], [{email: payment().email, journeyKey: "women_first_step_v2", sentAt: base - hour, clickedAt: null, paymentAttemptProduct: null}], [], []).channelSource).toBe("");
     expect(chooseClosing(payment(), [], [{email: payment().email, journeyKey: "boost_opportunity", sentAt: base - hour, clickedAt: base - 60000, paymentAttemptProduct: "match_boost"}], [], []).channelSource).toBe("");
   });
+  it("prefers an immutable initial paid source over a later email snapshot", () => {
+    const history = [
+      { email: payment().email, sourceKind: "first_touch" as const, createdAt: base - 4 * hour, utmSource: "facebook", utmMedium: "paid_social", utmCampaign: "first-campaign", metaCampaignId: "201", metaAdId: "101" },
+      { email: payment().email, sourceKind: "crm" as const, createdAt: base - hour, utmSource: "email", utmCampaign: "email-journey" },
+    ];
+    expect(chooseAcquisition(payment(), history)).toMatchObject({channelSource:"facebook",campaignRaw:"first-campaign",creative:"101",metaCampaignId:"201"});
+  });
+  it("never applies a future first-touch capture to an older sale", () => {
+    const history = [{email:payment().email,sourceKind:"first_touch" as const,createdAt:base+hour,utmSource:"meta",utmCampaign:"future"}];
+    expect(chooseAcquisition(payment(),history).campaignRaw).not.toBe("future");
+  });
+
 });

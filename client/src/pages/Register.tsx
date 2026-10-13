@@ -16,6 +16,7 @@ import EmbeddedDnaQuiz from "@/components/EmbeddedDnaQuiz";
 import GrowWallet from "@/components/GrowWallet";
 import LiveVoucherCard from "@/components/LiveVoucherCard";
 import { normalizeIsraeliPhone } from "@shared/profileValidation";
+import { getFirstTouchAcquisition, getLastUtmAcquisition } from "@/lib/acquisitionTracking";
 
 type Step = "profile" | "dna_select" | "compatibility_quiz" | "free_token_verify" | "payment" | "uploading" | "uploading_error" | "already_registered" | "done";
 
@@ -431,6 +432,7 @@ export default function Register() {
         photoBase64, photoMime, origin: window.location.origin,
         freeToken: freeTokenFromUrl || undefined,
         consentMatchmaking, consentDataSharing, consentEmailMarketing,
+        firstTouch: getFirstTouchAcquisition(),
         utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
         utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
         utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
@@ -481,6 +483,7 @@ export default function Register() {
         photoBase64, photoMime, origin: window.location.origin,
         freeToken: freeTokenFromUrl || undefined,
         consentMatchmaking, consentDataSharing, consentEmailMarketing,
+        firstTouch: getFirstTouchAcquisition(),
         utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
         utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
         utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
@@ -569,6 +572,7 @@ export default function Register() {
         origin: window.location.origin,
         freeToken: normalizedCode || undefined, // invite token → marks isPaid=true
         consentMatchmaking, consentDataSharing, consentEmailMarketing,
+        firstTouch: getFirstTouchAcquisition(),
         utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
         utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
         utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
@@ -720,10 +724,11 @@ export default function Register() {
     consentMatchmaking,
     consentDataSharing,
     consentEmailMarketing,
-    utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
-    utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
-    utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
-    utmContent: sessionStorage.getItem("utm_content") || localStorage.getItem("utm_content") || undefined,
+    utmSource: getLastUtmAcquisition()?.utmSource,
+    utmMedium: getLastUtmAcquisition()?.utmMedium,
+    utmCampaign: getLastUtmAcquisition()?.utmCampaign,
+    utmContent: getLastUtmAcquisition()?.utmContent,
+    firstTouch: getFirstTouchAcquisition(),
   });
 
   // Keep a same-device backup as soon as the main form has enough identifying
@@ -1813,6 +1818,7 @@ export default function Register() {
                       locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
                       origin: window.location.origin,
                       consentMatchmaking, consentDataSharing, consentEmailMarketing,
+        firstTouch: getFirstTouchAcquisition(),
                     });
                   }}
                   className="bg-[#191265] text-white font-bold py-3 rounded-2xl hover:bg-[#1800ad] transition-all"
