@@ -1916,7 +1916,7 @@ export default function CRMMatchmaking() {
                       <div className="grid grid-cols-2 gap-3 mb-4">
                         {persons.map((s, i) => (
                           <div key={i} className={`rounded-xl p-3 ${(s as any).isCoachingClient ? 'bg-pink-50 ring-1 ring-pink-200' : 'bg-[#f8f6f0]'}`}>
-                            <MatchProfileCard profile={comparisonProfile(s)} onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(s.id)?.length || 0} />
+                            <MatchProfileCard profile={comparisonProfile(s)} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(s.id)?.length || 0} />
                             {/* Per-person status badge */}
                             {s.personStatus && (
                               <div className={`mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${s.personStatus.color}`}>
@@ -3171,9 +3171,10 @@ export default function CRMMatchmaking() {
                       {compatData && filterTargetProfile && (
                         <details className="mt-4 rounded-xl border border-[#191265]/10 bg-[#faf9f5] p-3">
                           <summary className="cursor-pointer text-sm font-bold text-[#191265]">השוואה זוגית · {Math.round(compatData.score)}%</summary>
-                          <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-3">
-                            <MatchProfileCard profile={asMatchProfile(filterTargetProfile)} onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(filterTargetProfile.id)?.length || 0} />
-                            <MatchProfileCard profile={asMatchProfile(single)} onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(single.id)?.length || 0} />
+                          <div className="grid grid-cols-2 gap-3 mt-3">
+                            {[filterTargetProfile, single].map(profile => <div key={profile.id} className={`rounded-xl p-3 ${profile.isCoachingClient ? 'bg-pink-50 ring-1 ring-pink-200' : 'bg-[#f8f6f0]'}`}>
+                              <MatchProfileCard profile={asMatchProfile(profile)} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(profile.id)?.length || 0} />
+                            </div>)}
                           </div>
                         </details>
                       )}
