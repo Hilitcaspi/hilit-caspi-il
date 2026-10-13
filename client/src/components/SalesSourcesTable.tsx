@@ -30,30 +30,30 @@ function SourceDetails({ sale }: { sale: Sale }) {
   const display = presentSalesSource(sale);
   return <details className="group mt-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs">
     <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400"><ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" />מסלול הרכישה</summary>
-    <div className="mt-3 space-y-2 border-r-2 border-gray-200 pr-3 leading-5">
-      <p><span className="text-gray-500">הקישור שממנו הושלמה הרכישה: </span><strong>{journey.closingLabel}</strong></p>
-      {journey.closingDetail && <p className="text-gray-600">{journey.closingDetail}</p>}
-      {journey.acquisitionRecorded ? <>
-        <p><span className="text-gray-500">איך הגיעו אלינו קודם: </span><strong>{journey.acquisitionLabel}</strong></p>
-        {journey.acquisitionCampaign && <p>קמפיין מקור: {journey.acquisitionCampaign}</p>}
-        {sale.acquisition.creative && <p>מודעת מקור: {sale.acquisition.creative}</p>}
-      </> : <p className="text-gray-600">לא תועד איך נחשפו אלינו לראשונה. זה לא ערוץ נוסף ולא אומר שהגיעו בלי פרסום.</p>}
-      {sale.emailAssist?.clicked && !journey.emailClosed && <p className="text-gray-600">תועד גם קליק במייל לפני התשלום: {sale.emailAssist.campaign}. הרכישה לא נספרה פעמיים.</p>}
+    <div className="mt-3 space-y-2 leading-5">
+      {journey.distinctAcquisition && <p><span className="text-gray-500">מקור ההיכרות המתועד: </span><strong>{journey.acquisitionLabel}</strong>{journey.acquisitionCampaign && <span> · {journey.acquisitionCampaign}</span>}</p>}
+      <p><span className="text-gray-500">הקישור האחרון לפני הרכישה: </span><strong>{journey.closingLabel}</strong></p>
+      {sale.closing.channel === "Meta Ads (ממומן)" && display.detail && <p>קמפיין: {display.detail}</p>}
+      {sale.closing.channel === "Meta Ads (ממומן)" && sale.closing.confidence.includes("מזהה מודעה תואם") && display.creative && <p>מודעה: {display.creative}</p>}
       <p className="text-gray-600">{explainSalesSourceEvidence(sale)}</p>
+      {journey.emailClosed && !journey.acquisitionRecorded && <p className="text-gray-500">איך הגיעו לרשימת המיילים: לא מתועד. זה לא ערוץ נוסף.</p>}
+      {sale.emailAssist?.clicked && !journey.emailClosed && <p className="text-gray-600">מייל נוסף שנלחץ לפני התשלום: {sale.emailAssist.campaign}. לא נספר כרכישה נוספת.</p>}
       <details className="rounded-md bg-white p-2 text-[11px] text-gray-500">
         <summary className="cursor-pointer focus-visible:outline focus-visible:outline-indigo-400">פרטי המדידה (לפי הצורך)</summary>
         <p className="mt-2">תיעוד הקישור: {journey.evidence}</p>
-        {display.creative && <p>תג קישור או שם מודעה: <bdi>{display.creative}</bdi></p>}
-        {display.creative && sale.closing.channel !== "Meta Ads (ממומן)" && <p>תג קישור לבדו אינו מזהה מודעה ולא מוכיח שזה קמפיין ממומן.</p>}
+        {sale.closing.medium && <p>סוג קישור שנשמר: <bdi>{sale.closing.medium}</bdi></p>}
+        {(sale.closing.content || display.creative) && <p>תג תוכן: <bdi>{sale.closing.content || display.creative}</bdi></p>}
       </details>
     </div>
   </details>;
 }
 function SourceBadge({ sale }: { sale: Sale }) {
   const journey = salesSourceJourney(sale);
-  return <div className="flex flex-wrap items-center gap-2 leading-5">
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${palettes[journey.group].badge}`}><span className={`h-1.5 w-1.5 rounded-full ${palettes[journey.group].dot}`} aria-hidden="true" />{journey.label}</span>
-    {journey.emailClosed && <span className="text-violet-700">(נסגר במייל)</span>}
+  return <div className="space-y-1 leading-5">
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold ${palettes[journey.group].badge}`}><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${palettes[journey.group].dot}`} aria-hidden="true" />{journey.primaryLabel}</span>
+    {journey.primaryCampaign && journey.group !== "email" && <p className="font-medium text-gray-700">קמפיין: <bdi>{journey.primaryCampaign}</bdi></p>}
+    {journey.primaryCreative && <p className="text-gray-600">מודעה: <bdi>{journey.primaryCreative}</bdi></p>}
+    {journey.emailClosed && journey.group !== "email" && <p className="font-medium text-violet-700">← {journey.closingLabel}</p>}
   </div>;
 }
 export function SalesSourcesTable({ data, loading, error }: { data?: SalesIntelligence; loading: boolean; error: boolean }) {
@@ -71,7 +71,7 @@ export function SalesSourcesTable({ data, loading, error }: { data?: SalesIntell
     const source = presentSalesSource(sale);
     const journey = salesSourceJourney(sale);
     return (status === "all" || sale.status === status) && (!effectiveGroup || journey.group === effectiveGroup)
-      && [sale.buyerName, sale.productLabel, sale.closing.channel, sale.closing.campaign, sale.acquisition.campaign, sale.acquisition.creative, sale.creative, source.title, source.detail, journey.label].filter(Boolean).join(" ").toLocaleLowerCase("he-IL").includes(search.trim().toLocaleLowerCase("he-IL"));
+      && [journey.primaryLabel, sale.buyerName, sale.productLabel, sale.closing.channel, sale.closing.campaign, sale.acquisition.campaign, sale.acquisition.creative, sale.creative, source.title, source.detail, journey.label].filter(Boolean).join(" ").toLocaleLowerCase("he-IL").includes(search.trim().toLocaleLowerCase("he-IL"));
   }), [productSales, search, status, effectiveGroup]);
   return <Card id="sales-sources" className="border-0 shadow-sm">
     <CardHeader className="pb-3">
@@ -86,13 +86,14 @@ export function SalesSourcesTable({ data, loading, error }: { data?: SalesIntell
           </select>
         </div>
       </div>
-      <p className="text-xs leading-5 text-gray-500">כל רכישה נספרת פעם אחת. רכישה שהחלה במודעה והסתיימה במייל מופיעה תחת מקור המודעה, אם הוא מתועד, עם סימון ״נסגר במייל״.</p>
+      <p className="text-xs leading-5 text-gray-500">מקור ההיכרות מופיע בכותרת אם הוא מתועד. כשמייל הוא הקישור האחרון, שמו מוצג מתחת. ממומן, אורגני ופוסט או סטורי מסומנים רק לפי מידע שנשמר; כל רכישה נספרת פעם אחת.</p>
       {data && totals.length > 0 && <section aria-label="סיכום רכישות לפי מקור" className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {totals.map(total => <button key={total.group} type="button" aria-pressed={effectiveGroup === total.group} onClick={() => setSelectedGroup(effectiveGroup === total.group ? null : total.group)} className={`min-w-0 rounded-xl border p-3 text-right transition-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 ${palettes[total.group].card} ${effectiveGroup === total.group ? "ring-2 ring-indigo-400" : "hover:shadow-sm"}`}>
           <span className="flex items-center gap-2 text-xs font-semibold"><span className={`h-2 w-2 shrink-0 rounded-full ${palettes[total.group].dot}`} aria-hidden="true" />{total.label}</span>
           <span className="mt-2 block text-xl font-bold">{total.count} <span className="text-xs font-normal">{total.count === 1 ? "רכישה" : "רכישות"}</span></span>
           <span className="mt-1 block text-xs">{money(total.revenueAgorot)}</span>
           <span className="mt-1 block text-[11px]">({total.emailClosedCount} {total.emailClosedCount === 1 ? "נסגרה" : "נסגרו"} במייל)</span>
+          {total.linkTypes.map(type => <span key={type.label} className="mt-1 block text-[11px]">{type.label}: {type.count}</span>)}
           {total.closingOnlyCount > 0 && <span className="mt-1 block text-[10px] opacity-75">{total.group === "unknown" ? "לא נשמר מאיזה ערוץ הגיעו" : `ב־${total.closingOnlyCount} ידוע ערוץ הסגירה בלבד`}</span>}
         </button>)}
       </section>}
@@ -109,7 +110,7 @@ export function SalesSourcesTable({ data, loading, error }: { data?: SalesIntell
       {data && <>
         <p aria-live="polite" className="mb-3 text-xs text-gray-600">{productLabel}: {productSummary.includedCount} רכישות שנכללו בסך {money(productSummary.includedRevenueAgorot)}{productSummary.reviewCount > 0 && ` · ${productSummary.reviewCount} רשומות בסך ${money(productSummary.reviewRevenueAgorot)} לבדיקה, לא בסכום הראשי`}</p>
         {(product === "boost" || product === "plus") && <p className="mb-3 rounded-lg bg-indigo-50 p-2 text-xs leading-5 text-indigo-900">{product === "boost" ? "רכישות Boost מוצגות בנפרד ממכירות המאגר. אזור אישי מסומן רק כשנשמר תיעוד כניסה מתאים, ולא לפי סוג המוצר." : "רכישות פלוס וחידושי מנוי מוצגים בנפרד ממכירות המאגר. חידוש מסומן רק כשזוהה בתיעוד."}</p>}
-        {totals.some(total => total.group === "unknown") && <p className="mb-3 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-700">״ערוץ ההגעה לא תועד״: התשלום מופיע באתר, אבל לא נשמר מידע שמזהה אם הגיעו ממודעה, ממייל או מקישור אחר. לא משייכים אותו לקמפיין על סמך ניחוש.</p>}
+        {totals.some(total => total.group === "unknown") && <p className="mb-3 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-700">״מקור לא מזוהה״: אין תיעוד שמאפשר לשייך את הרכישה למודעה, למייל או לתוכן אורגני. היא נשארת בסכום המכירות, אבל לא נזקפת לזכות ערוץ מסוים.</p>}
         <div className="space-y-3 md:hidden">
           {rows.map(sale => <article key={sale.order} className={`rounded-xl border bg-white p-3 text-xs ${palettes[salesSourceJourney(sale).group].card.split(" ")[0]}`}>
             <div className="flex justify-between gap-2"><strong>{sale.buyerName || "שם לא זמין"}</strong><strong className="whitespace-nowrap text-emerald-700">{money(sale.amountAgorot)}</strong></div>

@@ -67,8 +67,8 @@ export type SalesIntelligence = {
     coupon: string | null;
     status: "included" | "review";
     paymentEvidence: string;
-    acquisition: { channel: string; campaign: string; confidence: string; creative?: string | null };
-    closing: { channel: string; campaign: string; confidence: string };
+    acquisition: { channel: string; campaign: string; confidence: string; creative?: string | null; source?: string | null; medium?: string | null; content?: string | null };
+    closing: { channel: string; campaign: string; confidence: string; source?: string | null; medium?: string | null; content?: string | null };
     emailAssist: { campaign: string; clicked: boolean; sameDay: boolean } | null;
     lagDays: number | null;
   }>;
@@ -963,11 +963,17 @@ export async function getSalesIntelligence(
         campaign: row.acquisitionResolved.campaign,
         confidence: row.acquisitionResolved.confidence,
         creative: row.acquisitionResolved.creative || null,
+        source: sanitizeSalesLabel(row.acquisition.channelSource, "") || null,
+        medium: sanitizeSalesLabel(row.acquisition.medium, "") || null,
+        content: sanitizeSalesLabel(row.acquisition.creative, "") || null,
       },
       closing: {
         channel: row.closingResolved.channel,
         campaign: row.closingResolved.campaign,
         confidence: row.closingResolved.confidence,
+        source: sanitizeSalesLabel(row.closing.channelSource, "") || null,
+        medium: sanitizeSalesLabel(row.closing.medium, "") || null,
+        content: sanitizeSalesLabel(row.closing.creative, "") || null,
       },
       emailAssist: row.emailAssist ? {
         campaign: campaignLabel(row.emailAssist.campaignRaw),
