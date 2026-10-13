@@ -7,6 +7,7 @@ type SaleSource = {
   acquisition: Attribution;
   creative?: string | null;
   emailAssist?: { campaign: string; clicked: boolean; sameDay: boolean } | null;
+  sourceDiagnostics?: { checkoutTagged: boolean; priorSourceFound: boolean; mutableCrmAfterPurchase: boolean; capturedFirstTouch: boolean };
 };
 const genericCampaign = (value: string) => ["database", "ללא קמפיין", "ללא מקור מתועד"].includes(value.trim().toLowerCase());
 const lifecycleChannel = (value: string) => ["paid_database", "paid_plus", "paid_guide", "dna_quiz", "direct", "unknown"].includes(value.trim().toLowerCase());
@@ -156,7 +157,12 @@ export function summarizeSalesSources(sales: Array<SaleSource & { status: "inclu
 }
 
 export function explainSalesSourceEvidence(sale: SaleSource) {
-  if (unknownChannel(sale.closing.channel)) return "לא נשמר מקור לקישור הרכישה. אין בכך הוכחה לרכישה ישירה או ממומנת.";
+  if (unknownChannel(sale.closing.channel)) {
+    if (salesSourceJourney(sale).acquisitionRecorded) return "מקור ההיכרות מתועד, אבל קישור הקופה לא נשמר. אין בכך ראיה שהרכישה הנוכחית הגיעה שוב מאותו ערוץ.";
+    if (sale.sourceDiagnostics?.mutableCrmAfterPurchase) return "לא נשמר תיוג בקופה. ברשומת הליד קיים תיוג מקור, אבל הרשומה עודכנה אחרי הרכישה ואין צילום היסטורי שמאמת את התיוג בזמן הרכישה. לכן לא משייכים אותה לקמפיין ללא הוכחה.";
+    if (sale.sourceDiagnostics && !sale.sourceDiagnostics.checkoutTagged) return "אין תיוג מקור בעסקה או בקופה המקושרת, ולא נמצא מקור קודם מתועד בשאלון, בפרופיל או בקליק רלוונטי לפני התשלום. סיבת אובדן התיוג עצמה אינה מתועדת; אי אפשר להסיק שזה ממומן או ישיר.";
+    return "לא נשמר מקור לקישור הרכישה. אין בכך הוכחה לרכישה ישירה או ממומנת.";
+  }
   if (sale.closing.confidence.includes("מזהה מודעה תואם")) return "מזהה המודעה שנשמר בעסקה תואם למודעה בחשבון הישראלי.";
   if (sale.closing.channel === "Email") return sale.emailAssist?.clicked ? "תועד קליק במייל לפני התשלום. זהו המגע שנמדד, לא הוכחה שהמייל לבדו גרם לרכישה." : "נשמר תיוג של קישור ממייל, אך המייל המסוים לא זוהה.";
   return describeSourceLink(sale.closing, sale.creative).note;

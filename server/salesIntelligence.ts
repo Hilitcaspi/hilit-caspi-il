@@ -72,6 +72,7 @@ export type SalesIntelligence = {
     closing: { channel: string; campaign: string; confidence: string; source?: string | null; medium?: string | null; content?: string | null };
     emailAssist: { campaign: string; clicked: boolean; sameDay: boolean } | null;
     lagDays: number | null;
+    sourceDiagnostics?: { checkoutTagged: boolean; priorSourceFound: boolean; mutableCrmAfterPurchase: boolean; capturedFirstTouch: boolean };
   }>;
   channels: Array<{ channel: string; count: number; revenueAgorot: number }>;
   products: Array<{ product: string; label: string; count: number; revenueAgorot: number }>;
@@ -120,7 +121,7 @@ type HistoricalTouch = SourceFields & {
   email: string;
   createdAt: number;
   updatedAt?: number | null;
-  sourceKind: "crm" | "legacy" | "single" | "payment" | "plus_intent" | "analytics" | "first_touch";
+  sourceKind: "crm" | "legacy" | "single" | "payment" | "plus_intent" | "analytics" | "first_touch" | "linked_dna";
   metaCampaignId?: string | null;
   metaAdId?: string | null;
   transactionId?: string | null;
@@ -256,7 +257,11 @@ function campaignLabel(value: unknown): string {
 }
 
 function hasSourceFields(row: SourceFields): boolean {
-  return Boolean(text(row.source) || text(row.utmSource) || text(row.utmMedium) || text(row.utmCampaign) || text(row.utmContent));
+  const source = lower(row.utmSource) || lower(row.source);
+  // A lifecycle label describes a service, not a channel. It must never hide
+  // a later valid source record in the same person's historical evidence.
+  const identifiableSource = !!source && !["paid_database", "paid_plus", "paid_guide", "dna_quiz", "database", "direct", "unknown", "(direct)", "none"].includes(source);
+  return identifiableSource || Boolean(text(row.utmMedium) || text(row.utmCampaign) || text(row.utmContent));
 }
 
 function isTestOrTiny(row: Pick<PaymentRow, "couponCode" | "amountAgorot">): boolean {
@@ -458,9 +463,9 @@ function exactTransactionMatch(value: unknown, transactionId: string): boolean {
 export function chooseAcquisition(payment: PaymentRow, history: HistoricalTouch[]): InternalAttribution {
   const before = history.filter(row => numberValue(row.createdAt) > 0 && numberValue(row.createdAt) <= payment.paidAt);
   const snapshot = before.filter(row => row.sourceKind === "first_touch").sort((a, b) => a.createdAt - b.createdAt)[0];
-  if (snapshot) return internalAttribution({ ...snapshot, utmContent: snapshot.metaAdId || snapshot.utmContent }, "מקור ראשוני נפרד שנשמר בהרשמה", snapshot.createdAt, { metaCampaignId: snapshot.metaCampaignId });
+  if (snapshot && (hasSourceFields(snapshot) || snapshot.metaCampaignId)) return internalAttribution({ ...snapshot, utmContent: snapshot.metaAdId || snapshot.utmContent }, "מקור ראשוני נפרד שנשמר בהרשמה", snapshot.createdAt, { metaCampaignId: snapshot.metaCampaignId });
   const immutableAnalytics = before
-    .filter(row => row.sourceKind === "analytics" && hasSourceFields(row))
+    .filter(row => ["analytics", "linked_dna"].includes(row.sourceKind) && hasSourceFields(row))
     .sort((a, b) => a.createdAt - b.createdAt)[0];
   const crmMetaLead = before
     .filter(row => row.sourceKind === "crm" && ["meta_lead_guide", "meta_lead_dna", "meta_lead_call"].includes(lower(row.source)) && text(row.metaCampaignId) && numberValue(row.updatedAt) <= payment.paidAt)
@@ -492,6 +497,18 @@ export function chooseAcquisition(payment: PaymentRow, history: HistoricalTouch[
 
   if (hasSourceFields(payment)) return internalAttribution(payment, "מקור בעסקה; לא נמצא מקור קודם", payment.paidAt);
   return unknownAttribution("לא נמצא מקור רכישה היסטורי מתועד");
+}
+
+/** Only booleans leave the server; mutable late CRM tags are not attributed. */
+export function diagnoseSalesSource(payment: PaymentRow, history: HistoricalTouch[]) {
+  const before = history.filter(row => numberValue(row.createdAt) > 0 && numberValue(row.createdAt) <= payment.paidAt);
+  const acquisition = chooseAcquisition(payment, history);
+  return {
+    checkoutTagged: hasSourceFields(payment) || before.some(row => row.sourceKind === "payment" && exactTransactionMatch(row.confirmedTransactionId, payment.transactionId) && hasSourceFields(row)),
+    priorSourceFound: !["ישיר / לא ידוע", "שאלון DNA / מקור לא ידוע"].includes(classifyChannel(acquisition.channelSource, acquisition.medium)),
+    mutableCrmAfterPurchase: before.some(row => row.sourceKind === "crm" && hasSourceFields(row) && numberValue(row.updatedAt) > payment.paidAt),
+    capturedFirstTouch: before.some(row => row.sourceKind === "first_touch" && hasSourceFields(row)),
+  };
 }
 
 export function chooseClosing(
@@ -820,8 +837,25 @@ export async function getSalesIntelligence(
     } catch { return []; } // Missing new table must never erase historical sales.
   }) : [];
 
+  const linkedDnaRows = await queryByEmailChunks(emails, async chunk => {
+    const [rows] = await db.execute(sql`
+      SELECT s.email, q.utmSource, q.utmMedium, q.utmCampaign, q.utmContent,
+        UNIX_TIMESTAMP(q.createdAt) * 1000 AS createdAt
+      FROM dna_quiz_results q JOIN singles s ON s.id = q.singleId
+      WHERE LOWER(TRIM(s.email)) IN (${sql.join(chunk.map(value => sql`${value}`), sql`, `)})
+        AND q.createdAt >= FROM_UNIXTIME(${historyFrom / 1000}) AND q.createdAt < FROM_UNIXTIME(${endDate / 1000})
+      UNION
+      SELECT c.email, q.utmSource, q.utmMedium, q.utmCampaign, q.utmContent,
+        UNIX_TIMESTAMP(q.createdAt) * 1000 AS createdAt
+      FROM dna_quiz_results q JOIN crm_leads c ON c.quizSessionId = q.sessionId
+      WHERE LOWER(TRIM(c.email)) IN (${sql.join(chunk.map(value => sql`${value}`), sql`, `)})
+        AND q.createdAt >= FROM_UNIXTIME(${historyFrom / 1000}) AND q.createdAt < FROM_UNIXTIME(${endDate / 1000})
+    `) as any;
+    return rows as any[];
+  });
   const history = byEmail<HistoricalTouch>([
     ...capturedSources,
+    ...linkedDnaRows.map((row: any) => ({ ...row, email: text(row.email), createdAt: numberValue(row.createdAt), sourceKind: "linked_dna" as const })),
 
     ...crmRows.map((row: any) => ({ ...row, email: text(row.email), createdAt: numberValue(row.createdAt), sourceKind: "crm" as const, metaCampaignId: text(row.metaCampaignId) || null })),
     ...legacyRows.map((row: any) => ({ ...row, email: text(row.email), createdAt: numberValue(row.createdAt), sourceKind: "legacy" as const })),
@@ -977,6 +1011,7 @@ export async function getSalesIntelligence(
       coupon: row.payment.couponCode ? sanitizeSalesLabel(row.payment.couponCode, "קופון") : null,
       status: row.status,
       paymentEvidence: "דיווח תשלום באתר; טרם הוצלב בדוח Grow",
+      sourceDiagnostics: diagnoseSalesSource(row.payment, history.get(normalizedEmail(row.payment.email)) || []),
       acquisition: {
         channel: row.acquisitionResolved.channel,
         campaign: row.acquisitionResolved.campaign,

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { splitSalesVisibleDay, israelSalesDay } from "@shared/salesDayPresentation";
 import { ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,61 +66,8 @@ function SourceBadge({ sale }: { sale: Sale }) {
     </>}
   </div>;
 }
-export function SalesSourcesTable({ data, loading, error }: { data?: SalesIntelligence; loading: boolean; error: boolean }) {
-  const [search, setSearch] = useState("");
-  const [product, setProduct] = useState<SalesProductFilter>(DEFAULT_SALES_PRODUCT);
-  const [status, setStatus] = useState("all");
-  const [selectedGroup, setSelectedGroup] = useState<SalesSourceGroup | null>(null);
-  const productSales = useMemo(() => filterSalesByProduct(data?.sales || [], product), [data?.sales, product]);
-  const productSummary = useMemo(() => summarizeProductSales(productSales), [productSales]);
-  const extraProducts = useMemo(() => additionalSalesProducts(data?.sales || []), [data?.sales]);
-  const productLabel = SALES_PRODUCT_CHOICES.find(choice => choice.value === product)?.label || extraProducts.find(choice => choice.value === product)?.label || "מוצר";
-  const totals = useMemo(() => summarizeSalesSources(productSales), [productSales]);
-  const effectiveGroup = totals.some(total => total.group === selectedGroup) ? selectedGroup : null;
-  const rows = useMemo(() => [...productSales].reverse().filter(sale => {
-    const source = presentSalesSource(sale);
-    const journey = salesSourceJourney(sale);
-    return (status === "all" || sale.status === status) && (!effectiveGroup || journey.group === effectiveGroup)
-      && [journey.primaryLabel, sale.buyerName, sale.productLabel, sale.closing.channel, sale.closing.campaign, sale.acquisition.campaign, sale.acquisition.creative, sale.creative, source.title, source.detail, journey.label].filter(Boolean).join(" ").toLocaleLowerCase("he-IL").includes(search.trim().toLocaleLowerCase("he-IL"));
-  }), [productSales, search, status, effectiveGroup]);
-  return <Card id="sales-sources" className="border-0 shadow-sm">
-    <CardHeader className="pb-3">
-      <h3 className="font-bold text-gray-900">מאיפה הגיעה כל רכישה</h3>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs leading-5 text-gray-500">הרכישות והערוצים כאן מוצגים לפי המוצר שנבחר. מאגר הוא ברירת המחדל.</p>
-        <div className="min-w-0 w-full sm:w-auto">
-          <label htmlFor="sales-product" className="mb-1 block text-xs font-semibold text-gray-700">איזה מוצר להציג?</label>
-          <select id="sales-product" aria-label="בחירת מוצר ברכישות" value={product} onChange={event => { setProduct(event.target.value as SalesProductFilter); setSelectedGroup(null); }} className="w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-950 sm:min-w-[220px]">
-            {SALES_PRODUCT_CHOICES.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-            {extraProducts.length > 0 && <optgroup label="מוצר נוסף בנפרד">{extraProducts.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</optgroup>}
-          </select>
-        </div>
-      </div>
-      <p className="text-xs leading-5 text-gray-500">כשמייל סגר את הרכישה, הכותרת היא ״מייל״ ומתחת מופיעים הערוץ והקמפיין המקוריים, אם נשמרו. הסיכום למעלה משייך כל רכישה למקור המתועד שלה. ממומן, אורגני ופוסט או סטורי מסומנים רק לפי מידע שנשמר; כל רכישה נספרת פעם אחת.</p>
-      {data && totals.length > 0 && <section aria-label="סיכום רכישות לפי מקור" className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        {totals.map(total => <button key={total.group} type="button" aria-pressed={effectiveGroup === total.group} onClick={() => setSelectedGroup(effectiveGroup === total.group ? null : total.group)} className={`min-w-0 rounded-xl border p-3 text-right transition-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 ${palettes[total.group].card} ${effectiveGroup === total.group ? "ring-2 ring-indigo-400" : "hover:shadow-sm"}`}>
-          <span className="flex items-center gap-2 text-xs font-semibold"><span className={`h-2 w-2 shrink-0 rounded-full ${palettes[total.group].dot}`} aria-hidden="true" />{total.label}</span>
-          <span className="mt-2 block text-xl font-bold">{total.count} <span className="text-xs font-normal">{total.count === 1 ? "רכישה" : "רכישות"}</span></span>
-          <span className="mt-1 block text-xs">{money(total.revenueAgorot)}</span>
-          <span className="mt-1 block text-[11px]">({total.emailClosedCount} {total.emailClosedCount === 1 ? "נסגרה" : "נסגרו"} במייל)</span>
-          {total.linkTypes.map(type => <span key={type.label} className="mt-1 block text-[11px]">{type.label}: {type.count}</span>)}
-          {total.closingOnlyCount > 0 && <span className="mt-1 block text-[10px] opacity-75">{total.group === "unknown" ? "לא נשמר מאיזה ערוץ הגיעו" : `ב־${total.closingOnlyCount} ידוע ערוץ הסגירה בלבד`}</span>}
-        </button>)}
-      </section>}
-      {effectiveGroup && <button type="button" onClick={() => setSelectedGroup(null)} className="self-start text-xs font-medium text-indigo-700 underline">הצגת כל המקורות</button>}
-      <p className="text-[10px] leading-5 text-gray-500">לחיצה על ערוץ מסננת את הרשימה. הסיכום מתייחס רק למוצר שנבחר ולתקופה שנבחרה, ואינו משתנה בזמן חיפוש. רשומות שבבירור אינן נכללות בסיכום.</p>
-      <div className="flex flex-wrap gap-2">
-        <input aria-label="חיפוש ברכישות" placeholder="חיפוש לפי רוכש, מוצר או קמפיין" value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs" />
-        <select aria-label="סינון מצב רכישה" value={status} onChange={event => setStatus(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs"><option value="all">כל הרשומות</option><option value="included">נכללו בהכנסה</option><option value="review">לבדיקה מול Grow</option></select>
-      </div>
-    </CardHeader>
-    <CardContent>
-      {loading && <Skeleton className="h-48 rounded-lg" />}
-      {error && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">נתוני הרכישות אינם זמינים כרגע. אפשר לרענן, ולא מוצגים אפסים במקום נתונים חסרים.</p>}
-      {data && <>
-        <p aria-live="polite" className="mb-3 text-xs text-gray-600">{productLabel}: {productSummary.includedCount} רכישות שנכללו בסך {money(productSummary.includedRevenueAgorot)}{productSummary.reviewCount > 0 && ` · ${productSummary.reviewCount} רשומות בסך ${money(productSummary.reviewRevenueAgorot)} לבדיקה, לא בסכום הראשי`}</p>
-        {(product === "boost" || product === "plus") && <p className="mb-3 rounded-lg bg-indigo-50 p-2 text-xs leading-5 text-indigo-900">{product === "boost" ? "רכישות Boost מוצגות בנפרד ממכירות המאגר. אזור אישי מסומן רק כשנשמר תיעוד כניסה מתאים, ולא לפי סוג המוצר." : "רכישות פלוס וחידושי מנוי מוצגים בנפרד ממכירות המאגר. חידוש מסומן רק כשזוהה בתיעוד."}</p>}
-        {totals.some(total => total.group === "unknown") && <p className="mb-3 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-700">״מקור לא מזוהה״: אין תיעוד שמאפשר לשייך את הרכישה למודעה, למייל או לתוכן אורגני. היא נשארת בסכום המכירות, אבל לא נזקפת לזכות ערוץ מסוים.</p>}
+function SalesRows({ rows }: { rows: Sale[] }) {
+  return <>
         <div className="space-y-3 md:hidden">
           {rows.map(sale => <article key={sale.order} className={`rounded-xl border bg-white p-3 text-xs ${palettes[salesSourceJourney(sale).group].card.split(" ")[0]}`}>
             <div className="flex justify-between gap-2"><strong>{sale.buyerName || "שם לא זמין"}</strong><strong className="whitespace-nowrap text-emerald-700">{money(sale.amountAgorot)}</strong></div>
@@ -143,6 +91,73 @@ export function SalesSourcesTable({ data, loading, error }: { data?: SalesIntell
             </tr>)}</tbody>
           </table>
         </div>
+  </>;
+}
+export function SalesSourcesTable({ data, loading, error }: { data?: SalesIntelligence; loading: boolean; error: boolean }) {
+  const [search, setSearch] = useState("");
+  const [product, setProduct] = useState<SalesProductFilter>(DEFAULT_SALES_PRODUCT);
+  const [status, setStatus] = useState("all");
+  const [selectedGroup, setSelectedGroup] = useState<SalesSourceGroup | null>(null);
+  const productSales = useMemo(() => filterSalesByProduct(data?.sales || [], product), [data?.sales, product]);
+  const productSummary = useMemo(() => summarizeProductSales(productSales), [productSales]);
+  const extraProducts = useMemo(() => additionalSalesProducts(data?.sales || []), [data?.sales]);
+  const productLabel = SALES_PRODUCT_CHOICES.find(choice => choice.value === product)?.label || extraProducts.find(choice => choice.value === product)?.label || "מוצר";
+  const totals = useMemo(() => summarizeSalesSources(productSales), [productSales]);
+  const effectiveGroup = totals.some(total => total.group === selectedGroup) ? selectedGroup : null;
+  const rows = useMemo(() => [...productSales].reverse().filter(sale => {
+    const source = presentSalesSource(sale);
+    const journey = salesSourceJourney(sale);
+    return (status === "all" || sale.status === status) && (!effectiveGroup || journey.group === effectiveGroup)
+      && [journey.primaryLabel, sale.buyerName, sale.productLabel, sale.closing.channel, sale.closing.campaign, sale.acquisition.campaign, sale.acquisition.creative, sale.creative, source.title, source.detail, journey.label].filter(Boolean).join(" ").toLocaleLowerCase("he-IL").includes(search.trim().toLocaleLowerCase("he-IL"));
+  }), [productSales, search, status, effectiveGroup]);
+  const dayRows = splitSalesVisibleDay(rows, data?.endDate ?? Date.now());
+  return <Card id="sales-sources" className="border-0 shadow-sm">
+    <CardHeader className="pb-3">
+      <h3 className="font-bold text-gray-900">מאיפה הגיעה כל רכישה</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs leading-5 text-gray-500">רכישות היום פתוחות; יתר התקופה נפתחת בחץ. מאגר הוא ברירת המחדל.</p>
+        <div className="min-w-0 w-full sm:w-auto">
+          <label htmlFor="sales-product" className="mb-1 block text-xs font-semibold text-gray-700">איזה מוצר להציג?</label>
+          <select id="sales-product" aria-label="בחירת מוצר ברכישות" value={product} onChange={event => { setProduct(event.target.value as SalesProductFilter); setSelectedGroup(null); }} className="w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-950 sm:min-w-[220px]">
+            {SALES_PRODUCT_CHOICES.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+            {extraProducts.length > 0 && <optgroup label="מוצר נוסף בנפרד">{extraProducts.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</optgroup>}
+          </select>
+        </div>
+      </div>
+      <details className="text-xs text-gray-500"><summary className="cursor-pointer">איך לקרוא את המקורות והסיכום?</summary><p className="mt-2 leading-5">הסיכום הצבעוני מתייחס לכל התקופה שנבחרה. הרשימה פתוחה רק ליום האחרון שנבחר, ושאר הימים בחץ. כשמייל סגר רכישה, מקור הגיוס מוצג בנפרד אם נשמר. ממומן ואורגני מסומנים רק לפי ראיות; כל רכישה נספרת פעם אחת.</p></details>
+      {data && totals.length > 0 && <section aria-label="סיכום רכישות לפי מקור" className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {totals.map(total => <button key={total.group} type="button" aria-pressed={effectiveGroup === total.group} onClick={() => setSelectedGroup(effectiveGroup === total.group ? null : total.group)} className={`min-w-0 rounded-xl border p-3 text-right transition-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 ${palettes[total.group].card} ${effectiveGroup === total.group ? "ring-2 ring-indigo-400" : "hover:shadow-sm"}`}>
+          <span className="flex items-center gap-2 text-xs font-semibold"><span className={`h-2 w-2 shrink-0 rounded-full ${palettes[total.group].dot}`} aria-hidden="true" />{total.label}</span>
+          <span className="mt-2 block text-xl font-bold">{total.count} <span className="text-xs font-normal">{total.count === 1 ? "רכישה" : "רכישות"}</span></span>
+          <span className="mt-1 block text-xs">{money(total.revenueAgorot)}</span>
+          <span className="mt-1 block text-[11px]">({total.emailClosedCount} {total.emailClosedCount === 1 ? "נסגרה" : "נסגרו"} במייל)</span>
+          {total.linkTypes.map(type => <span key={type.label} className="mt-1 block text-[11px]">{type.label}: {type.count}</span>)}
+          {total.closingOnlyCount > 0 && <span className="mt-1 block text-[10px] opacity-75">{total.group === "unknown" ? "לא נשמר מאיזה ערוץ הגיעו" : `ב־${total.closingOnlyCount} ידוע ערוץ הסגירה בלבד`}</span>}
+        </button>)}
+      </section>}
+      {effectiveGroup && <button type="button" onClick={() => setSelectedGroup(null)} className="self-start text-xs font-medium text-indigo-700 underline">הצגת כל המקורות</button>}
+      <p className="text-[10px] leading-5 text-gray-500">לחיצה על ערוץ מסננת את הרשימה. הסיכום מתייחס רק למוצר שנבחר ולתקופה שנבחרה, ואינו משתנה בזמן חיפוש. רשומות שבבירור אינן נכללות בסיכום.</p>
+      <div className="flex flex-wrap gap-2">
+        <input aria-label="חיפוש ברכישות" placeholder="חיפוש לפי רוכש, מוצר או קמפיין" value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs" />
+        <select aria-label="סינון מצב רכישה" value={status} onChange={event => setStatus(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs"><option value="all">כל הרשומות</option><option value="included">נכללו בהכנסה</option><option value="review">לבדיקה מול Grow</option></select>
+      </div>
+    </CardHeader>
+    <CardContent>
+      {loading && <Skeleton className="h-48 rounded-lg" />}
+      {error && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">נתוני הרכישות אינם זמינים כרגע. אפשר לרענן, ולא מוצגים אפסים במקום נתונים חסרים.</p>}
+      {data && <>
+        <p aria-live="polite" className="mb-3 text-xs text-gray-600">סיכום כל התקופה · {productLabel}: {productSummary.includedCount} רכישות שנכללו בסך {money(productSummary.includedRevenueAgorot)}{productSummary.reviewCount > 0 && ` · ${productSummary.reviewCount} רשומות בסך ${money(productSummary.reviewRevenueAgorot)} לבדיקה, לא בסכום הראשי`}</p>
+        {(product === "boost" || product === "plus") && <p className="mb-3 rounded-lg bg-indigo-50 p-2 text-xs leading-5 text-indigo-900">{product === "boost" ? "רכישות Boost מוצגות בנפרד ממכירות המאגר. אזור אישי מסומן רק כשנשמר תיעוד כניסה מתאים, ולא לפי סוג המוצר." : "רכישות פלוס וחידושי מנוי מוצגים בנפרד ממכירות המאגר. חידוש מסומן רק כשזוהה בתיעוד."}</p>}
+        {totals.some(total => total.group === "unknown") && <p className="mb-3 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-700">״מקור לא מזוהה״: אין תיעוד שמאפשר לשייך את הרכישה למודעה, למייל או לתוכן אורגני. היא נשארת בסכום המכירות, אבל לא נזקפת לזכות ערוץ מסוים.</p>}
+        <section aria-label="רכישות היום המוצגות">
+          <h4 className="mb-3 font-bold text-sm text-gray-900">{dayRows.day === israelSalesDay(Date.now()) ? "רכישות היום" : `רכישות ${dayRows.day.split("-").reverse().join(".")}`} · {dayRows.visible.length}</h4>
+          <SalesRows rows={dayRows.visible} />
+          {!dayRows.visible.length && <p className="py-3 text-xs text-gray-500">אין רכישות ביום הזה לפי הסינון שנבחר. יתר התקופה מופיעה בחץ למטה.</p>}
+        </section>
+        {dayRows.older.length > 0 && <details key={`${dayRows.day}:${product}:${effectiveGroup}:${status}`} className="group mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3" aria-label="רכישות יתר התקופה">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-[#191265]"><ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />פתיחת יתר הרכישות בתקופה ({dayRows.older.length})</summary>
+          <div className="mt-3 max-h-[28rem] overflow-y-auto overscroll-contain"><SalesRows rows={dayRows.older} /></div>
+        </details>}
         {!rows.length && <p className="py-6 text-center text-sm text-gray-500">אין רכישות להצגה לפי הסינון שנבחר.</p>}
         <p className="mt-3 text-[10px] leading-5 text-gray-500">הסינון כאן משנה רק את רשימת הרכישות וסיכום הערוצים שלה. יתר מדדי הדאשבורד מתייחסים לכל המוצרים. בדיקת התשלום מול Grow נפרדת מזיהוי מקור ההגעה; מודל האתר אינו זהה לייחוס ב־Ads Manager.</p>
       </>}
