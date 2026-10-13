@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import ProfileEditForm from "@/components/ProfileEditForm";
 import DatabaseExpectations from "@/components/DatabaseExpectations";
 import LiveVoucherCard from "@/components/LiveVoucherCard";
+import { PlusCycleProgressCard } from "@/components/PlusCycleProgressCard";
 import EssentialEmailOptIn from "@/components/EssentialEmailOptIn";
 import GrowWallet from "@/components/GrowWallet";
 import AnonymousBoostSilhouette from "@/components/AnonymousBoostSilhouette";
@@ -23,7 +24,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
   const [copyApproved, setCopyApproved] = useState(false);
   const statusQuery = trpc.plusPilot.getMyStatus.useQuery(
     { email, token },
-    { enabled: Boolean(email && token), retry: false },
+    { enabled: Boolean(email && token), retry: false, staleTime: 0, refetchOnWindowFocus: true },
   );
   const updateSocialConsent = trpc.plusPilot.updateSocialExposureConsent.useMutation({
     onSuccess: () => utils.plusPilot.getMyStatus.invalidate({ email, token }),
@@ -76,14 +77,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
 
         {status === "active" && cycleProgress && (
           <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-            <div className="rounded-xl bg-[#191265] p-4 text-white">
-              <div className="flex items-center justify-between gap-3">
-                <div><p className="text-xs text-white/70">הצעות שנשלחו במחזור הנוכחי</p><p className="mt-1 text-3xl font-black text-[#ffe27c]">{cycleProgress.delivered}/{cycleProgress.target}</p></div>
-                <div className="text-left text-[11px] leading-5 text-white/65">נותרו {cycleProgress.daysRemaining} ימים<br />עד {new Date(cycleProgress.cycleEnd).toLocaleDateString("he-IL")}</div>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-[#ffe27c]" style={{ width: `${cycleProgress.progressPercent}%` }} /></div>
-              <p className="mt-2 text-[10px] leading-5 text-white/60">המונה כולל רק הצעות שנבדקו ידנית ונשלחו בפועל. בוסט אלגוריתמי אינו מחליף את יעד 2 ההצעות. אישור הדדי, דייט או זוגיות אינם מובטחים.</p>
-            </div>
+            <PlusCycleProgressCard progress={cycleProgress} billingStatus={pilot?.billingStatus} />
             <a href="https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%9C%D7%A7%D7%95%D7%97%2F%D7%AA%20Database%20Plus%20%D7%95%D7%99%D7%A9%20%D7%9C%D7%99%20%D7%A9%D7%90%D7%9C%D7%94" target="_blank" rel="noreferrer" className="flex min-h-24 items-center justify-center rounded-xl border border-[#eadf9e] bg-white px-5 text-center text-xs font-black text-[#191265]">
               שירות Plus אישי<br />בוואטסאפ העסקי
             </a>
