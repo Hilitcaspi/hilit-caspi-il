@@ -8400,6 +8400,17 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
       }),
 
+    growAccountingStatus: teamProcedure
+      .input(z.object({ startDate: z.number().int().nonnegative(), endDate: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        if (input.endDate <= input.startDate || input.endDate - input.startDate > 93 * 86_400_000) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid reporting range" });
+        }
+        const { growAccountingSummary } = await import("./growPaymentAccounting");
+        try { return await growAccountingSummary(input.startDate, input.endDate); }
+        catch { return {available:false as const,rows:[]}; }
+      }),
+
     measurementStatus: teamProcedure
       .input(z.object({ startDate: z.number().int().nonnegative(), endDate: z.number().int().positive() }))
       .query(async ({ input }) => {

@@ -1,0 +1,1 @@
+ALTER TABLE `grow_payment_receipts` ADD `provider_date` varchar(10);

@@ -52,7 +52,9 @@ describe("database NOW fulfillment", () => {
     expect(schema.match(/couponCode:\s+varchar\("coupon_code"/g)).toHaveLength(2);
     expect(routers).toContain("couponCode: input.couponCode?.trim().toUpperCase() || null");
     expect(routers).not.toContain("Increment usage counter");
-    expect(webhook).toContain("couponCode: purchaseTracking?.couponCode || null");
+    const accounting = readFileSync(resolve(root, "server/growPaymentAccounting.ts"), "utf8");
+    expect(webhook).toContain("couponCode: measurementCheckoutUtm()?.couponCode");
+    expect(accounting).toContain("couponCode:input.couponCode || null");
     expect(webhook).toContain("usedCount: sql`${discountCodes.usedCount} + 1`");
     expect(webhook).toContain("purchaseTracking.couponCode && !purchaseTracking.confirmedAt");
   });

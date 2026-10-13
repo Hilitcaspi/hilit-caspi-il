@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProfitAndLossSection } from "@/components/ProfitAndLossSection";
 import { SalesSourcesTable } from "@/components/SalesSourcesTable";
 import { MetaPurchaseDeliveryStatus } from "@/components/MetaPurchaseDeliveryStatus";
+import { GrowAccountingStatus } from "@/components/GrowAccountingStatus";
 import {
   formatIsraelCalendarDate,
   formatIsraelDateRange,
@@ -277,7 +278,7 @@ export default function Dashboard() {
           <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs text-gray-500">יתרה לפי הנתונים הקיימים, לא רווח סופי</p><strong>{intelligence.data.summary.balanceAgorot == null ? "לא זמין" : fmt(intelligence.data.summary.balanceAgorot / 100)}</strong></div>
         </div>}
         <details className="rounded-xl bg-white shadow-sm"><summary className="cursor-pointer px-4 py-3 text-sm font-bold">ניהול הוצאות</summary><ProfitAndLossSection startDate={startDate} endDate={endDate} expensesOnly /></details>
-        <details className="rounded-xl bg-white shadow-sm"><summary className="cursor-pointer px-4 py-3 text-sm font-bold">מצב מדידה</summary><MetaPurchaseDeliveryStatus startDate={startDate} endDate={endDate} /></details>
+        <details className="rounded-xl bg-white shadow-sm"><summary className="cursor-pointer px-4 py-3 text-sm font-bold">מצב מדידה</summary><GrowAccountingStatus startDate={startDate} endDate={endDate} /><MetaPurchaseDeliveryStatus startDate={startDate} endDate={endDate} /></details>
 
         {/* ═══════════════════════════════════════════════════════════════════════
             SECTION 2: CHANNEL BREAKDOWN — VISUAL

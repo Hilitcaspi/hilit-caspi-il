@@ -242,7 +242,9 @@ async function startServer() {
     const { verifyLiveCheckoutReference } = await import("../liveCheckoutReference");
     if (!verifyLiveCheckoutReference(reference, email)) return res.status(403).json({ error: "invalid_live_checkout" });
     try {
-      await handleGrowWebhook(req.body, { liveCheckoutReference: reference });
+      const context = { liveCheckoutReference: reference, accountingRetry: false };
+      await handleGrowWebhook(req.body, context);
+      if (context.accountingRetry) return res.status(503).json({ error: "payment_inquiry_retry" });
       res.json({ ok: true });
     } catch (error) {
       console.error("[GrowLiveWebhook] Verification or fulfillment failed", error instanceof Error ? error.name : "unknown");
@@ -255,7 +257,7 @@ async function startServer() {
   // Configure in Grow dashboard: Webhook URL → https://hilitcaspi.com/api/grow/webhook
   // Accept both JSON and form-encoded (Grow sends form-encoded from their servers)
   app.post("/api/grow/webhook", express.json(), express.urlencoded({ extended: true }), async (req, res) => {
-    res.status(200).json({ ok: true }); // Preserve existing payment acknowledgement behavior.
+    // Acknowledge only after durable receipt storage; Grow retries a temporary failure.
     try {
       // Accept ALL webhooks — no key validation at all
       const webhookFieldNames = req.body && typeof req.body === "object"
@@ -266,9 +268,13 @@ async function startServer() {
       );
       const boostCheckoutReference = typeof req.query.boost_ref === "string" ? req.query.boost_ref : undefined;
       const plusCheckoutReference = typeof req.query.plus_ref === "string" ? req.query.plus_ref : undefined;
-      await handleGrowWebhook(req.body, { boostCheckoutReference, plusCheckoutReference });
-    } catch (err) {
-      console.error("[GrowWebhook] Unhandled error:", err);
+      const context = { boostCheckoutReference, plusCheckoutReference, accountingRetry: false };
+      await handleGrowWebhook(req.body, context);
+      if (context.accountingRetry) return res.status(503).json({ error: "payment_inquiry_retry" });
+      res.status(200).json({ ok: true });
+    } catch {
+      console.error("[GrowWebhook] Receipt or processing unavailable; provider retry required");
+      res.status(503).json({ error: "payment_notification_retry" });
     }
   });
 

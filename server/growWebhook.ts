@@ -31,6 +31,7 @@
  */
 
 import crypto from "crypto";
+import { recordGrowPaymentOnce } from "./growPaymentAccounting";
 import { captureAcquisitionIfMissing } from "../shared/acquisitionAttribution";
 import { and, desc as orderDesc, eq, gt, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
@@ -675,7 +676,7 @@ function extractUtmFromWebhook(data: any): { utmSource?: string; utmMedium?: str
 }
 
 // ─── Main webhook handler (exported, registered in index.ts) ──────────────────
-export async function handleGrowWebhook(body: any, context: { boostCheckoutReference?: string; plusCheckoutReference?: string; liveCheckoutReference?: string } = {}): Promise<void> {
+export async function handleGrowWebhook(body: any, context: { boostCheckoutReference?: string; plusCheckoutReference?: string; liveCheckoutReference?: string; accountingRetry?: boolean } = {}): Promise<void> {
   // Support both PaymentLinks (new) and legacy formats
   const data = body?.data ?? body;
   const email: string = (data.payerEmail || data.email || "").trim().toLowerCase();
@@ -684,7 +685,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   const sumRaw = data.sum ?? data.paymentSum ?? 0;
   const sum = typeof sumRaw === "string" ? parseFloat(sumRaw) : Number(sumRaw);
   const desc: string = data.description || data.paymentDesc || "";
-  const transactionId: string = data.transactionId || data.transactionCode || "";
+  const transactionId: string = String(data.transactionId || data.transactionCode || "").trim();
   const processToken: string = data.paymentLinkProcessToken || data.processToken || "";
   const hasVerifiedPlusReference = verifyPlusCheckoutReference(context.plusCheckoutReference, email);
   const verifiedLiveTier = verifyLiveCheckoutReference(context.liveCheckoutReference, email);
@@ -866,10 +867,10 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     }
   }
 
-  console.log(`[GrowWebhook] Payment: ${name} (${email}) | product: ${product} | sum: ${sum} | tx: ${transactionId}`);
+  console.log(`[GrowWebhook] Payment notification received; product=${product || "unknown"}`);
 
   if (!product) {
-    console.warn("[GrowWebhook] Could not identify product for payment:", { email, name, sum, desc });
+    console.warn("[GrowWebhook] Product classification unavailable");
     await notifyOwner({
       title: "⚠️ תשלום לא מזוהה ב-Grow",
       content: `${name} (${email}) שילם ${sum} ₪ אבל לא הצלחנו לזהות את המוצר.\nתיאור: ${desc}\nTransaction: ${transactionId}`,
@@ -898,6 +899,25 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     }
   }
 
+  // Forward-only accounting is independent of fulfillment and legacy SDK callbacks.
+  // Uncertain/mismatched notifications are retained for review, never guessed into revenue.
+  const accountingInput = {
+    transactionId, transactionToken: String(data.transactionToken || ""),
+    processId: String(data.processId || ""), processToken: liveProcessToken,
+    product, email, amountAgorot: Math.round(sum * 100), receivedAt: Date.now(),
+    paymentDate: data.paymentDate, statusCode: data.statusCode,
+    couponCode: measurementCheckoutUtm()?.couponCode,
+    utmSource: measurementCheckoutUtm()?.utmSource, utmMedium: measurementCheckoutUtm()?.utmMedium,
+    utmCampaign: measurementCheckoutUtm()?.utmCampaign, utmContent: measurementCheckoutUtm()?.utmContent,
+  };
+  function measurementCheckoutUtm() {
+    return purchaseTracking && purchaseTracking.providerProcessToken === liveProcessToken && liveProcessToken
+      ? purchaseTracking : null;
+  }
+  // Propagate receipt-storage failures so the provider can retry the same identity.
+  const accountingResult = await recordGrowPaymentOnce(accountingInput);
+  if (accountingResult === "pending") context.accountingRetry = true;
+
   // Measurement is separate from legacy fulfillment lookup: never attach another checkout's cookies.
   const measurementTracking = purchaseTracking && matchesMetaCheckout({
     processToken: liveProcessToken, checkoutProcessToken: purchaseTracking.providerProcessToken,
@@ -913,7 +933,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   const paidMeasurementNotification = isPaidGrowMeasurementNotification({
     statusCode: data.statusCode, transactionId, transactionToken: String(data.transactionToken || ""), paymentDate: data.paymentDate,
   });
-  if (paidMeasurementNotification && measureProductionPurchase && measurementPaidAt !== null) {
+  if (!["review", "pending"].includes(accountingResult) && paidMeasurementNotification && measureProductionPurchase && measurementPaidAt !== null) {
     await capiPurchase({
       email, name: name || measurementTracking?.name,
       phone: phone || measurementTracking?.phone,
@@ -927,6 +947,13 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     }).catch(() => console.error("[MetaCAPI] durable measurement enqueue failed"));
   }
 
+
+  // Approval acknowledges receipt; it is NOT verification or a new charge.
+  // Retry must not be silenced at Grow while inquiry is still unavailable.
+  if (["recorded", "duplicate"].includes(accountingResult) && /^\d{3,30}$/.test(transactionId)) {
+    const { approveTransaction } = await import("./growPayment");
+    await approveTransaction(transactionId, data, product ?? undefined);
+  }
 
   // ── Idempotency guard: skip duplicate webhook deliveries ─────────────────
   // Grow sends the webhook TWICE per purchase:
@@ -985,16 +1012,6 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
         // Continue processing even if idempotency check fails
       }
     }
-  }
-
-  // Approve the transaction on Grow's server (required by Grow)
-  // Must send ALL fields from the server notification (webhook body).
-  if (transactionId) {
-    import("./growPayment").then(({ approveTransaction }) => {
-      approveTransaction(transactionId, data, product ?? undefined).catch(err =>
-        console.error("[GrowWebhook] approveTransaction failed:", err)
-      );
-    }).catch(() => {});
   }
 
   // Mark the originating checkout as paid before product fulfillment. Recovery
@@ -1067,47 +1084,8 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       }).catch((error: unknown) => console.error(`[GrowWebhook] Failed to queue product feedback for ${product}:`, error));
     }
 
-    // Persist the actual amount paid as the P&L revenue source of truth.
-    // The idempotency guard above prevents Grow's dual delivery from duplicating revenue.
-    if (sum > 0) {
-      try {
-        const db = await getDb();
-        if (db) {
-          const normalizedTransaction = transactionId || `grow-${email}-${product}-${Date.now()}`;
-          const dedupeKey = completedPaymentDedupeKey({
-            email,
-            product,
-            transactionId: normalizedTransaction,
-            verifiedBoostReference,
-          });
-          await db.insert(completedPayments).values({
-            transactionId: normalizedTransaction,
-            dedupeKey,
-            email,
-            product,
-            couponCode: purchaseTracking?.couponCode || null,
-            utmSource: purchaseTracking?.utmSource || null,
-            utmMedium: purchaseTracking?.utmMedium || null,
-            utmCampaign: purchaseTracking?.utmCampaign || null,
-            utmContent: purchaseTracking?.utmContent || null,
-            amountAgorot: Math.round(sum * 100),
-            amountSource: "grow",
-            paidAt: Date.now(),
-            createdAt: Date.now(),
-          }).onDuplicateKeyUpdate({ set: {
-            couponCode: purchaseTracking?.couponCode || null,
-            utmSource: purchaseTracking?.utmSource || null,
-            utmMedium: purchaseTracking?.utmMedium || null,
-            utmCampaign: purchaseTracking?.utmCampaign || null,
-            utmContent: purchaseTracking?.utmContent || null,
-            amountAgorot: Math.round(sum * 100),
-            amountSource: "grow",
-          }});
-        }
-      } catch (amountErr) {
-        console.error(`[GrowWebhook] Failed to persist completed payment amount for ${email}:`, amountErr);
-      }
-    }
+    // Revenue was recorded atomically from the canonical provider notification above.
+    // No SDK/fulfillment callback may create a second ledger row.
 
     if (purchaseTracking && transactionId && sum > 0 && !businessActionAlreadyProcessed) {
       try {

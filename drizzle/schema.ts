@@ -1630,3 +1630,21 @@ export const contentStudioVersions = mysqlTable("content_studio_versions", {
 }));
 export type ContentStudioVersion = typeof contentStudioVersions.$inferSelect;
 export type InsertContentStudioVersion = typeof contentStudioVersions.$inferInsert;
+
+/** Forward-only Grow accounting receipts. Never store card/contact data here. */
+export const growPaymentReceipts = mysqlTable("grow_payment_receipts", {
+  id: int("id").autoincrement().primaryKey(),
+  receiptKey: varchar("receipt_key", { length: 64 }).notNull(),
+  product: varchar("product", { length: 80 }).notNull(),
+  amountAgorot: int("amount_agorot").notNull(),
+  state: mysqlEnum("state", ["notification_only", "verified", "review", "duplicate_existing"]).notNull(),
+  category: varchar("category", { length: 80 }).notNull(),
+  referencesEncrypted: text("references_encrypted").notNull(),
+  providerDate: varchar("provider_date", { length: 10 }),
+  paidAt: bigint("paid_at", { mode: "number" }).notNull(),
+  receivedAt: bigint("received_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({
+  identityIdx: uniqueIndex("grow_receipt_identity_idx").on(table.receiptKey),
+  dateStateIdx: index("grow_receipt_date_state_idx").on(table.receivedAt, table.state),
+}));
