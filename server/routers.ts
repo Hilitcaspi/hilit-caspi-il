@@ -1,3 +1,4 @@
+import { getMatchResponseSummaries } from "./matchResponseMetrics";
 // © 2024–2025 Hilit Caspi. All rights reserved. Proprietary and confidential.
 // שיטת ההתאמה, האלגוריתם והתכנים מוגנים בזכויות יוצרים ומהווים סוד מסחרי של הילית כספי.
 
@@ -6465,37 +6466,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         return { success: true, isNotBasic: newVal };
       }),
 
-    // Count non-responses per single (for serial non-responder badge)
-    getNonResponseCounts: teamProcedure
-      .query(async ({ ctx }) => {
-        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        // Find matches where status is rejected/expired but neither side explicitly rejected
-        const allExpired = await db.select({
-          singleAId: matches.singleAId,
-          singleBId: matches.singleBId,
-          approvedByA: matches.approvedByA,
-          approvedByB: matches.approvedByB,
-        }).from(matches).where(
-          and(
-            or(eq(matches.status, "rejected"), eq(matches.status, "expired")),
-            ne(matches.approvedByA, true),
-            ne(matches.approvedByB, true)
-          )
-        );
-        // Count per single how many times they didn't respond
-        const counts: Record<number, number> = {};
-        for (const m of allExpired) {
-          if (m.approvedByA !== true) {
-            counts[m.singleAId] = (counts[m.singleAId] || 0) + 1;
-          }
-          if (m.approvedByB !== true) {
-            counts[m.singleBId] = (counts[m.singleBId] || 0) + 1;
-          }
-        }
-        return counts;
-      }),
+    // Compatibility endpoint: current consecutive unanswered deliveries, not declines.
+    getNonResponseCounts: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const summaries = await getMatchResponseSummaries();
+      return Object.fromEntries(Object.entries(summaries).map(([id, summary]) => [id, summary.consecutiveUnanswered]));
+    }),
+    getResponseSummaries: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return getMatchResponseSummaries();
+    }),
 
     // Update admin notes for a single (internal only, never sent to clients)
     updateAdminNotes: teamProcedure

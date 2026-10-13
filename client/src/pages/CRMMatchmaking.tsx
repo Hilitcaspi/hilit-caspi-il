@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import MatchProfileCard, { MatchProfileFacts, MatchPreferenceFacts, ProfilePhoto, preferenceRange, type MatchProfile } from "@/components/MatchProfileCard";
 import { buildAdvancedMatchExclusions, isAdvancedMatchCandidate } from "@shared/advancedMatchCandidates";
+import ResponseFollowupSection from "@/components/ResponseFollowupSection";
 import MatchmakingDashboard from "./MatchmakingDashboard";
 import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
 import LiveOctoberAdminSection from "@/components/LiveOctoberAdminSection";
@@ -607,10 +608,11 @@ export default function CRMMatchmaking() {
     ]);
   };
 
-  // Non-response counts for serial non-responder badge
-  const { data: nonResponseCounts = {} } = (trpc.matchmaking as any).getNonResponseCounts.useQuery(undefined, {
+  // A decline is a response, and only personally exposed proposals can warn.
+  const { data: responseSummaries = {}, refetch: refetchResponses, isLoading: responsesLoading, isError: responsesError } = trpc.matchmaking.getResponseSummaries.useQuery(undefined, {
     enabled: !!user && user.role === "admin",
-  }) as { data: Record<number, number> };
+    refetchOnWindowFocus: true, staleTime: 0,
+  });
 
   if (loading) {
     return <div className="min-h-screen bg-[#f0eadc] flex items-center justify-center" dir="rtl"><div className="text-[#191265]">טוענת...</div></div>;
@@ -1119,9 +1121,9 @@ export default function CRMMatchmaking() {
                       <span className="font-bold text-[#191265]">{single.firstName} {single.lastName || ""}</span>
                       {(single as any).isCoachingClient && <span className="text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
                       {(single as any).isNotBasic && <span className="text-[9px] bg-amber-200 text-amber-800 font-bold px-1.5 py-0.5 rounded-full">⭐ דורש תשומת לב</span>}
-                      {((nonResponseCounts as Record<number, number>)[single.id] ?? 0) >= 3 && (
-                        <span className="text-[9px] bg-red-200 text-red-800 font-bold px-1.5 py-0.5 rounded-full" title={`לא ענה ${(nonResponseCounts as Record<number, number>)[single.id]} פעמים`}>
-                          🚨 לא עונה ({(nonResponseCounts as Record<number, number>)[single.id]})
+                      {!responsesError && responseSummaries[single.id]?.needsFollowup && (
+                        <span className="text-[9px] bg-red-200 text-red-800 font-bold px-1.5 py-0.5 rounded-full" title="הצעות אחרונות שנמסרו ונשארו ללא תגובה אחרי זמן המענה. סירוב נחשב תגובה.">
+                          רצף ללא תגובה ({responseSummaries[single.id].consecutiveUnanswered})
                         </span>
                       )}
                       <Badge className="text-xs bg-[#191265]/10 text-[#191265]">{GENDER_LABELS[single.gender] || single.gender}</Badge>
@@ -1286,6 +1288,7 @@ export default function CRMMatchmaking() {
                         <div><span className="font-semibold text-[#191265]">נרשם:</span> {new Date(typeof single.createdAt === 'number' ? single.createdAt : (single.createdAt as Date)).toLocaleDateString("he-IL")}</div>
                         <div><span className="font-semibold text-[#191265]">ID:</span> {single.id}</div>
                         <div className="col-span-2"><MatchPreferenceFacts profile={single} /></div>
+                        {!responsesError && responseSummaries[single.id] && <div className="col-span-2 text-xs">תגובות להצעות: {responseSummaries[single.id].respondedCount} נענו · {responseSummaries[single.id].unansweredCount} ללא תגובה בעבר · {responseSummaries[single.id].waitingCount} עדיין בזמן המענה. כן ולא נחשבים תגובה.</div>}
                         {single.height && <div><span className="font-semibold text-[#191265]">גובה:</span> {single.height} ס"מ</div>}
                         {single.education && <div><span className="font-semibold text-[#191265]">השכלה:</span> {EDUCATION_LABELS[single.education] || single.education}</div>}
                         {single.religiosity && <div><span className="font-semibold text-[#191265]">דת:</span> {RELIGIOSITY_LABELS[single.religiosity] || single.religiosity}</div>}
@@ -2367,6 +2370,7 @@ export default function CRMMatchmaking() {
         {/* Unmatched Tab */}
         {activeTab === "unmatched" && (
           <div className="space-y-3">
+            <ResponseFollowupSection profiles={typedSingles} summaries={responseSummaries} loading={responsesLoading} error={responsesError} refresh={() => void refetchResponses()} onPhoto={setLightboxUrl} />
             <div className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-[#191265]">🔍 לא קיבלו התאמה יותר מ־14 יום או ביקשו טיפול דרך המשוב</p>
