@@ -45,3 +45,60 @@ export function presentSalesSource(sale: SaleSource) {
   };
   return { title, detail, creative, original };
 }
+
+export type SalesSourceGroup = "meta" | "instagram" | "facebook" | "google_ads" | "google" | "whatsapp" | "sms" | "email" | "onsite" | "renewal" | "referral" | "other" | "unknown";
+const groupNames: Record<SalesSourceGroup, string> = {
+  meta: "Meta ממומן", instagram: "אינסטגרם", facebook: "פייסבוק", google_ads: "Google Ads", google: "Google / חיפוש",
+  whatsapp: "וואטסאפ", sms: "SMS", email: "מייל · מקור קודם לא זוהה", onsite: "אזור אישי / הצעה באתר", renewal: "חידוש מנוי", referral: "הפניה", other: "מקור אחר", unknown: "מקור לא ידוע",
+};
+function sourceGroup(channel: string): SalesSourceGroup {
+  if (unknownChannel(channel)) return "unknown";
+  if (channel === "Meta Ads (ממומן)") return "meta";
+  if (channel.startsWith("Instagram")) return "instagram";
+  if (channel.startsWith("Facebook")) return "facebook";
+  if (channel === "Google Ads") return "google_ads";
+  if (channel.startsWith("Google")) return "google";
+  if (channel === "WhatsApp") return "whatsapp";
+  if (channel === "SMS") return "sms";
+  if (channel === "Email") return "email";
+  if (["אזור אישי", "הצעה באתר"].includes(channel)) return "onsite";
+  if (channel === "חידוש") return "renewal";
+  if (channel === "הפניה") return "referral";
+  return "other";
+}
+
+/** Source grouping is a separate display lens. Each included sale belongs to one group. */
+export function salesSourceJourney(sale: SaleSource) {
+  const hasRecordedAcquisition = !unknownChannel(sale.acquisition.channel)
+    && !sale.acquisition.confidence.includes("לא נמצא מקור קודם");
+  const attribution = hasRecordedAcquisition ? sale.acquisition : sale.closing;
+  const group = sourceGroup(attribution.channel);
+  const display = presentSalesSource(sale);
+  return {
+    group,
+    label: group === "email" && hasRecordedAcquisition ? "מייל" : groupNames[group],
+    emailClosed: sale.closing.channel === "Email",
+    acquisitionRecorded: hasRecordedAcquisition,
+    acquisitionLabel: hasRecordedAcquisition
+      ? (group === "email" ? "מייל (מקור מוקדם מתועד)" : groupNames[group])
+      : "מקור מוקדם לא נשמר",
+    acquisitionCampaign: hasRecordedAcquisition && !genericCampaign(sale.acquisition.campaign) ? sale.acquisition.campaign : null,
+    closingLabel: display.title,
+    closingDetail: display.detail,
+    evidence: hasRecordedAcquisition ? sale.acquisition.confidence : sale.closing.confidence,
+  };
+}
+export function summarizeSalesSources(sales: Array<SaleSource & { status: "included" | "review"; amountAgorot: number }>) {
+  const groups = new Map<SalesSourceGroup, { group: SalesSourceGroup; label: string; count: number; revenueAgorot: number; emailClosedCount: number; closingOnlyCount: number }>();
+  for (const sale of sales) {
+    if (sale.status !== "included") continue;
+    const journey = salesSourceJourney(sale);
+    const total = groups.get(journey.group) || { group: journey.group, label: journey.group === "email" ? "מייל" : journey.label, count: 0, revenueAgorot: 0, emailClosedCount: 0, closingOnlyCount: 0 };
+    total.count += 1;
+    total.revenueAgorot += sale.amountAgorot;
+    if (journey.emailClosed) total.emailClosedCount += 1;
+    if (!journey.acquisitionRecorded) total.closingOnlyCount += 1;
+    groups.set(journey.group, total);
+  }
+  return Array.from(groups.values()).sort((a, b) => b.count - a.count || b.revenueAgorot - a.revenueAgorot || a.group.localeCompare(b.group));
+}

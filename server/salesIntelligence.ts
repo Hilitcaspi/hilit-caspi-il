@@ -67,7 +67,7 @@ export type SalesIntelligence = {
     coupon: string | null;
     status: "included" | "review";
     paymentEvidence: string;
-    acquisition: { channel: string; campaign: string; confidence: string };
+    acquisition: { channel: string; campaign: string; confidence: string; creative?: string | null };
     closing: { channel: string; campaign: string; confidence: string };
     emailAssist: { campaign: string; clicked: boolean; sameDay: boolean } | null;
     lagDays: number | null;
@@ -962,6 +962,7 @@ export async function getSalesIntelligence(
         channel: row.acquisitionResolved.channel,
         campaign: row.acquisitionResolved.campaign,
         confidence: row.acquisitionResolved.confidence,
+        creative: row.acquisitionResolved.creative || null,
       },
       closing: {
         channel: row.closingResolved.channel,

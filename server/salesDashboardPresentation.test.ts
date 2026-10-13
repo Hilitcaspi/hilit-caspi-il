@@ -22,11 +22,11 @@ describe("restored dashboard presentation", () => {
     expect(dashboardSource).toContain('label: "3 ימים מלאים"');
     expect(dashboardSource).toContain("setRefreshedAt(Date.now())");
     expect(dashboardSource).toContain("SalesSourcesTable");
-    for (const label of ["מאיפה הגיעה כל רכישה", "רוכש", "מוצר", "סכום", "מודעה / תוכן מתויג", "לא תועד"]) expect(tableSource).toContain(label);
+    for (const label of ["מאיפה הגיעה כל רכישה", "רוכש", "מוצר", "סכום", "מסלול הרכישה", "מקור הגיוס", "סיכום רכישות לפי מקור"]) expect(tableSource).toContain(label);
     expect(tableSource).toContain("sale.closing.channel");
     expect(tableSource).toContain("sale.acquisition.campaign");
     expect(tableSource).toContain('timeZone: "Asia/Jerusalem"');
-    expect(tableSource).not.toContain("sale.email");
+    expect(tableSource).not.toMatch(/sale\.email\b/);
   });
   it("keeps included income and review rows on one shared source", () => {
     expect(dashboardSource).toContain("trpc.dashboard.salesIntelligence.useQuery");
