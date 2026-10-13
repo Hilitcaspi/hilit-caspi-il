@@ -24,12 +24,13 @@ export function presentSalesSource(sale: SaleSource) {
     detail = "הקישור מתויג כביו באינסטגרם; זו אינה ראיה לקליק ממודעה ממומנת.";
     creative = null;
   } else if (closing.channel === "Email") {
-    title = "מייל · " + (genericCampaign(closing.campaign) ? "הזמנה להצטרף למאגר" : closing.campaign);
+    title = "מייל · " + (genericCampaign(closing.campaign) ? "קישור רכישה" : closing.campaign);
     detail = sale.emailAssist?.clicked
       ? `קליק במייל לפני הרכישה: ${sale.emailAssist.campaign}`
       : "בתשלום נשמר תיוג של קישור ממייל; המייל המדויק לא זוהה.";
   } else if (/^Instagram|^Facebook/.test(closing.channel)) {
-    title = closing.channel.startsWith("Instagram") ? "אינסטגרם · סוג הקישור לא זוהה" : "פייסבוק · סוג הקישור לא זוהה";
+    title = closing.channel.startsWith("Instagram") ? "אינסטגרם · ללא זיהוי מודעה" : "פייסבוק · ללא זיהוי מודעה";
+    detail = "בקישור התשלום נשמר תיוג של הרשת, אך אין מידע שמזהה מודעה מסוימת או קובע אם הקישור ממומן.";
   } else if (closing.channel === "Meta Ads (ממומן)") {
     title = "מודעה ממומנת ב־Meta";
   }
@@ -49,7 +50,7 @@ export function presentSalesSource(sale: SaleSource) {
 export type SalesSourceGroup = "meta" | "instagram" | "facebook" | "google_ads" | "google" | "whatsapp" | "sms" | "email" | "onsite" | "renewal" | "referral" | "other" | "unknown";
 const groupNames: Record<SalesSourceGroup, string> = {
   meta: "Meta ממומן", instagram: "אינסטגרם", facebook: "פייסבוק", google_ads: "Google Ads", google: "Google / חיפוש",
-  whatsapp: "וואטסאפ", sms: "SMS", email: "מייל · מקור קודם לא זוהה", onsite: "אזור אישי / הצעה באתר", renewal: "חידוש מנוי", referral: "הפניה", other: "מקור אחר", unknown: "מקור לא ידוע",
+  whatsapp: "וואטסאפ", sms: "SMS", email: "מייל · מקור קודם לא זוהה", onsite: "אזור אישי / הצעה באתר", renewal: "חידוש מנוי", referral: "הפניה", other: "מקור אחר", unknown: "ערוץ ההגעה לא תועד",
 };
 function sourceGroup(channel: string): SalesSourceGroup {
   if (unknownChannel(channel)) return "unknown";
@@ -81,7 +82,7 @@ export function salesSourceJourney(sale: SaleSource) {
     acquisitionRecorded: hasRecordedAcquisition,
     acquisitionLabel: hasRecordedAcquisition
       ? (group === "email" ? "מייל (מקור מוקדם מתועד)" : groupNames[group])
-      : "מקור מוקדם לא נשמר",
+      : "לא תועד איך נחשפו אלינו לפני הקישור הזה",
     acquisitionCampaign: hasRecordedAcquisition && !genericCampaign(sale.acquisition.campaign) ? sale.acquisition.campaign : null,
     closingLabel: display.title,
     closingDetail: display.detail,
@@ -101,4 +102,19 @@ export function summarizeSalesSources(sales: Array<SaleSource & { status: "inclu
     groups.set(journey.group, total);
   }
   return Array.from(groups.values()).sort((a, b) => b.count - a.count || b.revenueAgorot - a.revenueAgorot || a.group.localeCompare(b.group));
+}
+
+/** Explains evidence, not cause. Raw tracking labels stay in the optional technical detail. */
+export function explainSalesSourceEvidence(sale: SaleSource) {
+  const display = presentSalesSource(sale);
+  const evidence = sale.closing.confidence;
+  if (unknownChannel(sale.closing.channel)) return "התשלום נרשם, אבל לא נשמר מידע שמזהה את ערוץ ההגעה. אין בכך הוכחה לרכישה ישירה או ממומנת.";
+  if (evidence.includes("מזהה מודעה תואם")) return "מזהה המודעה שנשמר בעסקה תואם למודעה בחשבון הישראלי.";
+  if (sale.closing.channel === "Meta Ads (ממומן)") return "תיוג הרכישה מופה לקמפיין ממומן בחשבון הישראלי. זהו שיוך באתר, לא אימות של מספר ההמרות ב־Meta.";
+  if (sale.closing.channel === "Email") return sale.emailAssist?.clicked ? "תועד קליק במייל לפני התשלום." : "נשמר תיוג של קישור ממייל, אך המייל המסוים לא זוהה.";
+  if (sale.creative === "bio_link") return "הקישור מתויג כקישור הביו באינסטגרם. לא תועד איך הגיעו לפרופיל לפניו.";
+  if (/^Facebook|^Instagram/.test(sale.closing.channel)) return display.detail || "נשמר תיוג של הרשת בלבד, ללא זיהוי מודעה.";
+  if (sale.closing.channel === "אזור אישי") return "תועדה כניסה לרכישה מהאזור האישי.";
+  if (sale.closing.channel === "חידוש") return "החיוב סווג כחידוש מנוי; לא כרכישה חדשה מקמפיין.";
+  return "הערוץ מבוסס על התיעוד שנשמר לפני התשלום. פרטי המדידה זמינים בהרחבה.";
 }

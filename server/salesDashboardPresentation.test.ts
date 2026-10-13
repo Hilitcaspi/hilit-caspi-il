@@ -22,7 +22,7 @@ describe("restored dashboard presentation", () => {
     expect(dashboardSource).toContain('label: "3 ימים מלאים"');
     expect(dashboardSource).toContain("setRefreshedAt(Date.now())");
     expect(dashboardSource).toContain("SalesSourcesTable");
-    for (const label of ["מאיפה הגיעה כל רכישה", "רוכש", "מוצר", "סכום", "מסלול הרכישה", "מקור הגיוס", "סיכום רכישות לפי מקור"]) expect(tableSource).toContain(label);
+    for (const label of ["מאיפה הגיעה כל רכישה", "רוכש", "מוצר", "סכום", "מסלול הרכישה", "איך הגיעו אלינו קודם", "סיכום רכישות לפי מקור"]) expect(tableSource).toContain(label);
     expect(tableSource).toContain("sale.closing.channel");
     expect(tableSource).toContain("sale.acquisition.campaign");
     expect(tableSource).toContain('timeZone: "Asia/Jerusalem"');
@@ -33,7 +33,7 @@ describe("restored dashboard presentation", () => {
     expect(dashboardSource).toContain("revenue: intelligence.data.summary.includedRevenueAgorot / 100");
     expect(dashboardSource).toContain("purchases: intelligence.data.summary.includedCount");
     expect(dashboardSource).toContain("intelligence.data.channels.map");
-    expect(tableSource).toContain("ההתאמה העצמאית ל־Grow עדיין אינה מאושרת");
+    expect(tableSource).toContain("בדיקת התשלום מול Grow נפרדת מזיהוי מקור ההגעה");
     expect(tableSource).toContain("מודל האתר אינו זהה לייחוס ב־Ads Manager");
     expect(dashboardSource).not.toContain("Grow מאומת");
   });
@@ -50,5 +50,23 @@ describe("restored dashboard presentation", () => {
     expect(dashboardSource).not.toContain("sendCompletionSms");
     expect(dashboardSource).toContain("expensesOnly");
     expect(dashboardSource).toContain("<details");
+  });
+});
+
+describe("product selector and understandable evidence", () => {
+  it("shares product-filtered rows between summary and purchase list", () => {
+    expect(tableSource).toContain("useState<SalesProductFilter>(DEFAULT_SALES_PRODUCT)");
+    expect(tableSource).toContain("summarizeSalesSources(productSales)");
+    expect(tableSource).toContain("summarizeProductSales(productSales)");
+    expect(tableSource).toContain("[...productSales].reverse()");
+    expect(tableSource).not.toContain("data.summary.includedCount");
+    expect(tableSource).toContain("בחירת מוצר ברכישות");
+    expect(tableSource).toContain("setSelectedGroup(null)");
+  });
+  it("hides raw tags behind a second expansion and does not invent acquisition", () => {
+    expect(tableSource).toContain("פרטי המדידה (לפי הצורך)");
+    expect(tableSource).toContain("explainSalesSourceEvidence(sale)");
+    expect(tableSource).toContain("זה לא ערוץ נוסף");
+    expect(tableSource).not.toContain("ראיית המקור:");
   });
 });

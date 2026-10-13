@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { presentSalesSource, salesSourceJourney, summarizeSalesSources } from "../shared/salesSourcePresentation";
+import { presentSalesSource, salesSourceJourney, summarizeSalesSources, explainSalesSourceEvidence } from "../shared/salesSourcePresentation";
 const source = (channel: string, campaign = "database", confidence = "UTM בתהליך תשלום מותאם לעסקה") => ({ channel, campaign, confidence });
 const sale = (channel: string, campaign = "database", creative: string | null = null) => ({
   closing: source(channel, campaign), acquisition: source("paid_database", "ללא קמפיין"), creative, emailAssist: null,
@@ -13,11 +13,11 @@ describe("human-readable purchase sources", () => {
     expect(result.original).toBeNull();
   });
   it("does not call an untyped Instagram link organic or paid", () => {
-    expect(presentSalesSource(sale("Instagram (אורגני/לא ידוע)")).title).toBe("אינסטגרם · סוג הקישור לא זוהה");
+    expect(presentSalesSource(sale("Instagram (אורגני/לא ידוע)")).title).toBe("אינסטגרם · ללא זיהוי מודעה");
   });
   it("explains a generic email tag and shows a recorded email click separately", () => {
     const result = presentSalesSource({ ...sale("Email"), emailAssist: { campaign: "הצעד הראשון לנשים", clicked: true, sameDay: true } });
-    expect(result.title).toBe("מייל · הזמנה להצטרף למאגר");
+    expect(result.title).toBe("מייל · קישור רכישה");
     expect(result.detail).toContain("קליק במייל לפני הרכישה: הצעד הראשון לנשים");
     expect(result.original).toBeNull();
   });
@@ -84,5 +84,24 @@ describe("acquisition summary and collapsed journey", () => {
   });
   it("returns no invented zero-value channels for an empty period", () => {
     expect(summarizeSalesSources([])).toEqual([]);
+  });
+});
+
+describe("plain-language evidence", () => {
+  it("explains Facebook with a raw tag without inventing a paid campaign", () => {
+    const input = sale("Facebook (אורגני/לא ידוע)", "database", "rem_db");
+    expect(presentSalesSource(input).title).toBe("פייסבוק · ללא זיהוי מודעה");
+    expect(explainSalesSourceEvidence(input)).toContain("אין מידע שמזהה מודעה");
+    expect(presentSalesSource(input).creative).toBe("rem_db");
+    expect(salesSourceJourney(input).acquisitionRecorded).toBe(false);
+  });
+  it("separates unknown first exposure from the recorded closing channel", () => {
+    const input = sale("Facebook (אורגני/לא ידוע)");
+    expect(salesSourceJourney(input).acquisitionLabel).toContain("לא תועד איך נחשפו");
+    expect(salesSourceJourney(input).group).toBe("facebook");
+  });
+  it("never calls an unknown source a direct sale or a paid ad", () => {
+    expect(salesSourceJourney(sale("ישיר / לא ידוע")).label).toBe("ערוץ ההגעה לא תועד");
+    expect(explainSalesSourceEvidence(sale("ישיר / לא ידוע"))).toContain("אין בכך הוכחה");
   });
 });
