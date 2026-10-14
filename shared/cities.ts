@@ -95,6 +95,65 @@ export const CITY_DB: Record<string, CityData> = {
   "אפרת":             { lat: 31.6583, lng: 35.1583, socioEconomic: 8,  religiousRatio: 0.60, region: "jerusalem" },
 };
 
+// This is the existing top distance tier, named here so every geography
+// consumer uses the same definition of "same or nearby".
+export const SAME_OR_NEARBY_CITY_DISTANCE_KM = 5;
+
+function cityLookupKey(city: string): string {
+  return city
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f\u0591-\u05bd\u05bf-\u05c5\u05c7]/g, "")
+    .toLocaleLowerCase()
+    .replace(/[׳״'\"]/g, "")
+    .replace(/[\u05be\-_/–—.,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Database city values may have been entered in Hebrew, English, or with a
+// common spelling variation. Keep the coordinate database Hebrew-canonical.
+const CITY_ALIAS_ENTRIES: ReadonlyArray<readonly [string, string]> = [
+  ["tel aviv", "תל אביב"], ["tel aviv yafo", "תל אביב-יפו"], ["tel aviv jaffa", "תל אביב-יפו"],
+  ["ramat gan", "רמת גן"], ["givatayim", "גבעתיים"], ["bnei brak", "בני ברק"],
+  ["petah tikva", "פתח תקווה"], ["petach tikva", "פתח תקווה"], ["rishon lezion", "ראשון לציון"],
+  ["holon", "חולון"], ["bat yam", "בת ים"], ["or yehuda", "אור יהודה"], ["yehud", "יהוד"],
+  ["kiryat ono", "קריית אונו"], ["gan yavne", "גן יבנה"], ["azor", "אזור"],
+  ["herzliya", "הרצליה"], ["raanana", "רעננה"], ["kfar saba", "כפר סבא"], ["hod hasharon", "הוד השרון"],
+  ["netanya", "נתניה"], ["ramat hasharon", "רמת השרון"], ["kfar yona", "כפר יונה"],
+  ["tayibe", "טייבה"], ["taibeh", "טייבה"], ["elkana", "אלקנה"],
+  ["jerusalem", "ירושלים"], ["maale adumim", "מעלה אדומים"], ["beit shemesh", "בית שמש"],
+  ["modiin", "מודיעין"], ["modiin illit", "מודיעין עילית"], ["beitar illit", "ביתר עילית"],
+  ["abu ghosh", "אבו גוש"], ["rehovot", "רחובות"], ["ness ziona", "נס ציונה"], ["lod", "לוד"],
+  ["ramla", "רמלה"], ["yavne", "יבנה"], ["ashdod", "אשדוד"], ["ashkelon", "אשקלון"],
+  ["kiryat gat", "קריית גת"], ["beer sheva", "באר שבע"], ["beer sheba", "באר שבע"],
+  ["beersheba", "באר שבע"], ["eilat", "אילת"], ["dimona", "דימונה"], ["netivot", "נתיבות"],
+  ["sderot", "שדרות"], ["ofakim", "אופקים"], ["haifa", "חיפה"], ["kiryat ata", "קריית אתא"],
+  ["kiryat bialik", "קריית ביאליק"], ["kiryat motzkin", "קריית מוצקין"], ["kiryat yam", "קריית ים"],
+  ["acre", "עכו"], ["akko", "עכו"], ["nahariya", "נהריה"], ["karmiel", "כרמיאל"],
+  ["nazareth", "נצרת"], ["nazareth illit", "נצרת עילית"], ["nof hagalil", "נצרת עילית"],
+  ["afula", "עפולה"], ["beit shean", "בית שאן"], ["tiberias", "טבריה"], ["safed", "צפת"],
+  ["tzfat", "צפת"], ["katzrin", "קצרין"], ["migdal haemeq", "מגדל העמק"],
+  ["yokneam", "יוקנעם"], ["zichron yaakov", "זכרון יעקב"], ["pardes hanna", "פרדס חנה"],
+  ["pardes hanna karkur", "פרדס חנה"], ["hadera", "חדרה"], ["ariel", "אריאל"],
+  ["maale efraim", "מעלה אפרים"], ["efrat", "אפרת"],
+  ["תל אביב יפו", "תל אביב-יפו"], ["קרית אונו", "קריית אונו"], ["קרית גת", "קריית גת"],
+  ["קרית אתא", "קריית אתא"], ["קרית ביאליק", "קריית ביאליק"], ["קרית מוצקין", "קריית מוצקין"],
+  ["קרית ים", "קריית ים"], ["פתח תקוה", "פתח תקווה"], ["מודיעין מכבים רעות", "מודיעין"],
+  ["נצרת עלית", "נצרת עילית"], ["נוף הגליל", "נצרת עילית"], ["יקנעם", "יוקנעם"],
+  ["יקנעם עילית", "יוקנעם"], ["זיכרון יעקב", "זכרון יעקב"], ["פרדס חנה כרכור", "פרדס חנה"],
+];
+
+const CITY_BY_LOOKUP_KEY = new Map<string, string>([
+  ...Object.keys(CITY_DB).map(city => [cityLookupKey(city), city] as const),
+  ...CITY_ALIAS_ENTRIES.map(([alias, city]) => [cityLookupKey(alias), city] as const),
+]);
+
+/** Returns the CITY_DB canonical Hebrew name, or null for an unknown city. */
+export function normalizeIsraeliCityName(city: string | null | undefined): string | null {
+  if (!city) return null;
+  return CITY_BY_LOOKUP_KEY.get(cityLookupKey(city)) ?? null;
+}
+
 /**
  * Haversine distance between two lat/lng points, returns km.
  */
@@ -113,6 +172,19 @@ export function haversineKm(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/** True only when both supplied names resolve to known Israeli cities at the existing 5km top tier. */
+export function areSameOrNearbyIsraeliCities(
+  cityA: string | null | undefined,
+  cityB: string | null | undefined,
+): boolean {
+  const normalizedA = normalizeIsraeliCityName(cityA);
+  const normalizedB = normalizeIsraeliCityName(cityB);
+  const dataA = normalizedA ? CITY_DB[normalizedA] : null;
+  const dataB = normalizedB ? CITY_DB[normalizedB] : null;
+  if (!dataA || !dataB) return false;
+  return haversineKm(dataA.lat, dataA.lng, dataB.lat, dataB.lng) <= SAME_OR_NEARBY_CITY_DISTANCE_KM;
+}
+
 /**
  * Location score (0–100) based on haversine distance.
  * Bonus/penalty applied for socioeconomic and religious profile alignment.
@@ -127,24 +199,31 @@ export function scoreLocation(
 ): { score: number; distanceKm: number | null; notes: string[] } {
   const notes: string[] = [];
 
-  // Both "anywhere" → full score
-  if (locationPrefA === "anywhere" && locationPrefB === "anywhere") {
-    return { score: 100, distanceKm: null, notes: ["שניהם פתוחים לכל מרחק"] };
-  }
-
-  const dataA = cityA ? CITY_DB[cityA] : null;
-  const dataB = cityB ? CITY_DB[cityB] : null;
+  const normalizedA = normalizeIsraeliCityName(cityA);
+  const normalizedB = normalizeIsraeliCityName(cityB);
+  const dataA = normalizedA ? CITY_DB[normalizedA] : null;
+  const dataB = normalizedB ? CITY_DB[normalizedB] : null;
 
   // No city data → neutral
   if (!dataA || !dataB) {
     return { score: 55, distanceKm: null, notes: [] };
   }
 
+  // Both "anywhere" → full score only when there is a verifiable location.
+  if (locationPrefA === "anywhere" && locationPrefB === "anywhere") {
+    return { score: 100, distanceKm: null, notes: ["שניהם פתוחים לכל מרחק"] };
+  }
+
   const km = haversineKm(dataA.lat, dataA.lng, dataB.lat, dataB.lng);
+  // Close geography must not be downgraded by aggregate city demographics.
+  // Individual religion/preferences have their own separate scoring fields.
+  if (km <= SAME_OR_NEARBY_CITY_DISTANCE_KM) {
+    return { score: 100, distanceKm: Math.round(km), notes: [`מגורים באותה עיר או במרחק של עד ${SAME_OR_NEARBY_CITY_DISTANCE_KM} ק"מ`] };
+  }
 
   // Base distance score
   let base: number;
-  if (km <= 5)        base = 100;
+  if (km <= SAME_OR_NEARBY_CITY_DISTANCE_KM) base = 100;
   else if (km <= 15)  base = 90;
   else if (km <= 30)  base = 75;
   else if (km <= 50)  base = 58;

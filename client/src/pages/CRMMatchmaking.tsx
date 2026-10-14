@@ -342,6 +342,9 @@ export default function CRMMatchmaking() {
   const [filterWantsKids, setFilterWantsKids] = useState("");
   const [filterHasKids, setFilterHasKids] = useState("");
   const [filterArea, setFilterArea] = useState("");
+  const [filterVisibleLimit, setFilterVisibleLimit] = useState(10);
+  const [unmatchedView, setUnmatchedView] = useState<"matches" | "nonresponse">("matches");
+  useEffect(() => { setFilterVisibleLimit(10); }, [filterCompatTarget, filterGender, filterMinAge, filterMaxAge, filterCity, filterReligiosity, filterDna, filterName, filterMinHeight, filterMaxHeight, filterMaritalStatus, filterWantsKids, filterHasKids, filterArea]);
   const filterTargetRef = useRef(filterCompatTarget);
   const batchGeneration = useRef(0);
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
@@ -352,6 +355,7 @@ export default function CRMMatchmaking() {
     return () => { batchGeneration.current += 1; };
   }, [filterCompatTarget, activeTab]);
   const checkCompatForFilter = trpc.admin.checkCompatibility.useMutation();
+  const rankForFilter = trpc.admin.rankAdvancedCandidates.useMutation();
   const [selectedSingle, setSelectedSingle] = useState<number | null>(() => {
     const requestedSingle = Number(new URLSearchParams(window.location.search).get("singleId"));
     return Number.isInteger(requestedSingle) && requestedSingle > 0 ? requestedSingle : null;
@@ -860,30 +864,30 @@ export default function CRMMatchmaking() {
     }
   };
   const checkAllVisible = async (candidates: typeof typedSingles) => {
-    if (!filterCompatTarget || batchProgress) return;
+    if (!filterCompatTarget || batchProgress || checkCompatForFilter.isPending) return;
     const targetId = filterCompatTarget;
     const generation = ++batchGeneration.current;
     const queue = candidates.filter(single => !filterCompatResult[single.id]);
-    let next = 0, done = 0, failed = 0;
-    setBatchProgress({ done, total: queue.length, failed });
-    await Promise.all(Array.from({ length: Math.min(3, queue.length) }, async () => {
-      while (next < queue.length && generation === batchGeneration.current) {
-        const single = queue[next++];
-        try {
-          const data = await checkCompatForFilter.mutateAsync({ idA: targetId, idB: single.id });
-          if (generation === batchGeneration.current && filterTargetRef.current === targetId) {
-            setFilterCompatResult(prev => ({ ...prev, [single.id]: data }));
-          }
-        }
-        catch { failed += 1; }
-        done += 1;
-        if (generation === batchGeneration.current) setBatchProgress({ done, total: queue.length, failed });
+    if (!queue.length) return;
+    const collected: Record<number, any> = {};
+    setBatchProgress({ done: 0, total: queue.length, failed: 0 });
+    try {
+      // One batched deterministic ranking request, no narrative calls per candidate.
+      for (let offset = 0; offset < queue.length; offset += 2000) {
+        if (generation !== batchGeneration.current) return;
+        const response = await rankForFilter.mutateAsync({ targetId, candidateIds: queue.slice(offset, offset + 2000).map(single => single.id) });
+        if (generation !== batchGeneration.current || filterTargetRef.current !== targetId) return;
+        for (const result of response.results) collected[result.id] = result;
+        for (const id of response.excludedIds) collected[id] = { alreadySent: true, excluded: true };
+        setBatchProgress({ done: Math.min(queue.length, offset + 2000), total: queue.length, failed: 0 });
       }
-    }));
-    if (generation === batchGeneration.current) {
-      setBatchProgress(null);
-      if (failed) toast.warning(`${failed} בדיקות לא הושלמו. אפשר לנסות שוב; לא נשלחה אף התאמה.`);
-      else toast.success(`נבדקו ${done} מועמדים. לא נשלחה אף התאמה.`);
+      setFilterCompatResult(prev => ({ ...prev, ...collected }));
+      setFilterVisibleLimit(10);
+      toast.success("ההתאמות דורגו. מוצגות 10 הראשונות; לא נשלחה אף התאמה.");
+    } catch {
+      if (generation === batchGeneration.current) toast.error("הדירוג לא הושלם. אפשר לנסות שוב; לא נשלחה אף התאמה.");
+    } finally {
+      if (generation === batchGeneration.current) setBatchProgress(null);
     }
   };
 
@@ -1014,7 +1018,7 @@ export default function CRMMatchmaking() {
             { id: "matches" as const, label: `התאמות (${pendingCount} ממתינות)`, icon: <Heart size={14} /> },
             { id: "unmatched" as const, label: "התאמות לטיפול", icon: <Clock size={14} /> },
             { id: "filter_search" as const, label: "חיפוש מתקדם", icon: <Search size={14} /> },
-            { id: "compatibility" as const, label: "בדיקת התאמה", icon: <Zap size={14} /> },
+            { id: "compatibility" as const, label: "בדיקת התאמה בין שני אנשים", icon: <Zap size={14} /> },
             { id: "now" as const, label: "רוכשי NOW", icon: <AlarmClock size={14} /> },
             { id: "inactive_leads" as const, label: "לידים מאגר", icon: <span>💰</span> },
             { id: "tokens" as const, label: "טוקנים חינמיים", icon: <Gift size={14} /> },
@@ -2370,7 +2374,12 @@ export default function CRMMatchmaking() {
         {/* Unmatched Tab */}
         {activeTab === "unmatched" && (
           <div className="space-y-3">
-            <ResponseFollowupSection profiles={typedSingles} summaries={responseSummaries} loading={responsesLoading} error={responsesError} refresh={() => void refetchResponses()} onPhoto={setLightboxUrl} />
+            <div className="flex gap-2 flex-wrap rounded-xl bg-white p-2 shadow-sm" aria-label="סינון סיבת טיפול">
+              <button type="button" aria-pressed={unmatchedView === "matches"} onClick={() => setUnmatchedView("matches")} className={`rounded-lg px-4 py-2 text-xs font-bold ${unmatchedView === "matches" ? "bg-[#191265] text-white" : "bg-[#f8f6f0] text-[#191265]"}`}>ממתינים להתאמה</button>
+              <button type="button" aria-pressed={unmatchedView === "nonresponse"} onClick={() => setUnmatchedView("nonresponse")} className={`rounded-lg px-4 py-2 text-xs font-bold ${unmatchedView === "nonresponse" ? "bg-[#191265] text-white" : "bg-[#f8f6f0] text-[#191265]"}`}>אי־מענה חוזר להצעות</button>
+            </div>
+            {unmatchedView === "nonresponse" ? <ResponseFollowupSection profiles={typedSingles} summaries={responseSummaries} loading={responsesLoading} error={responsesError} refresh={() => void refetchResponses()} onPhoto={setLightboxUrl} /> : <>
+
             <div className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-[#191265]">🔍 לא קיבלו התאמה יותר מ־14 יום או ביקשו טיפול דרך המשוב</p>
@@ -2577,6 +2586,7 @@ export default function CRMMatchmaking() {
               ))}
               {unmatchedResult.total > unmatchedResult.limit && <div className="flex items-center justify-center gap-3 bg-white rounded-xl p-3 shadow-sm"><button disabled={unmatchedPage <= 1} onClick={() => setUnmatchedPage(page => Math.max(1, page - 1))} className="px-4 py-2 rounded-lg border text-sm font-semibold disabled:opacity-40">הקודם</button><span className="text-sm text-[#727272]">עמוד {unmatchedPage} מתוך {Math.ceil(unmatchedResult.total / unmatchedResult.limit)}</span><button disabled={unmatchedPage >= Math.ceil(unmatchedResult.total / unmatchedResult.limit)} onClick={() => setUnmatchedPage(page => page + 1)} className="px-4 py-2 rounded-lg bg-[#191265] text-white text-sm font-semibold disabled:opacity-40">הבא</button></div>}
             </>)}
+            </>}
           </div>
         )}
 
@@ -2874,7 +2884,7 @@ export default function CRMMatchmaking() {
             <div className="space-y-4">
               {/* Filter panel */}
               <div className="bg-white rounded-2xl shadow-sm p-5" dir="rtl">
-                <h3 className="font-black text-[#191265] text-lg mb-4">🔎 חיפוש מתקדם לפי פרמטרים</h3>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="font-black text-[#191265] text-lg">🔎 חיפוש מתקדם לפי פרמטרים</h3><button type="button" onClick={() => setActiveTab("compatibility")} className="rounded-lg border border-[#191265]/20 px-3 py-2 text-xs font-bold text-[#191265]">בדיקת התאמה בין שני אנשים</button></div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                   {/* Name */}
                   <div>
@@ -3024,14 +3034,14 @@ export default function CRMMatchmaking() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <button onClick={() => { setFilterGender(""); setFilterMinAge(""); setFilterMaxAge(""); setFilterCity(""); setFilterReligiosity(""); setFilterDna(""); setFilterName(""); setFilterCompatTarget(null); setFilterCompatSearch(""); setFilterCompatResult({}); setFilterMinHeight(""); setFilterMaxHeight(""); setFilterMaritalStatus(""); setFilterWantsKids(""); setFilterHasKids(""); setFilterArea(""); }}
                     className="text-xs text-[#727272] underline">נקה הכל</button>
-                  <span className="text-sm font-bold text-[#191265]">{filteredResults.length} תוצאות</span>
+                  <span className="text-sm font-bold text-[#191265]">{filteredResults.length} תוצאות · מוצגות {Math.min(filterVisibleLimit, filteredResults.length)}</span>
                   {filterCompatTarget && (
                     <button
                       onClick={() => void checkAllVisible(filteredResults)}
-                      disabled={!!batchProgress || !filteredResults.some(single => !filterCompatResult[single.id]) || advancedExclusions.unavailableIds.has(filterCompatTarget!)}
+                      disabled={!!batchProgress || checkCompatForFilter.isPending || !filteredResults.some(single => !filterCompatResult[single.id]) || advancedExclusions.unavailableIds.has(filterCompatTarget!)}
                       className="text-xs bg-[#191265] text-white font-bold px-4 py-1.5 rounded-full hover:bg-[#191265]/80 transition-colors"
                     >
-                      {batchProgress ? `בודק ${batchProgress.done} מתוך ${batchProgress.total}` : `בדוק התאמה לכולם (${filteredResults.filter(s => !filterCompatResult[s.id]).length})`}
+                      {batchProgress ? `מדרג ${batchProgress.total} התאמות…` : `דרג התאמה לכולם (${filteredResults.filter(s => !filterCompatResult[s.id]).length})`}
                     </button>
                   )}
                 </div>
@@ -3057,6 +3067,7 @@ export default function CRMMatchmaking() {
                 </section>
               )}
               <p className="text-xs text-[#727272]">הרשימה מציגה רק פרופילים זמינים; התאמות פעילות ומי שכבר נשלחה איתו הצעה מוסתרים. בדיקת התאמה אינה שולחת דבר.</p>
+              <p className="text-xs text-[#727272]">{filterCompatTarget && filteredResults.every(single => Boolean(filterCompatResult[single.id])) ? "הרשימה ממוינת לפי הציון של כל המועמדים בחיפוש, מהגבוה לנמוך." : "אפשר לדרג את כל המועמדים בבקשה מהירה אחת. הסבר מפורט נבדק רק לפי דרישה."}</p>
               {/* Results */}
               {filteredResults.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center text-[#727272]">
@@ -3064,7 +3075,7 @@ export default function CRMMatchmaking() {
                   <p>לא נמצאו תוצאות. שנה/י את הפרמטרים.</p>
                 </div>
               ) : (
-                filteredResults.map(single => {
+                filteredResults.slice(0, filterVisibleLimit).map(single => {
                   const compatData = filterCompatResult[single.id];
                   const compatibilityWarnings = getCompatibilityWarnings(compatData);
                   const canOverrideCriteria = compatData?.hasHardBlock === true && compatData?.canOverrideCriteria === true;
@@ -3082,7 +3093,7 @@ export default function CRMMatchmaking() {
                             )}
                             {single.photoUrl && (
                               <button type="button" onClick={() => setLightboxUrl(single.photoUrl!)} title="הגדל תמונה" className="focus:outline-none">
-                                <img src={single.photoUrl} alt={single.firstName}
+                                <img src={single.photoUrl} alt={single.firstName} loading="lazy" decoding="async"
                                   className="w-24 h-24 rounded-xl object-cover object-[center_20%] border-2 border-[#191265]/20 hover:border-[#ffe27c] cursor-zoom-in transition-colors" />
                               </button>
                             )}
@@ -3112,7 +3123,7 @@ export default function CRMMatchmaking() {
                               disabled={checkCompatForFilter.isPending || !!batchProgress || advancedExclusions.unavailableIds.has(filterCompatTarget!)}
                               className="text-xs bg-[#ffe27c] text-[#191265] font-bold px-3 py-1.5 rounded-full hover:bg-[#ffd84a] transition-colors disabled:opacity-50"
                             >
-                              {checkCompatForFilter.isPending ? "..." : "בדוק התאמה"}
+                              {checkCompatForFilter.isPending ? "..." : compatData?.narrativeDeferred ? "הסבר מפורט" : "בדוק התאמה"}
                             </button>
                           )}
                           {compatData && (
@@ -3178,10 +3189,15 @@ export default function CRMMatchmaking() {
                           </div>
                         </details>
                       )}
+                      {typeof compatData?.narrative === "string" && compatData.narrative && <details open className="mt-3 rounded-xl border border-[#191265]/10 bg-[#faf9f5] p-3">
+                        <summary className="cursor-pointer text-sm font-bold text-[#191265]">הסבר ההתאמה</summary>
+                        <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-[#555]">{compatData.narrative}</p>
+                      </details>}
                     </div>
                   );
                 })
               )}
+              {filteredResults.length > filterVisibleLimit && <button type="button" onClick={() => setFilterVisibleLimit(limit => limit + 5)} className="w-full rounded-xl border border-[#191265]/20 bg-white p-3 text-sm font-bold text-[#191265]">הצג עוד 5 התאמות ({filteredResults.length - filterVisibleLimit} נוספות)</button>}
             </div>
           );
         })()}

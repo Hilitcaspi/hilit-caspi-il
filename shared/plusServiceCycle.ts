@@ -8,9 +8,21 @@ export type PlusServiceMember = {
   endedAt?: number | null;
   cancelledAt?: number | null;
 };
+
+/**
+ * Historical fulfilment uses the original activation whenever it is present.
+ * A later provider renewal can update billing fields, but must not move old
+ * 30-day service boundaries or reassign already-sent manual proposals.
+ */
+export function getPlusServiceAnchor(member: PlusServiceMember) {
+  const activatedAt = Number(member.activatedAt || 0);
+  if (Number.isFinite(activatedAt) && activatedAt > 0) return activatedAt;
+  const billingCycleStartedAt = Number(member.billingCycleStartedAt || 0);
+  return Number.isFinite(billingCycleStartedAt) && billingCycleStartedAt > 0 ? billingCycleStartedAt : 0;
+}
 /** Computed service window only. Never proves a payment or advances billing fields. */
 export function resolvePlusServiceCycle(member: PlusServiceMember, now = Date.now()) {
-  const anchor = Number(member.billingCycleStartedAt || member.activatedAt || 0);
+  const anchor = getPlusServiceAnchor(member);
   const valid = Number.isFinite(anchor) && anchor > 0;
   const autoRenew = valid && member.status === "active" && member.billingStatus === "active" && !member.endedAt;
   const frozenAt = Number(member.cancelledAt || member.endedAt || 0);

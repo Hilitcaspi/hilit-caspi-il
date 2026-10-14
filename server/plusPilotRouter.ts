@@ -9,6 +9,7 @@ import { getMissingProfileFields } from "./matchmakingMetrics";
 import { calculatePlusServiceProgress, plusDeliveryEvidenceSelection } from "./plusSubscription";
 import { wasMatchProposalSent } from "../shared/matchDelivery";
 import { isPlusArchived } from "../shared/plusServiceCycle";
+import { buildPlusServiceHistory } from "../shared/plusServiceHistory";
 import { endPlusLocally } from "./plusLocalEnd";
 import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
 import { PLUS_CHECKOUT_PUBLICLY_AVAILABLE } from "./growPayment";
@@ -422,7 +423,6 @@ export const plusPilotRouter = router({
     ]);
     const matchById = new Map(allMatches.map(match => [match.id, match]));
     const boostMatchIds = new Set(boostRows
-      .filter(row => Boolean(row.fulfilledAt || matchById.get(Number(row.matchId || 0))?.proposedAt))
       .map(row => Number(row.matchId || 0))
       .filter(Boolean));
     const countableMatches = allMatches.map(match => ({
@@ -438,9 +438,26 @@ export const plusPilotRouter = router({
       if (checkout.plusMemberId && !checkoutByMemberId.has(checkout.plusMemberId)) checkoutByMemberId.set(checkout.plusMemberId, checkout);
       if (checkout.singleId && !checkoutBySingleId.has(checkout.singleId)) checkoutBySingleId.set(checkout.singleId, checkout);
     }
+    const overviewNow = Date.now();
     const enrichedRows = rows.map(row => {
       const memberMatches = countableMatches.filter(match => match.singleAId === row.single.id || match.singleBId === row.single.id);
-      const cycleProgress = calculatePlusServiceProgress(row.pilot, memberMatches);
+      const cycleProgress = calculatePlusServiceProgress(row.pilot, memberMatches, overviewNow);
+      const serviceHistory = buildPlusServiceHistory(row.pilot, memberMatches, overviewNow);
+      const memberMatchById = new Map(memberMatches.map(match => [match.id, match]));
+      const historicalServicePeriods = serviceHistory.periods.map(period => ({
+        ...period,
+        manualProposals: period.manualProposals.map(proposal => {
+          const match = memberMatchById.get(proposal.id);
+          const otherId = match?.singleAId === row.single.id ? match.singleBId : match?.singleAId;
+          const other = otherId ? singleById.get(otherId) : null;
+          return {
+            ...proposal,
+            status: match?.status || null,
+            matchDetailStatus: match?.matchDetailStatus || null,
+            other: other ? { id: other.id, firstName: other.firstName, lastName: other.lastName } : null,
+          };
+        }),
+      }));
       const cycleMatches = memberMatches
         .filter(match => wasMatchProposalSent(match) && Number(match.proposedAt || 0) >= cycleProgress.cycleStart && Number(match.proposedAt || 0) < cycleProgress.cycleEnd)
         .sort((a, b) => Number(b.proposedAt || 0) - Number(a.proposedAt || 0))
@@ -489,6 +506,10 @@ export const plusPilotRouter = router({
         cycleProgress,
         cycleMatches,
         cycleMatchCount: cycleMatches.filter(match => match.source !== "boost").length,
+        serviceHistory: {
+          ...serviceHistory,
+          periods: historicalServicePeriods,
+        },
         monthMatches,
         monthMatchCount: monthMatches.filter(match => match.source !== "boost").length,
         monthLabel: monthRange.label,

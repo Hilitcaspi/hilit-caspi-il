@@ -5,6 +5,11 @@ import { presentPlusCycle } from "../shared/plusCyclePresentation";
 const anchor = Date.parse("2026-09-13T10:00:00+03:00");
 const member={ singleId:1,status:"active",billingStatus:"active",billingCycleStartedAt:anchor,billingCycleEndsAt:Date.parse("2026-10-13T10:00:00+03:00"),activatedAt:anchor,monthlyMatchTarget:2 };
 describe("30-day Plus service cycles independent of charges",()=>{
+ it("uses the original activation for current and historical cycles even after a later payment",()=>{
+  const later={...member,billingCycleStartedAt:anchor+span+5*86400000,monthlyMatchTarget:3,pilotCohort:'plus_launch_sep26'};
+  const p=calculatePlusServiceProgress(later,[],anchor+span+6*86400000);
+  expect(p.cycleStart).toBe(anchor+span);expect(p.cycleEnd).toBe(anchor+2*span);expect(p.cycleIndex).toBe(1);expect(p.target).toBe(2);
+ });
  it("renews at the exact 30-day boundary, not the billing calendar month",()=>{
   expect(resolvePlusServiceCycle(member,anchor+span-1).cycleStart).toBe(anchor);
   expect(resolvePlusServiceCycle(member,anchor+span).cycleStart).toBe(anchor+span);
@@ -52,7 +57,7 @@ describe("30-day Plus service cycles independent of charges",()=>{
   expect(resolvePlusServiceCycle(member,anchor-1000).cycleStart).toBe(anchor);
   expect(calculatePlusServiceProgress(member,[],anchor-1000).needsMatches).toBe(false);
   const dst=Date.parse('2026-10-10T10:00:00+03:00');
-  expect(resolvePlusServiceCycle({...member,billingCycleStartedAt:dst},dst+span).cycleStart-dst).toBe(span);
+  expect(resolvePlusServiceCycle({...member,billingCycleStartedAt:dst,activatedAt:dst},dst+span).cycleStart-dst).toBe(span);
  });
  it("presents service renewal honestly, without claiming a provider payment",()=>{
   const view=presentPlusCycle(calculatePlusServiceProgress(member,[],anchor+span+1000),anchor+span+1000,'active');

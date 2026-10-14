@@ -25,14 +25,31 @@ describe("advanced matchmaking UI contracts (no network or customer data)", () =
     expect(card).not.toContain("educationPreference");
     expect(card).toContain('profile.shomerShabbat == null ? "לא צוין"');
   });
-  it("only previews compatibility in the bounded batch with target and generation guards", () => {
+  it("ranks in bounded bulk requests with target and generation guards, without narrative calls", () => {
     const batch = ui.slice(ui.indexOf("const checkAllVisible"), ui.indexOf("const baseUrl =", ui.indexOf("const checkAllVisible")));
-    expect(batch).toContain("Math.min(3, queue.length)");
-    expect(batch).toContain("generation === batchGeneration.current && filterTargetRef.current === targetId");
-    expect(batch).toContain("checkCompatForFilter.mutateAsync");
+    expect(batch).toContain("offset += 2000");
+    expect(batch).toContain("generation !== batchGeneration.current || filterTargetRef.current !== targetId");
+    expect(batch).toContain("rankForFilter.mutateAsync");
+    expect(batch).not.toContain("checkCompatForFilter.mutateAsync");
     for (const unsafe of ["approveMatch", "createAndSendMatch", "runMatching", "sendEmail", "sendSms"]) expect(batch).not.toContain(unsafe);
     expect(ui).toContain("[filterCompatTarget, activeTab]");
     expect(ui).not.toContain("toCheck.slice(0, 50)");
+  });
+  it("renders ten results initially and five more on demand while ranking the entire pool", () => {
+    expect(ui).toContain("filteredResults.slice(0, filterVisibleLimit)");
+    expect(ui).toContain("useState(10)");
+    expect(ui).toContain("setFilterVisibleLimit(limit => limit + 5)");
+    expect(ui).toContain("checkAllVisible(filteredResults)");
+    expect(ui).toContain('compatData?.narrativeDeferred ? "הסבר מפורט"');
+    expect(ui).toContain('loading="lazy" decoding="async"');
+    expect(ui).toContain('typeof compatData?.narrative === "string"');
+    expect(ui).toContain("הסבר ההתאמה");
+  });
+  it("keeps the original care cards as default and puts nonresponse behind a filter", () => {
+    expect(ui).toContain('useState<"matches" | "nonresponse">("matches")');
+    expect(ui).toContain('unmatchedView === "nonresponse" ? <ResponseFollowupSection');
+    expect(ui).toContain("אי־מענה חוזר להצעות");
+    expect(ui).toContain("בדיקת התאמה בין שני אנשים");
   });
   it("uses actual delivery history and pure exclusions, and prevents photo clicks toggling the pair", () => {
     expect(ui).toContain("typedMatches.filter(wasMatchProposalSent)");

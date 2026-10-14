@@ -42,7 +42,12 @@
  */
 import type { Single } from "../drizzle/schema";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
-import { scoreLocation } from "../shared/cities";
+import {
+  areSameOrNearbyIsraeliCities,
+  normalizeIsraeliCityName,
+  SAME_OR_NEARBY_CITY_DISTANCE_KM,
+  scoreLocation,
+} from "../shared/cities";
 import { MATCH_SCORING_VERSION, MATCH_SCORE_WEIGHTS } from "../shared/matchScoringPolicy";
 
 export const MATCH_THRESHOLD = 55;
@@ -590,14 +595,11 @@ function scoreLocationV8(
   religiosityB?: string | null
 ): { score: number; distanceKm: number | null; notes: string[] } {
   const notes: string[] = [];
-  if (locationPrefA === "anywhere" && locationPrefB === "anywhere") {
-    return { score: 100, distanceKm: null, notes: ["שניהם פתוחים לכל מרחק"] };
-  }
   const result = scoreLocation(cityA, cityB, locationPrefA, locationPrefB, religiosityA, religiosityB);
   const km = result.distanceKm;
   if (km === null) return result;
   let base: number;
-  if (km <= 5)         base = 100;
+  if (km <= SAME_OR_NEARBY_CITY_DISTANCE_KM) base = 100;
   else if (km <= 20)   base = 85;
   else if (km <= 50)   base = 65;
   else if (km <= 80)   base = 40;
@@ -613,7 +615,7 @@ function scoreLocationV8(
       locationPrefA !== "close" && locationPrefB !== "close") {
     base = Math.max(base, 50);
   }
-  const bonusFromOriginal = result.score - (km <= 5 ? 100 : km <= 15 ? 90 : km <= 30 ? 75 : km <= 50 ? 58 : km <= 80 ? 38 : km <= 120 ? 20 : 5);
+  const bonusFromOriginal = result.score - (km <= SAME_OR_NEARBY_CITY_DISTANCE_KM ? 100 : km <= 15 ? 90 : km <= 30 ? 75 : km <= 50 ? 58 : km <= 80 ? 38 : km <= 120 ? 20 : 5);
   let final = Math.max(0, Math.min(100, base + Math.max(0, bonusFromOriginal)));
   if (km > 50 && (locationPrefA === "close" || locationPrefB === "close")) {
     final = Math.min(final, locationPrefA === "close" && locationPrefB === "close" ? 15 : 30);
@@ -811,10 +813,19 @@ const CITY_PROFILES: Record<string, CityProfile> = {
 
 function getCityProfile(city: string | null | undefined): CityProfile {
   if (!city) return "mixed";
-  return CITY_PROFILES[city] ?? "mixed";
+  const normalizedCity = normalizeIsraeliCityName(city);
+  return CITY_PROFILES[normalizedCity ?? city.trim()] ?? "mixed";
 }
 
 function scoreCityIntelligence(a: Single, b: Single): { score: number; narrativeHints: string[] } {
+  // Geography takes precedence in this diagnostic: a verified same-city or
+  // existing-top-tier pair is fully practical regardless of distance preference.
+  if (areSameOrNearbyIsraeliCities(a.city, b.city)) {
+    return {
+      score: 100,
+      narrativeHints: [`מגורים באותה עיר או במרחק של עד ${SAME_OR_NEARBY_CITY_DISTANCE_KM} ק"מ`],
+    };
+  }
   const profA = getCityProfile(a.city);
   const profB = getCityProfile(b.city);
   const hints: string[] = [];

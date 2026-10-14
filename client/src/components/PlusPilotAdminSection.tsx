@@ -251,6 +251,20 @@ export default function PlusPilotAdminSection() {
                     <p className="mt-2 text-[10px] text-[#666]">{row.boostBenefit.used ? `הבוסט נשלח ב־${formatDate(row.boostBenefit.usedAt)}${row.boostBenefit.requestStatus === "rejected" ? " וההצעה נסגרה לאחר מכן" : ""}` : row.boostBenefit.inProgress ? `הבקשה נקלטה ב־${formatDate(row.boostBenefit.requestedAt)} ועדיין לא נשלחה בפועל` : row.boostBenefit.available ? "הבוסט עדיין זמין להפעלה מהאזור האישי" : `חברות Boost: ${row.boostMembership?.status || "לא הוגדרה"}`}</p>
                   </div>
                 </div>}
+                {row.serviceHistory?.periods?.length > 0 && <details className="mt-3 rounded-xl border border-[#e9e5dd] bg-[#f8f7f4] p-3">
+                  <summary className="cursor-pointer text-[10px] font-bold text-[#5d557d]">היסטוריית שירות שהושלמה · {row.serviceHistory.periods.length}{row.serviceHistory.omittedPeriodCount ? ` מתוך תקופה ארוכה יותר (+${row.serviceHistory.omittedPeriodCount} ישנות)` : ""}</summary>
+                  <p className="mt-2 text-[9px] leading-5 text-[#888]">כל שורה היא חלון שירות רציף של 30 יום, לא חודש קלנדרי ולא אישור לחידוש או תשלום ב־Grow. תווית החודש היא עזר ניווט בלבד.</p>
+                  <div className="mt-2 space-y-2">
+                    {row.serviceHistory.periods.map((period: any) => <div key={period.cycleIndex} className="rounded-lg border border-[#e5e2da] bg-white p-2 text-[10px]">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 text-[#625d73]"><strong className="text-[#191265]">מחזור שירות 30 יום #{period.cycleIndex + 1}</strong><span>{formatDate(period.serviceStart)}–{formatDate(period.serviceEnd)}</span><span className="rounded-full bg-[#f3f1fb] px-2 py-0.5 text-[9px]">עזר: {period.calendarMonthLabel}</span></div>
+                      <p className="mt-1 text-[9px] text-[#777]">{period.manualProposalCount} הצעות ידניות שנשלחו בפועל מתוך יעד {period.target}; בוסט ומועמדים שנוצרו לא נספרים.</p>
+                      {period.manualProposals.length > 0 && <ol className="mt-1.5 space-y-1 border-r border-[#e6e1f2] pr-2 text-[9px] text-[#666]">
+                        {period.manualProposals.map((proposal: any) => <li key={proposal.id} className="flex flex-wrap justify-between gap-x-2"><span>{proposal.other ? `${proposal.other.firstName} ${proposal.other.lastName || ""}`.trim() : `התאמה #${proposal.id}`} · {MATCH_STATUS_LABELS[proposal.status] || proposal.status || "נשלחה"}</span><time>{formatDate(proposal.proposedAt)}</time></li>)}
+                        {period.omittedManualProposalCount > 0 && <li>ועוד {period.omittedManualProposalCount} הצעות מתועדות</li>}
+                      </ol>}
+                    </div>)}
+                  </div>
+                </details>}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {row.pilot.status === "active" && <button type="button" disabled={endMembership.isPending} onClick={() => { setEndMember({ id: row.pilot.id, name: `${row.single.firstName} ${row.single.lastName || ""}`.trim() }); setProviderStopped(false); }} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[10px] font-bold text-red-800">סיום מנוי Plus</button>}
@@ -286,7 +300,10 @@ export default function PlusPilotAdminSection() {
         <summary className="cursor-pointer text-xs font-bold text-[#777]">מנויי Plus שהסתיימו · ארכיון ({archivedRows.length})</summary>
         <p className="mt-2 text-[10px] leading-5 text-[#888]">ההיסטוריה נשמרת. אלה אינם מופיעים ברשימת המנויים הפעילים או בתור ההתאמות.</p>
         <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
-          {archivedRows.map(row => <article key={row.pilot.id} className="rounded-lg border bg-white p-3 text-xs text-[#777]"><strong>{row.single.firstName} {row.single.lastName}</strong><span className="mr-2">Plus הסתיים · {formatDate(row.pilot.endedAt)}</span><span className="mt-1 block text-[10px]">מחזור אחרון: {formatDate(row.cycleProgress.cycleStart)} עד {formatDate(row.cycleProgress.cycleEnd)} · {row.cycleProgress.delivered} הצעות ידניות</span></article>)}
+          {archivedRows.map(row => <article key={row.pilot.id} className="rounded-lg border bg-white p-3 text-xs text-[#777]">
+            <strong>{row.single.firstName} {row.single.lastName}</strong><span className="mr-2">Plus הסתיים · {formatDate(row.pilot.endedAt)}</span><span className="mt-1 block text-[10px]">מחזור אחרון: {formatDate(row.cycleProgress.cycleStart)} עד {formatDate(row.cycleProgress.cycleEnd)} · {row.cycleProgress.delivered} הצעות ידניות</span>
+            {row.serviceHistory?.periods?.length > 0 && <details className="mt-2 rounded-lg bg-[#f8f7f4] p-2 text-[10px]"><summary className="cursor-pointer font-bold text-[#5d557d]">היסטוריית שירות של 30 יום ({row.serviceHistory.periods.length})</summary><p className="mt-1 text-[9px]">חלונות שירות בלבד; תווית החודש אינה גבול השירות ואינה מאמתת תשלום.</p>{row.serviceHistory.periods.map((period: any) => <div key={period.cycleIndex} className="mt-1 flex flex-wrap justify-between gap-x-2 border-t pt-1"><span>#{period.cycleIndex + 1} · {formatDate(period.serviceStart)}–{formatDate(period.serviceEnd)} · עזר: {period.calendarMonthLabel}</span><span>{period.manualProposalCount}/{period.target} ידניות</span></div>)}</details>}
+          </article>)}
           {!archivedRows.length && <p className="text-xs text-[#999]">אין מנויים שהסתיימו לפי החיפוש</p>}
         </div>
       </details>

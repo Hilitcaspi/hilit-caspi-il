@@ -1,3 +1,4 @@
+import { rankAdvancedCandidates } from "./advancedMatchRanking";
 import { getMatchResponseSummaries } from "./matchResponseMetrics";
 // © 2024–2025 Hilit Caspi. All rights reserved. Proprietary and confidential.
 // שיטת ההתאמה, האלגוריתם והתכנים מוגנים בזכויות יוצרים ומהווים סוד מסחרי של הילית כספי.
@@ -3154,6 +3155,9 @@ export const appRouter = router({
       if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       return loadBoostMonthlyStats();
     }),
+    rankAdvancedCandidates: teamProcedure
+      .input(z.object({ targetId: z.number().int().positive(), candidateIds: z.array(z.number().int().positive()).max(2000) }))
+      .mutation(async ({ input }) => rankAdvancedCandidates(input.targetId, input.candidateIds)),
     checkCompatibility: teamProcedure
       .input(z.object({ idA: z.number(), idB: z.number() }))
       .mutation(async ({ ctx, input }) => {
