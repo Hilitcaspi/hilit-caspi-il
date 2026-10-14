@@ -39,8 +39,9 @@ type ExtendedPlus = LiveLaunchRawAudience["plus"][number] & {
 };
 
 /** The narrow source shape is injectable so tests never need a database. */
-export type October14RawAudience = Omit<LiveLaunchRawAudience, "plus"> & {
+export type October14RawAudience = Omit<LiveLaunchRawAudience, "plus" | "activity"> & {
   plus: ExtendedPlus[];
+  activity: Array<LiveLaunchRawAudience["activity"][number] & { openedAt?: number | null }>;
 };
 
 /** PRIVATE: never serialize these members or `frozen` to an admin/browser response. */
@@ -96,6 +97,10 @@ export type October14PrepareOptions = {
   now?: number;
   /** Default is email. Use all only for a single owner review of independent channel freezes. */
   channel?: October14Channel;
+  /** Owner clarified that the database email should reach all eligible leads. SMS remains high-intent only. */
+  databaseAudience?: "warm" | "all_eligible" | "engaged";
+  /** Owner-approved 24-hour campaign rest; existing legacy runners retain their seven-day default. */
+  emailRestHours?: number;
   /** Campaign-level owner approval; false by default and never invents individual SMS consent. */
   smsApproved?: boolean;
 };
@@ -104,6 +109,8 @@ export type October14RunOptions = October14PrepareOptions & {
   dryRun?: boolean;
   execute?: boolean;
   approvalConfirmed?: boolean;
+  /** A separately claimed, email-only supplement; it cannot replay recipients from the initial delivery. */
+  deliveryPhase?: "initial" | "supplemental" | "completion" | "final_completion";
   /** Must be tonight, no later than 22:00 Asia/Jerusalem. */
   expiresAt?: number;
   /** The private hash set returned by an owner-reviewed prepare call. */
@@ -170,7 +177,7 @@ function canonicalActivityEmail(value: unknown) {
  * neutralized before its pure classifier sees activity. SMS additionally exempts only
  * this campaign's paired email, so an approved SMS is not blocked by tonight's email.
  */
-function activityForClassification(raw: October14RawAudience, channel: October14Channel) {
+function activityForClassification(raw: October14RawAudience, channel: October14Channel, now = Date.now(), emailRestHours = 168) {
   return raw.activity.map(activity => {
     const original = String(activity.journeyKey || "");
     let journeyKey = original;
@@ -182,7 +189,8 @@ function activityForClassification(raw: October14RawAudience, channel: October14
       // local input mapping, not a change to (or invocation of) the old runner.
       journeyKey = "live_launch26_oct14_paired_email_exempt";
     }
-    return { ...activity, journeyKey };
+    const outsideApprovedEmailRest = channel !== "sms" && Number(activity.sentAt || 0) < now - Math.max(24, emailRestHours) * 3_600_000;
+    return { ...activity, journeyKey, ...(outsideApprovedEmailRest ? {sentAt: 0} : {}) };
   });
 }
 
@@ -191,15 +199,18 @@ function activityForClassification(raw: October14RawAudience, channel: October14
  * with tickets=[]: this campaign is not a ticket dispatch and a previous ticket must
  * not hide an otherwise eligible paid-database member from this separate offer.
  */
-export function classifyOctober14Audience(raw: October14RawAudience, now = Date.now(), channel: October14Channel = "email") {
+export function classifyOctober14Audience(raw: October14RawAudience, now = Date.now(), channel: October14Channel = "email", databaseAudience: "warm" | "all_eligible" | "engaged" = "warm", emailRestHours = 168) {
   const classified = classifyLiveLaunchAudience({
     ...raw,
     tickets: [],
-    activity: activityForClassification(raw, channel),
-  } as LiveLaunchRawAudience, now);
+    activity: activityForClassification(raw, channel, now, emailRestHours),
+  } as LiveLaunchRawAudience, now, { dedupePhones: channel === "sms" });
   const previousPlusBySingleId = new Map<number, ExtendedPlus>();
   for (const row of raw.plus) previousPlusBySingleId.set(Number(row.singleId), row);
 
+  const engagementEmails = new Set(raw.activity.filter(a => Number(a.openedAt || 0) > 0 || Number(a.clickedAt || 0) > 0).map(a => canonicalEmail(a.email)).filter(Boolean));
+  for (const p of raw.profiles) if (Number(p.questionnaireCompletedAt || 0) > 0) engagementEmails.add(canonicalEmail(p.email));
+  for (const p of raw.paymentLeads) if (p.product === "database") engagementEmails.add(canonicalEmail(p.email));
   const databaseWarm: October14Member[] = [];
   const plusMembers: October14Member[] = [];
   const suppressions = { ...classified.suppressions };
@@ -221,7 +232,7 @@ export function classifyOctober14Audience(raw: October14RawAudience, now = Date.
     if (candidate.segment === "cold") {
       // Unpaid prospects only. The established classifier has already removed paid
       // database contacts and active Plus accounts from this group.
-      if (candidate.smsIntent) databaseWarm.push(member);
+      if (candidate.smsIntent || (channel !== "sms" && (databaseAudience === "all_eligible" || (databaseAudience === "engaged" && engagementEmails.has(canonical))))) databaseWarm.push(member);
       else increment(suppressions, "no_recent_verified_engagement");
     } else if (candidate.segment === "database") {
       // A Plus offer is only for active paid database members with no raw Plus history.
@@ -269,7 +280,7 @@ export async function readOctober14RawAudience(now = Date.now(), dbOverride?: an
       db.execute(sql`SELECT email, product, confirmed_at AS confirmedAt, created_at AS createdAt FROM payment_leads WHERE created_at >= ${checkoutIntentAt} OR confirmed_at IS NULL`),
       // Older SMS rows must be included: absence from a short activity read is not
       // evidence that a phone has never received campaign SMS.
-      db.execute(sql`SELECT recipientEmail AS email, journeyKey, status, sentAt, clickedAt FROM email_log WHERE sentAt >= ${emailRestAt} OR clickedAt >= ${clickIntentAt} OR LOWER(journeyKey) LIKE '%sms%' OR journeyKey LIKE 'live_launch26_%' OR journeyKey IN ('oct14_database/email', 'oct14_plus/email', 'oct14_database/sms')`),
+      db.execute(sql`SELECT recipientEmail AS email, journeyKey, status, sentAt, clickedAt, openedAt FROM email_log WHERE openedAt IS NOT NULL OR clickedAt IS NOT NULL OR sentAt >= ${emailRestAt} OR clickedAt >= ${clickIntentAt} OR LOWER(journeyKey) LIKE '%sms%' OR journeyKey LIKE 'live_launch26_%' OR journeyKey IN ('oct14_database/email', 'oct14_plus/email', 'oct14_database/sms')`),
     ]);
     return {
       profiles: asRows(profiles), crm: asRows(crm), plus: asRows<ExtendedPlus>(plus), tickets: [],
@@ -353,10 +364,12 @@ export async function prepareOctober14Audience(
   let smsMembers: October14Member[] = [];
 
   if (channel === "email" || channel === "all") {
-    const classified = classifyOctober14Audience(raw, now, "email");
+    const classified = classifyOctober14Audience(raw, now, "email", options.databaseAudience, options.emailRestHours);
     Object.entries(classified.suppressions).forEach(([key, count]) => increment(suppressions, key, count));
-    databaseWarm = await filterEmailRecipients(classified.databaseWarm, raw, "databaseWarm", dependencies, suppressions);
-    plusMembers = await filterEmailRecipients(classified.plusMembers, raw, "plusMembers", dependencies, suppressions);
+    let blocklist: Promise<Set<string>> | undefined;
+    const emailDependencies = { ...dependencies, readBrevoBlockedRecipientSet: () => blocklist ||= (dependencies.readBrevoBlockedRecipientSet || readBrevoBlockedRecipientSet)() };
+    databaseWarm = await filterEmailRecipients(classified.databaseWarm, raw, "databaseWarm", emailDependencies, suppressions);
+    plusMembers = await filterEmailRecipients(classified.plusMembers, raw, "plusMembers", emailDependencies, suppressions);
   }
   if (channel === "sms" || channel === "all") {
     const classified = classifyOctober14Audience(raw, now, "sms");
@@ -478,8 +491,11 @@ async function insertEmailBatch(
     record.id = ids.get(record.member.email.toLowerCase()) || 0;
     if (!record.id) throw new Error("Unable to claim campaign delivery record");
     record.draft.htmlContent = trackedHtml(record.draft.htmlContent, record.id);
-    await db.update(emailLog).set({ htmlBody: record.draft.htmlContent }).where(eq(emailLog.id, record.id));
   }
+  // Persist tracked versions atomically in one round trip, before contacting Brevo.
+  if (records.length) await db.execute(sql`UPDATE email_log SET htmlBody = CASE id
+    ${sql.join(records.map(record => sql`WHEN ${record.id} THEN ${record.draft.htmlContent}`), sql` `)}
+    ELSE htmlBody END WHERE status = 'processing' AND id IN (${sql.join(records.map(record => sql`${record.id}`), sql`, `)})`);
   return { journeyKey, records };
 }
 
@@ -524,10 +540,14 @@ export async function runOctober14Campaign(
   if (!executionAllowed(options, now)) {
     throw new Error("October 14 execution requires explicit confirmed approval within the approved Jerusalem window and same-night expiry");
   }
+  if (options.deliveryPhase !== undefined && options.deliveryPhase !== "initial" && (channel !== "email" || !["all_eligible", "engaged"].includes(options.databaseAudience || ""))) {
+    throw new Error("Supplemental delivery is only for the owner-approved broad email audience");
+  }
   if (!options.frozen) throw new Error("A frozen owner-reviewed audience is required before execution");
 
   // Re-read all eligibility at send time. The frozen hashes can only reduce, never add.
   const prepared = await prepareOctober14Audience({ ...options, now, channel }, dependencies);
+  if (prepared.summary.suppressions.brevo_blocklist_unavailable) throw new Error("Brevo blocklist could not be verified; no delivery run has been claimed");
   const selected = channel === "email"
     ? {
       databaseWarm: selectFrozenMembers(prepared.members.databaseWarm, options.frozen.email.databaseWarm, "email"),
@@ -546,16 +566,38 @@ export async function runOctober14Campaign(
 
   const db = await (dependencies.getDb || getDb)();
   if (!db) throw new Error("Database unavailable");
-  const runKey = `${OCTOBER14_CAMPAIGN}:${channel}`;
+  if (options.deliveryPhase === "supplemental" || options.deliveryPhase === "completion" || options.deliveryPhase === "final_completion") {
+    const initial = asRows<{status: string}>(await db.execute(sql`SELECT status FROM lifecycle_run_claims WHERE run_key = ${`${OCTOBER14_CAMPAIGN}:email`} LIMIT 1`));
+    const inflight = asRows<{count: number}>(await db.execute(sql`SELECT COUNT(*) AS count FROM email_log WHERE journeyKey IN ('oct14_database/email', 'oct14_plus/email') AND status = 'processing'`));
+    if (!initial[0] || Number(inflight[0]?.count || 0) > 0) throw new Error("Initial delivery must stop before the supplemental audience can be sent");
+    // Failed/review-required rows remain excluded by selectPriorCampaignLogs; this
+    // supplement only reaches new recipients, never a replay of the uncertain batch.
+  }
+  const runKey = `${OCTOBER14_CAMPAIGN}:${channel}${options.deliveryPhase && options.deliveryPhase !== "initial" ? ":" + options.deliveryPhase : ""}`;
   const claim = await db.execute(sql`INSERT IGNORE INTO lifecycle_run_claims (run_key, status, started_at, result_json) VALUES (${runKey}, 'running', ${now}, ${safeFailureMetadata("review_required_if_interrupted", { channel })})`);
-  if (affectedRows(claim) !== 1) throw new Error("Campaign channel already claimed; manual review is required before any further delivery");
+  let claimed = affectedRows(claim) === 1;
+  if (!claimed && options.deliveryPhase === "supplemental") {
+    // A previously completed zero-recipient run is safe to reopen only when no
+    // delivery record was created at its start time. Never reopen an uncertain send.
+    const emptyRun = await db.execute(sql`UPDATE lifecycle_run_claims SET status = 'running', started_at = ${now}, completed_at = NULL, result_json = ${safeFailureMetadata("review_required_if_interrupted", {channel})}
+      WHERE run_key = ${runKey} AND status = 'completed'
+        AND JSON_EXTRACT(result_json, '$.emailAccepted') = 0
+        AND JSON_EXTRACT(result_json, '$.smsAccepted') = 0
+        AND JSON_EXTRACT(result_json, '$.reviewRequired') = 0
+        AND NOT EXISTS (SELECT 1 FROM email_log WHERE journeyKey IN ('oct14_database/email', 'oct14_plus/email') AND scheduledAt = lifecycle_run_claims.started_at)`);
+    claimed = affectedRows(emptyRun) === 1;
+  }
+  if (!claimed) throw new Error("Campaign channel already claimed; manual review is required before any further delivery");
 
   const result: October14RunResult = { emailAccepted: 0, smsAccepted: 0, reviewRequired: 0, suppressed };
   if (channel === "email") {
     const send = dependencies.sendEmailBatch || sendEmailBatch;
     for (const [cohort, members] of [["databaseWarm", selectedDatabaseWarm], ["plusMembers", selectedPlusMembers]] as const) {
-      for (let offset = 0; offset < members.length; offset += 100) {
-        const batch = members.slice(offset, offset + 100);
+      for (let offset = 0; offset < members.length; offset += 50) {
+        if (!(dependencies.readRawAudience && options.now !== undefined) && Date.now() > options.expiresAt!) {
+          throw new Error("Same-night delivery window ended; no further batches are permitted");
+        }
+        const batch = members.slice(offset, offset + 50);
         const { records } = await insertEmailBatch(db, cohort, batch, now, dependencies);
         const ids = records.map(record => record.id);
         let delivery: Awaited<ReturnType<typeof sendEmailBatch>>;
@@ -586,6 +628,7 @@ export async function runOctober14Campaign(
           channel, cohort, providerMessageIds: delivery.messageIds,
         }), Date.now());
         result.emailAccepted += ids.length;
+        if (offset + 50 < members.length) await new Promise(resolve => setTimeout(resolve, 250));
       }
     }
   } else {

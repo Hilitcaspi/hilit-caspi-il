@@ -45,6 +45,26 @@ describe("October 14 campaign", () => {
     expect(audience.databaseWarm).toEqual([]);
     expect(audience.suppressions.no_recent_verified_engagement).toBe(1);
   });
+  it("broad approved email includes eligible leads without purchase intent but SMS does not", () => {
+    const source=raw({crm:[coldCrm()],paymentLeads:[]});
+    expect(classifyOctober14Audience(source,now,"email","all_eligible").databaseWarm).toHaveLength(1);
+    expect(classifyOctober14Audience(source,now,"sms","all_eligible").databaseWarm).toHaveLength(0);
+  });
+  it("email uses unique addresses rather than deduping distinct members sharing a phone", () => {
+    const source=raw({profiles:[paidProfile(7,"one@example.test"),paidProfile(8,"two@example.test")]});
+    expect(classifyOctober14Audience(source,now,"email").plusMembers).toHaveLength(2);
+  });
+  it("supplemental run cannot change channel or run before a frozen email audience is supplied", async () => {
+    await expect(runOctober14Campaign({deliveryPhase:"supplemental",databaseAudience:"warm",channel:"email",execute:true,dryRun:false,approvalConfirmed:true,now,expiresAt:OCTOBER14_SEND_EXPIRES_AT})).rejects.toThrow("Supplemental delivery");
+  });
+  it("includes an opener with approved 24h rest while excluding unengaged or very recent contacts", () => {
+    const source=raw({crm:[coldCrm()],paymentLeads:[],activity:[{email:"warm@example.test",journeyKey:"nurture",status:"sent",sentAt:now-2*86400000,openedAt:now-10000,clickedAt:null}]});
+    expect(classifyOctober14Audience(source,now,"email","engaged",24).databaseWarm).toHaveLength(1);
+    source.activity[0].sentAt=now-1000;
+    expect(classifyOctober14Audience(source,now,"email","engaged",24).databaseWarm).toHaveLength(0);
+    source.activity=[];
+    expect(classifyOctober14Audience(source,now,"email","engaged",24).databaseWarm).toHaveLength(0);
+  });
   it("blocks public SMS while the owner is revising its copy", async () => {
     const sms=vi.fn();
     await expect(runOctober14Campaign({channel:"sms",execute:true,dryRun:false,approvalConfirmed:true},{sendSMSBulkDetailed:sms})).rejects.toThrow("SMS copy is awaiting");
@@ -104,7 +124,7 @@ describe("October 14 campaign", () => {
         if (claimCount === 1) return [{ affectedRows: 1 }];
         if (claimCount === 2) return [logs];
         if (claimCount === 3) return [{ affectedRows: 1 }];
-        if (claimCount === 4) return [{ affectedRows: 0 }];
+        if (claimCount === 5) return [{ affectedRows: 0 }];
         return [{ affectedRows: 1 }];
       }),
       insert: vi.fn(() => ({ values: async (rows: Array<{ recipientEmail: string }>) => {
@@ -131,6 +151,43 @@ describe("October 14 campaign", () => {
     expect(sms).not.toHaveBeenCalled();
   });
 
+  it("never contacts Brevo when atomic tracked-body persistence fails", async () => {
+    const source = raw({ crm: [coldCrm()] });
+    const review = await prepareOctober14Audience({ now, channel: "email" }, safeDependencies(source));
+    let step = 0;
+    const email = vi.fn();
+    const db = {
+      execute: vi.fn(async () => {
+        step++;
+        if (step === 1) return [{ affectedRows: 1 }];
+        if (step === 2) return [[{ id: 1, recipientEmail: "warm@example.test" }]];
+        throw new Error("atomic persistence failed");
+      }),
+      insert: vi.fn(() => ({ values: async () => undefined })),
+      update: vi.fn(),
+    };
+    await expect(runOctober14Campaign({ execute: true, dryRun: false, approvalConfirmed: true,
+      channel: "email", now, expiresAt: OCTOBER14_SEND_EXPIRES_AT, frozen: review.frozen }, {
+      ...safeDependencies(source), getDb: async () => db as any, sendEmailBatch: email,
+      buildSignedUnsubscribeUrl: () => "https://hilitcaspi.com/unsubscribe?token=mock",
+    })).rejects.toThrow("atomic persistence failed");
+    expect(email).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("does not claim a delivery if the provider blocklist cannot be read", async () => {
+    const source=raw({crm:[coldCrm()]});const db=vi.fn();const email=vi.fn();
+    await expect(runOctober14Campaign({execute:true,dryRun:false,approvalConfirmed:true,channel:"email",now,expiresAt:OCTOBER14_SEND_EXPIRES_AT,frozen:{email:{databaseWarm:[],plusMembers:[]},sms:[]}}, {readRawAudience:async()=>source,readBrevoBlockedRecipientSet:async()=>{throw new Error("offline");},getDb:db,sendEmailBatch:email})).rejects.toThrow("blocklist could not be verified");
+    expect(db).not.toHaveBeenCalled();expect(email).not.toHaveBeenCalled();
+  });
+  it("can reopen only a proven empty supplemental run, never the initial or ambiguous delivery", async () => {
+    const source=raw({crm:[coldCrm()]});const review=await prepareOctober14Audience({now,channel:"email",databaseAudience:"engaged",emailRestHours:24},safeDependencies(source));
+    let calls=0;const logs:Array<{id:number;recipientEmail:string}>=[];
+    const db={execute:vi.fn(async()=>{calls++;if(calls===1)return [[{status:"completed"}]];if(calls===2)return [[{count:0}]];if(calls===3)return [{affectedRows:0}];if(calls===5)return [logs];return [{affectedRows:1}];}),insert:vi.fn(()=>({values:async(rows:any[])=>rows.forEach((r,i)=>logs.push({id:i+1,recipientEmail:r.recipientEmail}))})),update:vi.fn(()=>({set:()=>({where:async()=>undefined})}))};
+    const email=vi.fn().mockResolvedValue({success:true,messageIds:["accepted-id"]});
+    await expect(runOctober14Campaign({execute:true,dryRun:false,approvalConfirmed:true,channel:"email",databaseAudience:"engaged",emailRestHours:24,deliveryPhase:"supplemental",now,expiresAt:OCTOBER14_SEND_EXPIRES_AT,frozen:review.frozen},{...safeDependencies(source),getDb:async()=>db as any,sendEmailBatch:email,buildSignedUnsubscribeUrl:()=>"https://hilitcaspi.com/unsubscribe?token=mock"})).resolves.toMatchObject({emailAccepted:1});
+    expect(email).toHaveBeenCalledOnce();
+  });
   it("rejects a deferred or expired approval before reading, writing, or sending", async () => {
     const email = vi.fn();
     await expect(runOctober14Campaign({

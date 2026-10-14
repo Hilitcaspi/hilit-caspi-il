@@ -267,7 +267,7 @@ function stableMemberOrder(a: LiveLaunchMember, b: LiveLaunchMember) {
  * Pure classification function. It returns contacts only to the caller/runtime;
  * `summarizeLiveLaunchAudience` is the safe aggregate payload for an owner review.
  */
-export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Date.now()): {
+export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Date.now(), options: { dedupePhones?: boolean } = {}): {
   members: LiveLaunchMember[];
   suppressions: Record<string, number>;
   plusMissingTicket: number;
@@ -449,6 +449,7 @@ export function classifyLiveLaunchAudience(raw: LiveLaunchRawAudience, now = Dat
     if (!phoneWinners.has(member.phone)) phoneWinners.set(member.phone, member);
   }
   const members = memberCandidates.filter(member => {
+    if (options.dedupePhones === false) return true;
     if (!member.phone || phoneWinners.get(member.phone) === member) return true;
     increment(suppressions, "duplicate_canonical_phone");
     return false;
