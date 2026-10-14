@@ -352,6 +352,9 @@ export default function CRMMatchmaking() {
     filterTargetRef.current = filterCompatTarget;
     batchGeneration.current += 1;
     setBatchProgress(null);
+    // A returned-to tab must not compare a cached preview with a fresh pending
+    // score. Re-rank with current profiles/answers; stale in-flight work is fenced.
+    setFilterCompatResult({});
     return () => { batchGeneration.current += 1; };
   }, [filterCompatTarget, activeTab]);
   const checkCompatForFilter = trpc.admin.checkCompatibility.useMutation();
@@ -681,6 +684,9 @@ export default function CRMMatchmaking() {
     singleAMinAge?: number | null; singleAMaxAge?: number | null;
     singleBMinAge?: number | null; singleBMaxAge?: number | null;
     scoreBreakdown?: string | null;
+    savedScore?: number | null;
+    scoreSource?: "current_preview" | "saved_snapshot" | "unavailable";
+    scoreWarnings?: string[];
     autoExplanation?: string | null;
     notes?: string | null;
     proposalSource?: "regular" | "boost";
@@ -1835,6 +1841,8 @@ export default function CRMMatchmaking() {
                             💛 {Math.round(match.score)}%
                           </div>
                         )}
+                        {match.scoreSource === "current_preview" && <span className="text-[10px] text-[#727272]">ציון עדכני</span>}
+                        {match.scoreSource === "unavailable" && <span className="text-xs text-red-600">לא ניתן לחשב ציון — פרופיל חסר</span>}
                         <Badge className={`text-xs ${cfg.color}`}>{cfg.icon} {cfg.label}</Badge>
                         <div className="flex items-center gap-2 flex-wrap text-sm font-semibold text-[#191265]">
                           <ProfilePhoto profile={{ id: match.singleAId, name: match.singleAName, photoUrl: match.singleAPhotoUrl }} size="small" onPhoto={setLightboxUrl} />
@@ -2001,6 +2009,21 @@ export default function CRMMatchmaking() {
                               <p className="text-xs font-bold text-[#191265]">📊 פירוט ציון תאימות</p>
                               {bd && <span className="text-[10px] text-[#727272] bg-white px-2 py-0.5 rounded-full border">{bd.algorithm ?? "נוסחה קודמת"}</span>}
                             </div>
+                            {match.scoreSource === "current_preview" && (
+                              <p className="text-[11px] text-[#555] mb-2">הציון מחושב כעת לפי הנתונים והנוסחה העדכניים, כמו בחיפוש המתקדם ובבדיקת זוג. טרם נשלחה הצעה.</p>
+                            )}
+                            {match.scoreSource === "current_preview" && match.savedScore != null && match.savedScore !== match.score && (
+                              <details className="text-[11px] text-[#725c47] mb-2">
+                                <summary className="cursor-pointer">הציון שנשמר ביצירת המועמד: {Math.round(match.savedScore)}% — פירוט</summary>
+                                <p className="mt-1">זהו צילום מצב קודם של הנוסחה והנתונים. הוא נשמר לצורך מעקב בלבד; הציון בראש הכרטיס ובפירוט הוא העדכני.</p>
+                              </details>
+                            )}
+                            {match.scoreSource === "current_preview" && !!match.scoreWarnings?.length && (
+                              <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 mb-2 text-xs text-amber-900">
+                                <p className="font-bold">נדרשת בדיקת העדפות — הציון אינו אישור לשליחה</p>
+                                {match.scoreWarnings.map((warning, i) => <p key={i}>{warning}</p>)}
+                              </div>
+                            )}
                             {bd && !currentVersion && (
                               <p className="text-[11px] text-[#725c47] mb-2">זהו ציון היסטורי שנשמר לפני שינוי הנוסחה. הוא לא חושב מחדש, ולכן עשוי להיות שונה מציון חיפוש עדכני לאותו זוג.</p>
                             )}
@@ -2051,7 +2074,7 @@ export default function CRMMatchmaking() {
                             )}
                             {match.autoExplanation && (
                               <div className="border-t border-[#e9e8e8] pt-2">
-                                <p className="text-xs font-semibold text-[#191265] mb-1">💬 הסבר אוטומטי (בשמך):</p>
+                                <p className="text-xs font-semibold text-[#191265] mb-1">💬 {match.scoreSource === "current_preview" ? "הסבר שנשמר ביצירת המועמד (לא חושב מחדש):" : "הסבר אוטומטי (בשמך):"}</p>
                                 <p className="text-xs text-[#555] leading-relaxed italic">{match.autoExplanation}</p>
                               </div>
                             )}

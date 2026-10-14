@@ -1,4 +1,6 @@
 import { rankAdvancedCandidates } from "./advancedMatchRanking";
+import { evaluateMatchPreview, previewScoreDimensions } from "./matchScorePreview";
+import { loadMatchScoreInputs, presentMatchScore } from "./pendingMatchScore";
 import { getMatchResponseSummaries } from "./matchResponseMetrics";
 // © 2024–2025 Hilit Caspi. All rights reserved. Proprietary and confidential.
 // שיטת ההתאמה, האלגוריתם והתכנים מוגנים בזכויות יוצרים ומהווים סוד מסחרי של הילית כספי.
@@ -3171,36 +3173,13 @@ export const appRouter = router({
         const answersB = await db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleB.id)).limit(1);
         const parsedA: MatchAnswer[] = answersA[0]?.answersJson ? (typeof answersA[0].answersJson === 'string' ? JSON.parse(answersA[0].answersJson) : answersA[0].answersJson as MatchAnswer[]) : [];
         const parsedB: MatchAnswer[] = answersB[0]?.answersJson ? (typeof answersB[0].answersJson === 'string' ? JSON.parse(answersB[0].answersJson) : answersB[0].answersJson as MatchAnswer[]) : [];
-        const strictBreakdown = computeFullScore(singleA as any, singleB as any, parsedA, parsedB);
-        // Use the admin variant for the preview score, while keeping the strict
-        // blocker visible so the UI can require an explicit override.
-        const breakdown = computeFullScoreAdmin(singleA as any, singleB as any, parsedA, parsedB);
-        const hardBlockReason = strictBreakdown.details
-          .find(detail => detail.startsWith("פסילה מוחלטת:"))
-          ?.replace(/^פסילה מוחלטת:\s*/, "") || null;
-        const canOverrideCriteria = strictBreakdown.total === 0
-          && !!hardBlockReason
-          && !hardBlockReason.includes("מגדר המבוקש");
-        const warnings = [...(breakdown.warnings ?? [])];
-        if (hardBlockReason && !warnings.some(warning => warning.includes(hardBlockReason))) {
-          warnings.unshift(`⚠️ ${hardBlockReason}`);
-        }
+        const preview = evaluateMatchPreview(singleA as any, singleB as any, parsedA, parsedB);
+        const { breakdown, warnings, hasHardBlock, hardBlockReason, canOverrideCriteria } = preview;
         const narrative = await buildMatchExplanation(singleA as any, singleB as any, breakdown, parsedA, parsedB);
         return {
-          score: breakdown.total,
-          warnings,
-          hasHardBlock: strictBreakdown.total === 0,
-          hardBlockReason,
-          canOverrideCriteria,
-          breakdown: {
-            questionnaire: breakdown.questionnaire,
-            lifeStage: breakdown.lifeStage,
-            dna: breakdown.dna,
-            practical: breakdown.practical,
-            religiosity: breakdown.religiosity,
-            education: breakdown.education,
-            cityIntelligence: breakdown.cityIntelligence,
-          },
+          score: preview.score,
+          warnings, hasHardBlock, hardBlockReason, canOverrideCriteria,
+          breakdown: previewScoreDimensions(preview),
           narrative,
           personA: { id: singleA.id, firstName: singleA.firstName, lastName: singleA.lastName, age: singleA.age, city: singleA.city, gender: singleA.gender, photoUrl: singleA.photoUrl },
           personB: { id: singleB.id, firstName: singleB.firstName, lastName: singleB.lastName, age: singleB.age, city: singleB.city, gender: singleB.gender, photoUrl: singleB.photoUrl },
@@ -4552,11 +4531,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         ))
         .orderBy(desc(matches.score ?? 0));
 
-      return Promise.all(pendingMatches.map(async (m) => {
-        const [singleA] = await db.select().from(singles).where(eq(singles.id, m.singleAId)).limit(1);
-        const [singleB] = await db.select().from(singles).where(eq(singles.id, m.singleBId)).limit(1);
-        return { match: m, singleA: singleA ?? null, singleB: singleB ?? null };
-      }));
+      const inputs = await loadMatchScoreInputs(db, Array.from(new Set(pendingMatches.flatMap(m => [m.singleAId, m.singleBId]))));
+      return pendingMatches.map(m => {
+        const singleA = inputs.people.get(m.singleAId);
+        const singleB = inputs.people.get(m.singleBId);
+        const score = presentMatchScore(m, singleA, singleB, inputs.answers.get(m.singleAId), inputs.answers.get(m.singleBId));
+        return { match: { ...m, ...score }, singleA: singleA ?? null, singleB: singleB ?? null };
+      }).sort((a, b) => (b.match.score ?? -1) - (a.match.score ?? -1));
     }),
 
     /**
@@ -5285,25 +5266,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
       // Enrich with single names
       const singleIds = Array.from(new Set(allMatches.flatMap(m => [m.singleAId, m.singleBId])));
-      const singleRows = singleIds.length > 0
-        ? await db.select({
-            id: singles.id, firstName: singles.firstName, lastName: singles.lastName,
-            gender: singles.gender, city: singles.city, age: singles.age,
-            dnaType: singles.dnaType, occupation: singles.occupation, phone: singles.phone,
-            photoUrl: singles.photoUrl, education: singles.education,
-            hasKids: singles.hasKids, numKids: singles.numKids, wantsKids: singles.wantsKids,
-            religiosity: singles.religiosity, about: singles.about, partnerDescription: singles.partnerDescription,
-            height: singles.height, minAgePreference: singles.minAgePreference, maxAgePreference: singles.maxAgePreference,
-            maritalStatus: singles.maritalStatus, shomerShabbat: singles.shomerShabbat,
-            hasPets: singles.hasPets, petType: singles.petType, acceptsPets: singles.acceptsPets,
-            locationPreference: singles.locationPreference, smokingStatus: singles.smokingStatus,
-            subscriptionStartedAt: singles.subscriptionStartedAt, subscriptionRenewsAt: singles.subscriptionRenewsAt,
-            email: singles.email, isActive: singles.isActive,
-            isCoachingClient: singles.isCoachingClient, isNotBasic: singles.isNotBasic, updatedAt: singles.updatedAt, questionnaireCompletedAt: singles.questionnaireCompletedAt,
-          })
-            .from(singles).where(inArray(singles.id, singleIds))
-        : [] as any[];
-      const singleMap = new Map(singleRows.map(s => [s.id, s]));
+      // Score with full profiles and answers, not the partial display projection.
+      const scoreInputs = await loadMatchScoreInputs(db, singleIds);
+      const singleMap = scoreInputs.people;
 
       const boostRequestRows = await db.select({ matchId: matchBoostRequests.matchId, singleId: matchBoostRequests.singleId, fulfilledAt: matchBoostRequests.fulfilledAt })
         .from(matchBoostRequests).where(isNotNull(matchBoostRequests.fulfilledAt)).orderBy(desc(matchBoostRequests.fulfilledAt));
@@ -5316,6 +5281,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const b = singleMap.get(m.singleBId);
         return {
           ...m,
+          ...presentMatchScore(m, a, b, scoreInputs.answers.get(m.singleAId), scoreInputs.answers.get(m.singleBId)),
           boostInitiatorId: boostSenderByMatch.get(m.id) ?? null,
           proposalSource: String(m.autoExplanation || "").startsWith("[BOOST]") || String(m.notes || "").startsWith("[BOOST_SENT]") ? "boost" as const : "regular" as const,
           outcomeFeedback: parseMatchOutcomeNotes(m.notes),

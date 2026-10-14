@@ -972,7 +972,10 @@ function computeInteractionBonuses(a: Single, b: Single): { score: number; detai
     const ageA = a.age ?? 30;
     const ageB = b.age ?? 30;
     const ageDiff = Math.abs(ageA - ageB);
-    const bothYoungEnough = ageA <= 42 && ageB <= 50;
+    // The limits belong to the profiles, not to arbitrary A/B positions.
+    // Swapping the target and candidate must never change the pair's score.
+    const withinTimingRange = (person: Single) => (person.age ?? 30) <= (person.gender === "male" ? 50 : 42);
+    const bothYoungEnough = withinTimingRange(a) && withinTimingRange(b);
     if (ageDiff <= 5 && bothYoungEnough) {
       bonus += 25;
       details.push("שניהם רוצים ילדים ובגיל הנכון, תזמון מושלם");

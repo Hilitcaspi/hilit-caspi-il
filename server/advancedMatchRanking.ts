@@ -2,22 +2,18 @@ import { TRPCError } from "@trpc/server";
 import { inArray, or } from "drizzle-orm";
 import { matches, matchmakingAnswers, singles } from "../drizzle/schema";
 import { buildAdvancedMatchExclusions, isAdvancedMatchCandidate } from "../shared/advancedMatchCandidates";
-import { computeFullScore, computeFullScoreAdmin } from "./compatibility";
+import { evaluateMatchPreview, previewScoreDimensions } from "./matchScorePreview";
 import { getDb } from "./db";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
 
 /** Identical deterministic score to checkCompatibility; narrative is deferred. */
 export function scoreAdvancedPair(personA: any, personB: any, answersA: MatchAnswer[], answersB: MatchAnswer[]) {
-  const strict = computeFullScore(personA, personB, answersA, answersB);
-  const breakdown = computeFullScoreAdmin(personA, personB, answersA, answersB);
-  const hardBlockReason = strict.details.find(detail => detail.startsWith("פסילה מוחלטת:"))?.replace(/^פסילה מוחלטת:\s*/, "") || null;
-  const warnings = [...(breakdown.warnings || [])];
-  if (hardBlockReason && !warnings.some(w => w.includes(hardBlockReason))) warnings.unshift(`⚠️ ${hardBlockReason}`);
+  const preview = evaluateMatchPreview(personA, personB, answersA, answersB);
   return {
-    id: personB.id, score: breakdown.total, warnings,
-    hasHardBlock: strict.total === 0, hardBlockReason,
-    canOverrideCriteria: strict.total === 0 && Boolean(hardBlockReason) && !hardBlockReason!.includes("מגדר המבוקש"),
-    breakdown: { questionnaire: breakdown.questionnaire, lifeStage: breakdown.lifeStage, dna: breakdown.dna, practical: breakdown.practical, religiosity: breakdown.religiosity, education: breakdown.education, cityIntelligence: breakdown.cityIntelligence },
+    id: personB.id, score: preview.score, warnings: preview.warnings,
+    hasHardBlock: preview.hasHardBlock, hardBlockReason: preview.hardBlockReason,
+    canOverrideCriteria: preview.canOverrideCriteria,
+    breakdown: previewScoreDimensions(preview),
     narrativeDeferred: true as const,
   };
 }

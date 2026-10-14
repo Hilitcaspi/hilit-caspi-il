@@ -1,4 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+// These are input/auth contract tests, not live integration tests. Never let
+// an inherited environment connection turn a synthetic ID into a real write.
+vi.mock("./db", async importOriginal => ({
+  ...(await importOriginal<typeof import("./db")>()),
+  getDb: vi.fn(async () => null),
+}));
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
