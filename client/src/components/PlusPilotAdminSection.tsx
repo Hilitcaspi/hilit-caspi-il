@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const STATUS_LABELS: Record<string, string> = {
   waitlist: "רשימת המתנה",
@@ -7,7 +9,7 @@ const STATUS_LABELS: Record<string, string> = {
   invited: "הוזמן/ה",
   active: "פעיל/ה",
   declined: "לא מומש",
-  churned: "עזב/ה",
+  churned: "מנוי שהסתיים",
 };
 
 const MATCH_STATUS_LABELS: Record<string, string> = {
@@ -19,7 +21,7 @@ const MATCH_STATUS_LABELS: Record<string, string> = {
 };
 
 function formatDate(value: number | null | undefined) {
-  return value ? new Date(value).toLocaleDateString("he-IL") : "—";
+  return value ? new Date(value).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" }) : "—";
 }
 
 export default function PlusPilotAdminSection() {
@@ -27,24 +29,35 @@ export default function PlusPilotAdminSection() {
   const [statusFilter, setStatusFilter] = useState("active");
   const [cohort, setCohort] = useState("pilot-01");
   const [price, setPrice] = useState("99");
+  const [endMember, setEndMember] = useState<{ id: number; name: string } | null>(null);
+  const [providerStopped, setProviderStopped] = useState(false);
   const overview = trpc.plusPilot.adminOverview.useQuery(undefined, {
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
   });
-  const updateStatus = trpc.plusPilot.adminUpdateStatus.useMutation({ onSuccess: () => overview.refetch() });
+  const updateStatus = trpc.plusPilot.adminUpdateStatus.useMutation({ onSuccess: () => overview.refetch(), onError: error => toast.error(error.message) });
+  const endMembership = trpc.plusPilot.adminEndMembership.useMutation({
+    onSuccess: () => { setEndMember(null); setProviderStopped(false); overview.refetch(); toast.success("מנוי Plus הסתיים באתר והועבר לארכיון. החברות במאגר לא שונתה."); },
+    onError: error => toast.error(error.message),
+  });
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return (overview.data?.rows || []).filter((row: any) => {
-      const matchesStatus = statusFilter === "all" || row.pilot.status === statusFilter;
+      const matchesStatus = !row.archived && (statusFilter === "needs_matches" ? row.cycleProgress.needsMatches : statusFilter === "all" || row.pilot.status === statusFilter);
       const haystack = `${row.single.firstName || ""} ${row.single.lastName || ""} ${row.single.email || ""} ${row.single.phone || ""}`.toLowerCase();
       return matchesStatus && (!query || haystack.includes(query));
     });
   }, [overview.data?.rows, search, statusFilter]);
 
+  const archivedRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (overview.data?.rows || []).filter(row => row.archived && (!query || `${row.single.firstName} ${row.single.lastName || ""} ${row.single.email || ""}`.toLowerCase().includes(query)));
+  }, [overview.data?.rows, search]);
+
   const verifiedPurchases = useMemo(() => {
     const active = (overview.data?.rows || [])
-      .filter((row: any) => row.confirmedPayment)
+      .filter((row: any) => row.confirmedPayment && !row.archived)
       .map((row: any) => ({
         key: `active-${row.pilot.id}`,
         fullName: `${row.single.firstName || ""} ${row.single.lastName || ""}`.trim(),
@@ -65,8 +78,8 @@ export default function PlusPilotAdminSection() {
   }, [overview.data?.rows, overview.data?.pendingPaidProfiles]);
 
   if (overview.isLoading) return <section className="h-44 rounded-2xl bg-white animate-pulse border border-[#e9e8e8]" />;
-  if (!overview.data) return null;
-  const { counts, commitment, capacity, capacityBreakdown, pendingPaidProfiles, relaunchStats, holidayLaunchStats, waitlistToInviteRate, inviteToActiveRate, retentionRate } = overview.data;
+  if (!overview.data) return <section className="rounded-2xl border bg-white p-5"><p>לא ניתן לטעון את נתוני Plus כרגע.</p><button type="button" onClick={() => overview.refetch()}>ניסיון נוסף</button></section>;
+  const { counts, commitment, capacity, capacityBreakdown, pendingPaidProfiles, relaunchStats, holidayLaunchStats, waitlistToInviteRate, inviteToActiveRate, retentionRate, serviceNeeds } = overview.data;
 
   const changeStatus = (id: number, status: "waitlist" | "eligible" | "invited" | "active" | "declined" | "churned") => {
     updateStatus.mutate({
@@ -83,7 +96,7 @@ export default function PlusPilotAdminSection() {
         <div>
           <p className="text-[11px] font-bold text-[#8b7420]">מנוי פרימיום · יעד מדיד של 2 הצעות, או 3 במחזור ההשקה לזכאים</p>
           <h3 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h3>
-          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">ברירת המחדל מציגה מנויים ששילמו והופעלו. לכל מנוי מוצגות שתי הצעות ה־Plus לפי מחזור החיוב האישי, ההתאמות שנשלחו בפועל ומצב הבוסט: זמין, בטיפול או נשלח.</p>
+          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">מחזור ההתאמות הידניות מתקדם אוטומטית כל 30 יום כל עוד Plus פעיל, גם אם הודעת החידוש מ־Grow לא נקלטה. מחזור שירות אינו אישור תשלום. מנוי שסיימת יופיע רק בארכיון המקופל למטה.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <button type="button" onClick={() => overview.refetch()} disabled={overview.isFetching} className="rounded-xl border border-[#d8b67e] bg-white px-3 py-2 font-bold text-[#6f541d] disabled:opacity-50">
@@ -187,11 +200,19 @@ export default function PlusPilotAdminSection() {
         <div className="rounded-lg bg-red-50 p-2 text-red-800">דורשים טיפול <strong>{commitment.atRisk}</strong></div>
       </div>
 
+      <div className="mt-4 rounded-xl border border-[#e4d27e] bg-[#191265] p-4 text-white" role="status">
+        <strong className="text-sm">התאמות חדשות למחזור השירות</strong>
+        <p className="mt-1 text-xs leading-6">{serviceNeeds.members} מנויים ממתינים להשלמת {serviceNeeds.proposals} הצעות ידניות במחזור שלהם. עם תחילת כל מחזור, ההצעות מהמחזור הקודם נשארות בהיסטוריה ולא נספרות שוב.</p>
+        <button type="button" onClick={() => setStatusFilter("needs_matches")} className="mt-2 rounded-lg bg-[#ffe27c] px-3 py-2 text-xs font-black text-[#191265]">הצג מנויים שצריכים התאמות</button>
+        <p className="mt-2 text-[10px] leading-5 text-white/65">ההתראה היא לצוות בלבד. אין שליחת התאמות או הודעות אוטומטית. זכאות הבוסט החינמי נשארת לפי מחזור החיוב המתועד, ללא שינוי במסגרת זו.</p>
+      </div>
+
       <div className="mt-4 flex flex-col sm:flex-row gap-2">
         <input value={search} onChange={event => setSearch(event.target.value)} placeholder="חיפוש לפי שם, מייל או טלפון" className="flex-1 rounded-xl border border-[#ddd] bg-white px-3 py-2.5 text-xs outline-none focus:border-[#191265]" />
         <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="rounded-xl border border-[#ddd] bg-white px-3 py-2.5 text-xs">
-          <option value="all">כל הסטטוסים</option>
-          {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          <option value="all">כל הסטטוסים ללא הארכיון</option>
+          <option value="needs_matches">צריכים התאמות במחזור הנוכחי</option>
+          {Object.entries(STATUS_LABELS).filter(([value]) => value !== "churned").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </div>
 
@@ -206,11 +227,12 @@ export default function PlusPilotAdminSection() {
                   {row.pilot.eligibilityScore != null && <span className="text-[9px] text-[#777]">ציון זכאות {row.pilot.eligibilityScore}</span>}
                 </div>
                 <p className="mt-1 text-[10px] text-[#777]">{row.single.email} · {row.single.phone || "ללא טלפון"} · {row.single.age || "?"} · {row.single.city || ""}</p>
-                <p className="mt-1 text-[9px] text-[#999]">נרשם/ה לרשימה: {new Date(row.pilot.waitlistedAt).toLocaleDateString("he-IL")}</p>
+                <p className="mt-1 text-[9px] text-[#999]">נרשם/ה לרשימה: {new Date(row.pilot.waitlistedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold">
-                  <span className={`rounded-full px-2 py-1 ${row.cycleProgress.state === "green" ? "bg-emerald-100 text-emerald-800" : row.cycleProgress.state === "red" ? "bg-red-100 text-red-800" : row.cycleProgress.state === "yellow" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"}`}>{row.cycleProgress.delivered}/{row.cycleProgress.target} הצעות · {row.cycleProgress.daysRemaining} ימים</span>
-                  <span className={`rounded-full px-2 py-1 ${row.pilot.billingStatus === "active" ? "bg-blue-100 text-blue-800" : row.pilot.billingStatus === "past_due" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}>חיוב: {row.pilot.billingStatus}</span>
-                  {row.confirmedPayment && <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">תשלום 99 ₪ מאומת</span>}
+                  <span className={`rounded-full px-2 py-1 ${row.cycleProgress.state === "green" ? "bg-emerald-100 text-emerald-800" : row.cycleProgress.state === "red" ? "bg-red-100 text-red-800" : row.cycleProgress.state === "yellow" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"}`}>{row.cycleProgress.delivered} מתוך {row.cycleProgress.target} הצעות · {row.cycleProgress.daysRemaining} ימים</span>
+                  <span className={`rounded-full px-2 py-1 ${row.pilot.billingStatus === "active" ? "bg-blue-100 text-blue-800" : row.pilot.billingStatus === "past_due" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}>מצב חיוב רשום: {row.pilot.billingStatus}</span>
+                  {row.cycleProgress.needsMatches && <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-900">נדרשות {row.cycleProgress.remaining} הצעות חדשות</span>}
+                  {row.confirmedPayment && <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">תשלום הצטרפות מתועד</span>}
                   {row.holidayLaunchEntitlement && <span className="rounded-full bg-[#10182f] px-2 py-1 text-[#ffe27c]">הטבת השקה · יעד 3/3</span>}
                   {row.holidayLaunchEntitlement && row.launchAttribution?.source && <span className="rounded-full bg-[#f3ead7] px-2 py-1 text-[#7b5d27]">מקור: {row.launchAttribution.source === "sms" ? "SMS" : row.launchAttribution.source === "email" ? "מייל" : row.launchAttribution.source}</span>}
                   {row.pilot.premiumSupportEnabled && <span className="rounded-full bg-[#191265] px-2 py-1 text-[#ffe27c]">שירות פרימיום</span>}
@@ -218,20 +240,21 @@ export default function PlusPilotAdminSection() {
                 </div>
                 {row.pilot.status === "active" && <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <div className="rounded-xl border border-[#e4e0f4] bg-[#faf9ff] p-3">
-                    <div className="flex items-center justify-between gap-2"><strong className="text-[11px] text-[#191265]">הצעות Plus במחזור החיוב</strong><span className="text-sm font-black text-[#191265]">{row.cycleMatchCount}/{row.cycleProgress.target}</span></div>
+                    <div className="flex items-center justify-between gap-2"><strong className="text-[11px] text-[#191265]">הצעות Plus במחזור השירות</strong><span className="text-sm font-black text-[#191265]">{row.cycleMatchCount} מתוך {row.cycleProgress.target}</span></div>
                     <p className="mt-1 text-[9px] text-[#888]">{formatDate(row.cycleProgress.cycleStart)} עד {formatDate(row.cycleProgress.cycleEnd)} · {row.cycleProgress.daysRemaining} ימים נותרו</p>
                     <div className="mt-2 space-y-1 text-[10px] text-[#666]">
-                      {row.cycleMatches.length > 0 ? row.cycleMatches.map((match: any) => <div key={match.id} className="flex items-start justify-between gap-2 rounded-lg bg-white px-2 py-1.5"><span>{match.other ? `${match.other.firstName} ${match.other.lastName || ""}`.trim() : `התאמה #${match.id}`}<small className="block text-[9px] text-[#999]">{MATCH_STATUS_LABELS[match.status] || match.status}</small></span><span className="shrink-0 text-left">{match.source === "boost" ? "בוסט" : "הצעת Plus"}<small className="block text-[9px] text-[#999]">{formatDate(match.proposedAt)}</small></span></div>) : <span>טרם נשלחו הצעות במחזור החיוב הנוכחי</span>}
+                      {row.cycleMatches.length > 0 ? row.cycleMatches.map((match: any) => <div key={match.id} className="flex items-start justify-between gap-2 rounded-lg bg-white px-2 py-1.5"><span>{match.other ? `${match.other.firstName} ${match.other.lastName || ""}`.trim() : `התאמה #${match.id}`}<small className="block text-[9px] text-[#999]">{MATCH_STATUS_LABELS[match.status] || match.status}</small></span><span className="shrink-0 text-left">{match.source === "boost" ? "בוסט" : "הצעת Plus"}<small className="block text-[9px] text-[#999]">{formatDate(match.proposedAt)}</small></span></div>) : <span>טרם נשלחו הצעות במחזור השירות הנוכחי</span>}
                     </div>
                   </div>
                   <div className={`rounded-xl border p-3 ${row.boostBenefit.used ? "border-violet-200 bg-violet-50" : row.boostBenefit.inProgress ? "border-blue-200 bg-blue-50" : row.boostBenefit.available ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-gray-50"}`}>
-                    <div className="flex items-center justify-between gap-2"><strong className="text-[11px] text-[#191265]">הבוסט החינמי במחזור</strong><span className="text-[10px] font-black">{row.boostBenefit.used ? "נשלח בפועל" : row.boostBenefit.inProgress ? "בטיפול" : row.boostBenefit.available ? "זמין" : "לא זמין"}</span></div>
+                    <div className="flex items-center justify-between gap-2"><strong className="text-[11px] text-[#191265]">הבוסט החינמי לפי מחזור החיוב המתועד</strong><span className="text-[10px] font-black">{row.boostBenefit.used ? "נשלח בפועל" : row.boostBenefit.inProgress ? "בטיפול" : row.boostBenefit.available ? "זמין" : "לא זמין"}</span></div>
                     <p className="mt-2 text-[10px] text-[#666]">{row.boostBenefit.used ? `הבוסט נשלח ב־${formatDate(row.boostBenefit.usedAt)}${row.boostBenefit.requestStatus === "rejected" ? " וההצעה נסגרה לאחר מכן" : ""}` : row.boostBenefit.inProgress ? `הבקשה נקלטה ב־${formatDate(row.boostBenefit.requestedAt)} ועדיין לא נשלחה בפועל` : row.boostBenefit.available ? "הבוסט עדיין זמין להפעלה מהאזור האישי" : `חברות Boost: ${row.boostMembership?.status || "לא הוגדרה"}`}</p>
                   </div>
                 </div>}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {(["eligible", "invited", "active", "declined", "churned"] as const).map(status => (
+                {row.pilot.status === "active" && <button type="button" disabled={endMembership.isPending} onClick={() => { setEndMember({ id: row.pilot.id, name: `${row.single.firstName} ${row.single.lastName || ""}`.trim() }); setProviderStopped(false); }} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[10px] font-bold text-red-800">סיום מנוי Plus</button>}
+                {(["eligible", "invited", "active", "declined"] as const).map(status => (
                   <button
                     key={status}
                     onClick={() => changeStatus(row.pilot.id, status)}
@@ -259,6 +282,22 @@ export default function PlusPilotAdminSection() {
         ))}
         {rows.length === 0 && <div className="py-8 text-center text-xs text-[#888]">אין נרשמים לפי הסינון הנוכחי</div>}
       </div>
+      <details className="mt-4 rounded-xl border border-[#e9e5dd] bg-[#f8f7f4] p-4">
+        <summary className="cursor-pointer text-xs font-bold text-[#777]">מנויי Plus שהסתיימו · ארכיון ({archivedRows.length})</summary>
+        <p className="mt-2 text-[10px] leading-5 text-[#888]">ההיסטוריה נשמרת. אלה אינם מופיעים ברשימת המנויים הפעילים או בתור ההתאמות.</p>
+        <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+          {archivedRows.map(row => <article key={row.pilot.id} className="rounded-lg border bg-white p-3 text-xs text-[#777]"><strong>{row.single.firstName} {row.single.lastName}</strong><span className="mr-2">Plus הסתיים · {formatDate(row.pilot.endedAt)}</span><span className="mt-1 block text-[10px]">מחזור אחרון: {formatDate(row.cycleProgress.cycleStart)} עד {formatDate(row.cycleProgress.cycleEnd)} · {row.cycleProgress.delivered} הצעות ידניות</span></article>)}
+          {!archivedRows.length && <p className="text-xs text-[#999]">אין מנויים שהסתיימו לפי החיפוש</p>}
+        </div>
+      </details>
+      <Dialog open={Boolean(endMember)} onOpenChange={open => { if (!open && !endMembership.isPending) { setEndMember(null); setProviderStopped(false); } }}>
+        <DialogContent dir="rtl" className="max-w-md text-right">
+          <DialogHeader><DialogTitle>סיום מנוי Plus באתר</DialogTitle><DialogDescription>סיום Plus עבור {endMember?.name}. המנוי יוסר מרשימת הפעילים ומתור ההתאמות ויועבר לארכיון. הטבות Plus יסתיימו מיד; החברות הרגילה במאגר והיסטוריית ההתאמות יישארו ללא שינוי.</DialogDescription></DialogHeader>
+          <p className="rounded-lg bg-amber-50 p-3 text-xs leading-6 text-amber-900">פעולה זו אינה מבטלת תשלום ב־Grow. יש להפסיק את החיוב שם לפני סיום המנוי כאן.</p>
+          <label className="flex items-start gap-2 text-sm leading-6"><input type="checkbox" checked={providerStopped} onChange={event => setProviderStopped(event.target.checked)} disabled={endMembership.isPending} className="mt-1" />בדקתי שהחיוב ב־Grow הופסק, ואני מאשרת לסיים את Plus באתר.</label>
+          <div className="flex gap-2"><button type="button" disabled={!providerStopped || !endMember || endMembership.isPending} onClick={() => endMember && providerStopped && endMembership.mutate({ id: endMember.id, providerStoppedConfirmed: true })} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40">{endMembership.isPending ? "מסיים…" : "סיום Plus והעברה לארכיון"}</button><button type="button" disabled={endMembership.isPending} onClick={() => { setEndMember(null); setProviderStopped(false); }} className="rounded-lg border px-4 py-2 text-sm">ביטול</button></div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

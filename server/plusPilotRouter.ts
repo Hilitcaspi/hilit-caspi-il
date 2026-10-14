@@ -6,7 +6,10 @@ import { getDb } from "./db";
 import { sendEmail } from "./brevo";
 import { zonedMidnightUtc } from "./dailyReportMetrics";
 import { getMissingProfileFields } from "./matchmakingMetrics";
-import { calculatePlusCycleProgress } from "./plusSubscription";
+import { calculatePlusServiceProgress, plusDeliveryEvidenceSelection } from "./plusSubscription";
+import { wasMatchProposalSent } from "../shared/matchDelivery";
+import { isPlusArchived } from "../shared/plusServiceCycle";
+import { endPlusLocally } from "./plusLocalEnd";
 import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
 import { PLUS_CHECKOUT_PUBLICLY_AVAILABLE } from "./growPayment";
 import {
@@ -145,6 +148,7 @@ async function getVerifiedSingle(email: string, token: string) {
 
 async function getMemberMatches(db: any, singleId: number) {
   const memberMatches = await db.select({
+    ...plusDeliveryEvidenceSelection,
     id: matches.id,
     singleAId: matches.singleAId,
     singleBId: matches.singleBId,
@@ -187,7 +191,7 @@ export const plusPilotRouter = router({
         },
         databaseMembershipActive: Boolean(single.isPaid && single.isActive),
         eligibility,
-        cycleProgress: pilot[0] ? calculatePlusCycleProgress(pilot[0], memberMatches) : null,
+        cycleProgress: pilot[0] ? calculatePlusServiceProgress(pilot[0], memberMatches) : null,
         launchOffer: pilot[0] && qualifiesForPlusHolidayLaunch(pilot[0].pilotCohort)
           ? {
               type: "third_match" as const,
@@ -285,6 +289,7 @@ export const plusPilotRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "לא נמצא מנוי Plus פעיל" });
       }
       const now = Date.now();
+      const serviceAccessUntil = calculatePlusServiceProgress(member, [], now).cycleEnd;
       await db.update(plusPilotMembers).set({
         billingStatus: "cancelled",
         cancelledAt: now,
@@ -305,7 +310,7 @@ export const plusPilotRouter = router({
           description: `בקשת ביטול התקבלה. מזהה מנוי: ${member.providerSubscriptionId || "לא התקבל"}. סיבה: ${input.reason?.trim() || "לא צוינה"}`,
           priority: "urgent",
           status: "todo",
-          dueAt: Math.min(Number(member.billingCycleEndsAt || now), now + 2 * DAY_MS),
+          dueAt: Math.min(serviceAccessUntil || now, now + 2 * DAY_MS),
           createdBy: "plus_self_service_cancellation",
           createdAt: now,
           updatedAt: now,
@@ -319,7 +324,7 @@ export const plusPilotRouter = router({
           htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">בקשת הביטול התקבלה</h2><p style="line-height:1.8">בקשת עצירת החידוש הועברה לטיפול. הטבות Plus יישארו פעילות עד סוף מחזור החיוב הנוכחי.</p><p style="line-height:1.8">החברות הרגילה שלך במאגר נשארת ללא שינוי.</p></div>`,
         });
       }
-      return { success: true, accessUntil: member.billingCycleEndsAt || now };
+      return { success: true, accessUntil: serviceAccessUntil || now };
     }),
 
   adminOverview: teamProcedure.query(async ({ ctx }) => {
@@ -345,6 +350,7 @@ export const plusPilotRouter = router({
 
     const [allMatches, boostRows, boostMembershipRows, paymentRows, matchSingles, pendingPaidProfiles, relaunchLogs, checkoutAttributionRows, holidayLaunchLogs] = await Promise.all([
       db.select({
+        ...plusDeliveryEvidenceSelection,
         id: matches.id,
         singleAId: matches.singleAId,
         singleBId: matches.singleBId,
@@ -434,9 +440,9 @@ export const plusPilotRouter = router({
     }
     const enrichedRows = rows.map(row => {
       const memberMatches = countableMatches.filter(match => match.singleAId === row.single.id || match.singleBId === row.single.id);
-      const cycleProgress = calculatePlusCycleProgress(row.pilot, memberMatches);
+      const cycleProgress = calculatePlusServiceProgress(row.pilot, memberMatches);
       const cycleMatches = memberMatches
-        .filter(match => Number(match.proposedAt || 0) >= cycleProgress.cycleStart && Number(match.proposedAt || 0) < cycleProgress.cycleEnd)
+        .filter(match => wasMatchProposalSent(match) && Number(match.proposedAt || 0) >= cycleProgress.cycleStart && Number(match.proposedAt || 0) < cycleProgress.cycleEnd)
         .sort((a, b) => Number(b.proposedAt || 0) - Number(a.proposedAt || 0))
         .map(match => {
           const otherId = match.singleAId === row.single.id ? match.singleBId : match.singleAId;
@@ -453,7 +459,7 @@ export const plusPilotRouter = router({
           };
         });
       const monthMatches = memberMatches
-        .filter(match => Number(match.proposedAt || 0) >= monthRange.start && Number(match.proposedAt || 0) < monthRange.end && match.status !== "pending")
+        .filter(match => Number(match.proposedAt || 0) >= monthRange.start && Number(match.proposedAt || 0) < monthRange.end && wasMatchProposalSent(match))
         .sort((a, b) => Number(b.proposedAt || 0) - Number(a.proposedAt || 0))
         .map(match => {
           const otherId = match.singleAId === row.single.id ? match.singleBId : match.singleAId;
@@ -478,6 +484,7 @@ export const plusPilotRouter = router({
       const holidayLaunchTracking = buildPlusHolidayLaunchTracking(row.pilot, checkoutAttribution);
       return {
         ...row,
+        archived: isPlusArchived(row.pilot),
         confirmedPayment: hasConfirmedProductionPlusPayment(paymentEvents),
         cycleProgress,
         cycleMatches,
@@ -487,7 +494,7 @@ export const plusPilotRouter = router({
         monthLabel: monthRange.label,
         boostMembership: membershipBySingleId.get(row.single.id) || null,
         boostBenefit: calculatePlusBoostBenefit(row.pilot, memberBoostRequestsWithDelivery),
-        holidayLaunchEntitlement: holidayLaunchTracking.entitled,
+        holidayLaunchEntitlement: holidayLaunchTracking.entitled && cycleProgress.cycleIndex === 0,
         launchAttribution: holidayLaunchTracking.attribution,
       };
     });
@@ -495,9 +502,9 @@ export const plusPilotRouter = router({
     const invitedBase = counts.invited + counts.active + counts.declined + counts.churned;
     const activatedBase = counts.active + counts.churned;
     const commitment = {
-      met: enrichedRows.filter(row => row.pilot.status === "active" && row.cycleProgress.delivered >= row.cycleProgress.target).length,
-      atRisk: enrichedRows.filter(row => row.pilot.status === "active" && row.cycleProgress.state === "red").length,
-      inProgress: enrichedRows.filter(row => row.pilot.status === "active" && row.cycleProgress.delivered < row.cycleProgress.target && row.cycleProgress.state !== "red").length,
+      met: enrichedRows.filter(row => row.pilot.status === "active" && !row.archived && row.cycleProgress.delivered >= row.cycleProgress.target).length,
+      atRisk: enrichedRows.filter(row => row.pilot.status === "active" && !row.archived && row.cycleProgress.state === "red").length,
+      inProgress: enrichedRows.filter(row => row.pilot.status === "active" && !row.archived && row.cycleProgress.delivered < row.cycleProgress.target && row.cycleProgress.state !== "red").length,
     };
     const capacity = calculatePlusPilotCapacity(rows.map(row => ({
       status: row.pilot.status,
@@ -545,6 +552,7 @@ export const plusPilotRouter = router({
     return {
       counts,
       commitment,
+      serviceNeeds: { members: enrichedRows.filter(row => !row.archived && row.cycleProgress.needsMatches).length, proposals: enrichedRows.filter(row => !row.archived && row.cycleProgress.needsMatches).reduce((sum, row) => sum + row.cycleProgress.remaining, 0) },
       capacity,
       capacityBreakdown,
       relaunchStats,
@@ -645,6 +653,15 @@ export const plusPilotRouter = router({
         }
       }
       return { success: true };
+    }),
+
+  adminEndMembership: teamProcedure
+    .input(z.object({ id: z.number().int().positive(), providerStoppedConfirmed: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return endPlusLocally(db, input.id);
     }),
 
   adminUpdateSubscription: teamProcedure

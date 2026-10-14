@@ -1,8 +1,20 @@
 import { and, eq, or } from "drizzle-orm";
 import { crmTeamTasks, matchBoostRequests, matches, plusPilotMembers } from "../drizzle/schema";
 import { getDb } from "./db";
+import { wasMatchProposalSent, type MatchDeliveryEvidence } from "../shared/matchDelivery";
+import { resolvePlusServiceCycle, type PlusServiceMember } from "../shared/plusServiceCycle";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+export const plusDeliveryEvidenceSelection = {
+  status: matches.status, ownerApprovedAt: matches.ownerApprovedAt,
+  approvalTokenA: matches.approvalTokenA, approvalTokenB: matches.approvalTokenB,
+  singleAToken: matches.singleAToken, singleBToken: matches.singleBToken,
+  emailAOpenedAt: matches.emailAOpenedAt, emailBOpenedAt: matches.emailBOpenedAt,
+  tokenAUsedAt: matches.tokenAUsedAt, tokenBUsedAt: matches.tokenBUsedAt,
+  approvedByA: matches.approvedByA, approvedByB: matches.approvedByB,
+  emailRetriedAt: matches.emailRetriedAt, waSentAt: matches.waSentAt, notes: matches.notes,
+};
 
 export type PlusCycleMember = {
   singleId: number;
@@ -12,7 +24,7 @@ export type PlusCycleMember = {
   activatedAt?: number | null;
 };
 
-export type PlusCycleMatch = {
+export type PlusCycleMatch = MatchDeliveryEvidence & {
   id: number;
   singleAId: number;
   singleBId: number;
@@ -51,7 +63,7 @@ export function calculatePlusCycleProgress(
       .filter(match => {
         const proposedAt = Number(match.proposedAt || 0);
         const belongsToMember = match.singleAId === member.singleId || match.singleBId === member.singleId;
-        return belongsToMember && match.proposalSource !== "boost" && proposedAt >= cycleStart && proposedAt < cycleEnd;
+        return belongsToMember && wasMatchProposalSent(match) && match.proposalSource !== "boost" && proposedAt >= cycleStart && proposedAt < cycleEnd;
       })
       .map(match => match.id),
   );
@@ -79,6 +91,14 @@ export function calculatePlusCycleProgress(
   } as const;
 }
 
+export function calculatePlusServiceProgress(member: PlusCycleMember & PlusServiceMember & { pilotCohort?: string | null }, memberMatches: PlusCycleMatch[], now = Date.now()) {
+  const window = resolvePlusServiceCycle(member, now);
+  // The holiday third proposal belongs to the first service cycle only.
+  const target = window.cycleIndex > 0 && member.pilotCohort === "plus_launch_sep26" ? 2 : member.monthlyMatchTarget;
+  const progress = calculatePlusCycleProgress({ ...member, monthlyMatchTarget: target, billingCycleStartedAt: window.cycleStart, billingCycleEndsAt: window.cycleEnd }, memberMatches, now);
+  return { ...progress, cycleStart: window.cycleStart, cycleEnd: window.cycleEnd, kind: window.kind, autoRenew: window.autoRenew, cycleIndex: window.cycleIndex, needsMatches: member.status === "active" && member.billingStatus === "active" && !member.endedAt && window.valid && window.cycleStart <= now && progress.remaining > 0 };
+}
+
 export function shouldCreatePlusCommitmentTask(progress: ReturnType<typeof calculatePlusCycleProgress>) {
   return progress.state === "red" && progress.remaining > 0;
 }
@@ -94,6 +114,7 @@ export async function runPlusCommitmentMonitor(now = Date.now()) {
   if (members.length === 0) return { evaluated: 0, created: 0, skipped: 0 };
 
   const matchRows = await db.select({
+    ...plusDeliveryEvidenceSelection,
     id: matches.id,
     singleAId: matches.singleAId,
     singleBId: matches.singleBId,
@@ -109,8 +130,8 @@ export async function runPlusCommitmentMonitor(now = Date.now()) {
   let created = 0;
   let skipped = 0;
   for (const member of members) {
-    const progress = calculatePlusCycleProgress(member, countableMatches, now);
-    if (!shouldCreatePlusCommitmentTask(progress)) {
+    const progress = calculatePlusServiceProgress(member, countableMatches, now);
+    if (!progress.needsMatches || !shouldCreatePlusCommitmentTask(progress)) {
       skipped++;
       continue;
     }
@@ -129,7 +150,7 @@ export async function runPlusCommitmentMonitor(now = Date.now()) {
       singleId: member.singleId,
       taskType: "plus",
       title: `Plus: חסרות ${progress.remaining} הצעות במחזור הנוכחי`,
-      description: `נשלחו ${progress.delivered}/${progress.target} הצעות. נותרו ${progress.daysRemaining} ימים עד סוף מחזור החיוב.`,
+      description: `נשלחו ${progress.delivered} מתוך ${progress.target} הצעות. נותרו ${progress.daysRemaining} ימים עד סוף מחזור השירות בן 30 הימים. אין בכך אישור חיוב אצל הספק.`,
       priority: progress.daysRemaining <= 3 ? "urgent" : "high",
       status: "todo",
       dueAt: progress.cycleEnd,

@@ -17,11 +17,11 @@ describe("Database Plus billing cycle", () => {
       billingCycleStartedAt: start,
       billingCycleEndsAt: end,
     }, [
-      { id: 1, singleAId: 7, singleBId: 8, proposedAt: start + 1_000 },
-      { id: 1, singleAId: 7, singleBId: 8, proposedAt: start + 1_000 },
-      { id: 2, singleAId: 9, singleBId: 7, proposedAt: start + 2_000 },
-      { id: 3, singleAId: 7, singleBId: 10, proposedAt: start - 1_000 },
-      { id: 4, singleAId: 99, singleBId: 100, proposedAt: start + 3_000 },
+      { id: 1, singleAId: 7, singleBId: 8, ownerApprovedAt: start + 1, proposedAt: start + 1_000 },
+      { id: 1, singleAId: 7, singleBId: 8, ownerApprovedAt: start + 1, proposedAt: start + 1_000 },
+      { id: 2, singleAId: 9, singleBId: 7, ownerApprovedAt: start + 1, proposedAt: start + 2_000 },
+      { id: 3, singleAId: 7, singleBId: 10, ownerApprovedAt: start + 1, proposedAt: start - 1_000 },
+      { id: 4, singleAId: 99, singleBId: 100, ownerApprovedAt: start + 1, proposedAt: start + 3_000 },
     ], start + 10 * 24 * 60 * 60 * 1000);
 
     expect(progress.delivered).toBe(2);
@@ -39,8 +39,8 @@ describe("Database Plus billing cycle", () => {
       billingCycleStartedAt: start,
       billingCycleEndsAt: end,
     }, [
-      { id: 1, singleAId: 7, singleBId: 8, proposedAt: start + 1_000, proposalSource: "manual" },
-      { id: 2, singleAId: 7, singleBId: 9, proposedAt: start + 2_000, proposalSource: "boost" },
+      { id: 1, singleAId: 7, singleBId: 8, ownerApprovedAt: start + 1, proposedAt: start + 1_000, proposalSource: "manual" },
+      { id: 2, singleAId: 7, singleBId: 9, ownerApprovedAt: start + 1, proposedAt: start + 2_000, proposalSource: "boost" },
     ], start + 10 * 24 * 60 * 60 * 1000);
 
     expect(progress.delivered).toBe(1);
@@ -56,7 +56,7 @@ describe("Database Plus billing cycle", () => {
       billingCycleStartedAt: start,
       billingCycleEndsAt: end,
     }, [
-      { id: 1, singleAId: 7, singleBId: 8, proposedAt: start + 1_000 },
+      { id: 1, singleAId: 7, singleBId: 8, ownerApprovedAt: start + 1, proposedAt: start + 1_000 },
     ], end - 3 * 24 * 60 * 60 * 1000);
 
     expect(progress.delivered).toBe(1);
