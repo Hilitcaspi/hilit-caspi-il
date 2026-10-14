@@ -1,12 +1,17 @@
 export const LIVE_FIRST_MATCH_OFFER_ENABLED = true;
-/** Staff-facing draft: this code never publishes a promise or sends a proposal. */
-export const LIVE_FIRST_MATCH_POLICY_STATUS = "draft" as const;
-/** Public deadline copy stays off until the owner approves staffing/capacity and the final campaign. */
-export const LIVE_FIRST_MATCH_PUBLIC_PROMISE_ENABLED = false;
+/** Owner-approved on 14.10.2026; the staff queue never sends proposals automatically. */
+export const LIVE_FIRST_MATCH_POLICY_STATUS = "active" as const;
+/** Capacity approved by the owner. Public acquisition copy expires after this weekend. */
+export const LIVE_FIRST_MATCH_PUBLIC_PROMISE_ENABLED = true;
 export const LIVE_FIRST_MATCH_OFFER_START = Date.parse("2026-10-14T14:48:00.000Z");
 export const LIVE_FIRST_MATCH_EVENT_START = Date.parse("2026-10-31T18:30:00.000Z");
-/** No new live-benefit ticket is eligible once the event starts. */
-export const LIVE_FIRST_MATCH_OFFER_END = LIVE_FIRST_MATCH_EVENT_START;
+/** New eligibility closes at Sunday 18.10 00:00 Israel time; existing commitments stay in the queue. */
+export const LIVE_FIRST_MATCH_OFFER_END = Date.parse("2026-10-18T00:00:00+03:00");
+
+export function isLiveFirstMatchPublicOfferActive(now = Date.now()): boolean {
+  return LIVE_FIRST_MATCH_PUBLIC_PROMISE_ENABLED
+    && now >= LIVE_FIRST_MATCH_OFFER_START && now < LIVE_FIRST_MATCH_OFFER_END;
+}
 // Sunday 1.11 and Monday 2.11 are the two Israeli business days after the Saturday live.
 export const LIVE_FIRST_MATCH_ORIGINAL_PROMISE_DEADLINE = Date.parse("2026-11-02T21:59:59.000Z");
 

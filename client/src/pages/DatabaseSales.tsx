@@ -12,7 +12,7 @@ import { gaViewItem } from "@/lib/ga";
 import { motion, useInView } from "framer-motion";
 import { Link, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { LIVE_FIRST_MATCH_PUBLIC_PROMISE_ENABLED } from "@shared/liveFirstMatchPolicy";
+import { isLiveFirstMatchPublicOfferActive, LIVE_FIRST_MATCH_OFFER_END } from "@shared/liveFirstMatchPolicy";
 
 const CASUAL_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-casual_dac3228f.jpg";
 const SMILING_IMG = "/manus-storage/hilit-smiling-portrait_cddd0dfc.jpg";
@@ -53,7 +53,16 @@ const STEPS = [
 
 export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
   const isLiveOffer = campaign === "live";
-  const showFirstMatchPromise = isLiveOffer && LIVE_FIRST_MATCH_PUBLIC_PROMISE_ENABLED;
+  const [firstMatchOfferOpen, setFirstMatchOfferOpen] = useState(() => isLiveFirstMatchPublicOfferActive());
+  const showFirstMatchPromise = isLiveOffer && firstMatchOfferOpen;
+  useEffect(() => {
+    if (!isLiveOffer) return;
+    const refresh = () => setFirstMatchOfferOpen(isLiveFirstMatchPublicOfferActive());
+    refresh();
+    const timeout = window.setTimeout(refresh, Math.max(0, Math.min(2_147_483_647, LIVE_FIRST_MATCH_OFFER_END - Date.now() + 1)));
+    window.addEventListener("focus", refresh);
+    return () => { window.clearTimeout(timeout); window.removeEventListener("focus", refresh); };
+  }, [isLiveOffer]);
   const liveSales = trpc.liveOctober.salesStatus.useQuery(undefined, { enabled: isLiveOffer });
   const liveGiftOpen = liveSales.data?.databaseGiftOpen === true;
   // Track database page view
@@ -146,7 +155,7 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
                 <p className="mt-2 text-sm leading-7 text-white/85">ממלאים שאלון ויוצרים פרופיל במאגר, וכרטיס אחד למפגש אונליין איתי בזום נוסף במתנה. אין צורך להגיע לשום מקום או להזין קוד הטבה.</p>
                 {showFirstMatchPromise && <>
                 <p className="mt-3 text-base font-bold leading-7 text-[#ffe27c]">וגם הצעת התאמה ראשונה עד שני ימי עסקים מתום הלייב. ייתכן שההצעה תגיע עוד קודם.</p>
-                <p className="mt-2 text-xs leading-6 text-white/75">בהצעה החדשה, למצטרפים חדשים שמשלימים פרופיל, תמונה ושאלון עד הלייב. מועד היעד: יום שני, 2.11.2026.</p>
+                <p className="mt-2 text-xs leading-6 text-white/75">למצטרפים חדשים בהצעת סוף השבוע, עד סוף שבת 17.10, שמשלימים פרופיל, תמונה ושאלון עד הלייב. מועד היעד: יום שני, 2.11.2026.</p>
                 </>}
               </div>
             )}
@@ -190,7 +199,7 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
               {showFirstMatchPromise && <div className="mt-4 rounded-xl border border-[#e3cb78] bg-[#fff8e8] px-4 py-4">
                 <h3 className="text-lg font-black text-[#191265]">מהפרופיל המדויק להיכרות הבאה</h3>
                 <p className="mt-2 text-sm leading-7 text-[#625d78]">בלייב נפתח מקום להבין, לדייק ולשאול. בהצעה החדשה למאגר אשלח הצעת התאמה ראשונה עד שני ימי עסקים מתום הלייב, לכל המאוחר ביום שני 2.11.2026. אם נמצא חיבור נכון קודם, לא נחכה ללייב.</p>
-                <p className="mt-2 text-xs leading-6 text-[#625d78]">למצטרפים חדשים במסגרת ההצעה החדשה עם קוד LIVE, בתנאי שהפרופיל, התמונה והשאלון הושלמו עד 31.10 בשעה 20:30. ההטבה אינה מותנית בהשתתפות בלייב. זו התחייבות להצעה שנבדקה ונשלחה, לא לאישור הדדי, לדייט או לזוגיות.</p>
+                <p className="mt-2 text-xs leading-6 text-[#625d78]">למצטרפים חדשים עד סוף שבת 17.10 במסגרת ההצעה עם קוד LIVE, בתנאי שהפרופיל, התמונה והשאלון הושלמו עד 31.10 בשעה 20:30. ההטבה אינה מותנית בהשתתפות בלייב. זו התחייבות להצעה שנבדקה ונשלחה, לא לאישור הדדי, לדייט או לזוגיות.</p>
               </div>}
               {offerLocked && <p className="mt-4 text-sm font-bold text-[#75591e]">{liveSales.isLoading ? "בודקים את זמינות ההטבה. עוד רגע אפשר יהיה להמשיך בהרשמה." : "ההטבה אינה זמינה כרגע. לא נבצע רכישה בלי הכרטיס במתנה מהעמוד הזה."}</p>}
               <div className="mt-6 flex flex-wrap items-center gap-4">

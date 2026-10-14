@@ -118,7 +118,6 @@ export async function loadLiveFirstMatchQueue(now = Date.now()) {
       WHERE t.event_slug = ${LIVE_OCTOBER_SLUG}
         AND t.source = 'database_live'
         AND t.issued_at >= ${LIVE_FIRST_MATCH_OFFER_START}
-        AND t.issued_at < ${LIVE_FIRST_MATCH_OFFER_END}
         AND t.revoked_at IS NULL
         AND t.voucher_code NOT LIKE 'TEST-%'
       GROUP BY t.id, t.name, t.issued_at, t.single_id, t.email

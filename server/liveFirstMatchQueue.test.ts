@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { wasMatchProposalSent } from "../shared/matchDelivery";
 import {
   evaluateLiveFirstMatchPolicy,
+  isLiveFirstMatchPublicOfferActive,
+  LIVE_FIRST_MATCH_OFFER_END,
   LIVE_FIRST_MATCH_EVENT_START,
   LIVE_FIRST_MATCH_OFFER_START,
   LIVE_FIRST_MATCH_ORIGINAL_PROMISE_DEADLINE,
@@ -21,6 +23,14 @@ const complete = {
 };
 
 describe("live first-match queue policy", () => {
+  it("expires public acquisition copy on Sunday while preserving existing commitments", () => {
+    expect(new Date(LIVE_FIRST_MATCH_OFFER_END).toISOString()).toBe("2026-10-17T21:00:00.000Z");
+    expect(isLiveFirstMatchPublicOfferActive(LIVE_FIRST_MATCH_OFFER_START - 1)).toBe(false);
+    expect(isLiveFirstMatchPublicOfferActive(LIVE_FIRST_MATCH_OFFER_START)).toBe(true);
+    expect(isLiveFirstMatchPublicOfferActive(LIVE_FIRST_MATCH_OFFER_END - 1)).toBe(true);
+    expect(isLiveFirstMatchPublicOfferActive(LIVE_FIRST_MATCH_OFFER_END)).toBe(false);
+    expect(evaluateLiveFirstMatchPolicy(complete, LIVE_FIRST_MATCH_OFFER_END + 1).state).toBe("ready");
+  });
   it("uses the fixed Monday 2.11 deadline after the Saturday live", () => {
     const result = evaluateLiveFirstMatchPolicy(complete, LIVE_FIRST_MATCH_EVENT_START);
     expect(result.originalPromiseDeadline).toBe(LIVE_FIRST_MATCH_ORIGINAL_PROMISE_DEADLINE);
