@@ -26,8 +26,14 @@ describe("October14 content only newsletter", () => {
   it("states first cycle only and 99 recurring price for new Wednesday Plus", () => {
     const d = buildOctober14Newsletter({ ...input, audience: "plus_members" });
     expect(d.htmlContent).toContain("PLUS");
-    expect(d.htmlContent).toContain("17.10");
-    expect(d.htmlContent).toContain("23:59");
+    expect(d.htmlContent).not.toContain("17.10");
+    expect(d.htmlContent).not.toContain("23:59");
+    expect(d.preheader).not.toContain("23:59");
+    expect(d.textContent).not.toContain("17.10");
+    expect(d.htmlContent).toContain("יש לי הזמנה אישית בשבילך");
+    expect(d.htmlContent).toContain("לחברי מאגר פעילים");
+    expect(d.htmlContent).toContain("בדיקה אישית שלי");
+    expect(d.htmlContent).toContain("הטבות ששמורות רק לחברי Plus");
     expect(d.htmlContent).not.toContain("PLUS3");
     expect(d.htmlContent).not.toContain("היום בלבד");
     expect(d.htmlContent).toContain("שלוש הצעות התאמה");
