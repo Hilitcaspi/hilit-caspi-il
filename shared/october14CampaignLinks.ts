@@ -4,7 +4,7 @@ export type October14Channel = "email" | "sms" | "whatsapp";
 const SITE = "https://hilitcaspi.com";
 export function october14OfferUrl(audience: October14Audience, channel: October14Channel, placement = "primary") {
   const u = new URL(audience === "database_warm" ? "/live/database" : "/database-plus", SITE);
-  u.searchParams.set("coupon", audience === "database_warm" ? "LIVE" : "PLUS3");
+  u.searchParams.set("coupon", audience === "database_warm" ? "LIVE" : "PLUS");
   u.searchParams.set("utm_source", channel === "email" ? "newsletter" : channel === "whatsapp" ? "whatsapp_group" : "sms");
   u.searchParams.set("utm_medium", channel === "whatsapp" ? "organic_social" : channel);
   u.searchParams.set("utm_campaign", OCT14_CAMPAIGN);

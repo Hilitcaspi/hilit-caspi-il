@@ -1,9 +1,14 @@
-export const PLUS_WEDNESDAY_OFFER_CODE = "PLUS3" as const;
+export const PLUS_WEDNESDAY_OFFER_CODE = "PLUS" as const;
 export const PLUS_WEDNESDAY_COHORT = "plus_wednesday_2026" as const;
 export const PLUS_WEDNESDAY_FIRST_CYCLE_TARGET = 3;
 export const PLUS_STANDARD_CYCLE_TARGET = 2;
 export const PLUS_WEDNESDAY_OFFER_CUTOFF_AT = Date.parse("2026-10-14T14:48:00Z");
-export const PLUS_WEDNESDAY_OFFER_UTM_TERM_MARKER = `BONUS:${PLUS_WEDNESDAY_OFFER_CODE}` as const;
+// Keep the persisted internal marker stable across the public code rename.
+export const PLUS_WEDNESDAY_OFFER_UTM_TERM_MARKER = "BONUS:PLUS3" as const;
+export const PLUS_CURRENT_OFFER_EXPIRES_AT = Date.parse("2026-10-18T00:00:00+03:00");
+export function isPlusBonusCouponCode(value: string | null | undefined) {
+  return ["PLUS", "PLUS3"].includes(String(value || "").trim().toUpperCase());
+}
 const LEGACY_PLUS_THIRD_PROPOSAL_COHORT = "plus_launch_sep26";
 
 const ISRAEL_TIME_ZONE = "Asia/Jerusalem";
@@ -29,7 +34,7 @@ export function isIsraelWednesday(timestamp: number) {
 export function isPlusWednesdayOfferPaymentTime(paidAt: number) {
   return Number.isFinite(paidAt)
     && paidAt > PLUS_WEDNESDAY_OFFER_CUTOFF_AT
-    && isIsraelWednesday(paidAt);
+    && (paidAt < PLUS_CURRENT_OFFER_EXPIRES_AT || isIsraelWednesday(paidAt));
 }
 
 /** A waitlist/invited row is not a prior subscription; an activated or billed row is. */
@@ -79,7 +84,7 @@ export function canApplyPlusWednesdayOfferCoupon(input: {
   paidAt: number;
   existingMember?: PriorPlusMember;
 }) {
-  return String(input.couponCode || "").trim().toUpperCase() === PLUS_WEDNESDAY_OFFER_CODE
+  return isPlusBonusCouponCode(input.couponCode)
     && isPlusWednesdayOfferPaymentTime(input.paidAt)
     && !hasPreviouslyActivatedPlus(input.existingMember);
 }
@@ -119,6 +124,7 @@ export function getPlusWednesdayOfferPublicStatus(now = Date.now()) {
     available: isPlusWednesdayOfferPaymentTime(now),
     code: PLUS_WEDNESDAY_OFFER_CODE,
     firstCycleTarget: PLUS_WEDNESDAY_FIRST_CYCLE_TARGET,
+    currentCampaignExpiresAt: PLUS_CURRENT_OFFER_EXPIRES_AT,
     timezone: ISRAEL_TIME_ZONE,
   } as const;
 }

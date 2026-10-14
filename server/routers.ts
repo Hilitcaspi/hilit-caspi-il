@@ -7763,7 +7763,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }))
       .mutation(async ({ input }) => {
         const requested = input.code.trim().toUpperCase();
-        if (requested === "PLUS3") {
+        if (requested === "PLUS" || requested === "PLUS3") {
           const { validatePlusWednesdayCoupon } = await import("./plusWednesdayCoupon");
           return validatePlusWednesdayCoupon(input);
         }
@@ -8073,20 +8073,20 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               throw new TRPCError({ code: "PRECONDITION_FAILED", message: "מכסת ההשקה מלאה כרגע. אפשר להשאיר פרטים ונעדכן כשייפתח מקום נוסף" });
             }
 
-            const { appendPlusWednesdayOfferMarker, canApplyPlusWednesdayOfferCoupon, stripPlusWednesdayOfferMarker } = await import("../shared/plusWednesdayOffer");
+            const { appendPlusWednesdayOfferMarker, canApplyPlusWednesdayOfferCoupon, stripPlusWednesdayOfferMarker, isPlusBonusCouponCode } = await import("../shared/plusWednesdayOffer");
             const requestedCoupon = input.couponCode?.trim().toUpperCase();
             const cleanUtmTerm = stripPlusWednesdayOfferMarker(input.utmTerm);
-            if (requestedCoupon && requestedCoupon !== "PLUS3") {
-              throw new TRPCError({ code: "BAD_REQUEST", message: "במסלול Plus קוד ההטבה PLUS3 בלבד תקף, והוא אינו משנה את המחיר של 99 ₪" });
+            if (requestedCoupon && !isPlusBonusCouponCode(requestedCoupon)) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "במסלול Plus קוד ההטבה PLUS תקף, והוא אינו משנה את המחיר של 99 ₪" });
             }
-            if (requestedCoupon === "PLUS3" && !canApplyPlusWednesdayOfferCoupon({
+            if (isPlusBonusCouponCode(requestedCoupon) && !canApplyPlusWednesdayOfferCoupon({
               couponCode: requestedCoupon,
               paidAt: now,
               existingMember: priorPlusMember,
             })) {
-              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "הטבת PLUS3 מיועדת למצטרפים חדשים בלבד, לאחר מועד הפתיחה וביום רביעי לפי שעון ישראל. המחיר נשאר 99 ₪" });
+              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "הטבת PLUS מיועדת להצטרפות ראשונה בלבד ובחלון ההטבה הפעיל. ההטבה הנוכחית בתוקף עד סוף שבת 17.10 לפי שעון ישראל. המחיר נשאר 99 ₪" });
             }
-            input.utmTerm = requestedCoupon === "PLUS3"
+            input.utmTerm = isPlusBonusCouponCode(requestedCoupon)
               ? appendPlusWednesdayOfferMarker(cleanUtmTerm)
               : cleanUtmTerm || undefined;
           }

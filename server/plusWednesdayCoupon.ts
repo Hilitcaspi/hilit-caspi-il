@@ -5,8 +5,8 @@ import { canApplyPlusWednesdayOfferCoupon, isPlusWednesdayOfferPaymentTime, PLUS
 
 /** Preview validation only; createProcess and verified fulfilment recheck separately. */
 export async function validatePlusWednesdayCoupon(input: { product?: string; email?: string }, now = Date.now()) {
-  if (input.product !== "plus") return { valid: false as const, error: "קוד PLUS3 מיועד להצטרפות ל־Plus בלבד" };
-  if (!isPlusWednesdayOfferPaymentTime(now)) return { valid: false as const, error: "הטבת PLUS3 פתוחה ביום רביעי בלבד, לפי שעון ישראל" };
+  if (input.product !== "plus") return { valid: false as const, error: "קוד PLUS מיועד להצטרפות ל־Plus בלבד" };
+  if (!isPlusWednesdayOfferPaymentTime(now)) return { valid: false as const, error: "חלון המימוש של הטבת PLUS הסתיים. ההטבה הנוכחית תקפה עד סוף שבת 17.10 לפי שעון ישראל" };
   if (!input.email) return { valid: false as const, error: "יש להזין את כתובת המייל של חברות המאגר כדי לבדוק את ההטבה" };
   const db = await getDb();
   if (!db) return { valid: false as const, error: "לא ניתן לאמת זכאות כרגע. אפשר לנסות שוב." };
@@ -18,7 +18,7 @@ export async function validatePlusWednesdayCoupon(input: { product?: string; ema
     .from(plusPilotMembers).innerJoin(singles, eq(singles.id, plusPilotMembers.singleId))
     .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`).limit(1);
   if (!canApplyPlusWednesdayOfferCoupon({ couponCode: PLUS_WEDNESDAY_OFFER_CODE, paidAt: now, existingMember: priorPlus })) {
-    return { valid: false as const, error: "הטבת PLUS3 מיועדת להצטרפות ראשונה בלבד, לא לחידוש מנוי" };
+    return { valid: false as const, error: "הטבת PLUS מיועדת להצטרפות ראשונה בלבד, לא לחידוש מנוי" };
   }
   return { valid: true as const, code: PLUS_WEDNESDAY_OFFER_CODE };
 }

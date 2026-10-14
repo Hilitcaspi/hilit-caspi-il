@@ -1,3 +1,4 @@
+import { isPlusBonusCouponCode } from "@shared/plusWednesdayOffer";
 import { boostEntryChannelFromSearch } from "../../../shared/boostEntryChannel";
 /*
  * GrowWallet — Payment component using Grow Wallet SDK
@@ -302,7 +303,7 @@ export default function GrowWallet({
       const result = await validateCouponMutation.mutateAsync({ code: normalizedCode, product, email: email.trim() || undefined, personalToken });
       if (result.valid) {
         setCouponApplied({ code: result.code, discountPercent: result.discountPercent, discountAmount: result.discountAmount, fixedPrice: result.fixedPrice });
-        const label = result.code === "PLUS3"
+        const label = isPlusBonusCouponCode(result.code)
           ? "3 הצעות ידניות במחזור הראשון; המחיר נשאר 99 ₪"
           : result.fixedPrice ? `מחיר מיוחד: ₪${result.fixedPrice}` : result.discountPercent ? `${result.discountPercent}% הנחה` : result.discountAmount ? `₪${result.discountAmount} הנחה` : "כרטיס ללייב במתנה";
         toast.success(`קוד הוחל! ${label}`);
@@ -372,7 +373,7 @@ export default function GrowWallet({
     }
 
     const baseCheckoutPrice = PRODUCT_CONFIGS[product]?.sum ?? 0;
-    const trackedCheckoutPrice = couponApplied?.code === "PLUS3"
+    const trackedCheckoutPrice = isPlusBonusCouponCode(couponApplied?.code)
       ? baseCheckoutPrice
       : couponApplied?.fixedPrice
       ?? (couponApplied?.discountAmount
@@ -475,7 +476,7 @@ export default function GrowWallet({
       // Calculate discounted price if coupon is applied
       const basePrice = PRODUCT_CONFIGS[product]?.sum ?? 0;
       let finalPrice: number | undefined = undefined;
-      if (couponApplied && couponApplied.code !== "PLUS3") {
+      if (couponApplied && !isPlusBonusCouponCode(couponApplied.code)) {
         if (couponApplied.fixedPrice) {
           finalPrice = couponApplied.fixedPrice;
         } else if (couponApplied.discountAmount) {
@@ -666,7 +667,7 @@ export default function GrowWallet({
           <div className="flex items-center justify-between bg-green-50 border border-green-300 rounded-xl px-4 py-2.5">
             <span className="text-green-700 text-sm font-bold">
               ✓ קופון "{couponApplied.code}" הוחל
-              {couponApplied.code === "PLUS3" ? " — 3 הצעות ידניות במחזור הראשון, במחיר 99 ₪" : ""}
+              {isPlusBonusCouponCode(couponApplied.code) ? " — 3 הצעות ידניות במחזור הראשון, במחיר 99 ₪" : ""}
               {couponApplied.discountPercent ? ` — ${couponApplied.discountPercent}% הנחה` : ""}
               {couponApplied.discountAmount ? ` — ₪${couponApplied.discountAmount} הנחה` : ""}
               {couponApplied.fixedPrice ? ` — מחיר לתשלום: ₪${couponApplied.fixedPrice}` : ""}

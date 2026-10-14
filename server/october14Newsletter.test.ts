@@ -8,7 +8,7 @@ describe("October14 content only newsletter", () => {
         const u = new URL(october14OfferUrl(audience, channel));
         expect(u.origin).toBe("https://hilitcaspi.com");
         expect(u.searchParams.get("utm_campaign")).toBe(OCT14_CAMPAIGN);
-        expect(u.searchParams.get("coupon")).toBe(audience === "database_warm" ? "LIVE" : "PLUS3");
+        expect(u.searchParams.get("coupon")).toBe(audience === "database_warm" ? "LIVE" : "PLUS");
         expect(u.searchParams.get("utm_content")).toBe(`${audience}_primary`);
         expect(u.searchParams.get("utm_medium")).toBe(channel === "whatsapp" ? "organic_social" : channel);
       }
@@ -25,7 +25,11 @@ describe("October14 content only newsletter", () => {
   });
   it("states first cycle only and 99 recurring price for new Wednesday Plus", () => {
     const d = buildOctober14Newsletter({ ...input, audience: "plus_members" });
-    expect(d.htmlContent).toContain("PLUS3");
+    expect(d.htmlContent).toContain("PLUS");
+    expect(d.htmlContent).toContain("17.10");
+    expect(d.htmlContent).toContain("23:59");
+    expect(d.htmlContent).not.toContain("PLUS3");
+    expect(d.htmlContent).not.toContain("היום בלבד");
     expect(d.htmlContent).toContain("שלוש הצעות התאמה");
     expect(d.htmlContent).toContain("מהמחזור הבא: שתי הצעות");
     expect(d.htmlContent).toContain("אין שינוי במנויים קיימים");
