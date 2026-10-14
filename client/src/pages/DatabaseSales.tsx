@@ -12,6 +12,7 @@ import { gaViewItem } from "@/lib/ga";
 import { motion, useInView } from "framer-motion";
 import { Link, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { LIVE_FIRST_MATCH_PUBLIC_PROMISE_ENABLED } from "@shared/liveFirstMatchPolicy";
 
 const CASUAL_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-casual_dac3228f.jpg";
 const SMILING_IMG = "/manus-storage/hilit-smiling-portrait_cddd0dfc.jpg";
@@ -52,6 +53,7 @@ const STEPS = [
 
 export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
   const isLiveOffer = campaign === "live";
+  const showFirstMatchPromise = isLiveOffer && LIVE_FIRST_MATCH_PUBLIC_PROMISE_ENABLED;
   const liveSales = trpc.liveOctober.salesStatus.useQuery(undefined, { enabled: isLiveOffer });
   const liveGiftOpen = liveSales.data?.databaseGiftOpen === true;
   // Track database page view
@@ -142,6 +144,10 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
                 <p className="text-sm font-black text-[#ffe27c]">הצעה מיוחדת למצטרפים חדשים למאגר</p>
                 <p className="mt-2 text-2xl font-black">מצטרפים למאגר ב־299 ₪ ומקבלים כרטיס ללייב שלי בזום במתנה</p>
                 <p className="mt-2 text-sm leading-7 text-white/85">ממלאים שאלון ויוצרים פרופיל במאגר, וכרטיס אחד למפגש אונליין איתי בזום נוסף במתנה. אין צורך להגיע לשום מקום או להזין קוד הטבה.</p>
+                {showFirstMatchPromise && <>
+                <p className="mt-3 text-base font-bold leading-7 text-[#ffe27c]">וגם הצעת התאמה ראשונה עד שני ימי עסקים מתום הלייב. ייתכן שההצעה תגיע עוד קודם.</p>
+                <p className="mt-2 text-xs leading-6 text-white/75">בהצעה החדשה, למצטרפים חדשים שמשלימים פרופיל, תמונה ושאלון עד הלייב. מועד היעד: יום שני, 2.11.2026.</p>
+                </>}
               </div>
             )}
             {isNowHolidayOffer && (
@@ -181,6 +187,11 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
               <h2 id="live-offer-title" className="mt-3 text-3xl font-black leading-tight text-[#191265] md:text-4xl">אני רוצה להכיר אתכם במאגר. <span className="text-[#4e3eb4]">ואז לפגוש אתכם בלייב בזום.</span></h2>
               <p className="mt-4 text-base leading-8 text-[#625d78]"><>בהצטרפות למאגר ב־299 ₪ ממלאים שאלון זוגי ופרופיל, ואני בוחנת חיבורים שיכולים להתאים. למצטרפים חדשים דרך העמוד הזה מחכה גם <strong className="text-[#191265]">כרטיס אחד במתנה למפגש אונליין בזום ב־31.10 בשעה 20:30</strong>. מחיר הכרטיס בנפרד הוא 149 ₪.</></p>
               <p className="mt-4 rounded-xl bg-[#f5efff] px-4 py-3 text-sm font-bold leading-6 text-[#191265]">כרטיס המתנה נוסף אוטומטית להצטרפות דרך העמוד הזה. הכרטיס האישי ללייב יישלח לכתובת המייל שלך לאחר אישור התשלום ויופיע גם בדף התודה ובאזור האישי. קישור הכניסה לזום יישלח לקראת המפגש.</p>
+              {showFirstMatchPromise && <div className="mt-4 rounded-xl border border-[#e3cb78] bg-[#fff8e8] px-4 py-4">
+                <h3 className="text-lg font-black text-[#191265]">מהפרופיל המדויק להיכרות הבאה</h3>
+                <p className="mt-2 text-sm leading-7 text-[#625d78]">בלייב נפתח מקום להבין, לדייק ולשאול. בהצעה החדשה למאגר אשלח הצעת התאמה ראשונה עד שני ימי עסקים מתום הלייב, לכל המאוחר ביום שני 2.11.2026. אם נמצא חיבור נכון קודם, לא נחכה ללייב.</p>
+                <p className="mt-2 text-xs leading-6 text-[#625d78]">למצטרפים חדשים במסגרת ההצעה החדשה עם קוד LIVE, בתנאי שהפרופיל, התמונה והשאלון הושלמו עד 31.10 בשעה 20:30. ההטבה אינה מותנית בהשתתפות בלייב. זו התחייבות להצעה שנבדקה ונשלחה, לא לאישור הדדי, לדייט או לזוגיות.</p>
+              </div>}
               {offerLocked && <p className="mt-4 text-sm font-bold text-[#75591e]">{liveSales.isLoading ? "בודקים את זמינות ההטבה. עוד רגע אפשר יהיה להמשיך בהרשמה." : "ההטבה אינה זמינה כרגע. לא נבצע רכישה בלי הכרטיס במתנה מהעמוד הזה."}</p>}
               <div className="mt-6 flex flex-wrap items-center gap-4">
                 {liveGiftOpen ? <a href={joinHref} onClick={() => trackJoinClick("hero")} className="rounded-2xl bg-[#191265] px-7 py-4 text-sm font-black text-white transition hover:bg-[#30247e]">להצטרפות למאגר ולקבלת הכרטיס</a> : <span className="rounded-2xl border border-[#191265]/20 px-7 py-4 text-sm font-black text-[#191265]">ממתינים לאימות ההטבה</span>}
@@ -195,6 +206,7 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
               <p className="text-lg font-black">+ כרטיס אחד ללייב במתנה</p>
               <p className="mt-2 text-xs text-white/70">כרטיס רגיל בנפרד: 149 ₪</p>
               <p className="mt-4 text-sm font-bold text-[#ffe27c]">מספר המקומות בלייב מוגבל.</p>
+              {showFirstMatchPromise && <p className="mt-4 text-sm font-bold leading-6 text-[#ffe27c]">+ הצעת התאמה ראשונה עד 2 ימי עסקים מתום הלייב</p>}
               <div className="mt-6 rounded-xl border border-[#ffe27c]/35 bg-white/10 px-4 py-3 text-sm"><strong className="text-[#ffe27c]">כרטיס המתנה כלול בהצטרפות</strong><span className="mt-1 block text-xs text-white/65">נוסף אוטומטית, בלי צורך בקוד הטבה</span></div>
             </div>
           </div>

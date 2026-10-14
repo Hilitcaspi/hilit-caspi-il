@@ -3,6 +3,7 @@ import { crmTeamTasks, matchBoostRequests, matches, plusPilotMembers } from "../
 import { getDb } from "./db";
 import { wasMatchProposalSent, type MatchDeliveryEvidence } from "../shared/matchDelivery";
 import { resolvePlusServiceCycle, type PlusServiceMember } from "../shared/plusServiceCycle";
+import { getPlusWednesdayCycleTarget } from "../shared/plusWednesdayOffer";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -93,8 +94,8 @@ export function calculatePlusCycleProgress(
 
 export function calculatePlusServiceProgress(member: PlusCycleMember & PlusServiceMember & { pilotCohort?: string | null }, memberMatches: PlusCycleMatch[], now = Date.now()) {
   const window = resolvePlusServiceCycle(member, now);
-  // The holiday third proposal belongs to the first service cycle only.
-  const target = window.cycleIndex > 0 && member.pilotCohort === "plus_launch_sep26" ? 2 : member.monthlyMatchTarget;
+  // The Wednesday bonus grants a third *manual* proposal only in its first service cycle.
+  const target = getPlusWednesdayCycleTarget(member.pilotCohort, window.cycleIndex, member.monthlyMatchTarget);
   const progress = calculatePlusCycleProgress({ ...member, monthlyMatchTarget: target, billingCycleStartedAt: window.cycleStart, billingCycleEndsAt: window.cycleEnd }, memberMatches, now);
   return { ...progress, cycleStart: window.cycleStart, cycleEnd: window.cycleEnd, kind: window.kind, autoRenew: window.autoRenew, cycleIndex: window.cycleIndex, needsMatches: member.status === "active" && member.billingStatus === "active" && !member.endedAt && window.valid && window.cycleStart <= now && progress.remaining > 0 };
 }

@@ -1,3 +1,4 @@
+import { isPlusWednesdayOfferCohort, PLUS_WEDNESDAY_FIRST_CYCLE_TARGET } from "../shared/plusWednesdayOffer";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
@@ -193,7 +194,9 @@ export const plusPilotRouter = router({
         databaseMembershipActive: Boolean(single.isPaid && single.isActive),
         eligibility,
         cycleProgress: pilot[0] ? calculatePlusServiceProgress(pilot[0], memberMatches) : null,
-        launchOffer: pilot[0] && qualifiesForPlusHolidayLaunch(pilot[0].pilotCohort)
+        launchOffer: pilot[0] && isPlusWednesdayOfferCohort(pilot[0].pilotCohort)
+          ? { type: "wednesday_three_manual_proposals" as const, firstCycleTarget: PLUS_WEDNESDAY_FIRST_CYCLE_TARGET }
+          : pilot[0] && qualifiesForPlusHolidayLaunch(pilot[0].pilotCohort)
           ? {
               type: "third_match" as const,
               firstCycleTarget: PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET,
@@ -516,6 +519,7 @@ export const plusPilotRouter = router({
         boostMembership: membershipBySingleId.get(row.single.id) || null,
         boostBenefit: calculatePlusBoostBenefit(row.pilot, memberBoostRequestsWithDelivery),
         holidayLaunchEntitlement: holidayLaunchTracking.entitled && cycleProgress.cycleIndex === 0,
+        wednesdayOfferEntitlement: isPlusWednesdayOfferCohort(row.pilot.pilotCohort) && cycleProgress.cycleIndex === 0,
         launchAttribution: holidayLaunchTracking.attribution,
       };
     });

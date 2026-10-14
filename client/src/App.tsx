@@ -69,6 +69,7 @@ const LiveEvent = lazy(() => import("@/pages/LiveEvent"));
 const LiveEventThankYou = lazy(() => import("@/pages/LiveEventThankYou"));
 const LiveDatabaseOffer = lazy(() => import("@/pages/LiveDatabase"));
 const LiveSmsRedirect = lazy(() => import("@/pages/LiveSmsRedirect"));
+const October14SmsRedirect = lazy(() => import("@/pages/October14SmsRedirect"));
 const TermsLiveOctober = lazy(() => import("@/pages/TermsLiveOctober"));
 const SignsGuide = lazy(() => import("@/pages/SignsGuide"));
 const LaMekabel = lazy(() => import("@/pages/LaMekabel"));
@@ -121,6 +122,9 @@ const isLegacyAttributionPage = () =>
 // browser storage and never sends a network request.
 function ReferrerDetector() {
   useEffect(() => {
+    // The fixed SMS alias carries no query tags; its destination captures the
+    // canonical SMS UTM. Never let a link-preview/referrer become first touch here.
+    if (!isLegacyAttributionPage() && window.location.pathname === "/o14") return;
     if (isLegacyAttributionPage()) {
       try {
         const ref = document.referrer || "";
@@ -299,6 +303,7 @@ function HeRouter() {
           <Route path={"/ld"} component={LiveSmsRedirect} />
           <Route path={"/ll"} component={LiveSmsRedirect} />
           <Route path={"/lp"} component={LiveSmsRedirect} />
+          <Route path={"/o14"} component={October14SmsRedirect} />
           <Route path={"/course"} component={CourseSales} />
           <Route path={"/blog/:slug"} component={BlogPost} />
           <Route path={"/pages/:slug"} component={GeneratedLandingPage} />

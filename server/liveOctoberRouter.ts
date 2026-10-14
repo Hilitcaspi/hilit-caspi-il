@@ -7,6 +7,7 @@ import { liveOctoberQuestions, liveOctoberTickets } from "../drizzle/schema";
 import { ticketJoinUrl } from "./liveZoomDelivery";
 import { liveQuestionTicket } from "./liveQuestionAccess";
 import { confirmLiveAttendance, readLiveQuestionAccess } from "./liveAttendance";
+import { loadLiveFirstMatchQueue } from "./liveFirstMatchQueue";
 import {
   LIVE_OCTOBER_SLUG, ensurePlusLiveTicket, existingLiveTicket,
   getVerifiedLiveMember, isLiveCheckoutOpen, liveTicketByReceipt, submitLiveQuestion,
@@ -134,5 +135,11 @@ export const liveOctoberRouter = router({
       },
       tickets, questions,
     };
+  }),
+
+  adminFirstMatchQueue: teamProcedure.query(async ({ ctx }) => {
+    if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+    if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    return loadLiveFirstMatchQueue();
   }),
 });

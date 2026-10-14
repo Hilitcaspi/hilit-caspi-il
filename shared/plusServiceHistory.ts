@@ -1,5 +1,6 @@
 import { wasMatchProposalSent, type MatchDeliveryEvidence } from "./matchDelivery";
 import { getPlusServiceAnchor, PLUS_SERVICE_CYCLE_MS, type PlusServiceMember } from "./plusServiceCycle";
+import { getPlusWednesdayCycleTarget } from "./plusWednesdayOffer";
 
 /** Bound admin payloads while still showing up to two years of the member's own service history. */
 export const MAX_PLUS_SERVICE_HISTORY_PERIODS = 24;
@@ -64,9 +65,7 @@ function getIsraelCalendarMonthLabel(timestamp: number) {
 }
 
 function getPeriodTarget(member: PlusServiceHistoryMember, cycleIndex: number) {
-  const configuredTarget = Math.max(1, Number(member.monthlyMatchTarget || 2));
-  // The launch-only third proposal applied to the first period. Later service windows revert to two.
-  return cycleIndex > 0 && member.pilotCohort === "plus_launch_sep26" ? 2 : configuredTarget;
+  return getPlusWednesdayCycleTarget(member.pilotCohort, cycleIndex, member.monthlyMatchTarget);
 }
 
 function isCountableManualProposal(member: PlusServiceHistoryMember, proposal: PlusHistoricalProposal) {

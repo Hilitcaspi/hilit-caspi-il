@@ -71,7 +71,7 @@ describe("Database Plus holiday launch", () => {
     const source = readFileSync(resolve(process.cwd(), "server/plusFulfillment.ts"), "utf8");
     expect(source).toContain("!existing?.activatedAt");
     expect(source).toContain("qualifiesForPlusHolidayLaunch(checkoutIntent?.utmCampaign, cycleStart)");
-    expect(source).toContain("PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET : 2");
+    expect(source).toContain("PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET : PLUS_STANDARD_CYCLE_TARGET");
     expect(source).toContain("monthlyMatchTarget: cycleMatchTarget");
   });
 

@@ -7763,6 +7763,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }))
       .mutation(async ({ input }) => {
         const requested = input.code.trim().toUpperCase();
+        if (requested === "PLUS3") {
+          const { validatePlusWednesdayCoupon } = await import("./plusWednesdayCoupon");
+          return validatePlusWednesdayCoupon(input);
+        }
         if (requested === "TEST1") {
           const { isLiveTestCheckout } = await import("./liveTestCoupon");
           if (!isLiveTestCheckout(input.product || "", requested, input.email))
@@ -7930,9 +7934,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
   payment: router({
     plusCheckoutConfig: publicProcedure.query(async () => {
       const { getPlusCheckoutConfig } = await import("./growPayment");
+      const { getPlusWednesdayOfferPublicStatus } = await import("../shared/plusWednesdayOffer");
       return {
         ...getPlusCheckoutConfig(),
         attributionVersion: "plus_checkout_utm_v1" as const,
+        wednesdayOffer: getPlusWednesdayOfferPublicStatus(),
       };
     }),
     createProcess: publicProcedure
@@ -8046,15 +8052,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             });
           }
           if (existingSingle) {
-            const [existingMember] = await db.select({ id: plusPilotMembers.id })
+            const [priorPlusMember] = await db.select({
+              id: plusPilotMembers.id,
+              status: plusPilotMembers.status,
+              billingStatus: plusPilotMembers.billingStatus,
+              activatedAt: plusPilotMembers.activatedAt,
+              lastPaymentAt: plusPilotMembers.lastPaymentAt,
+              lastPaymentTransactionId: plusPilotMembers.lastPaymentTransactionId,
+            })
               .from(plusPilotMembers)
-              .where(and(
-                eq(plusPilotMembers.singleId, existingSingle.id),
-                eq(plusPilotMembers.status, "active"),
-                eq(plusPilotMembers.billingStatus, "active"),
-              ))
+              .where(eq(plusPilotMembers.singleId, existingSingle.id))
               .limit(1);
-            if (existingMember) {
+            if (priorPlusMember?.status === "active" && priorPlusMember.billingStatus === "active") {
               throw new TRPCError({ code: "CONFLICT", message: "מנוי Plus כבר פעיל עבור כתובת המייל הזו" });
             }
             const capacityRows = await db.select({ status: plusPilotMembers.status, gender: singles.gender })
@@ -8063,6 +8072,23 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             if (!hasPlusPilotCapacity(capacityRows, existingSingle.gender)) {
               throw new TRPCError({ code: "PRECONDITION_FAILED", message: "מכסת ההשקה מלאה כרגע. אפשר להשאיר פרטים ונעדכן כשייפתח מקום נוסף" });
             }
+
+            const { appendPlusWednesdayOfferMarker, canApplyPlusWednesdayOfferCoupon, stripPlusWednesdayOfferMarker } = await import("../shared/plusWednesdayOffer");
+            const requestedCoupon = input.couponCode?.trim().toUpperCase();
+            const cleanUtmTerm = stripPlusWednesdayOfferMarker(input.utmTerm);
+            if (requestedCoupon && requestedCoupon !== "PLUS3") {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "במסלול Plus קוד ההטבה PLUS3 בלבד תקף, והוא אינו משנה את המחיר של 99 ₪" });
+            }
+            if (requestedCoupon === "PLUS3" && !canApplyPlusWednesdayOfferCoupon({
+              couponCode: requestedCoupon,
+              paidAt: now,
+              existingMember: priorPlusMember,
+            })) {
+              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "הטבת PLUS3 מיועדת למצטרפים חדשים בלבד, לאחר מועד הפתיחה וביום רביעי לפי שעון ישראל. המחיר נשאר 99 ₪" });
+            }
+            input.utmTerm = requestedCoupon === "PLUS3"
+              ? appendPlusWednesdayOfferMarker(cleanUtmTerm)
+              : cleanUtmTerm || undefined;
           }
           await db.insert(plusCheckoutIntents).values({
             email: normalizedEmail,

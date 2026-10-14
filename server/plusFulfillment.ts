@@ -20,6 +20,12 @@ import {
   PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET,
   qualifiesForPlusHolidayLaunch,
 } from "./plusLaunchOffer";
+import {
+  PLUS_STANDARD_CYCLE_TARGET,
+  PLUS_WEDNESDAY_COHORT,
+  PLUS_WEDNESDAY_FIRST_CYCLE_TARGET,
+  qualifiesForPlusWednesdayOffer,
+} from "../shared/plusWednesdayOffer";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -104,19 +110,39 @@ export async function activatePlusForSingle(input: PlusActivationInput) {
   const [[existing], [checkoutIntent]] = await Promise.all([
     db.select().from(plusPilotMembers)
       .where(eq(plusPilotMembers.singleId, input.single.id)).limit(1),
-    db.select({ utmCampaign: plusCheckoutIntents.utmCampaign }).from(plusCheckoutIntents)
+    db.select({
+      utmTerm: plusCheckoutIntents.utmTerm,
+      utmCampaign: plusCheckoutIntents.utmCampaign,
+      paidAt: plusCheckoutIntents.paidAt,
+      amountAgorot: plusCheckoutIntents.amountAgorot,
+    }).from(plusCheckoutIntents)
       .where(sql`LOWER(TRIM(${plusCheckoutIntents.email})) = ${input.email.trim().toLowerCase()}`)
       .limit(1),
   ]);
-  const holidayLaunchFirstCycle = !existing?.activatedAt
-    && qualifiesForPlusHolidayLaunch(checkoutIntent?.utmCampaign, cycleStart);
-  const cycleMatchTarget = holidayLaunchFirstCycle ? PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET : 2;
+  // paidAt is written by the verified Grow webhook. Profile completion may happen later.
+  const wednesdayOfferFirstCycle = qualifiesForPlusWednesdayOffer({
+    utmTerm: checkoutIntent?.utmTerm,
+    paidAt: input.paidAt || checkoutIntent?.paidAt,
+    amountAgorot: input.amountAgorot || checkoutIntent?.amountAgorot,
+    existingMember: existing,
+  });
+  // A retried webhook for the same verified initial transaction is idempotent;
+  // a later renewal has a different provider transaction and returns to two.
+  const preservedWednesdayOffer = existing?.pilotCohort === PLUS_WEDNESDAY_COHORT
+    && existing.monthlyMatchTarget === PLUS_WEDNESDAY_FIRST_CYCLE_TARGET
+    && Boolean(input.transactionId)
+    && existing.lastPaymentTransactionId === input.transactionId;
+  const firstCycleWednesdayOffer = wednesdayOfferFirstCycle || preservedWednesdayOffer;
+  const legacyFirstCycle = (!existing?.activatedAt && qualifiesForPlusHolidayLaunch(checkoutIntent?.utmCampaign, cycleStart))
+    || (existing?.pilotCohort === PLUS_HOLIDAY_LAUNCH_COHORT && existing.monthlyMatchTarget === PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET && Boolean(input.transactionId) && existing.lastPaymentTransactionId === input.transactionId);
+  const cycleMatchTarget = firstCycleWednesdayOffer ? PLUS_WEDNESDAY_FIRST_CYCLE_TARGET
+    : legacyFirstCycle ? PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET : PLUS_STANDARD_CYCLE_TARGET;
 
   const memberValues = {
     status: "active" as const,
     billingStatus: "active" as const,
     pilotPriceAgorot: input.amountAgorot || 9900,
-    pilotCohort: holidayLaunchFirstCycle ? PLUS_HOLIDAY_LAUNCH_COHORT : existing?.pilotCohort || null,
+    pilotCohort: firstCycleWednesdayOffer ? PLUS_WEDNESDAY_COHORT : legacyFirstCycle ? PLUS_HOLIDAY_LAUNCH_COHORT : existing?.pilotCohort || null,
     monthlyMatchTarget: cycleMatchTarget,
     billingCycleStartedAt: cycleStart,
     billingCycleEndsAt: cycleEnd,
@@ -194,7 +220,7 @@ export async function activatePlusForSingle(input: PlusActivationInput) {
   await sendEmail({
     to: { email: input.email, name: input.name },
     subject: launchBonus ? "Database Plus שלך פעיל — והמתנה שלך בפנים" : "Database Plus שלך פעיל",
-    htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">ברוכים הבאים ל־Database Plus</h2><p style="line-height:1.8">המנוי שלך פעיל. ${holidayLaunchFirstCycle ? `לכבוד ההשקה והחגים, במחזור הראשון מגיעות לך <strong>שלוש הצעות התאמה חדשות שנבדקו ונשלחו</strong>.` : `בכל מחזור חיוב מגיעות לך לפחות <strong>שתי הצעות התאמה חדשות שנבדקו ונשלחו</strong>.`} החל מהמחזור הבא היעד הוא שתי הצעות בכל מחזור, ובנוסף <strong>בוסט אחד ללא תשלום נוסף</strong> שאפשר להפעיל מהאזור האישי.</p><p style="line-height:1.8">באזור האישי ניתן לראות את ההתקדמות ולפנות לערוץ השירות בעדיפות.</p>${launchBonus ? `<div style="margin:22px 0;padding:20px;border-radius:16px;background:#fff2f5;border:1px solid #ffc9d8"><strong style="color:#ff4466">מתנת ההשקה שלך: המדריך „לבחור נכון”</strong><p style="line-height:1.7;margin:8px 0 16px">המדריך המלא, בשווי 149 ₪, מחכה לך ללא תשלום נוסף.</p><a href="${launchBonus.url}" style="display:inline-block;background:#ff4466;color:white;text-decoration:none;padding:11px 20px;border-radius:999px;font-weight:bold">לפתיחת המדריך</a></div>` : ""}<p style="line-height:1.8;font-size:13px;color:#666">ההבטחה היא להצעות שנבדקו ונשלחו. אישור הדדי, דייט או זוגיות תלויים גם בצד השני ואינם מובטחים.</p><p style="text-align:center;margin:28px 0"><a href="${personalUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">כניסה לאזור האישי</a></p></div>`,
+    htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">ברוכים הבאים ל־Database Plus</h2><p style="line-height:1.8">המנוי שלך פעיל. ${firstCycleWednesdayOffer ? `בהטבת יום רביעי, במחזור 30 הימים הראשון מגיעות לך <strong>שלוש הצעות התאמה חדשות שנבדקו ונשלחו</strong>.` : legacyFirstCycle ? `בהטבת ההשקה שכבר ניתנה לך, במחזור הראשון מגיעות לך <strong>שלוש הצעות התאמה חדשות שנבדקו ונשלחו</strong>.` : `בכל מחזור חיוב מגיעות לך לפחות <strong>שתי הצעות התאמה חדשות שנבדקו ונשלחו</strong>.`} החל מהמחזור הבא היעד הוא שתי הצעות בכל מחזור, ובנוסף <strong>בוסט אחד ללא תשלום נוסף</strong> שאפשר להפעיל מהאזור האישי.</p><p style="line-height:1.8">באזור האישי ניתן לראות את ההתקדמות ולפנות לערוץ השירות בעדיפות.</p>${launchBonus ? `<div style="margin:22px 0;padding:20px;border-radius:16px;background:#fff2f5;border:1px solid #ffc9d8"><strong style="color:#ff4466">מתנת ההשקה שלך: המדריך „לבחור נכון”</strong><p style="line-height:1.7;margin:8px 0 16px">המדריך המלא, בשווי 149 ₪, מחכה לך ללא תשלום נוסף.</p><a href="${launchBonus.url}" style="display:inline-block;background:#ff4466;color:white;text-decoration:none;padding:11px 20px;border-radius:999px;font-weight:bold">לפתיחת המדריך</a></div>` : ""}<p style="line-height:1.8;font-size:13px;color:#666">ההבטחה היא להצעות שנבדקו ונשלחו. אישור הדדי, דייט או זוגיות תלויים גם בצד השני ואינם מובטחים.</p><p style="text-align:center;margin:28px 0"><a href="${personalUrl}" style="display:inline-block;background:#191265;color:#ffe27c;text-decoration:none;padding:14px 24px;border-radius:12px;font-weight:bold">כניסה לאזור האישי</a></p></div>`,
   });
   await notifyOwner({ title: "מנוי Database Plus חדש", content: `${input.name} (${input.email}) הפעיל/ה Plus.` });
   return { memberId: member.id, monthlyMatchTarget: cycleMatchTarget };
