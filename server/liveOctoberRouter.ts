@@ -8,6 +8,7 @@ import { ticketJoinUrl } from "./liveZoomDelivery";
 import { liveQuestionTicket } from "./liveQuestionAccess";
 import { confirmLiveAttendance, readLiveQuestionAccess } from "./liveAttendance";
 import { loadLiveFirstMatchQueue } from "./liveFirstMatchQueue";
+import { isZoomLiveDeliveryEnabled } from "./liveZoomApi";
 import {
   LIVE_OCTOBER_SLUG, ensurePlusLiveTicket, existingLiveTicket,
   getVerifiedLiveMember, isLiveCheckoutOpen, liveTicketByReceipt, submitLiveQuestion,
@@ -133,6 +134,7 @@ export const liveOctoberRouter = router({
         standalone: Number(totals?.standalone || 0), questions: Number(questionTotal?.total || 0),
         test: Number(testCount?.total || 0),
       },
+      zoomDelivery: { enabled: isZoomLiveDeliveryEnabled() },
       tickets, questions,
     };
   }),
