@@ -39,7 +39,12 @@ describe("Plus live RSVP reminder draft", () => {
     "https://hilitcaspi.com/live/question#q=demo",
     "https://hilitcaspi.com/live/question#rsvp=1",
     "https://hilitcaspi.com/my-profile#q=demo&rsvp=1",
-    "https://user:pass@hilitcaspi.com/live/question#q=demo&rsvp=1",
+    (() => {
+      const unsafeUrl = new URL(input.rsvpUrl);
+      unsafeUrl.username = "synthetic";
+      unsafeUrl.password = "fixture";
+      return unsafeUrl.href;
+    })(),
   ])("rejects unsafe or non-RSVP link %s", rsvpUrl => {
     expect(() => buildPlusLiveRsvpReminder({ ...input, rsvpUrl })).toThrow();
   });
