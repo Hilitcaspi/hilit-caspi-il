@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import MatchProfileCard, { MatchProfileFacts, MatchPreferenceFacts, ProfilePhoto, preferenceRange, type MatchProfile } from "@/components/MatchProfileCard";
 import { buildAdvancedMatchExclusions, isAdvancedMatchCandidate } from "@shared/advancedMatchCandidates";
+import { getAdvancedMatchFilterDefaults } from "@shared/advancedMatchFilterDefaults";
 import ResponseFollowupSection from "@/components/ResponseFollowupSection";
 import WaitingMemberProfile from "@/components/WaitingMemberProfile";
 import { waitingProfileMissingFields } from "@shared/waitingProfileCompleteness";
@@ -412,14 +413,23 @@ export default function CRMMatchmaking() {
     enabled: !!user && user.role === "admin" && activeTab === "unmatched",
   });
   const singlesWithoutMatches = unmatchedResult.items ?? [];
-  const openAdvancedForUnmatched = (single: { id: number; firstName: string; lastName?: string | null; seekingGender?: string | null; gender?: string }) => {
+  // Initial local filters only; saved preferences and scoring remain untouched.
+  const applyPreferredSearchFilters = (single: Parameters<typeof getAdvancedMatchFilterDefaults>[0]) => {
+    const defaults = getAdvancedMatchFilterDefaults(single);
+    setFilterGender(defaults.gender);
+    setFilterMinAge(defaults.minAge);
+    setFilterMaxAge(defaults.maxAge);
+    setFilterMinHeight(defaults.minHeight);
+    setFilterMaxHeight("");
+  };
+  const openAdvancedForUnmatched = (single: Parameters<typeof getAdvancedMatchFilterDefaults>[0] & { id: number; firstName: string; lastName?: string | null }) => {
     batchGeneration.current += 1;
     filterTargetRef.current = single.id;
     setBatchProgress(null);
-    setFilterGender(single.seekingGender === "any" ? "" : single.seekingGender || (single.gender === "female" ? "male" : "female"));
-    setFilterMinAge(""); setFilterMaxAge(""); setFilterCity("");
+    applyPreferredSearchFilters(single);
+    setFilterCity("");
     setFilterReligiosity(""); setFilterDna(""); setFilterName("");
-    setFilterMinHeight(""); setFilterMaxHeight(""); setFilterMaritalStatus("");
+    setFilterMaritalStatus("");
     setFilterWantsKids(""); setFilterHasKids(""); setFilterArea("");
     setFilterCompatTarget(single.id);
     setFilterCompatSearch(`${single.firstName} ${single.lastName || ""}`.trim());
@@ -883,7 +893,7 @@ export default function CRMMatchmaking() {
     setFilterCompatTarget(single.id);
     setFilterCompatSearch(`${single.firstName} ${single.lastName || ""}`.trim());
     setFilterCompatDropdown(false); setFilterCompatResult({});
-    setFilterGender(single.seekingGender === "any" ? "" : single.seekingGender || (single.gender === "female" ? "male" : "female"));
+    applyPreferredSearchFilters(single);
   };
   const checkOneVisible = async (candidateId: number) => {
     if (!filterCompatTarget) return;
@@ -992,6 +1002,7 @@ export default function CRMMatchmaking() {
               {/* Filter panel */}
               <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5" dir="rtl">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="font-black text-[#191265] text-lg">{embedded ? "חיפוש מתקדם עבור הפרופיל הזה" : "🔎 חיפוש מתקדם לפי פרמטרים"}</h3><button type="button" onClick={() => setActiveTab("compatibility")} className="rounded-lg border border-[#191265]/20 px-3 py-2 text-xs font-bold text-[#191265]">בדיקת התאמה בין שני אנשים</button></div>
+                <p className="mb-4 text-xs text-[#727272]">בבחירת פרופיל, המגדר והגובה המינימלי מתמלאים לפי ההעדפות שלו. טווח הגיל מורחב בשנתיים לכל צד, מגיל 18. אפשר לשנות את כל המסננים לפני החיפוש.</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                   {/* Name */}
                   <div>
@@ -1014,14 +1025,14 @@ export default function CRMMatchmaking() {
                   <div>
                     <label className="block text-xs text-[#727272] mb-1">גיל מינימלי</label>
                     <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(e.target.value)}
-                      placeholder="מ-" min={18} max={80}
+                      placeholder="מ-" min={18} max={120}
                       className="w-full border border-[#e9e8e8] rounded-lg px-3 py-2 text-sm text-[#191265] focus:outline-none focus:border-[#191265]" />
                   </div>
                   {/* Max age */}
                   <div>
                     <label className="block text-xs text-[#727272] mb-1">גיל מקסימלי</label>
                     <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(e.target.value)}
-                      placeholder="עד-" min={18} max={80}
+                      placeholder="עד-" min={18} max={120}
                       className="w-full border border-[#e9e8e8] rounded-lg px-3 py-2 text-sm text-[#191265] focus:outline-none focus:border-[#191265]" />
                   </div>
                   {/* City */}
@@ -3018,6 +3029,17 @@ export default function CRMMatchmaking() {
         )}
         {/* Compatibility Check Tab */}
         {activeTab === "compatibility" && (
+          <>
+          {(compatPersonA || compatPersonB) && (
+            <div className="mb-4 flex justify-end">
+              <button type="button" disabled={singlesLoading} className="rounded-xl bg-[#191265] px-4 py-2 text-sm font-bold text-white disabled:opacity-40" onClick={() => {
+                const target = typedSingles.find(single => single.id === (compatPersonA ?? compatPersonB));
+                if (!target) { toast.error("הפרופיל עדיין לא נטען. אפשר לנסות שוב."); return; }
+                selectFilterTarget(target);
+                setActiveTab("filter_search");
+              }}>{compatPersonA ? "חיפוש מתקדם לאדם הראשון שנבחר" : "חיפוש מתקדם לאדם השני שנבחר"}</button>
+            </div>
+          )}
           <CompatibilityCheckTab
             allSingles={allSinglesForCompat}
             compatPersonA={compatPersonA}
@@ -3055,6 +3077,7 @@ export default function CRMMatchmaking() {
             canSendDirectly={!!(compatPersonA && compatPersonB)}
             isSendingMatch={approveMatch.isPending || createAndSendMatch.isPending}
           />
+          </>
         )}
         {/* Profile Update Requests Tab */}
         {activeTab === "update_requests" && (
