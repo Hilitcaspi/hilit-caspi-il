@@ -77,7 +77,15 @@ import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivac
 import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYMENT_ATTRIBUTION_TTL_MS } from "./paymentAttribution";
 import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
 import { wasMatchProposalSent } from "../shared/matchDelivery";
-import { blocksNewMatch, canSuggestNewMatch, matchPairKey } from "./unmatchedQueue";
+import { blocksNewMatch } from "./unmatchedQueue";
+import {
+  buildLastAcceptedDeliveryBySingle,
+  buildRecipientMatchHistory,
+  getWaitingFrom,
+  normalizeQueueEmail,
+  sortWaitingProfilesByWaitingFrom,
+  UNMATCHED_QUEUE_HISTORY_DISCLAIMER,
+} from "../shared/unmatchedQueuePresentation";
 import { hashActor, recordSelfServiceEventSafely } from "./usageMetrics";
 import { isInvalidMatchPlaceholder } from "./invalidMatchPlaceholder";
 
@@ -5434,7 +5442,24 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!db) return { items: [], total: 0, page, limit, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } };
 
       // Get all active singles
-      const allSingles = await db.select().from(singles)
+      const allSingles = await db.select({
+        id: singles.id,
+        firstName: singles.firstName,
+        lastName: singles.lastName,
+        gender: singles.gender,
+        age: singles.age,
+        city: singles.city,
+        dnaType: singles.dnaType,
+        photoUrl: singles.photoUrl,
+        email: singles.email,
+        subscriptionStartedAt: singles.subscriptionStartedAt,
+        subscriptionRenewsAt: singles.subscriptionRenewsAt,
+        seekingGender: singles.seekingGender,
+        questionnaireCompletedAt: singles.questionnaireCompletedAt,
+        isCoachingClient: singles.isCoachingClient,
+        isNotBasic: singles.isNotBasic,
+        createdAt: singles.createdAt,
+      }).from(singles)
         .where(and(
           eq(singles.isActive, true),
           eq(singles.isPaid, true),
@@ -5469,24 +5494,17 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           blockingMatchStatusBySingle.set(match.singleBId, match.status);
         }
       }
-      const previouslySentPairs = new Set(sentMatchRows.map(match => matchPairKey(match.singleAId, match.singleBId)));
-      const fourteenDaysAgo = Date.now() - (14 * 24 * 60 * 60 * 1000);
+      const queueNow = Date.now();
+      const fourteenDaysAgo = queueNow - (14 * 24 * 60 * 60 * 1000);
       const acceptedByMatchAndSingle = new Set(acceptedDeliveries.map(row => `${row.matchId}:${row.singleId}`));
       const feedbackAttentionIds = new Set(feedbackAttentionRows.map(row => Number(row.singleId)).filter(Boolean));
 
       // Track the latest provider-accepted delivery for each recipient.
-      const lastMatchDateBySingle = new Map<number, number>();
+      const lastMatchDateBySingle = buildLastAcceptedDeliveryBySingle(acceptedDeliveries);
       const activeProposalBySingle = new Map<number, boolean>();
-      const sentMatchCountBySingle = new Map<number, number>();
-      for (const delivery of acceptedDeliveries) {
-        const ts = delivery.acceptedAt ?? 0;
-        const prev = lastMatchDateBySingle.get(delivery.singleId) ?? 0;
-        if (ts > prev) lastMatchDateBySingle.set(delivery.singleId, ts);
-      }
       for (const m of sentMatchRows) {
         for (const id of [m.singleAId, m.singleBId]) {
           if (!acceptedByMatchAndSingle.has(`${m.id}:${id}`)) continue;
-          sentMatchCountBySingle.set(id, (sentMatchCountBySingle.get(id) ?? 0) + 1);
           const stillInActiveConnection = blocksNewMatch(m);
           if (stillInActiveConnection) activeProposalBySingle.set(id, true);
         }
@@ -5496,82 +5514,61 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       const singlesWithout = allSingles.filter(s => {
         if (activeProposalBySingle.get(s.id)) return false;
         if (feedbackAttentionIds.has(s.id)) return true;
-        const eligibleSince = Number(s.questionnaireCompletedAt || s.createdAt || Date.now());
+        const eligibleSince = getWaitingFrom(s, lastMatchDateBySingle, queueNow);
         const lastMatch = lastMatchDateBySingle.get(s.id);
         if (!lastMatch) return eligibleSince < fourteenDaysAgo;
         return lastMatch < fourteenDaysAgo;
-      }).sort((a, b) => {
-        const feedbackPriority = Number(feedbackAttentionIds.has(b.id)) - Number(feedbackAttentionIds.has(a.id));
-        if (feedbackPriority) return feedbackPriority;
-        const aWaitingFrom = lastMatchDateBySingle.get(a.id) || Number(a.questionnaireCompletedAt || a.createdAt || Date.now());
-        const bWaitingFrom = lastMatchDateBySingle.get(b.id) || Number(b.questionnaireCompletedAt || b.createdAt || Date.now());
-        return aWaitingFrom - bWaitingFrom;
       });
-      const pagedSingles = singlesWithout.slice((page - 1) * limit, page * limit);
-
-      // For each, find potential matches from the pool
-      const pool = allSingles.map(s => ({
-        ...s,
-        seekingGender: s.seekingGender ?? (s.gender === "female" ? "male" : "female"),
-      }));
-
-      // Fetch all matchmaking answers once for efficient lookup
-      const allAnswers = await db.select().from(matchmakingAnswers);
-      const answersBySingleId = new Map<number, MatchAnswer[]>();
-      for (const row of allAnswers) {
-        const parsed: MatchAnswer[] = row.answersJson
-          ? (typeof row.answersJson === 'string' ? JSON.parse(row.answersJson) : row.answersJson as MatchAnswer[])
-          : [];
-        answersBySingleId.set(row.singleId, parsed);
+      // Longest waiting always comes first; feedback affects inclusion only.
+      const sortedSinglesWithout = sortWaitingProfilesByWaitingFrom(singlesWithout, lastMatchDateBySingle, queueNow);
+      const pagedSingles = sortedSinglesWithout.slice((page - 1) * limit, page * limit);
+      const pagedSingleIds = new Set(pagedSingles.map(single => single.id));
+      const historicalOpponentIds = new Set<number>();
+      for (const match of allMatchRows) {
+        if (pagedSingleIds.has(match.singleAId) && match.singleBId > 0) historicalOpponentIds.add(match.singleBId);
+        if (pagedSingleIds.has(match.singleBId) && match.singleAId > 0) historicalOpponentIds.add(match.singleAId);
+      }
+      const pagedEmails = Array.from(new Set(pagedSingles
+        .map(single => normalizeQueueEmail(single.email))
+        .filter((email): email is string => Boolean(email))));
+      const [historicalOpponents, verifiedDatabasePayments] = await Promise.all([
+        historicalOpponentIds.size > 0
+          ? db.select({
+              id: singles.id,
+              firstName: singles.firstName,
+              lastName: singles.lastName,
+              photoUrl: singles.photoUrl,
+            }).from(singles).where(inArray(singles.id, Array.from(historicalOpponentIds)))
+          : Promise.resolve([]),
+        pagedEmails.length > 0
+          ? db.select({ email: completedPayments.email, paidAt: completedPayments.paidAt })
+              .from(completedPayments)
+              .where(and(
+                eq(completedPayments.product, "database"),
+                eq(completedPayments.amountSource, "grow"),
+                gt(completedPayments.amountAgorot, 100),
+                inArray(sql`LOWER(TRIM(${completedPayments.email}))`, pagedEmails),
+              ))
+          : Promise.resolve([]),
+      ]);
+      const matchHistoryBySingle = buildRecipientMatchHistory(
+        allMatchRows,
+        acceptedDeliveries,
+        new Map(historicalOpponents.map(opponent => [opponent.id, opponent])),
+        pagedSingleIds,
+      );
+      const databasePurchasedAtByEmail = new Map<string, number>();
+      for (const payment of verifiedDatabasePayments) {
+        const email = normalizeQueueEmail(payment.email);
+        const paidAt = Number(payment.paidAt || 0);
+        if (!email || !paidAt) continue;
+        const previous = databasePurchasedAtByEmail.get(email);
+        if (!previous || paidAt < previous) databasePurchasedAtByEmail.set(email, paidAt);
       }
 
       const items = pagedSingles.map(s => {
-        const sAnswers = answersBySingleId.get(s.id) ?? [];
-
-        // Find top 3 potential matches using the full algorithm
-        const candidates = pool.filter(c => canSuggestNewMatch(s, c, blockingProposalIds, previouslySentPairs)
-          && passesHardFilters(s as any, c as any).pass);
-
-        const suggestions = candidates
-          .map(c => {
-            const cAnswers = answersBySingleId.get(c.id) ?? [];
-            const breakdown = computeFullScore(s as any, c as any, sAnswers, cAnswers);
-            return {
-              id: c.id,
-              name: `${c.firstName} ${c.lastName || ''}`.trim(),
-              age: c.age,
-              city: c.city,
-              gender: c.gender,
-              dnaType: c.dnaType,
-              photoUrl: c.photoUrl,
-              height: c.height,
-              education: c.education,
-              maritalStatus: c.maritalStatus,
-              hasKids: c.hasKids,
-              numKids: c.numKids,
-              wantsKids: c.wantsKids,
-              religiosity: c.religiosity,
-              shomerShabbat: c.shomerShabbat,
-              about: c.about,
-              partnerDescription: c.partnerDescription,
-              occupation: c.occupation,
-              smokingStatus: c.smokingStatus,
-              hasPets: c.hasPets,
-              petType: c.petType,
-              locationPreference: c.locationPreference,
-              phone: c.phone,
-              email: c.email,
-              score: breakdown.total,
-              hasActiveProposal: activeProposalBySingle.get(c.id) ?? false,
-              totalSentMatches: sentMatchCountBySingle.get(c.id) ?? 0,
-            };
-          })
-          .filter(candidate => candidate.score >= 60)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 3);
-
-        const waitingFrom = lastMatchDateBySingle.get(s.id) || Number(s.questionnaireCompletedAt || s.createdAt || Date.now());
-        const waitingDays = Math.max(0, Math.floor((Date.now() - waitingFrom) / (1000 * 60 * 60 * 24)));
+        const waitingFrom = getWaitingFrom(s, lastMatchDateBySingle, queueNow);
+        const waitingDays = Math.max(0, Math.floor((queueNow - waitingFrom) / (1000 * 60 * 60 * 24)));
 
         return {
           id: s.id,
@@ -5582,52 +5579,40 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           city: s.city,
           dnaType: s.dnaType,
           photoUrl: s.photoUrl,
-          phone: s.phone,
-          religiosity: s.religiosity,
-          height: s.height,
-          education: s.education,
-          maritalStatus: s.maritalStatus,
-          hasKids: s.hasKids,
-          numKids: s.numKids,
-          wantsKids: s.wantsKids,
-          shomerShabbat: s.shomerShabbat,
-          hasPets: s.hasPets,
-          petType: s.petType,
-          smokingStatus: s.smokingStatus,
-          locationPreference: s.locationPreference,
-          about: s.about,
-          partnerDescription: s.partnerDescription,
-          email: s.email,
-          occupation: s.occupation,
+          subscriptionStartedAt: s.subscriptionStartedAt,
           subscriptionEnd: s.subscriptionRenewsAt,
-          minAgePreference: s.minAgePreference,
-          maxAgePreference: s.maxAgePreference,
+          seekingGender: s.seekingGender,
+          questionnaireCompletedAt: s.questionnaireCompletedAt,
           isCoachingClient: s.isCoachingClient,
           isNotBasic: s.isNotBasic,
-          updatedAt: s.updatedAt,
           createdAt: s.createdAt,
+          waitingFrom,
           waitingDays,
           lastMatchAt: lastMatchDateBySingle.get(s.id) ?? null,
           feedbackNeedsMatchmaking: feedbackAttentionIds.has(s.id),
           hasBlockingProposal: blockingProposalIds.has(s.id),
           blockingMatchStatus: blockingMatchStatusBySingle.get(s.id) ?? null,
-          suggestions,
+          databasePurchasedAt: databasePurchasedAtByEmail.get(normalizeQueueEmail(s.email) || "") ?? null,
+          matchHistory: matchHistoryBySingle.get(s.id) ?? [],
+          // The client now requests advanced search separately; retain the old key for callers still expecting it.
+          suggestions: [],
         };
       });
       return {
         items,
-        total: singlesWithout.length,
+        total: sortedSinglesWithout.length,
         page,
         limit,
+        historyDisclaimer: UNMATCHED_QUEUE_HISTORY_DISCLAIMER,
         summary: {
-          over14: singlesWithout.filter(item => {
-            const waitingFrom = lastMatchDateBySingle.get(item.id) || Number(item.questionnaireCompletedAt || item.createdAt || Date.now());
+          over14: sortedSinglesWithout.filter(item => {
+            const waitingFrom = getWaitingFrom(item, lastMatchDateBySingle, queueNow);
             return waitingFrom < fourteenDaysAgo;
           }).length,
-          fromFeedback: singlesWithout.filter(item => feedbackAttentionIds.has(item.id)).length,
-          neverDelivered: singlesWithout.filter(item => !lastMatchDateBySingle.has(item.id)).length,
-          blocked: singlesWithout.filter(item => blockingProposalIds.has(item.id)).length,
-          missingPhoto: singlesWithout.filter(item => !item.photoUrl?.trim()).length,
+          fromFeedback: sortedSinglesWithout.filter(item => feedbackAttentionIds.has(item.id)).length,
+          neverDelivered: sortedSinglesWithout.filter(item => !lastMatchDateBySingle.has(item.id)).length,
+          blocked: sortedSinglesWithout.filter(item => blockingProposalIds.has(item.id)).length,
+          missingPhoto: sortedSinglesWithout.filter(item => !item.photoUrl?.trim()).length,
         },
       };
     }),
