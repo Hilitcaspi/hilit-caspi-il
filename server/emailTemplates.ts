@@ -114,7 +114,7 @@ function urgencyBanner(): string {
   return `<div style="background:linear-gradient(135deg,#7b0000 0%,#c0392b 100%); border-radius:12px; padding:16px 20px; margin:20px 0; text-align:center; border:2px solid #ff6b6b;">
     <p style="color:#ffe27c; font-size:13px; font-weight:700; margin:0 0 6px; letter-spacing:1px;">⏳ התראת מחיר</p>
     <p style="color:#fff; font-size:15px; font-weight:700; margin:0 0 6px;">ההטבה שלך: ₪299 במקום ₪499</p>
-    <p style="color:rgba(255,255,255,0.8); font-size:13px; margin:0;">הצטרפו עכשיו ותיהנו ממחיר מועדף - לא יהיה מחיר כזה שוב</p>
+    <p style="color:rgba(255,255,255,0.8); font-size:13px; margin:0;">הצטרפות עכשיו במחיר מועדף - לא יהיה מחיר כזה שוב</p>
   </div>`;
 }
 
@@ -165,7 +165,7 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:al
     <p>הילית כספי | Relationship Expert &amp; Matchmaker</p>
     <p><a href="${WHATSAPP_LINK}">וואטסאפ</a> · <a href="https://www.instagram.com/hilitcaspi_relationship">אינסטגרם</a> · <a href="https://www.facebook.com/share/1B28xCy726/">פייסבוק</a> · <a href="https://www.tiktok.com/@hilitcaspi_relationship">טיקטוק</a></p>
     <p style="margin-top:12px; font-size:12px; color:rgba(255,255,255,0.5);">קיבלת מייל זה כי נרשמת לרשימת התפוצה של הילית כספי.</p>
-    <p style="font-size:12px; color:rgba(255,255,255,0.6);">📬 כדי להמשיך לקבל ממני תכנים   העבירו את המייל הזה לתיקייה הראשית (גררו מ"קידומים" לתיבה הראשית), או לחצו "לא ספאם".</p>
+    <p style="font-size:12px; color:rgba(255,255,255,0.6);">📬 להמשך קבלת תכנים ממני, יש להעביר את המייל הזה לתיקייה הראשית (מ"קידומים" לתיבה הראשית), או לסמן "לא ספאם".</p>
     <p style="font-size:11px;"><a href="${unsubLink}" style="color:rgba(255,255,255,0.4);">הסרה מרשימת התפוצה</a></p>
     <p style="font-size:10px; color:rgba(255,255,255,0.2); margin-top:12px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">© 2024-2025 Hilit Caspi. All rights reserved. | כל הזכויות שמורות.<br/>שיטת ההתאמה, האלגוריתם והתכנים מוגנים בזכויות יוצרים. אין להעתיק, לשכפל או להשתמש בכל חלק מהם ללא אישור מפורש בכתב.
     </p>
@@ -243,7 +243,7 @@ export const WOMEN_FIRST_STEP_EMAIL_3: EmailTemplate = {
     <h2>{{firstName}}, זה המייל שחיכית לו</h2>
     <p>שלחתי לך שני מיילים בשבוע האחרון. אם הם דיברו אלייך - המדריך הזה יהיה המשך טבעי.</p>
     <p>כתבתי את "לבחור נכון - המדריך המעשי לזוגיות" אחרי שנים של ליווי מאות נשים. זה לא עוד ספר עצה. זה המדריך שהייתי רוצה שמישהי תיתן לי לפני שנים.</p>
-    <p><strong>מה תמצאו בפנים:</strong></p>
+    <p><strong>מה תמצאי בפנים:</strong></p>
       ✦ מלכודת 1: Miswanting, לרצות את מה שלא מאושר אותך<br>
     ✦ מלכודת 2: הסתגלות הדוניסטית, למה גם הגבר המושלם מתחיל להרגיש רגיל<br>
     ✦ מלכודת 3: השוואה חברתית, למה הסביבה שלך עיוורת אותך<br>
@@ -307,9 +307,9 @@ export const MEN_FIRST_STEP_EMAIL_1: EmailTemplate = {
 };
 
 export const MEN_FIRST_STEP_EMAIL_2: EmailTemplate = {
-  subject: "{{firstName}}, השאלה שאני שואל כל גבר שיושב מולי",
+  subject: "{{firstName}}, השאלה שאני שואלת כל גבר שיושב מולי",
   htmlBody: baseTemplate(`
-    <h2>{{firstName}}, שאלה אחת שאני שואל תמיד</h2>
+    <h2>{{firstName}}, שאלה אחת שאני שואלת תמיד</h2>
     <p>"מה היה טוב בזוגיות האחרונה שלך?"</p>
     <p>כמעט אף אחד לא מזכיר גובה, מראה, או הכנסה. כולם מדברים על תחושות: "היא ראתה אותי", "היא גרמה לי להרגיש בטוח".</p>
     <p>אז למה אנחנו ממשיכים לחפש לפי קריטריונים שלא קשורים לאושר?</p>
@@ -361,7 +361,7 @@ export const WOMEN_GUIDE_PURCHASE_EMAIL_1: EmailTemplate = {
     <a href="{{guideLink}}" class="cta">♡ לקריאת המדריך ←</a>
     <p>טיפ אחד לפני שמתחילים: קראי אותו בשקט, בלי הסחות דעת. יש שם דברים שיגרמו לך לעצור ולחשוב.</p>
     <hr class="divider" />
-    <p>ואם אתם רוצים ללכת עמוק יותר - אני כאן. שיחת היכרות של 15 דקות, חינם לגמרי:</p>
+    <p>ואם תרצי להעמיק - אני כאן. שיחת היכרות של 15 דקות, חינם לגמרי:</p>
     <a href="${CALENDLY_15MIN}" class="secondary-cta">♡ קביעת שיחת היכרות (15 דקות, חינם)</a>
     <p style="color:#727272; font-size:13px; text-align:center;">ללא עלות, ללא התחייבות.</p>
     <hr class="divider" />
@@ -400,7 +400,7 @@ export const WOMEN_GUIDE_PURCHASE_EMAIL_2: EmailTemplate = {
     <div class="quote">
       "קראתי את הסוד הרביעי ופתאום הבנתי למה כל הגברים הטובים 'נעלמו' אחרי כמה פגישות. זה היה כמו מראה."
     </div>
-    <p>אם יש לך שאלה, תובנה, או סתם רצית לשתף - אני כאן. פשוט כתבו לי בוואטסאפ.</p>
+    <p>אם יש לך שאלה, תובנה, או סתם רצית לשתף - אני כאן. פשוט כתבי לי בוואטסאפ.</p>
     <p>ואם את מרגישה שאת רוצה ליווי אישי - הצעד הבא הוא שיחת היכרות קצרה:</p>
     <a href="${CALENDLY_15MIN}" class="cta">♡ קביעת שיחת היכרות (15 דקות, חינם) ←</a>
     <hr class="divider" />
@@ -472,7 +472,7 @@ export const MEN_GUIDE_PURCHASE_EMAIL_2: EmailTemplate = {
     <div class="quote">
       "יישמתי את הסוד השלישי בדייט הבא שלי. היא שלחה לי הודעה למחרת. אנחנו ביחד כבר 8 חודשים." - אורי, 36
     </div>
-    <p>אם יש לך שאלה - כתבו לי בוואטסאפ. אני קוראת ועונה אישית.</p>
+    <p>אם יש לך שאלה - כתוב לי בוואטסאפ. אני קוראת ועונה אישית.</p>
     <p>ואם אתה מרגיש שאתה רוצה ליווי אישי - שיחה קצרה של 15 דקות יכולה לתת לך מפת דרכים:</p>
     <a href="${CALENDLY_15MIN}" class="cta">קביעת שיחת היכרות (15 דקות, חינם) ←</a>
     ${emailSignature()}
@@ -503,8 +503,8 @@ export const WOMEN_MATCHMAKING_EMAIL_1: EmailTemplate = {
       <h3 style="color:#ffe27c; font-size:18px; margin:0 0 16px; text-align:center;">איך מתבצעות ההתאמות?</h3>
       <div style="color:#fff; font-size:15px; line-height:2;">
         <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">1. בדיקה אישית</span> - אני עוברת על הפרופיל שלך אישית ומחפשת התאמה שמרגישה נכון - לא רק על הנייר.</p>
-        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">2. הצעת התאמה</span> - כשאמצא התאמה פוטנציאלית, אשלח לשניכם הצעה בנפרד בלי לחשוף פרטים של הצד השני.</p>
-        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">3. אישור שני הצדדים</span> - רק אם שניכם אישרו את ההתאמה, הפרטים ייחשפו ותוכלו ליצור קשר.</p>
+        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">2. הצעת התאמה</span> - כשאמצא התאמה פוטנציאלית, הצעה תישלח לכל צד בנפרד בלי לחשוף פרטים של הצד השני.</p>
+        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">3. אישור שני הצדדים</span> - לאחר אישור משני הצדדים, הפרטים ייחשפו ואפשר יהיה ליצור קשר.</p>
         <p style="margin:0;"><span style="color:#ffe27c; font-weight:700;">4. הפגישה בינכם</span> - השאר בידיכם. אני לא נמצאת בדייט ולא רואה את מה קורה ביניכם.</p>
       </div>
     </div>
@@ -517,7 +517,7 @@ export const WOMEN_MATCHMAKING_EMAIL_1: EmailTemplate = {
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, ברוכה הבאה למאגר!\n\nאיך התהליך עובד:\n1. בדיקה אישית של הפרופיל\n2. הצעת התאמה לשני הצדדים\n3. רק אם שניכם אישרו - הפרטים ייחשפו\n4. הפגישה ביניכם\n\nזמן ההמתנה משתנה מאדם לאדם. אין התחייבות למספר התאמות או לתדירות קבועה.\n\nבאהבה,
+  textBody: `{{firstName}}, ברוכה הבאה למאגר!\n\nאיך התהליך עובד:\n1. בדיקה אישית של הפרופיל\n2. הצעת התאמה לשני הצדדים\n3. לאחר אישור משני הצדדים - הפרטים ייחשפו\n4. הפגישה ביניכם\n\nזמן ההמתנה משתנה מאדם לאדם. אין התחייבות למספר התאמות או לתדירות קבועה.\n\nבאהבה,
 הילית כספי
 מאמנת ומשדכת | Relationship Expert & Matchmaker`,
 };
@@ -530,7 +530,7 @@ export const WOMEN_MATCHMAKING_EMAIL_2: EmailTemplate = {
     <p>בינתיים - יש משהו שיכול להגדיל משמעותית את הסיכויים שלך למצוא התאמה טובה:</p>
     <p>✦ ודאי שהפרופיל שלך מלא ומפורט<br>
     ✦ הוסיפי תמונה עדכונית ואמיתית<br>
-    <p>ספרו לי על ערך אחד שחשוב לכם מאוד בבן/בת זוג</p>    <p>פשוט ענה למייל הזה עם הפרטים - אני קוראת הכל.</p>
+    <p>אפשר לשתף אותי בערך אחד שחשוב במיוחד בבן זוג.</p><p>פשוט כתבי לי במייל עם הפרטים - אני קוראת הכול.</p>
     <hr class="divider" />
     <p>ואם יש לך שאלה על התהליך - אני כאן:</p>
     <a href="${WHATSAPP_LINK}" class="secondary-cta">שלחו לי וואטסאפ ←</a>
@@ -570,8 +570,8 @@ export const MEN_MATCHMAKING_EMAIL_1: EmailTemplate = {
       <h3 style="color:#ffe27c; font-size:18px; margin:0 0 16px; text-align:center;">איך מתבצעות ההתאמות?</h3>
       <div style="color:#fff; font-size:15px; line-height:2;">
         <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">1. בדיקה אישית</span> - אני עוברת על הפרופיל שלך אישית ומחפשת התאמה שמרגישה נכון - לא רק על הנייר.</p>
-        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">2. הצעת התאמה</span> - כשאמצא התאמה פוטנציאלית, אשלח לשניכם הצעה בנפרד בלי לחשוף פרטים של הצד השני.</p>
-        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">3. אישור שני הצדדים</span> - רק אם שניכם אישרו את ההתאמה, הפרטים ייחשפו ותוכלו ליצור קשר.</p>
+        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">2. הצעת התאמה</span> - כשאמצא התאמה פוטנציאלית, הצעה תישלח לכל צד בנפרד בלי לחשוף פרטים של הצד השני.</p>
+        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">3. אישור שני הצדדים</span> - לאחר אישור משני הצדדים, הפרטים ייחשפו ואפשר יהיה ליצור קשר.</p>
         <p style="margin:0;"><span style="color:#ffe27c; font-weight:700;">4. הפגישה ביניכם</span> - השאר בידיכם. אני לא נמצאת בדייט ולא רואה את מה קורה ביניכם.</p>
       </div>
     </div>
@@ -583,7 +583,7 @@ export const MEN_MATCHMAKING_EMAIL_1: EmailTemplate = {
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, ברוך הבא למאגר!\n\nאיך התהליך עובד:\n1. בדיקה אישית של הפרופיל\n2. הצעת התאמה לשני הצדדים\n3. רק אם שניכם אישרו - הפרטים ייחשפו\n4. הפגישה ביניכם\n\nזמן ההמתנה משתנה מאדם לאדם. אין התחייבות למספר התאמות או לתדירות קבועה.\n\nהילית`,
+  textBody: `{{firstName}}, ברוך הבא למאגר!\n\nאיך התהליך עובד:\n1. בדיקה אישית של הפרופיל\n2. הצעת התאמה לשני הצדדים\n3. לאחר אישור משני הצדדים - הפרטים ייחשפו\n4. הפגישה ביניכם\n\nזמן ההמתנה משתנה מאדם לאדם. אין התחייבות למספר התאמות או לתדירות קבועה.\n\nהילית`,
 };
 
 export const MEN_MATCHMAKING_EMAIL_2: EmailTemplate = {
@@ -591,7 +591,7 @@ export const MEN_MATCHMAKING_EMAIL_2: EmailTemplate = {
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, עדכון קצר</h2>
     <p>עבר שבוע. השאלון שלך אצלי ואני עובדת עליו.</p>
-    <p>טיפ שיגדיל את הסיכויים שלך: ספרו לי על ערך אחד שחשוב לכם מאוד בבן/בת זוג - פשוט כתבו לי בוואטסאפ.</p>
+    <p>טיפ שיגדיל את הסיכויים שלך: אפשר לשתף אותי בערך אחד שחשוב במיוחד בבת זוג - פשוט כתוב לי בוואטסאפ.</p>
     <p>שאלות? אני כאן:</p>
     <a href="${WHATSAPP_LINK}" class="secondary-cta">שלח לי וואטסאפ ←</a>
     ${emailSignature()}
@@ -626,7 +626,7 @@ export const WOMEN_TRANSFORMATION_EMAIL_1: EmailTemplate = {
     ✦ ליווי עד שאת בזוגיות שמגיעה לך</p>
     <p><strong>₪2,960</strong> (אפשרות ל-3 תשלומים) · כניסה למאגר ב-₪499 במתנה</p>
     <a href="${COACHING_PAGE}" class="cta">♡ אני רוצה להתחיל ←</a>
-    <p>יש שאלות? כתבו לי בוואטסאפ - אני כאן:</p>
+    <p>יש שאלות? כתבי לי בוואטסאפ - אני כאן:</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -643,8 +643,8 @@ export const WOMEN_TRANSFORMATION_EMAIL_2: EmailTemplate = {
     <div class="quote">
       "ישבתי עם ההצעה שלה שלושה ימים. הייתי בספק. בסוף אמרתי לעצמי: אני משקיעה בעצמי. זו ההחלטה הכי טובה שעשיתי." - מיכל, 38
     </div>
-    <p>אני מבינה שזו החלטה לא קטנה. ואני רוצה שתדעו - אני לא עובדת עם כולם. אני עובדת עם מי שמוכן לשינוי אמיתי.</p>
-    <p>אם אתם מרגישים שזה הזמן - אני כאן:</p>
+    <p>אני מבינה שזו החלטה לא קטנה. ואני רוצה שתדעי - אני לא עובדת עם כולם. אני עובדת עם מי שמוכן לשינוי אמיתי.</p>
+    <p>אם את מרגישה שזה הזמן - אני כאן:</p>
     <a href="${WHATSAPP_LINK}" class="cta">שלחו לי וואטסאפ ←</a>
     <hr class="divider" />
     ${emailSignature()}
@@ -661,9 +661,9 @@ export const WOMEN_TRANSFORMATION_EMAIL_3: EmailTemplate = {
     <p>זה המייל האחרון שאני שולחת על הנושא הזה - אני לא רוצה להציק.</p>
     <p>אבל לפני שאסגור את ההצעה - אני רוצה שתדעי:</p>
     <p>האנשים שמגיעים לליווי שלי מגיעים בדרך כלל אחרי שניסו הכל. אחרי שנים של דייטינג, אחרי ספרים ופודקאסטים ועצות מחברים. ואז הם מבינים שצריך מישהי שתלווה אותם אישית.</p>
-    <p>אם אתם מרגישים שזה הזמן - קבעו שיחה נוספת:</p>
+    <p>אם את מרגישה שזה הזמן - קבעי שיחה נוספת:</p>
     <a href="${CALENDLY_15MIN}" class="cta">♡ קביעת שיחה נוספת ←</a>
-    <p>ואם לא - אני מאחלת לכם את כל הטוב. הדרך שלכם לאהבה קיימת - גם בלי הליווי שלי.</p>
+    <p>ואם לא - אני מאחלת לך את כל הטוב. הדרך שלך לאהבה קיימת - גם בלי הליווי שלי.</p>
     <hr class="divider" />
     ${emailSignature()}
   `),
@@ -685,7 +685,7 @@ export const MEN_TRANSFORMATION_EMAIL_1: EmailTemplate = {
     ✦ ליווי עד שאתה בזוגיות שמגיעה לך</p>
     <p><strong>₪2,960</strong> (אפשרות ל-3 תשלומים) · כניסה למאגר ב-₪499 במתנה</p>
     <a href="${COACHING_PAGE}" class="cta">אני רוצה להתחיל ←</a>
-    <p>שאלות? <a href="https://wa.me/972552442334" class="secondary-cta">כתבו לי בוואטסאפ ←</a></p>
+    <p>שאלות? <a href="https://wa.me/972552442334" class="secondary-cta">כתוב לי בוואטסאפ ←</a></p>
     ${emailSignature()}
   `),
   textBody: `{{firstName}}, שמחתי לדבר איתך!\n\nלפרטים על הליווי: ${COACHING_PAGE}\n\nהילית`,
@@ -712,9 +712,9 @@ export const MEN_TRANSFORMATION_EMAIL_3: EmailTemplate = {
     <h2>{{firstName}}, מייל אחרון</h2>
     <p>זה המייל האחרון על הנושא הזה.</p>
     <p>הגברים שמגיעים לליווי שלי מגיעים בדרך כלל אחרי שניסו הכל. ואז הם מבינים שצריך מישהי שתלווה אותם אישית - מישהי שמבינה גם את הצד הנשי.</p>
-    <p>אם אתם מרגישים שזה הזמן:</p>
+    <p>אם אתה מרגיש שזה הזמן:</p>
     <a href="${CALENDLY_15MIN}" class="cta">קביעת שיחה נוספת ←</a>
-    <p>ואם לא - מאחלת לכם את כל הטוב.</p>
+    <p>ואם לא - מאחלת לך את כל הטוב.</p>
     ${emailSignature()}
   `),
   textBody: `{{firstName}}, מייל אחרון.\n\nשיחה נוספת: ${CALENDLY_15MIN}\n\nהילית`,
@@ -729,12 +729,12 @@ export const ABANDONED_GUIDE_EMAIL_1: EmailTemplate = {
     <p>ראיתי שהתחלת את תהליך רכישת המדריך, אבל התשלום לא הושלם.</p>
     <p>אני מבינה. לפעמים צריך רגע לחשוב. אבל רציתי לשאול אותך ישירות:</p>
     <div class="quote">
-      "מה עוצר אותך? לפעמים ההתנגדות הקטנה הזו היא בדיוק הסימן שאת מוכנה לשינוי."
+      "מה עוצר? לפעמים ההתנגדות הקטנה הזו היא בדיוק הסימן שהגיע זמן לשינוי."
     </div>
-    <p>המדריך "לבחור נכון - המדריך המעשי לזוגיות" נכתב בדיוק בשביל הרגע הזה - כשאת יודעת שמשהו צריך להשתנות, אבל לא בטוחה מאיפה להתחיל.</p>
+    <p>המדריך "לבחור נכון - המדריך המעשי לזוגיות" נכתב בדיוק בשביל הרגע הזה - כשהצורך בשינוי ברור, אבל לא ברור מאיפה להתחיל.</p>
     <p>כדי שיהיה לך קל לחזור ולהשלים, הכנתי קוד ייעודי:</p>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
-      <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלכם:</p>
+      <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלך:</p>
       <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
       <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - נוצר במיוחד להשלמת התשלום</p>
     </div>
@@ -773,8 +773,8 @@ export const ABANDONED_GUIDE_EMAIL_3: EmailTemplate = {
     <h2>{{firstName}}, זה המייל האחרון</h2>
     <p>זו התזכורת האחרונה שלי בנושא הזה.</p>
     <p>אבל לפני שאסגור - רציתי לשאול: מה עוצר אותך?</p>
-    <p>אם יש שאלה, ספק, או סתם רציתם לדבר - אני כאן:</p>
-    <a href="${WHATSAPP_LINK}" class="secondary-cta">שלחו לי וואטסאפ ←</a>
+    <p>אם יש שאלה, ספק או רצון לדבר - אני כאן:</p>
+    <a href="${WHATSAPP_LINK}" class="secondary-cta">אפשר לשלוח לי הודעה בוואטסאפ ←</a>
     <p>אם מתאים לך להשלים את התהליך:</p>
     <a href="${GROW_GUIDE}" class="cta">♡ לרכישה עם קוד BACK10 ←</a>
     <hr class="divider" />
@@ -802,7 +802,7 @@ export const ABANDONED_DATABASE_EMAIL_1: EmailTemplate = {
       <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - נוצר במיוחד להשלמת התשלום</p>
     </div>
     ${urgencyBanner()}
-    <a href="${GROW_DATABASE}" class="cta">♡ הצטרפו למאגר עם ההנחה ←</a>
+    <a href="${GROW_DATABASE}" class="cta">♡ הצטרפות למאגר עם ההנחה ←</a>
     <p style="color:#727272; font-size:13px; text-align:center;">₪269 במקום ₪299 · כניסה מיידית</p>
     <hr class="divider" />
     ${emailSignature()}
@@ -857,7 +857,7 @@ export const ABANDONED_COURSE_EMAIL_1: EmailTemplate = {
     </div>
     <p>כדי שיהיה לך קל לחזור ולהשלים, הכנתי קוד ייעודי:</p>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
-      <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלכם:</p>
+      <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלך:</p>
       <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
       <p style="font-size:13px; color:#727272; margin:0;">10% הנחה - נוצר במיוחד להשלמת התשלום</p>
     </div>
@@ -908,10 +908,10 @@ export const ABANDONED_COACHING_EMAIL_1: EmailTemplate = {
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, עמדת לשנות את החיים שלך</h2>
     <p>ביקרת בדף הליווי האישי שלי - ועצרת. ואני מבינה למה.</p>
-    <p>זו לא החלטה קטנה. ₪2,960 זה השקעה. ואני רוצה שתדעי - אני לא עובדת עם כולן. אני עובדת עם מי שמוכנה לשינוי אמיתי.</p>
-    <p>אם יש שאלה, ספק, או סתם רציתם לדבר - שיחה קצרה של 15 דקות יכולה לתת את כל התשובות:</p>
+    <p>זו לא החלטה קטנה. ₪2,960 זו השקעה. אני לא עובדת עם כולם; אני עובדת עם מי שיש בו נכונות לשינוי אמיתי.</p>
+    <p>אם יש שאלה, ספק או רצון לדבר - שיחה קצרה של 15 דקות יכולה לתת את כל התשובות:</p>
     <a href="${CALENDLY_15MIN}" class="cta">♡ קביעת שיחת היכרות חינמית ←</a>
-    <p>ואם אתם מוכנים - יש לכם קופון מיוחד:</p>
+    <p>למי שהגיע הזמן - יש כאן קופון מיוחד:</p>
     <div style="background:#f0eadc; border-radius:12px; padding:20px; text-align:center; margin:20px 0;">
       <p style="font-size:13px; color:#727272; margin:0 0 8px;">קוד הקופון שלך:</p>
       <p style="font-size:28px; font-weight:900; color:#191265; letter-spacing:4px; margin:0 0 8px;">BACK10</p>
@@ -1010,10 +1010,10 @@ export const WOMEN_COURSE_PURCHASE_EMAIL_1: EmailTemplate = {
   subject: "ברוכה הבאה לקורס! ♡ הכל מוכן לך",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, ברוכה הבאה!</h2>
-    <p>כל הכבוד על ההחלט    <p>זה לא קל לעצור ולהגיד: "אני משקיע/ה בעצמי." ועשיתם את זה.</p>
+    <p>כל הכבוד על ההחלטה.</p><p>זה לא קל לעצור ולהגיד: "אני משקיעה בעצמי." ועשית את זה.</p>
     <p>הקורס "המסע" מחכה לך. הכניסה שלך פעילה:</p>
     <a href="{{courseLink}}" class="cta">♡ כניסה לקורס ←</a>
-    <p><strong>טיפ לפני שמתחילים:</strong> עשו את המודול הראשון עוד היום - אפילו 20 דקות. מי שמתחיל ביום הראשון מסיים פי 3 יותר.</p>
+    <p><strong>טיפ לפני שמתחילים:</strong> עשי את המודול הראשון עוד היום - אפילו 20 דקות. מי שמתחיל ביום הראשון מסיים פי 3 יותר.</p>
     <div class="quote">
       "עשיתי את המודול הראשון בפיג'מה, בשעה 11 בלילה. בכיתי. הבנתי דברים שלא הבנתי אחרי שנים." - שירה, 34
     </div>
@@ -1035,7 +1035,7 @@ export const WOMEN_COURSE_PURCHASE_EMAIL_2: EmailTemplate = {
     <div class="quote">
       "המודול השני שבר לי את הראש. הבנתי למה אני מושכת שוב ושוב את אותו טיפוס. מאז - הכל השתנה." - נועה, 31
     </div>
-    <p>אם תקועים - כתבו לי. אני קוראת ועונה אישית:</p>
+    <p>אם נתקעת - כתבי לי. אני קוראת ועונה אישית:</p>
     <a href="${WHATSAPP_LINK}" class="cta">שלחו לי וואטסאפ ←</a>
     <hr class="divider" />
     ${emailSignature()}
@@ -1076,7 +1076,7 @@ export const MEN_COURSE_PURCHASE_EMAIL_2: EmailTemplate = {
     <h2>{{firstName}}, עדכון קצר</h2>
     <p>עברו יומיים. הגעת למודול השני?</p>
     <p>המודול השני הוא המקום שבו הכי הרבה אנשים עוצרים - ובדיוק שם נמצאת הפריצה.</p>
-    <p>תקועים? כתבו לי:</p>
+    <p>אם נתקעת - כתוב לי:</p>
     <a href="${WHATSAPP_LINK}" class="cta">שלח לי וואטסאפ ←</a>
     ${emailSignature()}
   `),
@@ -1135,7 +1135,7 @@ const FREE_GUIDE_EMAIL_1: EmailTemplate = {
     <p>שמחתי שבחרת להוריד אותו. זה לא מקרי שהגעת לכאן.</p>
     <p>לפני כמה שנים עזבתי קריירה מפוארת בהייטק. לא כי נאלצתי - כי הבנתי שמשימת חיי היא להוביל אנשים לאהבה. ראיתי יותר מדי אנשים מוכשרים, מצליחים, שלמים - שנשארים לבד לא בגלל שמשהו בהם שבור, אלא כי אף אחד לא לימד אותם את השפה הנכונה של זוגיות.</p>
     <p>את המדריך הזה כתבתי אחרי מאות שיחות עם לקוחות - סלבריטאים, רופאות, לוחמים, אנשי עסקים. כולם עם אותה תחושה: "ניסיתי הכל. כלום לא עובד."</p>
-    <p>במדריך הזה תמצא/י 4 דפוסים שהמוח עושה בלי שאנחנו שמים לב, ושמעכבים אנשים ממציאת אהבה.</p>
+    <p>המדריך כולל 4 דפוסים שהמוח פועל לפיהם בלי שנשים לב, ושעלולים לעכב מציאת אהבה.</p>
     <a href="https://hilitcaspi.com/api/guide/download" class="cta">פתיחת המדריך החינמי ←</a>
     <div class="quote">"הדבר הכי מפתיע שגיליתי? שרוב האנשים לא חסרים אהבה. הם חסרים את הכלים לזהות אותה כשהיא עומדת מולם."</div>
     <p>ובינתיים, אפשר להצטרף לקבוצת הוואטסאפ השקטה שלי:</p>
@@ -1162,9 +1162,9 @@ const FREE_GUIDE_EMAIL_2: EmailTemplate = {
     <div class="quote">
       "מה שאנשים באמת צריכים זה לא גובה וקריירה. זה מישהו שירגיש אותם, שיראה אותם, שיבין אותם בלי שיצטרך להסביר."
     </div>
-    <p>המדריך שהורדת מסביר את אחד מארבעת הדפוסים האלה. אם עדיין לא קראת/קראתם:</p>
+    <p>המדריך שהורדת מסביר את אחד מארבעת הדפוסים האלה. אם הקריאה במדריך עוד לא הסתיימה:</p>
     <a href="https://hilitcaspi.com/api/guide/download" class="cta">קריאת המדריך החינמי ←</a>
-    <p>ואם רוצים לדעת מה הפרופיל הזוגי שלך, יש שאלון DNA קצר שלוקח 3 דקות:</p>
+    <p>לגילוי הפרופיל הזוגי, יש שאלון DNA קצר שלוקח 3 דקות:</p>
     <a href="https://www.hilitcaspi.com/dna-quiz" class="secondary-cta">שאלון DNA חינמי (3 דקות) ←</a>
     <hr class="divider" />
     ${emailSignature()}
@@ -1191,7 +1191,7 @@ const FREE_GUIDE_EMAIL_3: EmailTemplate = {
       <p style="margin:0 0 8px; font-size:24px; font-weight:900; color:#191265; letter-spacing:3px;">BRAIN99</p>
       <p style="margin:0; font-size:13px; color:#191265;">המחיר יירד ל-₪99 בקופה. בלעדי ולזמן מוגבל.</p>
     </div>
-    <p>או אם רוצים לדבר ישירות, אפשר לקבוע שיחת היכרות חינמית:</p>
+    <p>לשיחה ישירה, אפשר לקבוע שיחת היכרות חינמית:</p>
     <a href="${CALENDLY_15MIN}" class="secondary-cta">שיחת היכרות חינמית (15 דקות) ←</a>
     <hr class="divider" />
     ${emailSignature()}
@@ -1212,16 +1212,16 @@ const SALES_CALL_EMAIL_1: EmailTemplate = {
     </div>
     <p>אין תשובה נכונה או לא נכונה. אני שואלת כי זה עוזר לי להגיע לשיחה שלנו מוכנה, ולתת לך את הכי הרבה ערך בזמן הקצר שיש לנו.</p>
     <p>אפשר לענות על המייל הזה ישירות, או לשלוח לי וואטסאפ:</p>
-    <a href="${WHATSAPP_LINK}?text=שלום+הילית,+הכי+מאתגר+אצלי+כרגע+זה..." class="secondary-cta">שלחי לי וואטסאפ עם התשובה</a>
-    <p style="color:#727272; font-size:14px;">אחזור אלייך בקרוב לתיאום השיחה.</p>
+    <a href="${WHATSAPP_LINK}?text=שלום+הילית,+הכי+מאתגר+אצלי+כרגע+זה..." class="secondary-cta">לשליחת תשובה בוואטסאפ</a>
+    <p style="color:#727272; font-size:14px;">אחזור בקרוב לתיאום השיחה.</p>
     ${emailSignature()}
   `),
-  textBody: `{{firstName}},\n\nקיבלתי את הפנייה שלך ושמחתי.\n\nלפני שנדבר, שאלה אחת: מה לדעתך הכי מאתגר אצלך בדייטינג עכשיו?\n\nאפשר לענות על המייל הזה, או לשלוח וואטסאפ: ${WHATSAPP_LINK}\n\nאחזור אלייך בקרוב.\nהילית`,
+  textBody: `{{firstName}},\n\nקיבלתי את הפנייה שלך ושמחתי.\n\nלפני שנדבר, שאלה אחת: מה לדעתך הכי מאתגר אצלך בדייטינג עכשיו?\n\nאפשר לענות על המייל הזה, או לשלוח וואטסאפ: ${WHATSAPP_LINK}\n\nאחזור בקרוב.\nהילית`,
 };
 
 // מייל 2 (24 שעות): סיפור הצלחה של לקוחה דומה - בונה אמון
 const SALES_CALL_EMAIL_2: EmailTemplate = {
-  subject: "סיפור שחשבתי עלייך כשקראתי אותו",
+  subject: "סיפור שחשבתי עליו כשקראתי אותו",
   htmlBody: baseTemplate(`
     <h2>{{firstName}}, רציתי לשתף אותך במשהו</h2>
     <p>לפני כמה חודשים הגיעה אלי רחל. 41, עורכת דין מצליחה, חכמה, יפה. אחרי 3 שנים של תאריכים שלא הובילו לשום מקום.</p>
@@ -1246,17 +1246,17 @@ const SALES_CALL_EMAIL_3: EmailTemplate = {
   htmlBody: baseTemplate(`
     <h2>{{firstName}},</h2>
     <p>שמרתי לך מקום בלוח הזמנים שלי לשיחת היכרות.</p>
-    <p>אני לא עובדת עם כולם. אני עובדת עם מי שמוכן/ה לשינוי אמיתי, ומי שמוכן/ה להשקיע בעצמו/ה.</p>
-    <p>הפנייה שלך אמרה לי שאת/ה אחד/ת מהאנשים האלה.</p>
+    <p>אני לא עובדת עם כולם. אני עובדת עם מי שיש בו נכונות לשינוי אמיתי ולהשקעה בתהליך.</p>
+    <p>הפנייה שלך אמרה לי שהצעד הזה עשוי להתאים לך.</p>
     <div style="background:#f0eadc; border-radius:16px; padding:28px 32px; margin:24px 0; text-align:center;">
       <p style="font-size:15px; color:#191265; font-weight:700; margin:0 0 8px;">שיחת היכרות אישית עם הילית</p>
       <p style="font-size:14px; color:#555; margin:0 0 20px;">15 דקות. חינמי לגמרי. ללא מחויבות.</p>
       <p style="font-size:13px; color:#727272; margin:0 0 20px;">בשיחה נבין יחד מה עוצר אותך ומה הצעד הנכון עבורך.</p>
       <a href="${CALENDLY_15MIN}&utm_campaign=sales_call_lead" style="display:inline-block; background:#ffe27c; color:#191265; font-weight:700; font-size:16px; padding:14px 32px; border-radius:12px; text-decoration:none;">קביעת השיחה עכשיו</a>
     </div>
-    <p>אם המקום הזה לא יתפס, אני אצטרך לתת אותו למישהו/ת אחר/ת.</p>
+    <p>אם המקום הזה לא יתפס, אצטרך להעביר אותו לממתינים ברשימה.</p>
     <p>אם יש שאלה לפני השיחה, אני כאן:</p>
-    <a href="${WHATSAPP_LINK}" class="secondary-cta">שלחי לי וואטסאפ</a>
+    <a href="${WHATSAPP_LINK}" class="secondary-cta">אפשר לכתוב לי בוואטסאפ</a>
     ${emailSignature()}
   `),
   textBody: `{{firstName}},\n\nשמרתי לך מקום לשיחת היכרות.\n\nקביעת שיחה (15 דקות, חינם): ${CALENDLY_15MIN}&utm_campaign=sales_call_lead\n\nשאלות? וואטסאפ: ${WHATSAPP_LINK}\n\nהילית`,
@@ -1265,19 +1265,19 @@ const SALES_CALL_EMAIL_3: EmailTemplate = {
 // ─── JOURNEY: Meta Lead DNA ───────────────────────────────────────────────────
 const META_LEAD_DNA_EMAIL_1: EmailTemplate = {
   subject: "{{firstName}}, הנה שאלון ה-DNA שביקשת 💛",
-  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, הנה שאלון ה-DNA שלך</h2><p>שמחתי שהתעניינת! שאלון ה-DNA הזוגי שלי לוקח 3 דקות ומגלה את הפרופיל הזוגי שלך.</p><p>אחרי שתסיים, תקבל:</p><p>✦ הפרופיל הזוגי שלך<br>✦ הכוח הזוגי הגדול ביותר שלך<br>✦ האתגר שחוזר ואיך לשבור אותו<br>✦ מי ההתאמה המושלמת עבורך</p><a href="https://www.hilitcaspi.com/dna-quiz" class="cta">התחלת שאלון ה-DNA (3 דקות)</a><div class="quote">"אחרי שאלון ה-DNA הבנתי בדיוק למה כל הקשרים שלי נגמרו אותו דבר. זה שינה הכל." - נועה, 34</div><p>ובינתיים, מוזמנים להצטרף לקבוצת הוואטסאפ השקטה שלי:</p><a href="https://hilitcaspi.com/api/wa/email" class="secondary-cta">הצטרפות לקבוצה השקטה שלי</a><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
+  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, הנה שאלון ה-DNA שלך</h2><p>שמחתי שהתעניינת! שאלון ה-DNA הזוגי שלי לוקח 3 דקות ומגלה את הפרופיל הזוגי שלך.</p><p>בסיום השאלון יופיעו:</p><p>✦ הפרופיל הזוגי שלך<br>✦ הכוח הזוגי הגדול ביותר שלך<br>✦ האתגר שחוזר ואיך לשבור אותו<br>✦ מי ההתאמה המושלמת עבורך</p><a href="https://www.hilitcaspi.com/dna-quiz" class="cta">התחלת שאלון ה-DNA (3 דקות)</a><div class="quote">"אחרי שאלון ה-DNA הבנתי בדיוק למה כל הקשרים שלי נגמרו אותו דבר. זה שינה הכל." - נועה, 34</div><p>ובינתיים, אפשר להצטרף לקבוצת הוואטסאפ השקטה שלי:</p><a href="https://hilitcaspi.com/api/wa/email" class="secondary-cta">הצטרפות לקבוצה השקטה שלי</a><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
   textBody: `{{firstName}}, הנה שאלון ה-DNA שביקשת!\n\nשאלון: https://www.hilitcaspi.com/dna-quiz\nקבוצת וואטסאפ: https://hilitcaspi.com/api/wa/email\n\nהילית`,
 };
 
 const META_LEAD_DNA_EMAIL_2: EmailTemplate = {
   subject: "השלמת את השאלון? הנה מה שמחכה לך",
-  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, הצעד הבא</h2><p>אם כבר עשית את שאלון ה-DNA, כל הכבוד! אם עוד לא, זה לוקח 3 דקות:</p><a href="https://www.hilitcaspi.com/dna-quiz" class="cta">שאלון ה-DNA (3 דקות)</a><p>אחרי שתסיים את השאלון, הצעד הטבעי הבא הוא להיכנס למאגר הרווקים. שם יש 5,000+ רווקים, כולם עברו אבחון DNA, וההתאמות מבוססות על האלגוריתם שלי.</p><div style="background:#f9f6f0;border-radius:12px;padding:20px 24px;margin:20px 0"><p style="font-size:15px;color:#191265;font-weight:700;margin:0 0 8px">כניסה למאגר הרווקים</p><p style="font-size:14px;color:#555;margin:0 0 12px">299 ש"ח. התאמות מבוססות אלגוריתם + אישור אישי שלי.</p><a href="https://hilitcaspi.com/join" style="display:inline-block;background:#191265;color:white;font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none">כניסה למאגר</a></div><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
+  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, הצעד הבא</h2><p>אם כבר עשית את שאלון ה-DNA, כל הכבוד! אם עוד לא, זה לוקח 3 דקות:</p><a href="https://www.hilitcaspi.com/dna-quiz" class="cta">שאלון ה-DNA (3 דקות)</a><p>בסיום השאלון, הצעד הטבעי הבא הוא להיכנס למאגר הרווקים. שם יש 5,000+ רווקים, כולם עברו אבחון DNA, וההתאמות מבוססות על האלגוריתם שלי.</p><div style="background:#f9f6f0;border-radius:12px;padding:20px 24px;margin:20px 0"><p style="font-size:15px;color:#191265;font-weight:700;margin:0 0 8px">כניסה למאגר הרווקים</p><p style="font-size:14px;color:#555;margin:0 0 12px">299 ש"ח. התאמות מבוססות אלגוריתם + אישור אישי שלי.</p><a href="https://hilitcaspi.com/join" style="display:inline-block;background:#191265;color:white;font-size:14px;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none">כניסה למאגר</a></div><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
   textBody: `{{firstName}}, השלמת את השאלון?\n\nשאלון: https://www.hilitcaspi.com/dna-quiz\nמאגר רווקים: https://hilitcaspi.com/join\n\nהילית`,
 };
 
 const META_LEAD_DNA_EMAIL_3: EmailTemplate = {
   subject: "{{firstName}}, קוד קופון מיוחד בשבילך",
-  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, מתנה קטנה ממני</h2><p>עברו כמה ימים מאז שנרשמת. רציתי לוודא שלא מפסידים:</p><div style="background:#191265;border-radius:12px;padding:24px;margin:24px 0;text-align:center"><p style="color:#ffe27c;font-size:14px;font-weight:700;margin:0 0 8px;letter-spacing:1px">קוד הקופון שלך</p><p style="color:#fff;font-size:32px;font-weight:900;margin:0 0 8px;letter-spacing:3px">HILIT10</p><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">10% הנחה על כל המוצרים</p></div><p>הקוד תקף לכל המוצרים:</p><a href="https://hilitcaspi.com/api/guide/download" class="secondary-cta">המדריך החינמי (0 ש"ח)</a><a href="https://hilitcaspi.com/guide" class="secondary-cta">המדריך "לבחור נכון" (299 ש"ח)</a>${urgencyBanner()}
+  htmlBody: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:32px 40px;text-align:center}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:40px;color:#191265;line-height:1.8;font-size:16px;text-align:right;direction:rtl}.body h2{text-align:right}.body p{text-align:right}.cta{display:block;background:#ffe27c;color:#191265!important;font-weight:700;font-size:17px;text-align:center;padding:16px 32px;border-radius:12px;text-decoration:none;margin:28px 0}.secondary-cta{display:block;border:2px solid #191265;color:#191265!important;font-weight:600;font-size:15px;text-align:center;padding:12px 24px;border-radius:12px;text-decoration:none;margin:12px 0}.quote{background:#f0eadc;border-right:4px solid #ffe27c;padding:16px 20px;border-radius:8px;margin:20px 0;font-style:italic;color:#444}.footer{background:#191265;padding:24px 40px;text-align:center}.footer p{color:rgba(255,255,255,.5);font-size:12px;margin:4px 0}.footer a{color:#ffe27c;text-decoration:none}</style></head><body><div class="container"><div class="header"><h1>הילית כספי</h1><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">Relationship Expert &amp; Matchmaker</p></div><div class="body"><h2>{{firstName}}, מתנה קטנה ממני</h2><p>עברו כמה ימים מאז שנרשמת. רציתי לוודא שההטבה לא מתפספסת:</p><div style="background:#191265;border-radius:12px;padding:24px;margin:24px 0;text-align:center"><p style="color:#ffe27c;font-size:14px;font-weight:700;margin:0 0 8px;letter-spacing:1px">קוד הקופון שלך</p><p style="color:#fff;font-size:32px;font-weight:900;margin:0 0 8px;letter-spacing:3px">HILIT10</p><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0">10% הנחה על כל המוצרים</p></div><p>הקוד תקף לכל המוצרים:</p><a href="https://hilitcaspi.com/api/guide/download" class="secondary-cta">המדריך החינמי (0 ש"ח)</a><a href="https://hilitcaspi.com/guide" class="secondary-cta">המדריך "לבחור נכון" (299 ש"ח)</a>${urgencyBanner()}
 <a href="https://hilitcaspi.com/join" class="cta">כניסה למאגר הרווקים (499 ש"ח)</a><a href="https://hilitcaspi.com/single-session" class="secondary-cta">שיחת התאמה חינמית</a><hr style="border:none;border-top:1px solid #f0eadc;margin:24px 0"/><p style="font-size:14px;color:#444">באהבה,<br><strong>הילית כספי</strong></p></div><div class="footer"><p>הילית כספי | Relationship Expert &amp; Matchmaker</p><p style="font-size:11px"><a href="https://hilitcaspi.com/unsubscribe?email={{recipientEmail}}" style="color:rgba(255,255,255,.4)">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
   textBody: `{{firstName}}, קוד קופון מיוחד: HILIT10 (10% הנחה)\n\nמאגר: https://hilitcaspi.com/join\nמדריך: https://hilitcaspi.com/guide\nשיחה: https://hilitcaspi.com/single-session\n\nהילית`,
 };
@@ -1382,7 +1382,6 @@ export function buildMatchProposalEmail(params: {
 }): EmailTemplate {
   const matchPhotoUrl = toEmailImageUrl(params.matchPhotoUrl);
   const isFemale = params.recipientGender === "female";
-  const isMale = params.recipientGender === "male";
   const isBoost = params.proposalSource === "boost";
   const isBoostSender = isBoost && params.boostRole === "sender";
   const dnaLabel = params.matchDnaType
@@ -1404,7 +1403,7 @@ export function buildMatchProposalEmail(params: {
   const kidsLine = kidsStatus
     ? `<p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">👶 ${kidsStatus}${params.matchWantsKids ? ` · ${wantsKidsLabel[params.matchWantsKids] || params.matchWantsKids}` : ""}</p>`
     : "";
-  const religiosityLabels: Record<string, string> = { secular: "חילוני/ת", traditional: "מסורתי/ת", religious: "דתי/ה", orthodox: "חרדי/ת" };
+  const religiosityLabels: Record<string, string> = { secular: "חילוני או חילונית", traditional: "מסורתי או מסורתית", religious: "דתי או דתייה", orthodox: "חרדי או חרדית" };
   const religiosityLine = params.matchReligiosity
     ? `<p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">✡️ ${religiosityLabels[params.matchReligiosity] || params.matchReligiosity}</p>`
     : "";
@@ -1417,17 +1416,17 @@ export function buildMatchProposalEmail(params: {
 
     ${isBoost ? `
     <div style="background:#f3ecff; border:2px solid #8b65c9; border-radius:14px; padding:18px 22px; margin-bottom:20px; text-align:center;">
-      <p style="font-size:17px; color:#4f287e; font-weight:900; margin:0 0 6px;">⚡ ${isBoostSender ? "זו בקשת ה־Boost שבחרת לשלוח" : "זו התאמה שהגיעה אליך דרך שירות Boost"}</p>
+      <p style="font-size:17px; color:#4f287e; font-weight:900; margin:0 0 6px;">⚡ ${isBoostSender ? "זו בקשת ה־Boost שבחרת לשלוח" : "זו התאמה שהגיעה עבורך דרך שירות Boost"}</p>
       <p style="font-size:13px; color:#5f4a73; line-height:1.7; margin:0;">${isBoostSender ? "ההצעה נשלחה לשני הצדדים, וגם האישור שלך נדרש כעת." : "ההצעה נשלחה במסגרת Boost על ידי חבר או חברת המאגר, ולא נבחרה ונשלחה אישית על ידי הילית."}</p>
     </div>` : ""}
 
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה ומחכה לאישור שלך" : "נשלחה אליך התאמת Boost שמחכה לאישור שלך") : "יש לך הצעה"}, ${params.firstName} 💛</h2>
+    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה ומחכה לאישור שלך" : "נשלחה עבורך התאמת Boost שמחכה לאישור שלך") : "יש לך הצעה"}, ${params.firstName} 💛</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
       ${isBoost
         ? (isBoostSender
           ? `בקשת ה־Boost שלך נשלחה לשני הצדדים. היא נוצרה על בסיס אלגוריתם ההתאמה והנתונים שמילאו שני הצדדים. <strong>התשלום ושליחת ה־Boost אינם אישור להתאמה. גם האישור שלך עדיין נדרש במייל.</strong> ההצעה לא נבחרה או נבדקה אישית על ידי הילית.`
-          : `נשלחה אליך התאמה במסגרת מסלול Boost. היא נוצרה על בסיס אלגוריתם ההתאמה והנתונים שמילאו שני הצדדים. <strong>ההתאמה ממתינה לאישור שלך במייל.</strong> ההצעה לא נבחרה או נבדקה אישית על ידי הילית.`)
-        : `מצאתי עבורך התאמה שחשבתי עליה הרבה לפני שהחלטתי לשלוח אותה ${isFemale ? "אלייך" : "אליך"}. לא כל ההצעות מגיעות ${isFemale ? "אלייך" : "אליך"}, רק אלו שאני מאמינה בהן.`}
+          : `נשלחה עבורך התאמה במסגרת מסלול Boost. היא נוצרה על בסיס אלגוריתם ההתאמה והנתונים שמילאו שני הצדדים. <strong>ההתאמה ממתינה לאישור שלך במייל.</strong> ההצעה לא נבחרה או נבדקה אישית על ידי הילית.`)
+        : `מצאתי עבורך התאמה שחשבתי עליה הרבה לפני שהחלטתי לשלוח אותה. לא כל ההצעות נשלחות, רק אלו שאני מאמינה בהן.`}
     </p>
 
     <!-- Compatibility score badge -->
@@ -1478,7 +1477,7 @@ export function buildMatchProposalEmail(params: {
     </div>`}
 
     <p style="color:#444; font-size:15px; line-height:1.8; margin:20px 0;">
-      ${isBoost ? "אם ההצעה מעניינת, אפשר ללחוץ על \"כן, מעניין אותי\". גם מי ששלח את ה־Boost נדרש לאשר בנפרד." : `אם ההצעה מעניינת ${isFemale ? "אותך" : "אותך"}, ${isFemale ? "לחצי" : "לחץ"} על "כן, מעניין אותי".`}
+      ${isBoost ? "אם ההצעה מעניינת, אפשר ללחוץ על \"כן, מעניין אותי\". גם מי ששלח את ה־Boost נדרש לאשר בנפרד." : `אם ההצעה מעניינת, אפשר ללחוץ על "כן, מעניין אותי".`}
       אם שני הצדדים מאשרים, פרטי יצירת הקשר נשלחים לשניהם.
       <br><br>
       <strong>אין מחויבות. אין לחץ. רק הזדמנות.</strong>
@@ -1503,10 +1502,10 @@ export function buildMatchProposalEmail(params: {
     subject: isBoost
       ? (isBoostSender
         ? `⚡ בקשת ה־Boost שלך נשלחה ומחכה לאישור · ${params.compatibilityScore}%`
-        : `⚡ נשלחה אליך התאמת Boost לאישור · ${params.compatibilityScore}%`)
+        : `⚡ התאמת Boost מחכה לאישור · ${params.compatibilityScore}%`)
       : `💛 יש לך התאמה שמחכה לך! ${params.compatibilityScore}%`,
     htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\n${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה לשני הצדדים. התשלום והשליחה אינם אישור להתאמה, וגם האישור שלך עדיין נדרש במייל" : "נשלחה אליך התאמה במסגרת מסלול Boost והיא ממתינה לאישור שלך במייל") : "יש לך הצעת התאמה חדשה"}. ${isBoost ? "ההצעה נוצרה על ידי האלגוריתם ולא נבחרה או נבדקה אישית על ידי הילית." : ""}\n\nאחוז התאמה: ${params.compatibilityScore}%\nהתאמה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}\n\nלאישור: ${params.yesUrl}\nלדחייה: ${params.noUrl}\n\nצוות הילית כספי`,
+    textBody: `שלום ${params.firstName},\n\n${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה לשני הצדדים. התשלום והשליחה אינם אישור להתאמה, וגם האישור שלך עדיין נדרש במייל" : "נשלחה עבורך התאמה במסגרת מסלול Boost והיא ממתינה לאישור שלך במייל") : "יש לך הצעת התאמה חדשה"}. ${isBoost ? "ההצעה נוצרה על ידי האלגוריתם ולא נבחרה או נבדקה אישית על ידי הילית." : ""}\n\nאחוז התאמה: ${params.compatibilityScore}%\nהתאמה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}\n\nלאישור: ${params.yesUrl}\nלדחייה: ${params.noUrl}\n\nצוות הילית כספי`,
   };
 }
 
@@ -1543,7 +1542,7 @@ export function buildContactRevealEmail(params: {
     </div>` : "";
 
   const content = `
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? "התאמת ה־Boost אושרה" : "זה קרה! שניכם אמרתם כן"} 💛</h2>
+    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? "התאמת ה־Boost אושרה" : "זה קרה! יש אישור משני הצדדים"} 💛</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
       ${params.firstName}, אני שמחה לשתף אותך   גם הצד השני מעוניין.
       הנה הפרטים המלאים של ההתאמה שלך:
@@ -1595,7 +1594,7 @@ export function buildContactRevealEmail(params: {
     </p>
 
     <a href="${WHATSAPP_LINK}" style="display:block; background:#25D366; color:#fff !important; font-weight:700; font-size:16px; text-align:center; padding:14px 28px; border-radius:12px; text-decoration:none; margin:16px 0;">
-      💬 שלחי לי הודעה בוואטסאפ
+      💬 שליחת הודעה בוואטסאפ
     </a>
 
     <div style="background:#f5f5f5; border-radius:8px; padding:16px 20px; margin:16px 0;">
@@ -1611,9 +1610,9 @@ export function buildContactRevealEmail(params: {
   return {
     subject: isBoost
       ? `התאמת ה־Boost אושרה! הנה הפרטים של ${params.matchFirstName} 💛`
-      : `שניכם אמרתם כן! הנה הפרטים של ${params.matchFirstName} 💛`,
+      : `יש אישור משני הצדדים! הנה הפרטים של ${params.matchFirstName} 💛`,
     htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\n${isBoost ? "התאמת ה־Boost אושרה" : "שניכם אמרתם כן"}!\n\nשם: ${params.matchFirstName}${params.matchLastName ? " " + params.matchLastName : ""}\nטלפון: ${params.matchPhone}\nמייל: ${params.matchEmail}\n\nכניסה לאזור האישי: ${params.dashboardUrl}\n${params.feedbackUrl ? `\nאשמח לשמוע על החוויה שלך. השיתוף שלך יכול לעזור לעוד אנשים שמחפשים אהבה. בסיום מחכה לך מתנה אישית ממני: ${params.feedbackUrl}\n` : ""}\nטיפ לפני הפגישה: ${params.preDateTip}\n\nהילית כספי`,
+    textBody: `שלום ${params.firstName},\n\n${isBoost ? "התאמת ה־Boost אושרה" : "יש אישור משני הצדדים"}!\n\nשם: ${params.matchFirstName}${params.matchLastName ? " " + params.matchLastName : ""}\nטלפון: ${params.matchPhone}\nמייל: ${params.matchEmail}\n\nכניסה לאזור האישי: ${params.dashboardUrl}\n${params.feedbackUrl ? `\nאשמח לשמוע על החוויה שלך. השיתוף שלך יכול לעזור לעוד אנשים שמחפשים אהבה. בסיום מחכה לך מתנה אישית ממני: ${params.feedbackUrl}\n` : ""}\nטיפ לפני הפגישה: ${params.preDateTip}\n\nהילית כספי`,
   };
 }
 
@@ -1631,10 +1630,10 @@ export function buildMatchRejectionAckEmail(params: {
       תודה שענית   זה עוזר לי להבין מה מתאים לך יותר.
     </p>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      אני ממשיכה לחפש עבורך. כשתהיה התאמה שאני מאמינה בה, אשלח אלייך.
+      אני ממשיכה לחפש עבורך. כשתימצא התאמה שאני מאמינה בה, תישלח הצעה חדשה.
     </p>
     <div class="quote">
-      "ההתאמה הנכונה לא תמיד מגיעה ראשונה   אבל כשהיא מגיעה, תרגישי את זה."
+      "ההתאמה הנכונה לא תמיד מגיעה ראשונה, אבל כשהיא מגיעה — זה מורגש."
     </div>
     ${emailSignature()}
   `;
@@ -1733,19 +1732,19 @@ export function buildConsolationEmail(params: {
   const content = `
     <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">הילית כאן 🤍</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      ${params.firstName} היקר/ה,
+      ${params.firstName},
     </p>
     <p style="color:#444; font-size:16px; line-height:1.8;">
       הפעם ההתאמה עם ${params.matchFirstName ? `<strong>${params.matchFirstName}</strong>` : 'הצד השני'} לא המשיכה הלאה — וזה בסדר גמור. זה חלק מהתהליך.
     </p>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      העובדה שפתחת את הלב ואמרת "כן" מראה שאת/ה מוכנ/ה לאהבה. זה הדבר הכי חשוב.
+      העובדה שניתן אישור להצעה מראה על נכונות לאהבה. זה הדבר הכי חשוב.
     </p>
     <div style="background:#f0eadc; border-right:4px solid #ffe27c; padding:16px 20px; border-radius:8px; margin:20px 0; font-style:italic; color:#444;">
       "כל 'לא' מקרב אותך ל'כן' הנכון. אני כאן, ממשיכה לחפש עבורך."
     </div>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      אני ממשיכה לעבוד עבורך: כשתהיה התאמה שאני מאמינה בה, תשמעו ממני.
+      אני ממשיכה לעבוד עבורך: כשתהיה התאמה שאני מאמינה בה, תישלח הודעה חדשה.
     </p>
     <hr style="border:none; border-top:1px solid #f0eadc; margin:24px 0;" />
     <p style="font-size:14px; color:#444;">באהבה,<br><strong>הילית כספי</strong><br>מאמנת ומשדכת | Relationship Expert &amp; Matchmaker</p>
@@ -1855,7 +1854,7 @@ export const WOMEN_V2_EMAIL_4: EmailTemplate = {
     <div class="quote">
       "עזבתי קריירה מפוארת בהייטק כי הבנתי שהעבודה האמיתית שלי היא להוביל אנשים לאהבה. זו לא קריירה - זו משימת חיים."
     </div>
-    <p>איזו מהשתיים אליך עכשיו?</p>
+    <p>איזו מהשתיים מתאימה לך עכשיו?</p>
     <a href="${CALENDLY_15MIN}" class="secondary-cta">שיחת ייעוץ אישית עם הילית ←</a>
     <p style="color:#727272; font-size:13px; text-align:center;">שיחה של 60 דקות | ניתוח הפרופיל שלך | תוכנית פעולה אישית</p>
     <p>או אם את מוכנה להצטרף למאגר ישיר:</p>
@@ -1880,10 +1879,10 @@ export const WOMEN_V2_EMAIL_5: EmailTemplate = {
     <div class="quote">
       "המדריך 'לבחור נכון' שכתבתי עוסק בדיוק בזה: איך מפסיקים לבחור לפי מה שהמוח חושב שהוא רוצה, ומתחילים לבחור לפי מה שבאמת ישמח אותנו."
     </div>
-    <p>{{firstName}}, אם זה מדבר אליך, המדריך מחכה לך:</p>
+    <p>{{firstName}}, אם זה מדבר אלייך, המדריך מחכה לך:</p>
     <a href="https://hilitcaspi.com/guide" class="secondary-cta">מדריך 'לבחור נכון' - ₪149 ←</a>
     <p style="color:#727272; font-size:13px; text-align:center;">כלים מעשיים. תרגילים. שיטה שעובדת.</p>
-    <p>ואם כבר יודעים מה מחפשים ומוכנים לצעד הבא, המאגר פתוח:</p>
+    <p>ואם כבר ברור לך מה את מחפשת ומוכנה לצעד הבא, המאגר פתוח:</p>
     <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר - ₪299 ←</a>
     <p style="color:#727272; font-size:13px; text-align:center;">מחיר מקורי ₪499 | מחיר מועדף ₪299 | ללא דמי מנוי</p>
     <hr class="divider" />
@@ -2061,7 +2060,7 @@ export const MEN_V2_EMAIL_6: EmailTemplate = {
     <p>זה אומר שתצטרף ב-<strong>₪269 בלבד</strong> (במקום ₪499 המחיר המקורי).</p>
     <a href="${MATCHMAKING_JOIN}" class="cta">הצטרפות למאגר עם קוד LOVE10 ←</a>
     <p style="color:#727272; font-size:13px; text-align:center;">הקוד תקף ל-48 שעות</p>
-    <p>ואם יש לך שאלות לפני שמחליט, אתה מוזמן לכתוב לי ישירות בוואטסאפ:</p>
+    <p>ואם יש לך שאלות לפני ההחלטה, אפשר לכתוב לי ישירות בוואטסאפ:</p>
     <a href="${WHATSAPP_LINK}" class="secondary-cta">שאלה בוואטסאפ ←</a>
     <hr class="divider" />
     ${emailSignature()}
@@ -2085,8 +2084,8 @@ const WOMEN_MATCHMAKING_WELCOME_EMAIL_1: EmailTemplate = {
       <h3 style="color:#ffe27c; font-size:18px; margin:0 0 16px; text-align:center;">איך מתבצעות ההתאמות?</h3>
       <div style="color:#fff; font-size:15px; line-height:2;">
         <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">1. בדיקה אישית</span> אני עוברת על הפרופיל שלך אישית ומחפשת התאמה שמרגישה נכון, לא רק על הנייר.</p>
-        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">2. הצעת התאמה</span> כשאמצא התאמה פוטנציאלית, אשלח לשניכם הצעה בנפרד בלי לחשוף פרטים של הצד השני.</p>
-        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">3. אישור שני הצדדים</span> רק אם שניכם אישרו את ההתאמה, הפרטים ייחשפו ותוכלו ליצור קשר.</p>
+        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">2. הצעת התאמה</span> כשאמצא התאמה פוטנציאלית, הצעה תישלח לכל צד בנפרד בלי לחשוף פרטים של הצד השני.</p>
+        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">3. אישור שני הצדדים</span> לאחר אישור משני הצדדים, הפרטים ייחשפו ואפשר יהיה ליצור קשר.</p>
         <p style="margin:0;"><span style="color:#ffe27c; font-weight:700;">4. הפגישה ביניכם</span> השאר בידיכם. אני לא נמצאת בדייט ולא רואה את מה קורה ביניכם.</p>
       </div>
     </div>
@@ -2101,7 +2100,7 @@ const WOMEN_MATCHMAKING_WELCOME_EMAIL_1: EmailTemplate = {
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, ברוכה הבאה למאגר!\n\nאיך התהליך עובד:\n1. בדיקה אישית של הפרופיל\n2. הצעת התאמה לשני הצדדים\n3. רק אם שניכם אישרו - הפרטים ייחשפו\n4. הפגישה ביניכם\n\nחשוב לדעת: דמי ההצטרפות הם עבור הכניסה למאגר ותהליך ההתאמה המקצועי. אין התחייבות למספר התאמות או לתדירות קבועה. התאמה נשלחת רק כשנמצאת התאמה הדדית ורלוונטית. זמן ההמתנה משתנה מאדם לאדם.\n\nבאהבה,\nהילית כספי\nמאמנת ומשדכת | Relationship Expert & Matchmaker`,
+  textBody: `{{firstName}}, ברוכה הבאה למאגר!\n\nאיך התהליך עובד:\n1. בדיקה אישית של הפרופיל\n2. הצעת התאמה לשני הצדדים\n3. לאחר אישור משני הצדדים - הפרטים ייחשפו\n4. הפגישה ביניכם\n\nחשוב לדעת: דמי ההצטרפות הם עבור הכניסה למאגר ותהליך ההתאמה המקצועי. אין התחייבות למספר התאמות או לתדירות קבועה. התאמה נשלחת רק כשנמצאת התאמה הדדית ורלוונטית. זמן ההמתנה משתנה מאדם לאדם.\n\nבאהבה,\nהילית כספי\nמאמנת ומשדכת | Relationship Expert & Matchmaker`,
 };
 
 const WOMEN_MATCHMAKING_WELCOME_EMAIL_2: EmailTemplate = {
@@ -2115,14 +2114,14 @@ const WOMEN_MATCHMAKING_WELCOME_EMAIL_2: EmailTemplate = {
       <p style="margin:0 0 16px;"><span style="color:#191265; font-weight:700; font-size:17px;">2. תמונה אמיתית ועדכונית</span><br/>
       <span style="color:#555; font-size:15px;">לא צריך תמונת סטודיו. תמונה טבעית שמראה את האנרגיה שלך - שווה יותר מכל תמונה מושלמת.</span></p>
       <p style="margin:0;"><span style="color:#191265; font-weight:700; font-size:17px;">3. ספרי לי ערך אחד שחשוב לך</span><br/>
-      <span style="color:#555; font-size:15px;">פשוט ענה למייל הזה עם ערך אחד שחשוב לך בבן זוג. זה עוזר לי לחפש עבורך בצורה מדויקת יותר.</span></p>
+      <span style="color:#555; font-size:15px;">פשוט כתבי לי במייל עם ערך אחד שחשוב לך בבן זוג. זה עוזר לי לחפש עבורך בצורה מדויקת יותר.</span></p>
     </div>
     <p>שאלות? אני כאן:</p>
     <a href="${WHATSAPP_LINK}" class="secondary-cta">שלחי לי וואטסאפ ←</a>
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, 3 טיפים שמגדילים סיכויים:\n\n1. תהיי ספציפית בתיאור שלך\n2. תמונה אמיתית ועדכונית\n3. ספרי לי ערך אחד שחשוב לך (ענה למייל הזה)\n\nשאלות? ${WHATSAPP_LINK}\n\nבאהבה,\nהילית כספי`,
+  textBody: `{{firstName}}, 3 טיפים שמגדילים סיכויים:\n\n1. תהיי ספציפית בתיאור שלך\n2. תמונה אמיתית ועדכונית\n3. ספרי לי ערך אחד שחשוב לך (כתבי לי במייל)\n\nשאלות? ${WHATSAPP_LINK}\n\nבאהבה,\nהילית כספי`,
 };
 
 const WOMEN_MATCHMAKING_WELCOME_EMAIL_3: EmailTemplate = {
@@ -2162,8 +2161,8 @@ const MEN_MATCHMAKING_WELCOME_EMAIL_1: EmailTemplate = {
       <h3 style="color:#ffe27c; font-size:18px; margin:0 0 16px; text-align:center;">איך מתבצעות ההתאמות?</h3>
       <div style="color:#fff; font-size:15px; line-height:2;">
         <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">1. בדיקה אישית</span> אני עוברת על הפרופיל שלך אישית ומחפשת התאמה שמרגישה נכון, לא רק על הנייר.</p>
-        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">2. הצעת התאמה</span> כשאמצא התאמה פוטנציאלית, אשלח לשניכם הצעה בנפרד בלי לחשוף פרטים של הצד השני.</p>
-        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">3. אישור שני הצדדים</span> רק אם שניכם אישרו את ההתאמה, הפרטים ייחשפו ותוכלו ליצור קשר.</p>
+        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">2. הצעת התאמה</span> כשאמצא התאמה פוטנציאלית, הצעה תישלח לכל צד בנפרד בלי לחשוף פרטים של הצד השני.</p>
+        <p style="margin:0 0 10px;"><span style="color:#ffe27c; font-weight:700;">3. אישור שני הצדדים</span> לאחר אישור משני הצדדים, הפרטים ייחשפו ואפשר יהיה ליצור קשר.</p>
         <p style="margin:0;"><span style="color:#ffe27c; font-weight:700;">4. הפגישה ביניכם</span> השאר בידיכם. אני לא נמצאת בדייט ולא רואה את מה קורה ביניכם.</p>
       </div>
     </div>
@@ -2178,7 +2177,7 @@ const MEN_MATCHMAKING_WELCOME_EMAIL_1: EmailTemplate = {
     <hr class="divider" />
     ${emailSignature()}
   `),
-  textBody: `{{firstName}}, ברוך הבא למאגר!\n\nאיך התהליך עובד:\n1. בדיקה אישית של הפרופיל\n2. הצעת התאמה לשני הצדדים\n3. רק אם שניכם אישרו - הפרטים ייחשפו\n4. הפגישה ביניכם\n\nחשוב לדעת: דמי ההצטרפות הם עבור הכניסה למאגר ותהליך ההתאמה המקצועי. אין התחייבות למספר התאמות או לתדירות קבועה. התאמה נשלחת רק כשנמצאת התאמה הדדית ורלוונטית. זמן ההמתנה משתנה מאדם לאדם.\n\nבאהבה,\nהילית כספי\nמאמנת ומשדכת | Relationship Expert & Matchmaker`,
+  textBody: `{{firstName}}, ברוך הבא למאגר!\n\nאיך התהליך עובד:\n1. בדיקה אישית של הפרופיל\n2. הצעת התאמה לשני הצדדים\n3. לאחר אישור משני הצדדים - הפרטים ייחשפו\n4. הפגישה ביניכם\n\nחשוב לדעת: דמי ההצטרפות הם עבור הכניסה למאגר ותהליך ההתאמה המקצועי. אין התחייבות למספר התאמות או לתדירות קבועה. התאמה נשלחת רק כשנמצאת התאמה הדדית ורלוונטית. זמן ההמתנה משתנה מאדם לאדם.\n\nבאהבה,\nהילית כספי\nמאמנת ומשדכת | Relationship Expert & Matchmaker`,
 };
 
 const MEN_MATCHMAKING_WELCOME_EMAIL_2: EmailTemplate = {
@@ -2250,21 +2249,15 @@ export function buildMatchFollowUpEmail(params: {
   gender?: string;
   proposalSource?: "regular" | "boost";
 }): EmailTemplate {
-  const isMale = params.gender === 'male';
   const isBoost = params.proposalSource === "boost";
-  // Gender-specific text
-  const feelText = isMale ? 'מרגיש לגביה' : 'מרגישה לגביו';
-  const sawText = isMale ? 'לא ראית את המייל' : 'לא ראית את המייל';
-  const spokeText = isMale ? 'לא דיבר אליך' : 'לא דיבר אליך';
-  const respondedText = isMale ? 'שלא הגבת עדיין' : 'שלא הגבת עדיין';
   const content = `
     <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? "התאמת ה־Boost עדיין ממתינה לאישור שלך" : "שבוע עבר"}, ${params.firstName} 💛</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      ${isBoost ? "לפני כמה ימים נשלחה אליך במסגרת מסלול Boost התאמה עם" : "לפני שבוע שלחתי לך הצעה:"} ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}.
+      ${isBoost ? "לפני כמה ימים נשלחה עבורך במסגרת מסלול Boost התאמה עם" : "לפני שבוע נשלחה עבורך הצעה עם"} ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}.
     </p>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      רציתי לבדוק איך אתה ${feelText}.
-      לפעמים הצעה מגיעה ברגע לא נכון, לפעמים משהו בפרופיל ${spokeText}, ולפעמים פשוט ${sawText}.
+      רציתי לבדוק מה התחושה לגבי ההתאמה.
+      לפעמים הצעה מגיעה ברגע לא נכון, לפעמים משהו בפרופיל לא מדבר, ולפעמים המייל פשוט לא נראה.
     </p>
     <p style="color:#444; font-size:16px; line-height:1.8;">
       <strong>הכפתורים עדיין פעילים:</strong>
@@ -2278,7 +2271,7 @@ export function buildMatchFollowUpEmail(params: {
     <div style="background:#f9f6f0; border-radius:14px; padding:24px 28px; margin:28px 0;">
       <p style="font-size:14px; color:#191265; font-weight:700; margin:0 0 12px;">שאלה אחת קצרה (לא חובה)</p>
       <p style="font-size:15px; color:#444; line-height:1.8; margin:0 0 16px;">
-        מה הסיבה העיקרית ${respondedText}?
+        מה הסיבה העיקרית לכך שעדיין לא נשלחה תגובה?
         התשובה שלך עוזרת לשפר את ההתאמות שיוצגו לך בעתיד.
       </p>
       <a href="${params.feedbackUrl}&reason=timing" style="display:block; border:1.5px solid #ddd; color:#444 !important; font-size:14px; text-align:center; padding:10px 20px; border-radius:10px; text-decoration:none; background:#fff; margin-bottom:8px;">
@@ -2302,7 +2295,7 @@ export function buildMatchFollowUpEmail(params: {
   return {
     subject: `${params.firstName}, ${isBoost ? "התאמת ה־Boost" : "ההצעה"} עדיין ממתינה לך 💛`,
     htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\n${isBoost ? "נשלחה אליך במסגרת מסלול Boost התאמה עם" : "לפני שבוע נשלחה אליך הצעה:"} ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}.\n\nהכפתורים עדיין פעילים:\nכן: ${params.yesUrl}\nלא: ${params.noUrl}\n\nצוות הילית כספי`,
+    textBody: `שלום ${params.firstName},\n\n${isBoost ? "נשלחה עבורך במסגרת מסלול Boost התאמה עם" : "לפני שבוע נשלחה עבורך הצעה עם"} ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}.\n\nהכפתורים עדיין פעילים:\nכן: ${params.yesUrl}\nלא: ${params.noUrl}\n\nצוות הילית כספי`,
   };
 }
 

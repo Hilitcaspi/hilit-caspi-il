@@ -55,7 +55,7 @@ export function buildDatabase90DayEmail(
     const url = questionnaireUrl(single);
     return {
       subject: `${firstName}, נשארו כמה פרטים כדי שנוכל להתאים לך נכון`,
-      htmlBody: frame(`<h2 style="font-size:24px">${firstName}, הפרופיל עדיין לא מלא</h2><p>כדי שנוכל לבדוק התאמות באופן רציני והדדי, חסרים כרגע: <strong>${missingText}</strong>.</p><p>פרופיל מלא עוזר לנו להבין לא רק מי מתאים לך, אלא גם למי את/ה מתאים/ה.</p>${cta(url, "השלמת הפרטים והשאלון")}<p style="font-size:13px;color:#777">התשלום אינו התחייבות למספר התאמות או לתדירות קבועה. התאמה נשלחת כאשר נמצאת התאמה הדדית ורלוונטית.</p>`),
+      htmlBody: frame(`<h2 style="font-size:24px">${firstName}, הפרופיל עדיין לא מלא</h2><p>כדי שנוכל לבדוק התאמות באופן רציני והדדי, חסרים כרגע: <strong>${missingText}</strong>.</p><p>פרופיל מלא עוזר לנו להבין מה מתאים לך ולבדוק שההתאמה מתאימה לשני הצדדים.</p>${cta(url, "השלמת הפרטים והשאלון")}<p style="font-size:13px;color:#777">התשלום אינו התחייבות למספר התאמות או לתדירות קבועה. התאמה נשלחת כאשר נמצאת התאמה הדדית ורלוונטית.</p>`),
       textBody: `${firstName}, חסרים בפרופיל: ${missingText}. להשלמה: ${url}`,
     };
   }

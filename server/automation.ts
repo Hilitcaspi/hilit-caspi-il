@@ -19,6 +19,7 @@ import { buildMatchFollowUpSmsMessage } from "./matchSms";
 import { EMAIL_SEQUENCES, renderTemplate, getDnaEmailVars, type JourneyKey, buildMatchFollowUpEmail } from "./emailTemplates";
 import crypto from "crypto";
 import { isEmailMarketingSuppressed } from "./emailUnsubscribe";
+import { alignJourneyGender, journeyRecipientGender, loadEmailRecipientGenders, queuedEmailGenderBlockReason, resolveEmailRecipientGender, validEmailGender } from "./emailRecipientGender";
 
 const SITE_BASE = "https://hilitcaspi.com";
 const OPERATIONAL_FIRST_EMAIL_JOURNEYS = new Set<JourneyKey>([
@@ -137,7 +138,7 @@ export async function startJourney({
   firstName: string;
   lastName?: string;
   phone?: string;
-  gender: "female" | "male";
+  gender?: "female" | "male" | null;
   dnaType?: string;
   journeyKey: JourneyKey;
   leadId?: number;
@@ -146,15 +147,21 @@ export async function startJourney({
   paymentAttemptProduct?: string;
   sendFirstImmediately?: boolean;
 }): Promise<void> {
-  const sequence = EMAIL_SEQUENCES[journeyKey];
-  if (!sequence) {
-    console.error(`[Automation] Unknown journey key: ${journeyKey}`);
-    return;
-  }
-
   const db = await getDb();
   if (!db) {
     console.error("[Automation] Database not available");
+    return;
+  }
+
+  // Resolve from the recipient, not from a default or the other party's gender.
+  if (!journeyKey.startsWith("en_")) {
+    const genderResolution = await resolveEmailRecipientGender(db, email, gender);
+    gender = genderResolution.gender;
+    journeyKey = alignJourneyGender(journeyKey, gender) as JourneyKey;
+  }
+  const sequence = EMAIL_SEQUENCES[journeyKey];
+  if (!sequence) {
+    console.error(`[Automation] Unknown journey key: ${journeyKey}`);
     return;
   }
 
@@ -263,7 +270,7 @@ export async function startJourney({
       phone,
       attributes: {
         DNA_TYPE: dnaType ?? "",
-        GENDER: gender,
+        ...(gender ? { GENDER: gender } : {}),
         SOURCE: sourceLabel,
       },
       listKey: journeyKey,
@@ -280,7 +287,9 @@ export async function startJourney({
   }
 
   // Resolve all recipient-facing DNA copy from one validated gender selection.
-  const dnaEmailVars = getDnaEmailVars(dnaType, gender);
+  const dnaEmailVars = gender ? getDnaEmailVars(dnaType, gender) : {
+    dnaTypeLabel: "הפרופיל הזוגי", dnaTypeSubtitle: "", dnaTypeSuperpower: "", dnaTypeChallenge: "", dnaTypeMatch: "",
+  };
 
   // Render first, then atomically claim one journey instance and queue the full
   // sequence. The date-scoped key only resolves concurrent starts; the 30-day
@@ -297,7 +306,7 @@ export async function startJourney({
       dnaType: dnaType ?? "לא ידוע",
       ...dnaEmailVars,
       joinDnaType: encodeURIComponent(dnaType ?? ""),
-      joinGender: gender,
+      joinGender: gender || "",
       joinFirstName: encodeURIComponent(firstName),
       guideLink,
       courseLink,
@@ -363,6 +372,7 @@ export async function startJourney({
       textBody: firstQueued.textBody,
       journeyKey,
       emailIndex: 1,
+      providedGender: gender,
     });
   }
 }
@@ -380,6 +390,7 @@ async function sendScheduledEmail({
   textBody,
   journeyKey,
   emailIndex,
+  providedGender,
 }: {
   db: Awaited<ReturnType<typeof getDb>>;
   emailLogId: number;
@@ -390,8 +401,19 @@ async function sendScheduledEmail({
   textBody: string;
   journeyKey: string;
   emailIndex: number;
+  providedGender?: "female" | "male" | null;
 }): Promise<boolean> {
   if (!db) return false;
+  if (journeyRecipientGender(journeyKey)) {
+    const evidence = await resolveEmailRecipientGender(db, email, providedGender);
+    const blocked = queuedEmailGenderBlockReason(journeyKey, evidence);
+    if (blocked) {
+      // Hold for review rather than guess, re-enrol, or overwrite old mail history.
+      await db.update(emailLog).set({ status: "failed", errorMessage: blocked }).where(eq(emailLog.id, emailLogId));
+      console.warn("[Automation] Gendered message held for review.");
+      return false;
+    }
+  }
   const result = await sendEmail({
     to: { email, name: firstName },
     subject,
@@ -595,8 +617,19 @@ export async function processPendingEmails(options: { minMarketingGapHours?: num
     }
   }
 
+  const pendingGenders = await loadEmailRecipientGenders(db, pending
+    .filter(entry => journeyRecipientGender(entry.journeyKey))
+    .map(entry => entry.recipientEmail));
+
   let sent = 0;
   for (const entry of pending) {
+    const genderBlock = queuedEmailGenderBlockReason(entry.journeyKey,
+      pendingGenders.get(entry.recipientEmail.trim().toLowerCase()) || { gender: null, source: "unknown" });
+    if (genderBlock) {
+      await db.update(emailLog).set({ status: "failed", errorMessage: genderBlock })
+        .where(and(eq(emailLog.id, entry.id), eq(emailLog.status, "pending")));
+      continue;
+    }
     const suppression = await isEmailMarketingSuppressed(entry.recipientEmail);
     if (suppression.suppressed && !isOperationalJourneyEmail(entry.journeyKey, entry.emailIndex)) {
       await db.update(emailLog)
@@ -762,6 +795,7 @@ export function getJourneyKey(
   gender: "female" | "male",
   journeyType: "first_step" | "first_step_v2" | "guide" | "matchmaking" | "matchmaking_welcome" | "transformation" | "course"
 ): JourneyKey {
+  if (!validEmailGender(gender)) throw new Error("email_gender_unverified");
   const prefix = gender === "female" ? "women" : "men";
   return `${prefix}_${journeyType}` as JourneyKey;
 }
@@ -1228,12 +1262,8 @@ export async function processCartAbandonment(options: { eligibleAfter?: number }
     const journeyKey = productToJourney[lead.product];
     if (!journeyKey) continue;
 
-    // Reuse profile gender where available; do not assume every lead is a woman.
-    const [profile] = await db.select({ gender: singles.gender })
-      .from(singles)
-      .where(sql`LOWER(${singles.email}) = ${normalizedEmail}`)
-      .limit(1);
-    const gender: "female" | "male" = profile?.gender === "male" ? "male" : "female";
+    // Shared recovery copy is neutral when gender cannot be verified.
+    const { gender } = await resolveEmailRecipientGender(db, normalizedEmail);
 
     // Queue the first email so suppression, conversion checks and frequency caps
     // are re-evaluated immediately before the actual send.

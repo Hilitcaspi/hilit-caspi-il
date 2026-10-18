@@ -40,6 +40,7 @@ import { sendEmail } from "./brevo";
 import { notifyOwner } from "./_core/notification";
 import { queueProductFeedbackAfterPurchase } from "./feedbackAutomation";
 import { getJourneyKey, startJourney } from "./automation";
+import { resolveEmailRecipientGender } from "./emailRecipientGender";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
 import { buildNewYearBundleAccessEmail } from "./newYearBundleEmail";
@@ -135,17 +136,10 @@ export function isPotentialPlusCharge(sum: number, sandboxConfigured = Boolean(
 
 // ─── Product handlers ─────────────────────────────────────────────────────────
 
-async function resolveLifecycleGender(email: string): Promise<"female" | "male"> {
+async function resolveLifecycleGender(email: string): Promise<"female" | "male" | null> {
   const db = await getDb();
-  if (!db) return "female";
-  const normalizedEmail = email.toLowerCase().trim();
-  const [lead] = await db.select({ gender: crmLeads.gender }).from(crmLeads)
-    .where(sql`LOWER(${crmLeads.email}) = ${normalizedEmail}`).limit(1);
-  if (lead?.gender === "male") return "male";
-  if (lead?.gender === "female") return "female";
-  const [single] = await db.select({ gender: singles.gender }).from(singles)
-    .where(sql`LOWER(${singles.email}) = ${normalizedEmail}`).limit(1);
-  return single?.gender === "male" ? "male" : "female";
+  if (!db) return null;
+  return (await resolveEmailRecipientGender(db, email)).gender;
 }
 
 async function handleGuide(email: string, name: string, opts?: { skipJourney?: boolean }) {
@@ -174,7 +168,7 @@ async function handleGuide(email: string, name: string, opts?: { skipJourney?: b
   sendEmail({
     to: { email, name },
     subject: "המדריך שלך מחכה 💛",
-    htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">המדריך ״לבחור נכון״ מחכה לך — הקישור האישי שלך בפנים &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847;</div><div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:40px 32px;text-align:center;"><h1 style="color:#ffe27c;font-size:26px;margin:0 0 8px;">ברוכים הבאים למדריך! 💛</h1><p style="color:rgba(255,255,255,0.8);font-size:15px;margin:0;">הקישור האישי שלכם מחכה</p></div><div style="padding:40px 32px;"><p style="font-size:18px;color:#191265;margin:0 0 16px;">שלום ${firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 16px;">שמחתי מאוד שרכשתם את המדריך "לבחור נכון".</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 16px;">המדריך הזה הוא חלק מתהליך. הוא לא נועד לקריאה חטופה אחת אלא לעבודה אמיתית לאורך כמה ימים. קחו את הזמן עם כל תרגיל, חשבו, ערערו על הנחות שנדמות מובנות מאליהן.</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">התשובות שלכם נשמרות ואפשר לצאת ולחזור אליו בכל עת דרך הקישור הזה. אם תגיעו לליווי, נוכל לעבוד עם התוצרים שיצאו ממנו יחד.</p><div style="text-align:center;margin:32px 0;"><a href="${PAID_GUIDE_URL}" style="display:inline-block;background:#ffe27c;color:#191265;font-size:18px;font-weight:bold;padding:16px 40px;border-radius:12px;text-decoration:none;">פתיחת המדריך</a></div><p style="font-size:13px;color:#888;margin:0 0 24px;text-align:center;">הקישור הוא אישי. שמרו אותו לגישה מכל מכשיר.</p><p style="font-size:15px;color:#191265;font-weight:bold;margin:24px 0 8px;">באהבה,<br>הילית כספי</p></div><div style="background:#191265;padding:20px 32px;text-align:center;"><p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0;">קיבלתם מייל זה כי רכשתם את המדריך של הילית כספי.<br><a href="${SITE_BASE}/unsubscribe?email=${encodeURIComponent(email)}" style="color:rgba(255,255,255,0.5);">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
+    htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">המדריך ״לבחור נכון״ מחכה לך — הקישור האישי שלך בפנים &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847; &#847;</div><div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:40px 32px;text-align:center;"><h1 style="color:#ffe27c;font-size:26px;margin:0 0 8px;">המדריך שלך מוכן! 💛</h1><p style="color:rgba(255,255,255,0.8);font-size:15px;margin:0;">הקישור האישי שלך מחכה</p></div><div style="padding:40px 32px;"><p style="font-size:18px;color:#191265;margin:0 0 16px;">שלום ${firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 16px;">שמחתי מאוד על רכישת המדריך "לבחור נכון".</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 16px;">המדריך הזה הוא חלק מתהליך. הוא לא נועד לקריאה חטופה אחת אלא לעבודה אמיתית לאורך כמה ימים. כדאי להקדיש זמן לכל תרגיל, לחשוב ולבחון מחדש הנחות שנדמות מובנות מאליהן.</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">התשובות שלך נשמרות ואפשר לצאת ולחזור אליו בכל עת דרך הקישור הזה. במסגרת ליווי, נוכל לעבוד עם התוצרים שיצאו ממנו יחד.</p><div style="text-align:center;margin:32px 0;"><a href="${PAID_GUIDE_URL}" style="display:inline-block;background:#ffe27c;color:#191265;font-size:18px;font-weight:bold;padding:16px 40px;border-radius:12px;text-decoration:none;">פתיחת המדריך</a></div><p style="font-size:13px;color:#888;margin:0 0 24px;text-align:center;">הקישור הוא אישי. כדאי לשמור אותו לגישה מכל מכשיר.</p><p style="font-size:15px;color:#191265;font-weight:bold;margin:24px 0 8px;">באהבה,<br>הילית כספי</p></div><div style="background:#191265;padding:20px 32px;text-align:center;"><p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0;">המייל נשלח בעקבות רכישת המדריך של הילית כספי.<br><a href="${SITE_BASE}/unsubscribe?email=${encodeURIComponent(email)}" style="color:rgba(255,255,255,0.5);">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
   }).catch(err => console.error("[GrowWebhook][Guide] Email failed:", err));
   // Update CRM lead status to client_guide
   const existingCrmGuide = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.email, email)).limit(1);
@@ -186,7 +180,7 @@ async function handleGuide(email: string, name: string, opts?: { skipJourney?: b
   // Start nurture journey (skip when called from bundle flow to avoid duplicate emails)
   if (!opts?.skipJourney) {
     const gender = await resolveLifecycleGender(email);
-    startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender, journeyKey: getJourneyKey(gender, "guide") }).catch(() => {});
+    if (gender) startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender, journeyKey: getJourneyKey(gender, "guide") }).catch(() => {});
   }
 }
 
@@ -247,7 +241,7 @@ async function handleCourse(
     sendEmail({
     to: { email, name },
     subject: "הקורס שלך מחכה! 🎓",
-    htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:40px 32px;text-align:center;"><h1 style="color:#ffe27c;font-size:26px;margin:0 0 8px;">תודה על הרכישה! 🎓</h1><p style="color:rgba(255,255,255,0.8);font-size:15px;margin:0;">הקורס שלך מחכה</p></div><div style="padding:40px 32px;"><p style="font-size:18px;color:#191265;margin:0 0 16px;">שלום ${firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">שמחתי מאוד שהצטרפתם לקורס "המסע"! 5 מודולים מעשיים שיוביל אתכם מהמקום שבו אתם תקועים אל האהבה שאתם מחפשים.</p><div style="text-align:center;margin:32px 0;"><a href="${COURSE_URL}" style="display:inline-block;background:#ffe27c;color:#191265;font-size:18px;font-weight:bold;padding:16px 40px;border-radius:12px;text-decoration:none;">כניסה לקורס</a></div><div style="background:#ffe27c;border-radius:12px;padding:20px 24px;margin:24px 0;"><p style="font-size:15px;color:#191265;font-weight:bold;margin:0 0 8px;">🎁 הבונוס שלך - המדריך הדיגיטלי</p><p style="font-size:14px;color:#191265;margin:0 0 16px;">כמי שרכש את הקורס, מגיע לך גם המדריך "לבחור נכון" - ללא תשלום נוסף.</p><div style="text-align:center;"><a href="${GUIDE_URL}" style="display:inline-block;background:#191265;color:#ffe27c;font-size:15px;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none;">פתיחת המדריך</a></div></div><p style="font-size:15px;color:#191265;font-weight:bold;margin:24px 0 8px;">באהבה,<br>הילית כספי</p></div><div style="background:#191265;padding:20px 32px;text-align:center;"><p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0;">קיבלת מייל זה כי רכשת את הקורס של הילית כספי.<br><a href="${SITE_BASE}/unsubscribe?email=${encodeURIComponent(email)}" style="color:rgba(255,255,255,0.5);">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
+    htmlContent: `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;"><div style="background:#191265;padding:40px 32px;text-align:center;"><h1 style="color:#ffe27c;font-size:26px;margin:0 0 8px;">תודה על הרכישה! 🎓</h1><p style="color:rgba(255,255,255,0.8);font-size:15px;margin:0;">הקורס שלך מחכה</p></div><div style="padding:40px 32px;"><p style="font-size:18px;color:#191265;margin:0 0 16px;">שלום ${firstName},</p><p style="font-size:15px;color:#555;line-height:1.7;margin:0 0 24px;">שמחתי מאוד על הצטרפותך לקורס "המסע"! 5 מודולים מעשיים ליצירת תנועה מהמקום הנוכחי אל האהבה שחיפשת.</p><div style="text-align:center;margin:32px 0;"><a href="${COURSE_URL}" style="display:inline-block;background:#ffe27c;color:#191265;font-size:18px;font-weight:bold;padding:16px 40px;border-radius:12px;text-decoration:none;">כניסה לקורס</a></div><div style="background:#ffe27c;border-radius:12px;padding:20px 24px;margin:24px 0;"><p style="font-size:15px;color:#191265;font-weight:bold;margin:0 0 8px;">🎁 הבונוס שלך - המדריך הדיגיטלי</p><p style="font-size:14px;color:#191265;margin:0 0 16px;">רכישת הקורס כוללת גם את המדריך "לבחור נכון" - ללא תשלום נוסף.</p><div style="text-align:center;"><a href="${GUIDE_URL}" style="display:inline-block;background:#191265;color:#ffe27c;font-size:15px;font-weight:bold;padding:12px 28px;border-radius:10px;text-decoration:none;">פתיחת המדריך</a></div></div><p style="font-size:15px;color:#191265;font-weight:bold;margin:24px 0 8px;">באהבה,<br>הילית כספי</p></div><div style="background:#191265;padding:20px 32px;text-align:center;"><p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0;">קיבלת מייל זה כי רכשת את הקורס של הילית כספי.<br><a href="${SITE_BASE}/unsubscribe?email=${encodeURIComponent(email)}" style="color:rgba(255,255,255,0.5);">הסרה מרשימת התפוצה</a></p></div></div></body></html>`,
     }).catch(err => console.error("[GrowWebhook][Course] Email failed:", err));
   }
     // Update CRM lead status to client_course
@@ -259,7 +253,7 @@ async function handleCourse(
   }
   if (!opts.skipJourney) {
     const gender = await resolveLifecycleGender(email);
-    startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender, journeyKey: getJourneyKey(gender, "course") }).catch(() => {});
+    if (gender) startJourney({ email, firstName, lastName: name.split(" ").slice(1).join(" ") || "", phone: "", gender, journeyKey: getJourneyKey(gender, "course") }).catch(() => {});
   }
 }
 async function handleCoaching(email: string, name: string) {

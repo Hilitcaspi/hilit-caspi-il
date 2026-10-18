@@ -536,7 +536,7 @@ async function startServer() {
             firstName,
             lastName,
             phone: phone || undefined,
-            gender: gender ?? "female",
+            gender,
             journeyKey,
             leadId,
           });
@@ -1366,7 +1366,7 @@ async function startServer() {
           const nameParts = name.trim().split(" ");
           await startJ({
             email, firstName: nameParts[0], lastName: nameParts.slice(1).join(" "),
-            phone: phone || undefined, gender: "female",
+            phone: phone || undefined, gender: undefined,
             journeyKey: form.journey, leadId,
           });
           totalNew++;

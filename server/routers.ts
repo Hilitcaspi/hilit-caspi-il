@@ -3328,10 +3328,10 @@ export const appRouter = router({
         }).where(eq(matches.id, matchId));
 
         const dnaLabels = DNA_HEBREW_LABELS;
-        const dnaA = singleA.dnaType ? dnaLabels[singleA.dnaType] || singleA.dnaType : null;
-        const dnaB = singleB.dnaType ? dnaLabels[singleB.dnaType] || singleB.dnaType : null;
+        const dnaA = singleA.dnaType ? (singleA.gender === "female" ? DNA_PROFILES[singleA.dnaType]?.label_f : singleA.gender === "male" ? DNA_PROFILES[singleA.dnaType]?.label_m : undefined) || dnaLabels[singleA.dnaType] || singleA.dnaType : null;
+        const dnaB = singleB.dnaType ? (singleB.gender === "female" ? DNA_PROFILES[singleB.dnaType]?.label_f : singleB.gender === "male" ? DNA_PROFILES[singleB.dnaType]?.label_m : undefined) || dnaLabels[singleB.dnaType] || singleB.dnaType : null;
         const defaultNote = input.hilitsNote ||
-          `בחרתי לחבר ביניכם כי ראיתי ${score >= 80 ? "התאמה גבוהה מאוד" : score >= 60 ? "התאמה טובה" : "פוטנציאל אמיתי"} בכמה רמות${dnaA && dnaB ? `. ${singleA.firstName} הוא ${dnaA} ו-${singleB.firstName} הוא ${dnaB}, ושני הסוגים האלה משלימים אחד את השני בצורה יוצאת דופן` : ""}. ${singleA.city === singleB.city ? `שניכם מ${singleA.city}, מה שמקל על מפגש ראשון. ` : ""}אני מאמינה שיש כאן בסיס לקשר אמיתי. תנו לזה צ'אנס.`;
+          `בחרתי לחבר ביניכם כי ראיתי ${score >= 80 ? "התאמה גבוהה מאוד" : score >= 60 ? "התאמה טובה" : "פוטנציאל אמיתי"} בכמה רמות${dnaA && dnaB ? `. הפרופיל של ${singleA.firstName}: ${dnaA}, והפרופיל של ${singleB.firstName}: ${dnaB}, ושני הסוגים האלה משלימים אחד את השני בצורה יוצאת דופן` : ""}. ${singleA.city === singleB.city ? `שניכם מ${singleA.city}, מה שמקל על מפגש ראשון. ` : ""}אני מאמינה שיש כאן בסיס לקשר אמיתי. תנו לזה צ'אנס.`;
 
         const baseUrl = "https://hilitcaspi.com";
         const emailA = buildMatchProposalEmailTemplate({
@@ -4653,10 +4653,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
         // Build Hilit's personal note based on DNA compatibility + profile details
         const dnaLabels = DNA_HEBREW_LABELS;
-        const dnaA = singleA.dnaType ? dnaLabels[singleA.dnaType] || singleA.dnaType : null;
-        const dnaB = singleB.dnaType ? dnaLabels[singleB.dnaType] || singleB.dnaType : null;
+        const dnaA = singleA.dnaType ? (singleA.gender === "female" ? DNA_PROFILES[singleA.dnaType]?.label_f : singleA.gender === "male" ? DNA_PROFILES[singleA.dnaType]?.label_m : undefined) || dnaLabels[singleA.dnaType] || singleA.dnaType : null;
+        const dnaB = singleB.dnaType ? (singleB.gender === "female" ? DNA_PROFILES[singleB.dnaType]?.label_f : singleB.gender === "male" ? DNA_PROFILES[singleB.dnaType]?.label_m : undefined) || dnaLabels[singleB.dnaType] || singleB.dnaType : null;
         const defaultNote = input.hilitsNote ||
-          `בחרתי לחבר ביניכם כי ראיתי ${score >= 80 ? "התאמה גבוהה מאוד" : score >= 60 ? "התאמה טובה" : "פוטנציאל אמיתי"} בכמה רמות${dnaA && dnaB ? `. ${singleA.firstName} הוא ${dnaA} ו-${singleB.firstName} הוא ${dnaB}, ושני הסוגים האלה משלימים אחד את השני בצורה יוצאת דופן` : ""}. ${singleA.city === singleB.city ? `שניכם מ${singleA.city}, מה שמקל על מפגש ראשון. ` : ""}אני מאמינה שיש כאן בסיס לקשר אמיתי. תנו לזה צ'אנס.`;
+          `בחרתי לחבר ביניכם כי ראיתי ${score >= 80 ? "התאמה גבוהה מאוד" : score >= 60 ? "התאמה טובה" : "פוטנציאל אמיתי"} בכמה רמות${dnaA && dnaB ? `. הפרופיל של ${singleA.firstName}: ${dnaA}, והפרופיל של ${singleB.firstName}: ${dnaB}, ושני הסוגים האלה משלימים אחד את השני בצורה יוצאת דופן` : ""}. ${singleA.city === singleB.city ? `שניכם מ${singleA.city}, מה שמקל על מפגש ראשון. ` : ""}אני מאמינה שיש כאן בסיס לקשר אמיתי. תנו לזה צ'אנס.`;
 
         // Send proposal emails to both singles
         const emailA = buildMatchProposalEmailTemplate({
@@ -5078,7 +5078,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               matchOccupation: singleB.occupation ?? undefined,
               matchDnaType: singleB.dnaType ?? undefined,
               compatibilityScore: score,
-              preDateTip: singleA.gender === "female" ? tipFemale : tipMale,
+              preDateTip: singleA.gender === "female" ? tipFemale : singleA.gender === "male" ? tipMale : "כדאי להגיע למפגש בסקרנות ובלב פתוח, בלי ציפייה לשלמות.",
               recipientEmail: singleA.email!,
               singleId: singleA.id,
               dashboardUrl: dashboardUrlA,
@@ -5097,7 +5097,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               matchOccupation: singleA.occupation ?? undefined,
               matchDnaType: singleA.dnaType ?? undefined,
               compatibilityScore: score,
-              preDateTip: singleB.gender === "female" ? tipFemale : tipMale,
+              preDateTip: singleB.gender === "female" ? tipFemale : singleB.gender === "male" ? tipMale : "כדאי להגיע למפגש בסקרנות ובלב פתוח, בלי ציפייה לשלמות.",
               recipientEmail: singleB.email!,
               singleId: singleB.id,
               dashboardUrl: dashboardUrlB,
