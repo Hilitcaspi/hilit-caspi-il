@@ -391,14 +391,18 @@ export default function CRMMatchmaking() {
   const [topMatchesPage, setTopMatchesPage] = useState<Record<number, number>>({}); // singleId -> page (0=first 3, 1=next 3, etc.)
   const [unmatchedPage, setUnmatchedPage] = useState(1);
   const [waitingExpandedId, setWaitingExpandedId] = useState<number | null>(null);
-  const [waitingSearchId, setWaitingSearchId] = useState<number | null>(null);
+  const [waitingSearchOriginId, setWaitingSearchOriginId] = useState<number | null>(null);
+  const waitingReturnPosition = useRef<{ memberId: number; scrollY: number } | null>(null);
+  const waitingReturnPending = useRef(false);
   useEffect(() => {
     batchGeneration.current += 1;
     setBatchProgress(null);
     setFilterCompatResult({});
     setWaitingExpandedId(null);
-    setWaitingSearchId(null);
-  }, [unmatchedPage, unmatchedView, activeTab]);
+    setWaitingSearchOriginId(null);
+    waitingReturnPosition.current = null;
+    waitingReturnPending.current = false;
+  }, [unmatchedPage, unmatchedView]);
 
   // Queries
   const { data: singles = [], refetch: refetchSingles, isLoading: singlesLoading } = trpc.matchmaking.listSingles.useQuery(undefined, {
@@ -414,6 +418,18 @@ export default function CRMMatchmaking() {
     enabled: !!user && user.role === "admin" && activeTab === "unmatched",
   });
   const singlesWithoutMatches = unmatchedResult.items ?? [];
+  useEffect(() => {
+    if (activeTab !== "unmatched" || unmatchedLoading || unmatchedFetching || !waitingReturnPending.current) return;
+    const frame = requestAnimationFrame(() => {
+      waitingReturnPending.current = false;
+      const position = waitingReturnPosition.current;
+      if (!position) return;
+      const row = document.querySelector(`[data-waiting-member="${position.memberId}"]`);
+      if (row) row.scrollIntoView({ block: "start", behavior: "instant" });
+      else window.scrollTo({ top: position.scrollY, behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab, unmatchedLoading, unmatchedFetching, singlesWithoutMatches]);
   // Initial local filters only; saved preferences and scoring remain untouched.
   const applyPreferredSearchFilters = (single: Parameters<typeof getAdvancedMatchFilterDefaults>[0]) => {
     const defaults = getAdvancedMatchFilterDefaults(single);
@@ -437,8 +453,10 @@ export default function CRMMatchmaking() {
     setFilterCompatResult({});
     setFilterVisibleLimit(10);
     setFilterCompatDropdown(false);
-    setWaitingExpandedId(single.id);
-    setWaitingSearchId(single.id);
+    waitingReturnPosition.current = { memberId: single.id, scrollY: window.scrollY };
+    setWaitingSearchOriginId(single.id);
+    setActiveTab("filter_search");
+    window.scrollTo({ top: 0, behavior: "instant" });
   };
   const closeWaitingSearch = () => {
     batchGeneration.current += 1;
@@ -446,7 +464,13 @@ export default function CRMMatchmaking() {
     setFilterCompatTarget(null);
     setFilterCompatResult({});
     setBatchProgress(null);
-    setWaitingSearchId(null);
+    setWaitingSearchOriginId(null);
+  };
+  const returnToWaitingQueue = () => {
+    waitingReturnPending.current = true;
+    setWaitingExpandedId(null);
+    closeWaitingSearch();
+    setActiveTab("unmatched");
   };
   const { data: inactiveSingles = [] } = (trpc.matchmaking as any).listInactiveSingles.useQuery(undefined, {
     enabled: !!user && user.role === "admin" && activeTab === "inactive_leads",
@@ -999,7 +1023,13 @@ export default function CRMMatchmaking() {
             : filteredResultsRaw;
 
           return (
-            <div className="space-y-4" data-advanced-workspace={embedded ? "waiting" : "standalone"}>
+            <div className={`space-y-4 ${waitingSearchOriginId != null ? "pb-28" : ""}`} data-advanced-workspace={embedded ? "waiting" : "standalone"}>
+              {waitingSearchOriginId != null && (
+                <div className="fixed bottom-4 left-4 right-4 z-30 mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 rounded-xl border border-[#191265]/15 bg-[#fffdf7] p-3 shadow-lg" dir="rtl" aria-label="חזרה לתור הטיפול">
+                  <p className="text-xs text-[#191265]">החיפוש פתוח בנפרד. המקום שלך ברשימת הממתינים נשמר.</p>
+                  <button type="button" onClick={returnToWaitingQueue} className="rounded-lg bg-[#191265] px-4 py-2 text-sm font-bold text-white">חזרה לממתינים להתאמה</button>
+                </div>
+              )}
               {/* Filter panel */}
               <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5" dir="rtl">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h3 className="font-black text-[#191265] text-lg">{embedded ? "חיפוש מתקדם עבור הפרופיל הזה" : "🔎 חיפוש מתקדם לפי פרמטרים"}</h3><button type="button" onClick={() => setActiveTab("compatibility")} className="rounded-lg border border-[#191265]/20 px-3 py-2 text-xs font-bold text-[#191265]">בדיקת התאמה בין שני אנשים</button></div>
@@ -2859,7 +2889,7 @@ export default function CRMMatchmaking() {
                         {!full && <p className="text-xs text-[#727272] mt-2">{singlesLoading ? "טוענת את פרטי הפרופיל המלאים..." : "פרטי הפרופיל המלאים לא נטענו. לחצי רענן כדי לנסות שוב."}</p>}
                       </div>
                       <div className="flex flex-wrap gap-2 shrink-0">
-                        <button type="button" disabled={!full} aria-expanded={isExpanded} onClick={() => { if (isExpanded) { setWaitingExpandedId(null); closeWaitingSearch(); } else { if (waitingSearchId && waitingSearchId !== s.id) closeWaitingSearch(); setWaitingExpandedId(s.id); } }} className="rounded-lg border border-[#191265]/20 px-3 py-2 text-xs font-bold text-[#191265] disabled:opacity-40">{isExpanded ? "סגור פרופיל" : "פרופיל מלא והיסטוריה"}</button>
+                        <button type="button" disabled={!full} aria-expanded={isExpanded} onClick={() => setWaitingExpandedId(isExpanded ? null : s.id)} className="rounded-lg border border-[#191265]/20 px-3 py-2 text-xs font-bold text-[#191265] disabled:opacity-40">{isExpanded ? "סגור פרופיל" : "פרופיל מלא והיסטוריה"}</button>
                         <button type="button" onClick={() => openAdvancedForUnmatched(profile)} disabled={s.hasBlockingProposal || !s.photoUrl || !full} className="rounded-lg bg-[#191265] px-3 py-2 text-xs font-bold text-white disabled:opacity-40">חיפוש מתקדם להתאמה</button>
                       </div>
                     </div>
@@ -2867,7 +2897,6 @@ export default function CRMMatchmaking() {
                     {isExpanded && <div className="mt-4 border-t border-[#e9e8e8] pt-4">
                       <WaitingMemberProfile profile={profile} history={sentHistory} databasePurchasedAt={s.databasePurchasedAt} onPhoto={setLightboxUrl} onEdit={() => setEditingSingleId(s.id)} onDeactivate={() => { if (window.confirm(`להעביר את ${s.firstName} ללא פעילים? הפרופיל לא יקבל התאמות חדשות.`)) toggleActive.mutate({ singleId: s.id, isActive: false }); }} deactivatePending={toggleActive.isPending} onClosed={refreshAfterProfileClosure}>
                         <AdminNotesField singleId={s.id} />
-                        {waitingSearchId === s.id && filterCompatTarget === s.id && renderAdvancedSearch(true)}
                       </WaitingMemberProfile>
                     </div>}
                   </div>

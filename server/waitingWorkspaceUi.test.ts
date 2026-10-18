@@ -17,12 +17,14 @@ describe("waiting workspace UI safety and performance contracts", () => {
     expect(queue).toContain("s.matchHistory || []");
     expect(queue).not.toContain("s.suggestions.map");
   });
-  it("reuses the existing advanced workspace, locked to the waiting person", () => {
+  it("opens the existing advanced tab with the waiting person preselected", () => {
     expect(ui).toContain("const renderAdvancedSearch = (embedded = false)");
-    expect(queue).toContain("waitingSearchId === s.id && filterCompatTarget === s.id && renderAdvancedSearch(true)");
+    expect(queue).not.toContain("renderAdvancedSearch(true)");
     expect(ui).toContain('activeTab === "filter_search" && renderAdvancedSearch(false)');
-    expect(ui).toContain('{!embedded && <div className="md:col-span-2">');
-    expect(ui).toContain("if (!embedded) { setFilterCompatTarget(null)");
+    expect(opener).toContain('setActiveTab("filter_search")');
+    expect(opener).toContain("applyPreferredSearchFilters(single)");
+    expect(ui).toContain("returnToWaitingQueue");
+    expect(ui).toContain("waitingReturnPosition.current");
     expect(opener).toContain("setFilterVisibleLimit(10)");
     expect(opener).toContain("batchGeneration.current += 1");
     for (const action of ["approveMatch.mutate", "createAndSendMatch.mutate", "toggleActive.mutate", "sendEmail", "sendSms", "rankForFilter.mutateAsync"]) expect(opener).not.toContain(action);
@@ -51,7 +53,8 @@ describe("waiting workspace UI safety and performance contracts", () => {
     expect(queue).toContain("full && missing.length > 0");
   });
   it("invalidates outstanding results on page, care filter, edits and closure", () => {
-    expect(ui).toContain("[unmatchedPage, unmatchedView, activeTab]");
+    expect(ui).toContain("[unmatchedPage, unmatchedView]");
+    expect(ui).toContain("[filterCompatTarget, activeTab]");
     expect(ui).toContain("const closeWaitingSearch =");
     expect(ui).toContain("filterTargetRef.current = null");
     expect(ui).toContain("onSuccess: () => { closeWaitingSearch(); refetchSingles(); refetchMatches(); refetchUnmatched();");

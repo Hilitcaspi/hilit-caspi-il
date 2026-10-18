@@ -211,6 +211,12 @@ export default function WaitingMemberProfile({
               <Pencil className="size-3.5" aria-hidden="true" />
               עריכת פרופיל
             </button>
+            {active && (
+              <button type="button" onClick={onDeactivate} disabled={deactivatePending} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe27c] disabled:cursor-not-allowed disabled:opacity-60">
+                <PauseCircle className="size-3.5" aria-hidden="true" />
+                {deactivatePending ? "משהה…" : "השהיית פרופיל"}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -297,12 +303,6 @@ export default function WaitingMemberProfile({
         <footer className="flex flex-col gap-3 border-t border-[#191265]/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs leading-5 text-[#655f73]">השהיה וסגירה מתבצעות רק לאחר אישור שלך. פתיחת מייל או WhatsApp אינה שולחת הודעה אוטומטית.</p>
           <div className="flex flex-wrap gap-2">
-            {active && (
-              <button type="button" onClick={onDeactivate} disabled={deactivatePending} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60">
-                <PauseCircle className="size-3.5" aria-hidden="true" />
-                {deactivatePending ? "משהה…" : "השהיית פרופיל"}
-              </button>
-            )}
             <ProfileClosureDialog
               profile={{
                 id: profile.id,
