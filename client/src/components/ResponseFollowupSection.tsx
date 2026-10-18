@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { buildNonResponseFollowupMessage, type MatchResponseSummary } from "@shared/matchResponseSummary";
+import { matchesProfileName } from "@shared/profileNameSearch";
 import { ProfilePhoto, type MatchProfile } from "./MatchProfileCard";
 
 type Profile = MatchProfile & { phone?: string | null; isActive?: boolean; isSeed?: boolean };
@@ -11,13 +12,14 @@ function whatsappUrl(phone?: string | null, message = "") {
   if (digits.startsWith("0")) digits = `972${digits.slice(1)}`;
   return digits.startsWith("972") && digits.length >= 11 && digits.length <= 13 ? `https://wa.me/${digits}?text=${encodeURIComponent(message)}` : null;
 }
-export default function ResponseFollowupSection({ profiles, summaries, loading, error, refresh, onPhoto }: {
+export default function ResponseFollowupSection({ profiles, summaries, loading, error, refresh, onPhoto, searchQuery = "" }: {
   profiles: Profile[]; summaries: Record<number, MatchResponseSummary>; loading: boolean; error: boolean;
-  refresh: () => void; onPhoto: (url: string) => void;
+  refresh: () => void; onPhoto: (url: string) => void; searchQuery?: string;
 }) {
   const [selected, setSelected] = useState<Profile | null>(null);
   const [draft, setDraft] = useState("");
-  const rows = profiles.filter(p => p.isActive !== false && !p.isSeed && summaries[p.id]?.needsFollowup)
+  const qualifiedRows = profiles.filter(p => p.isActive !== false && !p.isSeed && summaries[p.id]?.needsFollowup);
+  const rows = qualifiedRows.filter(profile => matchesProfileName(profile, searchQuery))
     .sort((a,b) => summaries[b.id].consecutiveUnanswered - summaries[a.id].consecutiveUnanswered);
   const url = selected ? whatsappUrl(selected.phone, draft) : null;
   return <section className="rounded-2xl bg-white border border-rose-200 p-4 shadow-sm space-y-3" aria-label="מעקב אי־מענה להצעות">
@@ -27,7 +29,7 @@ export default function ResponseFollowupSection({ profiles, summaries, loading, 
       </div>
       <button type="button" onClick={refresh} className="text-xs rounded-lg bg-[#f0eadc] px-3 py-2 text-[#191265]">רענון תגובות</button>
     </div>
-    {error ? <p className="text-sm text-red-700">נתוני התגובות לא נטענו. אין להסיק שאין צורך במעקב; אפשר לרענן.</p> : loading ? <p className="text-sm text-[#727272]">בודק תגובות ומסירות...</p> : rows.length === 0 ? <p className="text-sm text-[#727272]">אין כרגע רצף אי־מענה שמצריך פנייה.</p> : <div className="grid gap-3 md:grid-cols-2">
+    {error ? <p className="text-sm text-red-700">נתוני התגובות לא נטענו. אין להסיק שאין צורך במעקב; אפשר לרענן.</p> : loading ? <p className="text-sm text-[#727272]">בודק תגובות ומסירות...</p> : rows.length === 0 ? <p className="text-sm text-[#727272]">{searchQuery.trim() ? "לא נמצאו ממתינים בשם הזה" : "אין כרגע רצף אי־מענה שמצריך פנייה."}</p> : <div className="grid gap-3 md:grid-cols-2">
       {rows.map(profile => {
         const summary = summaries[profile.id];
         return <article key={profile.id} className="rounded-xl bg-rose-50/60 border border-rose-100 p-3">

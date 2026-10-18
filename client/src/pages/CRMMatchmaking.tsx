@@ -7,6 +7,7 @@ import MatchProfileCard, { MatchProfileFacts, MatchPreferenceFacts, ProfilePhoto
 import { PairCriteriaLegend } from "@/components/PairCriterionIndicator";
 import { buildAdvancedMatchExclusions, isAdvancedMatchCandidate } from "@shared/advancedMatchCandidates";
 import { getAdvancedMatchFilterDefaults } from "@shared/advancedMatchFilterDefaults";
+import { filterProfilesByName, getProfileNameSuggestions } from "@shared/profileNameSearch";
 import ResponseFollowupSection from "@/components/ResponseFollowupSection";
 import WaitingMemberProfile from "@/components/WaitingMemberProfile";
 import { waitingProfileMissingFields } from "@shared/waitingProfileCompleteness";
@@ -339,6 +340,8 @@ export default function CRMMatchmaking() {
   const [filterCompatTarget, setFilterCompatTarget] = useState<number | null>(null);
   const [filterCompatSearch, setFilterCompatSearch] = useState("");
   const [filterCompatDropdown, setFilterCompatDropdown] = useState(false);
+  const [filterTargetVisibleLimit, setFilterTargetVisibleLimit] = useState(10);
+  useEffect(() => { setFilterTargetVisibleLimit(10); }, [filterCompatSearch]);
   const [filterCompatResult, setFilterCompatResult] = useState<Record<number, any>>({});
   const [filterMinHeight, setFilterMinHeight] = useState("");
   const [filterMaxHeight, setFilterMaxHeight] = useState("");
@@ -390,10 +393,16 @@ export default function CRMMatchmaking() {
   const [editingSingleId, setEditingSingleId] = useState<number | null>(null);
   const [topMatchesPage, setTopMatchesPage] = useState<Record<number, number>>({}); // singleId -> page (0=first 3, 1=next 3, etc.)
   const [unmatchedPage, setUnmatchedPage] = useState(1);
+  const [unmatchedNameSearch, setUnmatchedNameSearch] = useState("");
+  const [debouncedUnmatchedNameSearch, setDebouncedUnmatchedNameSearch] = useState("");
   const [waitingExpandedId, setWaitingExpandedId] = useState<number | null>(null);
   const [waitingSearchOriginId, setWaitingSearchOriginId] = useState<number | null>(null);
   const waitingReturnPosition = useRef<{ memberId: number; scrollY: number } | null>(null);
   const waitingReturnPending = useRef(false);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedUnmatchedNameSearch(unmatchedNameSearch), 250);
+    return () => window.clearTimeout(timeout);
+  }, [unmatchedNameSearch]);
   useEffect(() => {
     batchGeneration.current += 1;
     setBatchProgress(null);
@@ -414,10 +423,24 @@ export default function CRMMatchmaking() {
   const { data: tokens = [], refetch: refetchTokens } = trpc.invites.getAll.useQuery(undefined, {
     enabled: !!user && user.role === "admin",
   });
-  const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } }, refetch: refetchUnmatched, isLoading: unmatchedLoading, isFetching: unmatchedFetching, isError: unmatchedError } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40 }, {
+  const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } }, refetch: refetchUnmatched, isLoading: unmatchedLoading, isFetching: unmatchedFetching, isError: unmatchedError } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40, search: debouncedUnmatchedNameSearch || undefined }, {
     enabled: !!user && user.role === "admin" && activeTab === "unmatched",
   });
   const singlesWithoutMatches = unmatchedResult.items ?? [];
+  const unmatchedSearchIsDebouncing = unmatchedNameSearch !== debouncedUnmatchedNameSearch;
+  const unmatchedQueueIsRefreshing = unmatchedFetching && unmatchedView === "matches";
+  const hasUnmatchedNameSearch = debouncedUnmatchedNameSearch.trim().length > 0;
+  const changeUnmatchedNameSearch = (value: string) => {
+    setUnmatchedNameSearch(value);
+    setUnmatchedPage(1);
+    setWaitingExpandedId(null);
+    batchGeneration.current += 1;
+    setBatchProgress(null);
+    setFilterCompatResult({});
+    setWaitingSearchOriginId(null);
+    waitingReturnPosition.current = null;
+    waitingReturnPending.current = false;
+  };
   useEffect(() => {
     if (activeTab !== "unmatched" || unmatchedLoading || unmatchedFetching || !waitingReturnPending.current) return;
     const frame = requestAnimationFrame(() => {
@@ -900,6 +923,9 @@ export default function CRMMatchmaking() {
 
   const advancedExclusions = buildAdvancedMatchExclusions(typedMatches, filterCompatTarget ?? undefined);
   const filterTargetProfile = typedSingles.find(single => single.id === filterCompatTarget);
+  const filterTargetExactChoices = filterProfilesByName(typedSingles, filterCompatSearch);
+  const filterTargetIsSuggestion = filterTargetExactChoices.length === 0;
+  const filterTargetChoices = filterTargetIsSuggestion ? getProfileNameSuggestions(typedSingles, filterCompatSearch) : filterTargetExactChoices;
   const asMatchProfile = (single: typeof typedSingles[number]): MatchProfile => ({
     ...single, hasKids: single.hasKids ?? single.hasChildren, numKids: single.numKids ?? single.numberOfChildren,
     wantsKids: single.wantsKids ?? single.wantsChildren, about: single.about ?? single.aboutMe,
@@ -991,7 +1017,7 @@ export default function CRMMatchmaking() {
   const renderAdvancedSearch = (embedded = false) => {
 
           const allSinglesForFilter = typedSingles;
-          const filteredResultsRaw = allSinglesForFilter.filter(s => {
+          const eligibleFilterResults = allSinglesForFilter.filter(s => {
             if (!isAdvancedMatchCandidate(s, advancedExclusions, filterCompatTarget ?? undefined)) return false;
             if (filterCompatResult[s.id]?.alreadySent) return false;
             if (filterGender && s.gender !== filterGender) return false;
@@ -1005,7 +1031,6 @@ export default function CRMMatchmaking() {
             if (filterCity && !filterArea && !(s.city || "").toLowerCase().includes(filterCity.toLowerCase())) return false;
             if (filterReligiosity && s.religiosity !== filterReligiosity) return false;
             if (filterDna && s.dnaType !== filterDna) return false;
-            if (filterName && !(`${s.firstName} ${s.lastName || ""}`).toLowerCase().includes(filterName.toLowerCase())) return false;
             if (filterMinHeight && (!(s as any).height || (s as any).height < parseInt(filterMinHeight))) return false;
             if (filterMaxHeight && (!(s as any).height || (s as any).height > parseInt(filterMaxHeight))) return false;
             if (filterMaritalStatus && (s as any).maritalStatus !== filterMaritalStatus) return false;
@@ -1014,6 +1039,8 @@ export default function CRMMatchmaking() {
             if (filterHasKids === "no" && (s.hasKids ?? s.hasChildren)) return false;
             return true;
           });
+          const filteredResultsRaw = filterProfilesByName(eligibleFilterResults, filterName);
+          const candidateNameSuggestions = filteredResultsRaw.length === 0 ? getProfileNameSuggestions(eligibleFilterResults, filterName) : [];
           const filteredResults = filterCompatTarget
             ? [...filteredResultsRaw].sort((a, b) => {
                 const scoreA = filterCompatResult[a.id]?.score ?? -1;
@@ -1161,7 +1188,8 @@ export default function CRMMatchmaking() {
                       )}
                       {filterCompatDropdown && filterCompatSearch && (
                         <div className="absolute z-50 top-full mt-1 w-full bg-white border border-[#e9e8e8] rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                          {typedSingles.filter(s => `${s.firstName} ${s.lastName || ""}`.toLowerCase().includes(filterCompatSearch.toLowerCase())).slice(0, 10).map(s => (
+                          {filterTargetIsSuggestion && <p className="px-4 py-2 text-xs text-[#727272]" data-profile-name-suggestions="target">{filterTargetChoices.length ? "לא נמצא שם תואם. שמות דומים לבדיקה ובחירה:" : "לא נמצא שם תואם. אפשר לחפש גם לפי השם הפרטי."}</p>}
+                          {filterTargetChoices.slice(0, filterTargetVisibleLimit).map(s => (
                             <button key={s.id} disabled={!!batchProgress} onClick={() => selectFilterTarget(s)}
                               className="w-full text-right px-4 py-2 text-sm hover:bg-[#f0eadc] text-[#191265]">
                               <div className="flex gap-3 items-center">
@@ -1172,6 +1200,7 @@ export default function CRMMatchmaking() {
                               </div>
                             </button>
                           ))}
+                          {filterTargetChoices.length > filterTargetVisibleLimit && <button type="button" disabled={!!batchProgress} onClick={() => setFilterTargetVisibleLimit(limit => limit + 10)} className="w-full border-t px-4 py-2 text-xs font-bold text-[#191265]">עוד שמות · מוצגים {filterTargetVisibleLimit} מתוך {filterTargetChoices.length}</button>}
                         </div>
                       )}
                     </div>
@@ -1223,7 +1252,9 @@ export default function CRMMatchmaking() {
               {filteredResults.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center text-[#727272]">
                   <div className="text-4xl mb-2">🔍</div>
-                  <p>לא נמצאו תוצאות. שנה/י את הפרמטרים.</p>
+                  <p>לא נמצאו תוצאות לפי השם והמסננים הנוכחיים.</p>
+                  {candidateNameSuggestions.length > 0 && <div className="mt-3" data-profile-name-suggestions="candidates"><p className="text-xs">שמות דומים לבדיקה. הבחירה תשנה רק את חיפוש השם:</p><div className="mt-2 flex flex-wrap justify-center gap-2">{candidateNameSuggestions.map(single => <button type="button" key={single.id} onClick={() => setFilterName(`${single.firstName} ${single.lastName || ""}`.trim())} className="rounded-lg border border-[#191265]/20 px-3 py-2 text-xs font-bold text-[#191265]">{single.firstName} {single.lastName} · {displayAge(single.age)} · {single.city}</button>)}</div></div>}
+                  {filterName && <button type="button" onClick={() => setFilterName("")} className="mt-3 text-xs underline text-[#191265]">ניקוי השם בלבד, בלי לשנות את שאר המסננים</button>}
                 </div>
               ) : (
                 filteredResults.slice(0, filterVisibleLimit).map(single => {
@@ -2829,11 +2860,27 @@ export default function CRMMatchmaking() {
         {/* Unmatched Tab */}
         {activeTab === "unmatched" && (
           <div className="space-y-3">
+            <div className="rounded-xl bg-white p-3 shadow-sm">
+              <label htmlFor="unmatched-name-search" className="mb-1 block text-xs font-bold text-[#191265]">חיפוש לפי שם</label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="unmatched-name-search"
+                  type="search"
+                  value={unmatchedNameSearch}
+                  maxLength={100}
+                  onChange={event => changeUnmatchedNameSearch(event.target.value)}
+                  placeholder="שם פרטי או שם מלא"
+                  className="min-w-0 flex-1 rounded-lg border border-[#191265]/20 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffe27c]"
+                  dir="rtl"
+                />
+                {unmatchedNameSearch && <button type="button" onClick={() => changeUnmatchedNameSearch("")} className="rounded-lg px-3 py-2 text-xs font-bold text-[#191265] hover:bg-[#f8f6f0]">נקה</button>}
+              </div>
+            </div>
             <div className="flex gap-2 flex-wrap rounded-xl bg-white p-2 shadow-sm" aria-label="סינון סיבת טיפול">
               <button type="button" aria-pressed={unmatchedView === "matches"} onClick={() => setUnmatchedView("matches")} className={`rounded-lg px-4 py-2 text-xs font-bold ${unmatchedView === "matches" ? "bg-[#191265] text-white" : "bg-[#f8f6f0] text-[#191265]"}`}>ממתינים להתאמה</button>
               <button type="button" aria-pressed={unmatchedView === "nonresponse"} onClick={() => setUnmatchedView("nonresponse")} className={`rounded-lg px-4 py-2 text-xs font-bold ${unmatchedView === "nonresponse" ? "bg-[#191265] text-white" : "bg-[#f8f6f0] text-[#191265]"}`}>אי־מענה חוזר להצעות</button>
             </div>
-            {unmatchedView === "nonresponse" ? <ResponseFollowupSection profiles={typedSingles} summaries={responseSummaries} loading={responsesLoading} error={responsesError} refresh={() => void refetchResponses()} onPhoto={setLightboxUrl} /> : <>
+            {unmatchedSearchIsDebouncing || unmatchedQueueIsRefreshing ? <div className="rounded-xl bg-white p-8 text-center text-[#191265]">{unmatchedNameSearch.trim() ? "מחפשת לפי שם..." : "טוענת את תור הממתינים..."}</div> : unmatchedView === "nonresponse" ? <ResponseFollowupSection profiles={typedSingles} summaries={responseSummaries} loading={responsesLoading} error={responsesError} refresh={() => void refetchResponses()} onPhoto={setLightboxUrl} searchQuery={debouncedUnmatchedNameSearch} /> : <>
 
             <div className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between">
               <div>
@@ -2856,10 +2903,10 @@ export default function CRMMatchmaking() {
               <div className="bg-white rounded-xl p-8 text-center text-[#191265]">טוענת את תור הממתינים לפי זמן ההמתנה...</div>
             ) : (singlesWithoutMatches as any[]).length === 0 ? (
               <div className="bg-white rounded-xl p-8 text-center">
-                <div className="text-4xl mb-3">{unmatchedResult.total ? "↩" : "🎉"}</div>
-                <p className="text-[#191265] font-bold">{unmatchedResult.total ? "אין אנשים בעמוד הזה" : "אין כרגע התאמות שממתינות לטיפול"}</p>
-                <p className="text-xs text-[#727272] mt-1">{unmatchedResult.total ? "ייתכן שהרשימה התעדכנה לאחר שליחה. חזרי לעמוד הקודם." : "אין פרופיל שעבר 14 יום ואין פידבק פתוח שדורש בדיקת התאמות"}</p>
-                {unmatchedResult.total > 0 && <button onClick={() => setUnmatchedPage(page => Math.max(1, page - 1))} className="mt-3 text-xs underline text-[#191265]">לעמוד הקודם</button>}
+                <div className="text-4xl mb-3">{hasUnmatchedNameSearch ? "🔎" : unmatchedResult.total ? "↩" : "🎉"}</div>
+                <p className="text-[#191265] font-bold">{hasUnmatchedNameSearch ? "לא נמצאו ממתינים בשם הזה" : unmatchedResult.total ? "אין אנשים בעמוד הזה" : "אין כרגע התאמות שממתינות לטיפול"}</p>
+                <p className="text-xs text-[#727272] mt-1">{hasUnmatchedNameSearch ? "אפשר לנסות שם אחר או לנקות את החיפוש." : unmatchedResult.total ? "ייתכן שהרשימה התעדכנה לאחר שליחה. חזרי לעמוד הקודם." : "אין פרופיל שעבר 14 יום ואין פידבק פתוח שדורש בדיקת התאמות"}</p>
+                {hasUnmatchedNameSearch ? <button type="button" onClick={() => changeUnmatchedNameSearch("")} className="mt-3 text-xs underline text-[#191265]">נקה חיפוש</button> : unmatchedResult.total > 0 && <button onClick={() => setUnmatchedPage(page => Math.max(1, page - 1))} className="mt-3 text-xs underline text-[#191265]">לעמוד הקודם</button>}
               </div>
             ) : (<>
               {(singlesWithoutMatches as any[]).map((s: any) => {

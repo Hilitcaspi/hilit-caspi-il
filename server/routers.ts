@@ -78,6 +78,7 @@ import { createPurchaseTrackingIdentity, getClientIp, normalizeMetaCookie, PAYME
 import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
 import { wasMatchProposalSent } from "../shared/matchDelivery";
 import { blocksNewMatch } from "./unmatchedQueue";
+import { filterProfilesByName } from "../shared/profileNameSearch";
 import {
   buildLastAcceptedDeliveryBySingle,
   buildRecipientMatchHistory,
@@ -5433,7 +5434,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * delivery evidence prevents failed email for one side from being counted.
      */
     getSinglesWithoutMatches: teamProcedure
-      .input(z.object({ page: z.number().int().min(1).default(1), limit: z.number().int().min(10).max(100).default(40) }).optional())
+      .input(z.object({ page: z.number().int().min(1).default(1), limit: z.number().int().min(10).max(100).default(40), search: z.string().max(100).optional() }).optional())
       .query(async ({ ctx, input }) => {
       if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
@@ -5520,7 +5521,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         return lastMatch < fourteenDaysAgo;
       });
       // Longest waiting always comes first; feedback affects inclusion only.
-      const sortedSinglesWithout = sortWaitingProfilesByWaitingFrom(singlesWithout, lastMatchDateBySingle, queueNow);
+      const nameFilteredSinglesWithout = filterProfilesByName(singlesWithout, input?.search || "");
+      const sortedSinglesWithout = sortWaitingProfilesByWaitingFrom(nameFilteredSinglesWithout, lastMatchDateBySingle, queueNow);
       const pagedSingles = sortedSinglesWithout.slice((page - 1) * limit, page * limit);
       const pagedSingleIds = new Set(pagedSingles.map(single => single.id));
       const historicalOpponentIds = new Set<number>();
