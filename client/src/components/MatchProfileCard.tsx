@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { getPairPreferenceIndicators } from "@shared/pairPreferenceIndicators";
+import { PairCriterionIndicator } from "./PairCriterionIndicator";
 
 export type MatchProfile = {
   id: number; firstName?: string | null; lastName?: string | null; name?: string | null;
@@ -64,8 +66,8 @@ export function MatchProfileFacts({ profile, sentCount }: { profile: MatchProfil
     {profile.subscriptionRenewsAt ? <p className={Date.now() > profile.subscriptionRenewsAt ? "text-red-700 font-bold" : ""}>מנוי עד: {new Date(profile.subscriptionRenewsAt).toLocaleDateString("he-IL")}{Date.now() > profile.subscriptionRenewsAt ? " (פג תוקף)" : ""}</p> : null}
   </div>;
 }
-export default function MatchProfileCard({ profile, onPhoto, sentCount, horizontal = false, comparison = false }: { profile: MatchProfile; onPhoto?: (url: string) => void; sentCount?: number; horizontal?: boolean; comparison?: boolean }) {
-  if (comparison) return <ComparisonProfile profile={profile} onPhoto={onPhoto} sentCount={sentCount} />;
+export default function MatchProfileCard({ profile, otherProfile, onPhoto, sentCount, horizontal = false, comparison = false }: { profile: MatchProfile; otherProfile?: MatchProfile; onPhoto?: (url: string) => void; sentCount?: number; horizontal?: boolean; comparison?: boolean }) {
+  if (comparison) return <ComparisonProfile profile={profile} otherProfile={otherProfile} onPhoto={onPhoto} sentCount={sentCount} />;
   const name = profile.name || `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
   return <article className={`min-w-0 rounded-xl p-3 ${profile.isCoachingClient ? "bg-pink-50 ring-1 ring-pink-200" : "bg-[#f8f6f0]"}`}>
     <div className={`flex gap-3 items-start ${horizontal ? "flex-row" : "flex-col sm:flex-row"}`}>
@@ -106,16 +108,17 @@ export default function MatchProfileCard({ profile, onPhoto, sentCount, horizont
 }
 
 /** Familiar pending-match layout, shared by both pair-comparison views. */
-function ComparisonProfile({ profile, onPhoto, sentCount }: { profile: MatchProfile; onPhoto?: (url: string) => void; sentCount?: number }) {
+function ComparisonProfile({ profile, otherProfile, onPhoto, sentCount }: { profile: MatchProfile; otherProfile?: MatchProfile; onPhoto?: (url: string) => void; sentCount?: number }) {
   const name = profile.name || `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
   const joined = profile.subscriptionStartedAt || profile.createdAt;
   const date = joined ? new Date(joined) : null;
+  const indicators = otherProfile ? getPairPreferenceIndicators(profile, otherProfile) : undefined;
   return <article className="min-w-0" data-match-comparison="classic">
     <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-2">
       <ProfilePhoto profile={profile} onPhoto={onPhoto} size="comparison" />
       <div className="w-full sm:w-auto flex-1 min-w-0">
         <h4 className="font-bold text-[#191265] text-sm truncate" title={name}>{name}</h4>
-        <p className="text-xs text-[#727272]">{profile.gender === "female" ? "אישה" : profile.gender === "male" ? "גבר" : ""} · {profile.age || "גיל לא צוין"} · {profile.city || "עיר לא צוינה"}</p>
+        <p className="text-xs leading-5 text-[#727272]">{profile.gender === "female" ? "אישה" : profile.gender === "male" ? "גבר" : "מגדר לא צוין"}<PairCriterionIndicator criterion="מגדר" indicator={indicators?.gender} /> · {profile.age || "גיל לא צוין"}<PairCriterionIndicator criterion="גיל" indicator={indicators?.age} /> · {profile.city || "עיר לא צוינה"}<PairCriterionIndicator criterion="מגורים" indicator={indicators?.location} /></p>
         {profile.dnaType && <p className="text-xs text-[#1800ad] font-medium">{DNA[profile.dnaType] || profile.dnaType}</p>}
         <div className="flex flex-wrap gap-1 mt-1 text-[9px] font-bold">
           {profile.isCoachingClient && <span className="rounded-full bg-pink-200 text-pink-800 px-1.5">מלווה</span>}
@@ -125,15 +128,16 @@ function ComparisonProfile({ profile, onPhoto, sentCount }: { profile: MatchProf
     </div>
     <div className="space-y-1 text-xs text-[#727272]">
       {profile.occupation && <p>💼 {profile.occupation}</p>}
-      {profile.education && <p>🎓 {EDUCATION[profile.education] || profile.education}</p>}
-      {profile.religiosity && <p>✨ {RELIGION[profile.religiosity] || profile.religiosity}</p>}
+      {profile.education && <p>🎓 {EDUCATION[profile.education] || profile.education}<PairCriterionIndicator criterion="השכלה" indicator={indicators?.education} /></p>}
+      {profile.religiosity && <p>✨ {RELIGION[profile.religiosity] || profile.religiosity}<PairCriterionIndicator criterion="רמה דתית" indicator={indicators?.religiosity} /></p>}
       {profile.maritalStatus && <p>💍 {MARITAL[profile.maritalStatus] || profile.maritalStatus}</p>}
-      {profile.height && <p>📏 {profile.height} ס״מ</p>}
-      {profile.hasKids != null && <p>👶 {profile.hasKids ? `יש ילדים${profile.numKids ? ` (${profile.numKids})` : ""}` : "אין ילדים"}{profile.wantsKids ? ` · ${profile.wantsKids === "yes" ? "רוצה ילדים" : profile.wantsKids === "no" ? "לא רוצה ילדים" : "פתיחות לנושא"}` : ""}</p>}
+      {profile.height && <p>📏 {profile.height} ס״מ<PairCriterionIndicator criterion="גובה" indicator={indicators?.height} /></p>}
+      {profile.hasKids != null && <p>👶 {profile.hasKids ? `יש ילדים${profile.numKids ? ` (${profile.numKids})` : ""}` : "אין ילדים"}<PairCriterionIndicator criterion="ילדים קיימים" indicator={indicators?.hasKids} /></p>}
+      {profile.wantsKids && <p>{profile.wantsKids === "yes" ? "רוצה ילדים" : profile.wantsKids === "no" ? "לא רוצה ילדים" : "פתיחות לנושא"}<PairCriterionIndicator criterion="רצון בילדים" indicator={indicators?.wantsKids} /></p>}
       <p>שמירת שבת: {profile.shomerShabbat == null ? "לא צוין" : profile.shomerShabbat ? "כן" : "לא"}</p>
       <p>שמירת נגיעה: לא מתועד במערכת</p>
-      {profile.hasPets != null && <p>🐾 {profile.hasPets ? profile.petType || "יש חיית מחמד" : "אין חיית מחמד"}{profile.acceptsPets != null ? profile.acceptsPets ? " · פתיחות לחיות" : " · ללא חיות" : ""}</p>}
-      {profile.smokingStatus && <p>עישון: {profile.smokingStatus === "no" ? "לא" : profile.smokingStatus === "yes" ? "כן" : "לפעמים"}</p>}
+      {profile.hasPets != null && <p>🐾 {profile.hasPets ? profile.petType || "יש חיית מחמד" : "אין חיית מחמד"}<PairCriterionIndicator criterion="חיות מחמד" indicator={indicators?.pets} />{profile.acceptsPets != null ? profile.acceptsPets ? " · פתיחות לחיות" : " · ללא חיות" : ""}</p>}
+      {profile.smokingStatus && <p>עישון: {profile.smokingStatus === "no" ? "לא" : profile.smokingStatus === "yes" ? "כן" : "לפעמים"}<PairCriterionIndicator criterion="עישון" indicator={indicators?.smoking} /></p>}
       <p>מרחק: {locationPreferenceLabel(profile.locationPreference)}</p>
       <p>גיל רצוי: {preferenceRange(profile.minAgePreference, profile.maxAgePreference)}</p>
       {profile.religiosityPreference && <p>רמה דתית רצויה: {profile.religiosityPreference.split(",").map(v => RELIGION[v.trim()] || v.trim()).join(", ")}</p>}

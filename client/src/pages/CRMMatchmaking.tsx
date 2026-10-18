@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import MatchProfileCard, { MatchProfileFacts, MatchPreferenceFacts, ProfilePhoto, preferenceRange, type MatchProfile } from "@/components/MatchProfileCard";
+import { PairCriteriaLegend } from "@/components/PairCriterionIndicator";
 import { buildAdvancedMatchExclusions, isAdvancedMatchCandidate } from "@shared/advancedMatchCandidates";
 import { getAdvancedMatchFilterDefaults } from "@shared/advancedMatchFilterDefaults";
 import ResponseFollowupSection from "@/components/ResponseFollowupSection";
@@ -1302,9 +1303,10 @@ export default function CRMMatchmaking() {
                       {compatData && filterTargetProfile && (
                         <details className="mt-4 rounded-xl border border-[#191265]/10 bg-[#faf9f5] p-3">
                           <summary className="cursor-pointer text-sm font-bold text-[#191265]">השוואה זוגית · {Math.round(compatData.score)}%</summary>
+                          <PairCriteriaLegend />
                           <div className="grid grid-cols-2 gap-3 mt-3">
                             {[filterTargetProfile, single].map(profile => <div key={profile.id} className={`rounded-xl p-3 ${profile.isCoachingClient ? 'bg-pink-50 ring-1 ring-pink-200' : 'bg-[#f8f6f0]'}`}>
-                              <MatchProfileCard profile={asMatchProfile(profile)} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(profile.id)?.length || 0} />
+                              <MatchProfileCard profile={asMatchProfile(profile)} otherProfile={asMatchProfile(profile.id === filterTargetProfile.id ? single : filterTargetProfile)} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(profile.id)?.length || 0} />
                             </div>)}
                           </div>
                         </details>
@@ -2323,11 +2325,12 @@ export default function CRMMatchmaking() {
                   {/* Expanded content */}
                   {isExpanded && (
                     <div className="border-t border-gray-100 p-4">
+                      <PairCriteriaLegend />
                       {/* Two profile cards side by side */}
                       <div className="grid grid-cols-2 gap-3 mb-4">
                         {persons.map((s, i) => (
                           <div key={i} className={`rounded-xl p-3 ${(s as any).isCoachingClient ? 'bg-pink-50 ring-1 ring-pink-200' : 'bg-[#f8f6f0]'}`}>
-                            <MatchProfileCard profile={comparisonProfile(s)} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(s.id)?.length || 0} />
+                            <MatchProfileCard profile={comparisonProfile(s)} otherProfile={comparisonProfile(persons[i === 0 ? 1 : 0])} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(s.id)?.length || 0} />
                             {/* Per-person status badge */}
                             {s.personStatus && (
                               <div className={`mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${s.personStatus.color}`}>
@@ -3055,6 +3058,12 @@ export default function CRMMatchmaking() {
             compatDropdownB={compatDropdownB}
             setCompatDropdownB={setCompatDropdownB}
             compatResult={compatResult}
+            comparisonProfiles={[compatResult?.personA, compatResult?.personB].map(person => {
+              if (!person) return undefined;
+              const current = typedSingles.find(single => single.id === person.id);
+              return current ? asMatchProfile(current) : person as MatchProfile;
+            })}
+            onPhoto={setLightboxUrl}
             isLoading={checkCompatMutation.isPending}
             onCheck={() => {
               if (!compatPersonA || !compatPersonB) { toast.error("בחר/י שני אנשים"); return; }
@@ -3477,6 +3486,8 @@ interface CompatibilityCheckTabProps {
   compatDropdownB: boolean;
   setCompatDropdownB: (v: boolean) => void;
   compatResult: any;
+  comparisonProfiles?: (MatchProfile | undefined)[];
+  onPhoto?: (url: string) => void;
   isLoading: boolean;
   onCheck: () => void;
   onSendMatch: (allowCriteriaOverride?: boolean) => void;
@@ -3637,6 +3648,8 @@ function CompatibilityCheckTab({
   compatDropdownB,
   setCompatDropdownB,
   compatResult,
+  comparisonProfiles,
+  onPhoto,
   isLoading,
   onCheck,
   onSendMatch,
@@ -3768,6 +3781,18 @@ function CompatibilityCheckTab({
               </div>
             </div>
           </div>
+
+          {comparisonProfiles?.[0] && comparisonProfiles?.[1] && (
+            <div className="rounded-2xl bg-white p-3 sm:p-5 shadow-sm" data-manual-pair-comparison>
+              <h3 className="text-sm font-bold text-[#191265]">השוואה זוגית לפי ההעדפות</h3>
+              <PairCriteriaLegend />
+              <div className="grid grid-cols-2 gap-3">
+                {comparisonProfiles.map((profile, index) => profile && <div key={profile.id} className="min-w-0 rounded-xl bg-[#f8f6f0] p-3">
+                  <MatchProfileCard profile={profile} otherProfile={comparisonProfiles[index === 0 ? 1 : 0]} comparison onPhoto={onPhoto} />
+                </div>)}
+              </div>
+            </div>
+          )}
 
           {/* Breakdown Bars */}
           <div className="bg-white rounded-2xl shadow-sm p-5">

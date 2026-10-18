@@ -31,7 +31,7 @@ describe("waiting workspace UI safety and performance contracts", () => {
     expect(ui).toContain("rankForFilter.mutateAsync");
     expect(ui).toContain("filteredResults.slice(0, filterVisibleLimit)");
     expect(ui).toContain("setFilterVisibleLimit(limit => limit + 5)");
-    expect(ui).toContain("profile={asMatchProfile(profile)} comparison");
+    expect(ui).toMatch(/profile=\{asMatchProfile\(profile\)\} otherProfile=\{asMatchProfile\(profile.id === filterTargetProfile.id \? single : filterTargetProfile\)\} comparison/);
     expect(ui).toContain("window.confirm(`לשלוח התאמה בין");
     expect(ui).toContain("advancedExclusions.unavailableIds.has(filterCompatTarget!)");
     expect(ui).toContain("isAdvancedMatchCandidate(s, advancedExclusions");

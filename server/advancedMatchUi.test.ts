@@ -8,9 +8,9 @@ describe("advanced matchmaking UI contracts (no network or customer data)", () =
     expect(ui).toMatch(/id: "unmatched"[^\n]+\n\s*\{ id: "filter_search"[^\n]+\n\s*\{ id: "compatibility"[^\n]+\n\s*\{ id: "now"/);
   });
   it("uses the same profile card for pending and advanced pair comparisons", () => {
-    expect(ui).toContain("profile={comparisonProfile(s)} comparison");
+    expect(ui).toMatch(/profile=\{comparisonProfile\(s\)\} otherProfile=\{comparisonProfile\(persons\[i === 0 \? 1 : 0\]\)\} comparison/);
     expect(ui).toContain("profile={asMatchProfile(filterTargetProfile)}");
-    expect(ui).toContain("profile={asMatchProfile(profile)} comparison");
+    expect(ui).toMatch(/profile=\{asMatchProfile\(profile\)\} otherProfile=\{asMatchProfile\(profile.id === filterTargetProfile.id \? single : filterTargetProfile\)\} comparison/);
     expect(ui).toContain("השוואה זוגית");
     expect(card).toContain('data-match-comparison="classic"');
     expect(card).toContain('size="comparison"');
