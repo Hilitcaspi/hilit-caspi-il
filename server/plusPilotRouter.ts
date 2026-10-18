@@ -13,6 +13,9 @@ import { isPlusArchived } from "../shared/plusServiceCycle";
 import { buildPlusServiceHistory } from "../shared/plusServiceHistory";
 import { endPlusLocally } from "./plusLocalEnd";
 import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
+import { recordPlusCancellation } from "./plusCancellation";
+import { notifyPlusCancellation } from "./plusCancellationNotifications";
+import { isPlusCancellationPending, loadPlusCancellationQueue } from "./plusCancellationQueue";
 import { PLUS_CHECKOUT_PUBLICLY_AVAILABLE } from "./growPayment";
 import {
   PLUS_HOLIDAY_LAUNCH_COHORT,
@@ -182,7 +185,9 @@ export const plusPilotRouter = router({
         getMemberMatches(db, single.id),
       ]);
       const eligibility = assessPlusEligibility(single, memberMatches);
+      const cancellationPending = await isPlusCancellationPending(db, pilot[0]);
       return {
+        cancellationPending,
         status: pilot[0]?.status || "none",
         pilot: pilot[0] || null,
         profile: {
@@ -287,48 +292,21 @@ export const plusPilotRouter = router({
     }))
     .mutation(async ({ input }) => {
       const { db, single } = await getVerifiedSingle(input.email, input.token);
-      const [member] = await db.select().from(plusPilotMembers)
-        .where(eq(plusPilotMembers.singleId, single.id)).limit(1);
-      if (!member || member.status !== "active") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "לא נמצא מנוי Plus פעיל" });
+      const request = await recordPlusCancellation(db, single.id);
+      if (request.firstRequest) {
+        // Intake is committed before any notification. Repeated clicks do not re-send.
+        await notifyPlusCancellation(db, request.requestKey);
+        if (single.email) {
+          try {
+            await sendEmail({
+              to: { email: single.email, name: single.firstName },
+              subject: "בקשת ביטול Database Plus התקבלה",
+              htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">בקשת הביטול התקבלה</h2><p style="line-height:1.8">בקשת עצירת החידוש נקלטה והועברה לטיפול בעצירת הוראת הקבע אצל ספק התשלום. אישור זה הוא אישור קליטת הבקשה, ולא אישור שהחיוב כבר הופסק.</p><p style="line-height:1.8">החברות הרגילה שלך במאגר נשארת ללא שינוי.</p></div>`,
+            });
+          } catch { console.warn("[PlusCancellation] Confirmation unavailable; request remains queued."); }
+        }
       }
-      const now = Date.now();
-      const serviceAccessUntil = calculatePlusServiceProgress(member, [], now).cycleEnd;
-      await db.update(plusPilotMembers).set({
-        billingStatus: "cancelled",
-        cancelledAt: now,
-        nextBillingAt: null,
-        updatedAt: now,
-      }).where(eq(plusPilotMembers.id, member.id));
-
-      const [openTask] = await db.select({ id: crmTeamTasks.id }).from(crmTeamTasks).where(and(
-        eq(crmTeamTasks.singleId, single.id),
-        eq(crmTeamTasks.taskType, "plus"),
-        or(eq(crmTeamTasks.status, "todo"), eq(crmTeamTasks.status, "in_progress")),
-      )).limit(1);
-      if (!openTask) {
-        await db.insert(crmTeamTasks).values({
-          singleId: single.id,
-          taskType: "plus",
-          title: "Plus: לעצור חיוב עתידי ב־Grow",
-          description: `בקשת ביטול התקבלה. מזהה מנוי: ${member.providerSubscriptionId || "לא התקבל"}. סיבה: ${input.reason?.trim() || "לא צוינה"}`,
-          priority: "urgent",
-          status: "todo",
-          dueAt: Math.min(serviceAccessUntil || now, now + 2 * DAY_MS),
-          createdBy: "plus_self_service_cancellation",
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-
-      if (single.email) {
-        await sendEmail({
-          to: { email: single.email, name: single.firstName },
-          subject: "בקשת ביטול Database Plus התקבלה",
-          htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:28px;color:#292552"><h2 style="color:#191265">בקשת הביטול התקבלה</h2><p style="line-height:1.8">בקשת עצירת החידוש הועברה לטיפול. הטבות Plus יישארו פעילות עד סוף מחזור החיוב הנוכחי.</p><p style="line-height:1.8">החברות הרגילה שלך במאגר נשארת ללא שינוי.</p></div>`,
-        });
-      }
-      return { success: true, accessUntil: serviceAccessUntil || now };
+      return { success: true, accessUntil: request.accessUntil, cancellationPending: true, providerChanged: false };
     }),
 
   adminOverview: teamProcedure.query(async ({ ctx }) => {
@@ -351,6 +329,8 @@ export const plusPilotRouter = router({
     }).from(plusPilotMembers)
       .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
       .orderBy(desc(plusPilotMembers.updatedAt));
+    const cancellationQueue = await loadPlusCancellationQueue(db, rows);
+    const cancellationPendingIds = new Set(cancellationQueue.map(row => row.plusMemberId));
 
     const [allMatches, boostRows, boostMembershipRows, paymentRows, matchSingles, pendingPaidProfiles, relaunchLogs, checkoutAttributionRows, holidayLaunchLogs] = await Promise.all([
       db.select({
@@ -504,6 +484,7 @@ export const plusPilotRouter = router({
       const holidayLaunchTracking = buildPlusHolidayLaunchTracking(row.pilot, checkoutAttribution);
       return {
         ...row,
+        cancellationPending: cancellationPendingIds.has(row.pilot.id),
         archived: isPlusArchived(row.pilot),
         confirmedPayment: hasConfirmedProductionPlusPayment(paymentEvents),
         cycleProgress,
@@ -576,6 +557,7 @@ export const plusPilotRouter = router({
     };
     return {
       counts,
+      cancellationQueue,
       commitment,
       serviceNeeds: { members: enrichedRows.filter(row => !row.archived && row.cycleProgress.needsMatches).length, proposals: enrichedRows.filter(row => !row.archived && row.cycleProgress.needsMatches).reduce((sum, row) => sum + row.cycleProgress.remaining, 0) },
       capacity,

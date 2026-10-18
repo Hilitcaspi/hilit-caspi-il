@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import { MySqlDialect } from "drizzle-orm/mysql-core";
 import { endPlusLocally } from "./plusLocalEnd";
-import { plusPilotMembers, crmTeamTasks } from "../drizzle/schema";
+import { plusPilotMembers, crmTeamTasks, plusCancellationRequests } from "../drizzle/schema";
 import { plusPilotRouter } from "./plusPilotRouter";
 function fakeDb(member:any,failAudit=false) {
  const writes:any[]=[];
+ const dialect=new MySqlDialect();
  const tx:any={select:()=>({from:()=>({where:()=>({limit:()=>({for:()=>Promise.resolve(member?[member]:[])})})})}),
- update:(table:any)=>({set:(values:any)=>({where:async()=>writes.push({table,values})})}),
+ update:(table:any)=>({set:(values:any)=>({where:async(condition:any)=>writes.push({table,values,condition:dialect.sqlToQuery(condition)})})}),
  insert:(table:any)=>({values:async(values:any)=>{if(failAudit)throw Error('synthetic audit failure');writes.push({table,values});}})};
  const db={transaction:vi.fn(async(fn:any)=>fn(tx))};return {db,writes};
 }
@@ -23,10 +25,13 @@ describe('local Plus end without provider action',()=>{
  it('atomically ends Plus and records a local staff action only',async()=>{
   const {db,writes}=fakeDb({id:1,singleId:2,status:'active',billingStatus:'active'});
   expect(await endPlusLocally(db,1,1000)).toEqual({success:true,alreadyEnded:false,providerChanged:false});
-  expect(db.transaction).toHaveBeenCalledOnce();expect(writes.length).toBe(3);
+  expect(db.transaction).toHaveBeenCalledOnce();expect(writes.length).toBe(5);
   expect(writes[0].table).toBe(plusPilotMembers);expect(writes[0].values).toEqual({status:'churned',billingStatus:'ended',premiumSupportEnabled:false,nextBillingAt:null,endedAt:1000,cancelledAt:1000,updatedAt:1000});
-  expect(writes[1].table).toBe(crmTeamTasks);expect(writes[1].values.status).toBe('cancelled');
-  expect(writes[2].values.createdBy).toBe('plus_local_end');expect(writes[2].values.status).toBe('done');
+  expect(writes[1].table).toBe(crmTeamTasks);expect(writes[1].values.status).toBe('cancelled');expect(writes[1].condition.params).toEqual([2,'plus','plus_commitment_monitor','todo','in_progress']);
+  expect(writes[2].table).toBe(plusCancellationRequests);expect(writes[2].values).toEqual({resolvedAt:1000,updatedAt:1000});expect(writes[2].condition.params).toEqual([1]);
+  expect(writes[3].table).toBe(crmTeamTasks);expect(writes[3].values).toEqual({status:'done',completedAt:1000,updatedAt:1000});expect(writes[3].condition.params).toEqual([2,'plus','plus_self_service_cancellation','todo','in_progress']);
+  expect(writes[4].values.createdBy).toBe('plus_local_end');expect(writes[4].values.status).toBe('done');
+  expect(writes[4]).toMatchObject({table:crmTeamTasks});
   expect(writes[0].values).not.toHaveProperty('billingCycleStartedAt');expect(writes[0].values).not.toHaveProperty('lastPaymentAt');
  });
  it('makes repeat end idempotent without another audit or record write',async()=>{

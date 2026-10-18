@@ -31,6 +31,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
   });
   const cancelPlus = trpc.plusPilot.requestCancellation.useMutation({
     onSuccess: () => utils.plusPilot.getMyStatus.invalidate({ email, token }),
+    onError: error => toast.error(error.message),
   });
 
   if (statusQuery.isLoading) {
@@ -38,8 +39,11 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
   }
   if (!statusQuery.data) return null;
 
-  const { status, pilot, eligibility, benefits, cycleProgress } = statusQuery.data;
+  const { status, pilot, eligibility, benefits, cycleProgress, cancellationPending } = statusQuery.data;
   const registered = (status as string) !== "none";
+  const canRequestCancellation = status === "active"
+    && (pilot?.billingStatus === "active" || pilot?.billingStatus === "past_due")
+    && !cancellationPending;
   const statusLabel: Record<string, string> = {
     waitlist: "ברשימת ההמתנה",
     eligible: "מתאים/ה לפיילוט",
@@ -112,10 +116,20 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
           </div>
         )}
 
-        {status === "active" && (pilot as any)?.billingStatus === "active" && (
-          <details className="mt-4 rounded-xl border border-[#e6dfcc] bg-white/70 p-4 text-[11px] text-[#666]">
-            <summary className="cursor-pointer font-bold text-[#191265]">ניהול וביטול המנוי</summary>
-            <p className="mt-2 leading-5">אפשר לבטל בכל עת. הטבות Plus נשארות עד סוף המחזור הנוכחי ופרטי הפרופיל וההיסטוריה נשמרים.</p>
+        {(status === "eligible" || status === "invited" || !registered) && (
+          <p className="mt-4 border-t border-[#eadf9e] pt-4 text-[11px] font-bold leading-5 text-[#6b6250]">
+            ההצטרפות למסלול סגורה כרגע. נעדכן כאן כשהיא תיפתח מחדש.
+          </p>
+        )}
+
+        {status === "active" && cancellationPending && (
+          <p className="mt-4 border-t border-[#eadf9e] pt-3 text-xs leading-5 text-slate-600">בקשת הביטול התקבלה והועברה לטיפול בעצירת הוראת הקבע. החיוב אצל ספק התשלום עדיין דורש טיפול; החברות הרגילה במאגר נשארת ללא שינוי.</p>
+        )}
+
+        {canRequestCancellation && (
+          <details className="mt-4 border-t border-[#eadf9e] pt-3 text-xs text-slate-600">
+            <summary className="cursor-pointer font-medium text-slate-700 hover:underline focus:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#191265] focus-visible:ring-offset-2">ניהול המנוי וביטול החידוש</summary>
+            <p className="mt-2 leading-5">אפשר לבקש ביטול חידוש. הבקשה מועברת לטיפול מול ספק התשלום; פרטי הפרופיל וההיסטוריה נשמרים.</p>
             <button
               type="button"
               disabled={cancelPlus.isPending}
@@ -124,21 +138,11 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
                   cancelPlus.mutate({ email, token });
                 }
               }}
-              className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 font-bold text-red-700 disabled:opacity-50"
+              className="mt-3 p-0 font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#191265] focus-visible:ring-offset-2 disabled:opacity-50"
             >
-              {cancelPlus.isPending ? "שולח/ת בקשה..." : "ביטול החידוש הבא"}
+              {cancelPlus.isPending ? "הבקשה נשלחת…" : "ביטול החידוש הבא"}
             </button>
           </details>
-        )}
-
-        {status === "active" && (pilot as any)?.billingStatus === "cancelled" && (
-          <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">בקשת הביטול התקבלה. Plus נשאר פעיל עד סוף המחזור הנוכחי ולא יתחדש לאחר מכן.</p>
-        )}
-
-        {(status === "eligible" || status === "invited" || !registered) && (
-          <p className="mt-4 border-t border-[#eadf9e] pt-4 text-[11px] font-bold leading-5 text-[#6b6250]">
-            ההצטרפות למסלול סגורה כרגע. נעדכן כאן כשהיא תיפתח מחדש.
-          </p>
         )}
       </div>
     </section>

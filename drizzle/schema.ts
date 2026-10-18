@@ -1020,6 +1020,28 @@ export const plusPilotMembers = mysqlTable("plus_pilot_members", {
 export type PlusPilotMember = typeof plusPilotMembers.$inferSelect;
 export type InsertPlusPilotMember = typeof plusPilotMembers.$inferInsert;
 
+/** Private operational recipient configuration; never returned by public/team APIs. */
+export const plusCancellationSettings = mysqlTable("plus_cancellation_settings", {
+  ownerOpenId: varchar("owner_open_id", { length: 64 }).primaryKey(),
+  recipientEmail: varchar("recipient_email", { length: 320 }).notNull(),
+  recipientPhone: varchar("recipient_phone", { length: 30 }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+
+/** A cancellation request is not evidence of a Grow stop. */
+export const plusCancellationRequests = mysqlTable("plus_cancellation_requests", {
+  id: int("id").primaryKey().autoincrement(),
+  requestKey: varchar("request_key", { length: 191 }).notNull().unique(),
+  plusMemberId: int("plus_member_id").notNull(),
+  requestedAt: bigint("requested_at", { mode: "number" }).notNull(),
+  resolvedAt: bigint("resolved_at", { mode: "number" }),
+  pushStatus: mysqlEnum("push_status", ["sending", "accepted", "failed", "unknown"]).notNull(),
+  emailStatus: mysqlEnum("email_status", ["sending", "accepted", "failed", "unknown"]).notNull(),
+  smsStatus: mysqlEnum("sms_status", ["sending", "accepted", "failed", "unknown"]).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+}, table => ({ memberIdx: index("plus_cancellation_member_idx").on(table.plusMemberId, table.resolvedAt) }));
+export type PlusCancellationRequest = typeof plusCancellationRequests.$inferSelect;
+
 /**
  * Public Database Plus checkout lifecycle before a full singles profile exists.
  * The row is keyed by normalized email so retries update the same intent and a

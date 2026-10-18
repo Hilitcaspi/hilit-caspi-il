@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, or } from "drizzle-orm";
-import { crmTeamTasks, plusPilotMembers } from "../drizzle/schema";
+import { and, eq, isNull, or } from "drizzle-orm";
+import { crmTeamTasks, plusCancellationRequests, plusPilotMembers } from "../drizzle/schema";
 
 /** Called only by the authorized team procedure after provider-stop confirmation. */
 export async function endPlusLocally(db: any, id: number, now = Date.now()) {
@@ -17,6 +17,15 @@ export async function endPlusLocally(db: any, id: number, now = Date.now()) {
     await tx.update(crmTeamTasks).set({ status: "cancelled", completedAt: now, updatedAt: now }).where(and(
       eq(crmTeamTasks.singleId, member.singleId), eq(crmTeamTasks.taskType, "plus"),
       eq(crmTeamTasks.createdBy, "plus_commitment_monitor"),
+      or(eq(crmTeamTasks.status, "todo"), eq(crmTeamTasks.status, "in_progress")),
+    ));
+    // This records staff confirmation, not an API-verified stop by the provider.
+    await tx.update(plusCancellationRequests).set({ resolvedAt: now, updatedAt: now }).where(and(
+      eq(plusCancellationRequests.plusMemberId, id), isNull(plusCancellationRequests.resolvedAt),
+    ));
+    await tx.update(crmTeamTasks).set({ status: "done", completedAt: now, updatedAt: now }).where(and(
+      eq(crmTeamTasks.singleId, member.singleId), eq(crmTeamTasks.taskType, "plus"),
+      eq(crmTeamTasks.createdBy, "plus_self_service_cancellation"),
       or(eq(crmTeamTasks.status, "todo"), eq(crmTeamTasks.status, "in_progress")),
     ));
     await tx.insert(crmTeamTasks).values({

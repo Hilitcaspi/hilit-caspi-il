@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import PlusCancellationQueue from "@/components/PlusCancellationQueue";
 
 const STATUS_LABELS: Record<string, string> = {
   waitlist: "רשימת המתנה",
@@ -80,6 +81,7 @@ export default function PlusPilotAdminSection() {
   if (overview.isLoading) return <section className="h-44 rounded-2xl bg-white animate-pulse border border-[#e9e8e8]" />;
   if (!overview.data) return <section className="rounded-2xl border bg-white p-5"><p>לא ניתן לטעון את נתוני Plus כרגע.</p><button type="button" onClick={() => overview.refetch()}>ניסיון נוסף</button></section>;
   const { counts, commitment, capacity, capacityBreakdown, pendingPaidProfiles, relaunchStats, holidayLaunchStats, waitlistToInviteRate, inviteToActiveRate, retentionRate, serviceNeeds } = overview.data;
+  const cancellationQueue = overview.data.cancellationQueue;
 
   const changeStatus = (id: number, status: "waitlist" | "eligible" | "invited" | "active" | "declined" | "churned") => {
     updateStatus.mutate({
@@ -106,6 +108,17 @@ export default function PlusPilotAdminSection() {
           <label className="rounded-xl border bg-white px-3 py-2">מחיר פיילוט ₪ <input type="number" min="0" value={price} onChange={event => setPrice(event.target.value)} className="mr-2 w-16 outline-none" /></label>
         </div>
       </div>
+
+      <PlusCancellationQueue
+        rows={cancellationQueue}
+        refreshing={overview.isFetching}
+        onRefresh={() => overview.refetch()}
+        onEnd={request => {
+          const fullName = `${request.single.firstName} ${request.single.lastName || ""}`.trim();
+          setEndMember({ id: request.plusMemberId, name: fullName });
+          setProviderStopped(false);
+        }}
+      />
 
       <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-2">
         {[
@@ -230,7 +243,7 @@ export default function PlusPilotAdminSection() {
                 <p className="mt-1 text-[9px] text-[#999]">נרשם/ה לרשימה: {new Date(row.pilot.waitlistedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold">
                   <span className={`rounded-full px-2 py-1 ${row.cycleProgress.state === "green" ? "bg-emerald-100 text-emerald-800" : row.cycleProgress.state === "red" ? "bg-red-100 text-red-800" : row.cycleProgress.state === "yellow" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"}`}>{row.cycleProgress.delivered} מתוך {row.cycleProgress.target} הצעות · {row.cycleProgress.daysRemaining} ימים</span>
-                  <span className={`rounded-full px-2 py-1 ${row.pilot.billingStatus === "active" ? "bg-blue-100 text-blue-800" : row.pilot.billingStatus === "past_due" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}>מצב חיוב רשום: {row.pilot.billingStatus}</span>
+                  {row.cancellationPending ? <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-900">בקשת עצירה · ממתין לטיפול ב־Grow</span> : <span className={`rounded-full px-2 py-1 ${row.pilot.billingStatus === "active" ? "bg-blue-100 text-blue-800" : row.pilot.billingStatus === "past_due" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}>מצב חיוב רשום: {row.pilot.billingStatus}</span>}
                   {row.cycleProgress.needsMatches && <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-900">נדרשות {row.cycleProgress.remaining} הצעות חדשות</span>}
                   {row.confirmedPayment && <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">תשלום הצטרפות מתועד</span>}
                   {row.holidayLaunchEntitlement && <span className="rounded-full bg-[#10182f] px-2 py-1 text-[#ffe27c]">הטבת השקה · יעד 3/3</span>}
@@ -311,7 +324,7 @@ export default function PlusPilotAdminSection() {
         <DialogContent dir="rtl" className="max-w-md text-right">
           <DialogHeader><DialogTitle>סיום מנוי Plus באתר</DialogTitle><DialogDescription>סיום Plus עבור {endMember?.name}. המנוי יוסר מרשימת הפעילים ומתור ההתאמות ויועבר לארכיון. הטבות Plus יסתיימו מיד; החברות הרגילה במאגר והיסטוריית ההתאמות יישארו ללא שינוי.</DialogDescription></DialogHeader>
           <p className="rounded-lg bg-amber-50 p-3 text-xs leading-6 text-amber-900">פעולה זו אינה מבטלת תשלום ב־Grow. יש להפסיק את החיוב שם לפני סיום המנוי כאן.</p>
-          <label className="flex items-start gap-2 text-sm leading-6"><input type="checkbox" checked={providerStopped} onChange={event => setProviderStopped(event.target.checked)} disabled={endMembership.isPending} className="mt-1" />בדקתי שהחיוב ב־Grow הופסק, ואני מאשרת לסיים את Plus באתר.</label>
+          <label className="flex items-start gap-2 text-sm leading-6"><input type="checkbox" checked={providerStopped} onChange={event => setProviderStopped(event.target.checked)} disabled={endMembership.isPending} className="mt-1" />אישור: החיוב ב־Grow הופסק; אפשר לסיים את Plus באתר.</label>
           <div className="flex gap-2"><button type="button" disabled={!providerStopped || !endMember || endMembership.isPending} onClick={() => endMember && providerStopped && endMembership.mutate({ id: endMember.id, providerStoppedConfirmed: true })} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40">{endMembership.isPending ? "מסיים…" : "סיום Plus והעברה לארכיון"}</button><button type="button" disabled={endMembership.isPending} onClick={() => { setEndMember(null); setProviderStopped(false); }} className="rounded-lg border px-4 py-2 text-sm">ביטול</button></div>
         </DialogContent>
       </Dialog>
