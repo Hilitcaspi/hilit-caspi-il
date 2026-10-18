@@ -10,6 +10,7 @@ import { getMissingProfileFields } from "./matchmakingMetrics";
 import { calculatePlusServiceProgress, plusDeliveryEvidenceSelection } from "./plusSubscription";
 import { wasMatchProposalSent } from "../shared/matchDelivery";
 import { isPlusArchived } from "../shared/plusServiceCycle";
+import { getPlusServiceDeparture } from "../shared/plusServiceDeparture";
 import { buildPlusServiceHistory } from "../shared/plusServiceHistory";
 import { endPlusLocally } from "./plusLocalEnd";
 import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
@@ -425,6 +426,12 @@ export const plusPilotRouter = router({
     const enrichedRows = rows.map(row => {
       const memberMatches = countableMatches.filter(match => match.singleAId === row.single.id || match.singleBId === row.single.id);
       const cycleProgress = calculatePlusServiceProgress(row.pilot, memberMatches, overviewNow);
+      const cancellation = cancellationQueue.find(request => request.plusMemberId === row.pilot.id);
+      const lastManualProposalAt = memberMatches.filter(match => match.proposalSource !== "boost" && wasMatchProposalSent(match)
+        && Number(match.proposedAt || 0) >= cycleProgress.cycleStart && Number(match.proposedAt || 0) < cycleProgress.cycleEnd)
+        .reduce((latest, match) => Math.max(latest, Number(match.proposedAt || 0)), 0);
+      const serviceDeparture = getPlusServiceDeparture(row.pilot, cycleProgress,
+        { pending: Boolean(cancellation), requestedAt: cancellation?.requestedAt, lastManualProposalAt }, overviewNow);
       const serviceHistory = buildPlusServiceHistory(row.pilot, memberMatches, overviewNow);
       const memberMatchById = new Map(memberMatches.map(match => [match.id, match]));
       const historicalServicePeriods = serviceHistory.periods.map(period => ({
@@ -485,7 +492,8 @@ export const plusPilotRouter = router({
       return {
         ...row,
         cancellationPending: cancellationPendingIds.has(row.pilot.id),
-        archived: isPlusArchived(row.pilot),
+        archived: isPlusArchived(row.pilot) || serviceDeparture.state === "archived",
+        serviceDeparture,
         confirmedPayment: hasConfirmedProductionPlusPayment(paymentEvents),
         cycleProgress,
         cycleMatches,
@@ -504,7 +512,8 @@ export const plusPilotRouter = router({
         launchAttribution: holidayLaunchTracking.attribution,
       };
     });
-    const counts = Object.fromEntries(PLUS_STATUSES.map(status => [status, rows.filter(row => row.pilot.status === status).length]));
+    const counts = Object.fromEntries(PLUS_STATUSES.map(status => [status, enrichedRows.filter(row =>
+      status === "churned" ? row.archived : row.pilot.status === status && !row.archived).length]));
     const invitedBase = counts.invited + counts.active + counts.declined + counts.churned;
     const activatedBase = counts.active + counts.churned;
     const commitment = {

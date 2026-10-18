@@ -97,7 +97,10 @@ export function calculatePlusServiceProgress(member: PlusCycleMember & PlusServi
   // The Wednesday bonus grants a third *manual* proposal only in its first service cycle.
   const target = getPlusWednesdayCycleTarget(member.pilotCohort, window.cycleIndex, member.monthlyMatchTarget);
   const progress = calculatePlusCycleProgress({ ...member, monthlyMatchTarget: target, billingCycleStartedAt: window.cycleStart, billingCycleEndsAt: window.cycleEnd }, memberMatches, now);
-  return { ...progress, cycleStart: window.cycleStart, cycleEnd: window.cycleEnd, kind: window.kind, autoRenew: window.autoRenew, cycleIndex: window.cycleIndex, needsMatches: member.status === "active" && member.billingStatus === "active" && !member.endedAt && window.valid && window.cycleStart <= now && progress.remaining > 0 };
+  const continuingCancellation = member.billingStatus === "cancelled" && Boolean(member.cancelledAt) && now < window.cycleEnd;
+  const needsMatches = member.status === "active" && (member.billingStatus === "active" || continuingCancellation)
+    && !member.endedAt && window.valid && window.cycleStart <= now && progress.remaining > 0;
+  return { ...progress, cycleStart: window.cycleStart, cycleEnd: window.cycleEnd, kind: window.kind, autoRenew: window.autoRenew, cycleIndex: window.cycleIndex, needsMatches };
 }
 
 export function shouldCreatePlusCommitmentTask(progress: ReturnType<typeof calculatePlusCycleProgress>) {
