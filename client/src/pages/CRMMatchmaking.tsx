@@ -2,7 +2,7 @@
  * CRM Matchmaking   admin page for managing the singles database and matches
  * URL: /crm/matchmaking
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MatchProfileCard, { MatchProfileFacts, MatchPreferenceFacts, ProfilePhoto, preferenceRange, type MatchProfile } from "@/components/MatchProfileCard";
 import ProfileStaffMarkers, { profileStaffSurface } from "@/components/ProfileStaffMarkers";
 import { PairCriteriaLegend } from "@/components/PairCriterionIndicator";
@@ -356,14 +356,31 @@ export default function CRMMatchmaking() {
   useEffect(() => { setFilterVisibleLimit(10); }, [filterCompatTarget, filterGender, filterMinAge, filterMaxAge, filterCity, filterReligiosity, filterDna, filterName, filterMinHeight, filterMaxHeight, filterMaritalStatus, filterWantsKids, filterHasKids, filterArea]);
   const filterTargetRef = useRef(filterCompatTarget);
   const batchGeneration = useRef(0);
+  // Manual previews are also asynchronous. Keep their request generation and
+  // selected pair outside render state so a late response cannot replace a
+  // newer pair (or a preview cleared after score inputs changed).
+  const manualPreviewGeneration = useRef(0);
+  const manualPairRef = useRef<{ idA: number | null; idB: number | null }>({ idA: null, idB: null });
+  const scoringInputsRevision = useRef(0);
+  const observedScoringInputsSignature = useRef<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
+  const invalidateScoringPreviews = useCallback(() => {
+    scoringInputsRevision.current += 1;
+    batchGeneration.current += 1;
+    manualPreviewGeneration.current += 1;
+    setBatchProgress(null);
+    setFilterCompatResult({});
+    setCompatResult(null);
+  }, []);
   useEffect(() => {
     filterTargetRef.current = filterCompatTarget;
     batchGeneration.current += 1;
+    manualPreviewGeneration.current += 1;
     setBatchProgress(null);
     // A returned-to tab must not compare a cached preview with a fresh pending
     // score. Re-rank with current profiles/answers; stale in-flight work is fenced.
     setFilterCompatResult({});
+    setCompatResult(null);
     return () => { batchGeneration.current += 1; };
   }, [filterCompatTarget, activeTab]);
   const checkCompatForFilter = trpc.admin.checkCompatibility.useMutation();
@@ -503,16 +520,8 @@ export default function CRMMatchmaking() {
   const { data: updateRequests = [], refetch: refetchUpdateRequests } = trpc.profileUpdates.getAllPending.useQuery(undefined, {
     enabled: !!user && user.role === "admin" && activeTab === "update_requests",
   });
-  const approveUpdateMutation = trpc.profileUpdates.review.useMutation({
-    onSuccess: () => { toast.success("אושר ונשמר!"); refetchUpdateRequests(); },
-    onError: () => toast.error("שגיאה באישור"),
-  });
-  const rejectUpdateMutation = trpc.profileUpdates.review.useMutation({
-    onSuccess: () => { toast.success("נדחה."); refetchUpdateRequests(); },
-    onError: () => toast.error("שגיאה בדחייה"),
-  });
   // All singles for compatibility check dropdowns
-  const { data: allSinglesForCompat = [] } = trpc.admin.getAllSingles.useQuery(undefined, {
+  const { data: allSinglesForCompat = [], refetch: refetchAllSinglesForCompat } = trpc.admin.getAllSingles.useQuery(undefined, {
     enabled: !!user && user.role === "admin" && activeTab === "compatibility",
   });
 
@@ -521,12 +530,51 @@ export default function CRMMatchmaking() {
     enabled: !!user && user.role === "admin" && activeTab === "inactive",
   });
 
+  // This signature deliberately uses persisted profile revisions rather than
+  // query timestamps: a same-data refetch must not constantly clear a useful
+  // preview, while an externally refreshed profile must fence all old scores.
+  const scoringInputsSignature = useMemo(() => (
+    (singles as Array<{ id: number; updatedAt?: number | string | Date | null; questionnaireCompletedAt?: number | null }>)
+      .map(single => `${single.id}:${String(single.updatedAt ?? "")}:${String(single.questionnaireCompletedAt ?? "")}`)
+      .sort()
+      .join("|")
+  ), [singles]);
+  const refreshScoringData = useCallback(async () => {
+    // An explicit refresh is conservative because questionnaire answers can
+    // change without an older row's updatedAt being populated.
+    invalidateScoringPreviews();
+    await Promise.all([
+      refetchSingles(),
+      refetchMatches(),
+      ...(activeTab === "unmatched" ? [refetchUnmatched()] : []),
+      ...(activeTab === "compatibility" ? [refetchAllSinglesForCompat()] : []),
+    ]);
+  }, [activeTab, invalidateScoringPreviews, refetchAllSinglesForCompat, refetchMatches, refetchSingles, refetchUnmatched]);
+  useEffect(() => {
+    if (observedScoringInputsSignature.current === null) {
+      observedScoringInputsSignature.current = scoringInputsSignature;
+      return;
+    }
+    if (observedScoringInputsSignature.current === scoringInputsSignature) return;
+    observedScoringInputsSignature.current = scoringInputsSignature;
+    invalidateScoringPreviews();
+  }, [invalidateScoringPreviews, scoringInputsSignature]);
+
+  const approveUpdateMutation = trpc.profileUpdates.review.useMutation({
+    onSuccess: () => {
+      void refreshScoringData();
+      toast.success("אושר ונשמר!");
+      refetchUpdateRequests();
+    },
+    onError: () => toast.error("שגיאה באישור"),
+  });
+  const rejectUpdateMutation = trpc.profileUpdates.review.useMutation({
+    onSuccess: () => { toast.success("נדחה."); refetchUpdateRequests(); },
+    onError: () => toast.error("שגיאה בדחייה"),
+  });
+
   // Compatibility check mutation
   const checkCompatMutation = trpc.admin.checkCompatibility.useMutation({
-    onSuccess: (data) => {
-      setCompatResult(data);
-      toast.success("בדיקת ההתאמה הושלמה!");
-    },
     onError: (err) => toast.error(`שגיאה: ${err.message}`),
   });
 
@@ -566,8 +614,8 @@ export default function CRMMatchmaking() {
   });
 
   const createAndSendMatch = (trpc.admin as any).createAndSendMatch.useMutation({
-    onSuccess: (result: any) => {
-      setCompatResult((prev: any) => prev ? { ...prev, matchStatus: 'proposed' } : prev);
+    onSuccess: (result: any, variables: { idA: number; idB: number }) => {
+      setCompatResult((prev: any) => isCurrentManualPreview(prev) && prev.personA?.id === variables.idA && prev.personB?.id === variables.idB ? { ...prev, matchStatus: 'proposed' } : prev);
       refetchMatches();
       refetchUnmatched();
       if (result.delivery && (!result.delivery.emailA || !result.delivery.emailB)) {
@@ -621,6 +669,7 @@ export default function CRMMatchmaking() {
 
   const toggleActive = trpc.matchmaking.toggleSingleActive.useMutation({
     onSuccess: async (_data, variables) => {
+      invalidateScoringPreviews();
       setSelectedSingle(null);
       setWaitingExpandedId(null);
       closeWaitingSearch();
@@ -675,21 +724,21 @@ export default function CRMMatchmaking() {
     onSuccess: () => {
       toast.success('התמונה עודכנה בהצלחה!');
       setPhotoUploadSingleId(null);
-      refetchSingles();
+      void refreshScoringData();
     },
     onError: (err: any) => toast.error('שגיאה בהעלאת התמונה: ' + err.message),
   });
 
   const updateSingleInline = (trpc.matchmaking as any).updateSingleInline.useMutation({
-    onSuccess: () => { closeWaitingSearch(); refetchSingles(); refetchMatches(); refetchUnmatched(); toast.success('פרטים עודכנו!'); },
+    onSuccess: () => { closeWaitingSearch(); void refreshScoringData(); toast.success('פרטים עודכנו!'); },
     onError: (err: any) => toast.error(err?.message || 'שגיאה בעדכון'),
   });
   const toggleCoachingClient = (trpc.matchmaking as any).toggleCoachingClient.useMutation({
-    onSuccess: () => { refetchSingles(); refetchMatches(); refetchUnmatched(); toast.success('עודכן!'); },
+    onSuccess: () => { void refreshScoringData(); toast.success('עודכן!'); },
     onError: (err: any) => { console.error('[toggleCoaching]', err); toast.error('שגיאה בעדכון מלווה: ' + (err?.message || '')); },
   });
   const toggleNotBasic = (trpc.matchmaking as any).toggleNotBasic.useMutation({
-    onSuccess: () => { refetchSingles(); refetchMatches(); refetchUnmatched(); toast.success('עודכן!'); },
+    onSuccess: () => { void refreshScoringData(); toast.success('עודכן!'); },
     onError: () => toast.error('שגיאה'),
   });
 
@@ -698,9 +747,7 @@ export default function CRMMatchmaking() {
     setWaitingExpandedId(null);
     closeWaitingSearch();
     await Promise.all([
-      refetchSingles(),
-      refetchMatches(),
-      refetchUnmatched(),
+      refreshScoringData(),
       refetchInactive(),
     ]);
   };
@@ -977,6 +1024,52 @@ export default function CRMMatchmaking() {
       partnerDescription: person.partnerDesc, subscriptionRenewsAt: person.subscriptionEnd,
     };
   };
+  const selectCompatPersonA = (id: number | null) => {
+    manualPreviewGeneration.current += 1;
+    manualPairRef.current = { ...manualPairRef.current, idA: id };
+    setCompatPersonA(id);
+    setCompatResult(null);
+  };
+  const selectCompatPersonB = (id: number | null) => {
+    manualPreviewGeneration.current += 1;
+    manualPairRef.current = { ...manualPairRef.current, idB: id };
+    setCompatPersonB(id);
+    setCompatResult(null);
+  };
+  const isCurrentManualPreview = (result: any) => {
+    const identity = result?.__previewIdentity;
+    return Boolean(
+      identity
+      && identity.epoch === manualPreviewGeneration.current
+      && identity.revision === scoringInputsRevision.current
+      && identity.signature === scoringInputsSignature
+      && identity.idA === compatPersonA
+      && identity.idB === compatPersonB
+      && manualPairRef.current.idA === compatPersonA
+      && manualPairRef.current.idB === compatPersonB
+      && result.personA?.id === compatPersonA
+      && result.personB?.id === compatPersonB
+    );
+  };
+  const displayedCompatResult = isCurrentManualPreview(compatResult) ? compatResult : null;
+  const isCurrentAdvancedPreview = (result: any, targetId: number | null, candidateId: number) => {
+    const identity = result?.__previewIdentity;
+    return Boolean(
+      identity
+      // Request generations fence late replies, not already accepted scores.
+      // A new batch for remaining candidates must preserve valid earlier results.
+      && identity.revision === scoringInputsRevision.current
+      && identity.signature === scoringInputsSignature
+      && identity.targetId === targetId
+      && identity.candidateId === candidateId
+      && filterTargetRef.current === targetId
+    );
+  };
+  const freshFilterCompatResult = Object.fromEntries(
+    Object.entries(filterCompatResult).filter(([candidateId, result]) => (
+      isCurrentAdvancedPreview(result, filterCompatTarget, Number(candidateId))
+    ))
+  ) as Record<number, any>;
   const selectFilterTarget = (single: typeof typedSingles[number]) => {
     batchGeneration.current += 1;
     filterTargetRef.current = single.id;
@@ -989,10 +1082,12 @@ export default function CRMMatchmaking() {
     if (!filterCompatTarget) return;
     const targetId = filterCompatTarget;
     const generation = batchGeneration.current;
+    const revision = scoringInputsRevision.current;
+    const signature = scoringInputsSignature;
     try {
       const data = await checkCompatForFilter.mutateAsync({ idA: targetId, idB: candidateId });
-      if (generation === batchGeneration.current && filterTargetRef.current === targetId) {
-        setFilterCompatResult(prev => ({ ...prev, [candidateId]: data }));
+      if (generation === batchGeneration.current && revision === scoringInputsRevision.current && signature === scoringInputsSignature && filterTargetRef.current === targetId) {
+        setFilterCompatResult(prev => ({ ...prev, [candidateId]: { ...data, __previewIdentity: { generation, revision, signature, targetId, candidateId } } }));
       }
     } catch {
       if (generation === batchGeneration.current) toast.error("בדיקת ההתאמה לא הושלמה. אפשר לנסות שוב; לא נשלחה התאמה.");
@@ -1001,9 +1096,11 @@ export default function CRMMatchmaking() {
   const checkAllVisible = async (candidates: typeof typedSingles) => {
     if (!filterCompatTarget || batchProgress || checkCompatForFilter.isPending) return;
     const targetId = filterCompatTarget;
-    const generation = ++batchGeneration.current;
-    const queue = candidates.filter(single => !filterCompatResult[single.id]);
+    const revision = scoringInputsRevision.current;
+    const signature = scoringInputsSignature;
+    const queue = candidates.filter(single => !freshFilterCompatResult[single.id]);
     if (!queue.length) return;
+    const generation = ++batchGeneration.current;
     const collected: Record<number, any> = {};
     setBatchProgress({ done: 0, total: queue.length, failed: 0 });
     try {
@@ -1011,11 +1108,12 @@ export default function CRMMatchmaking() {
       for (let offset = 0; offset < queue.length; offset += 2000) {
         if (generation !== batchGeneration.current) return;
         const response = await rankForFilter.mutateAsync({ targetId, candidateIds: queue.slice(offset, offset + 2000).map(single => single.id) });
-        if (generation !== batchGeneration.current || filterTargetRef.current !== targetId) return;
-        for (const result of response.results) collected[result.id] = result;
-        for (const id of response.excludedIds) collected[id] = { alreadySent: true, excluded: true };
+        if (generation !== batchGeneration.current || revision !== scoringInputsRevision.current || signature !== scoringInputsSignature || filterTargetRef.current !== targetId) return;
+        for (const result of response.results) collected[result.id] = { ...result, __previewIdentity: { generation, revision, signature, targetId, candidateId: result.id } };
+        for (const id of response.excludedIds) collected[id] = { alreadySent: true, excluded: true, __previewIdentity: { generation, revision, signature, targetId, candidateId: id } };
         setBatchProgress({ done: Math.min(queue.length, offset + 2000), total: queue.length, failed: 0 });
       }
+      if (generation !== batchGeneration.current || revision !== scoringInputsRevision.current || signature !== scoringInputsSignature || filterTargetRef.current !== targetId) return;
       setFilterCompatResult(prev => ({ ...prev, ...collected }));
       setFilterVisibleLimit(10);
       toast.success("ההתאמות דורגו. מוצגות 10 הראשונות; לא נשלחה אף התאמה.");
@@ -1057,7 +1155,7 @@ export default function CRMMatchmaking() {
           const allSinglesForFilter = typedSingles;
           const eligibleFilterResults = allSinglesForFilter.filter(s => {
             if (!isAdvancedMatchCandidate(s, advancedExclusions, filterCompatTarget ?? undefined)) return false;
-            if (filterCompatResult[s.id]?.alreadySent) return false;
+            if (freshFilterCompatResult[s.id]?.alreadySent) return false;
             if (filterGender && s.gender !== filterGender) return false;
             if (filterMinAge && s.age < parseInt(filterMinAge)) return false;
             if (filterMaxAge && s.age > parseInt(filterMaxAge)) return false;
@@ -1081,8 +1179,8 @@ export default function CRMMatchmaking() {
           const candidateNameSuggestions = filteredResultsRaw.length === 0 ? getProfileNameSuggestions(eligibleFilterResults, filterName) : [];
           const filteredResults = filterCompatTarget
             ? [...filteredResultsRaw].sort((a, b) => {
-                const scoreA = filterCompatResult[a.id]?.score ?? -1;
-                const scoreB = filterCompatResult[b.id]?.score ?? -1;
+                const scoreA = freshFilterCompatResult[a.id]?.score ?? -1;
+                const scoreB = freshFilterCompatResult[b.id]?.score ?? -1;
                 return scoreB - scoreA;
               })
             : filteredResultsRaw;
@@ -1255,10 +1353,10 @@ export default function CRMMatchmaking() {
                   {filterCompatTarget && (
                     <button
                       onClick={() => void checkAllVisible(filteredResults)}
-                      disabled={!!batchProgress || checkCompatForFilter.isPending || !filteredResults.some(single => !filterCompatResult[single.id]) || advancedExclusions.unavailableIds.has(filterCompatTarget!)}
+                      disabled={!!batchProgress || checkCompatForFilter.isPending || !filteredResults.some(single => !freshFilterCompatResult[single.id]) || advancedExclusions.unavailableIds.has(filterCompatTarget!)}
                       className="text-xs bg-[#191265] text-white font-bold px-4 py-1.5 rounded-full hover:bg-[#191265]/80 transition-colors"
                     >
-                      {batchProgress ? `מדרג ${batchProgress.total} התאמות…` : `דרג התאמה לכולם (${filteredResults.filter(s => !filterCompatResult[s.id]).length})`}
+                      {batchProgress ? `מדרג ${batchProgress.total} התאמות…` : `דרג התאמה לכולם (${filteredResults.filter(s => !freshFilterCompatResult[s.id]).length})`}
                     </button>
                   )}
                 </div>
@@ -1285,7 +1383,7 @@ export default function CRMMatchmaking() {
               )}
               <p className="text-xs text-[#727272]">הרשימה מציגה רק פרופילים זמינים; התאמות פעילות ומי שכבר נשלחה איתו הצעה מוסתרים. בדיקת התאמה אינה שולחת דבר.</p>
               {embedded && <p className="text-xs text-[#191265]">בחרי מסננים ואז לחצי ״דרג התאמה לכולם״. הדירוג מחשב את כל המועמדים ומציג את 10 הגבוהים ביותר; ״עוד 5״ אינו מחשב מחדש.</p>}
-              <p className="text-xs text-[#727272]">{filterCompatTarget && filteredResults.every(single => Boolean(filterCompatResult[single.id])) ? "הרשימה ממוינת לפי הציון של כל המועמדים בחיפוש, מהגבוה לנמוך." : "אפשר לדרג את כל המועמדים בבקשה מהירה אחת. הסבר מפורט נבדק רק לפי דרישה."}</p>
+              <p className="text-xs text-[#727272]">{filterCompatTarget && filteredResults.every(single => Boolean(freshFilterCompatResult[single.id])) ? "הרשימה ממוינת לפי הציון של כל המועמדים בחיפוש, מהגבוה לנמוך." : "אפשר לדרג את כל המועמדים בבקשה מהירה אחת. הסבר מפורט נבדק רק לפי דרישה."}</p>
               {/* Results */}
               {filteredResults.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center text-[#727272]">
@@ -1296,7 +1394,7 @@ export default function CRMMatchmaking() {
                 </div>
               ) : (
                 filteredResults.slice(0, filterVisibleLimit).map(single => {
-                  const compatData = filterCompatResult[single.id];
+                  const compatData = freshFilterCompatResult[single.id];
                   const compatibilityWarnings = getCompatibilityWarnings(compatData);
                   const canOverrideCriteria = compatData?.hasHardBlock === true && compatData?.canOverrideCriteria === true;
                   const hasNonOverridableBlock = compatData?.hasHardBlock === true && compatData?.canOverrideCriteria !== true;
@@ -1375,6 +1473,10 @@ export default function CRMMatchmaking() {
                               {filterCompatTarget && filterCompatTarget !== single.id && !compatData.alreadySent && (
                                 <button
                                   onClick={() => {
+                                    if (!isCurrentAdvancedPreview(compatData, filterCompatTarget, single.id)) {
+                                      toast.error("הנתונים השתנו. יש לדרג מחדש לפני שליחה.");
+                                      return;
+                                    }
                                     const warningText = compatibilityWarnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${compatibilityWarnings.join("\n")}` : "";
                                     if (window.confirm(`לשלוח התאמה בין ${typedSingles.find(s => s.id === filterCompatTarget)?.firstName} ל-${single.firstName}?${warningText}`)) {
                                       if (compatData.matchId) {
@@ -1488,6 +1590,17 @@ export default function CRMMatchmaking() {
               className="h-8 text-xs bg-white/20 border-white/30 text-white hover:bg-white/30 border"
             >
               {refreshMatchScores.isPending ? "מחשב..." : "📊 רענן ציוני שאלון"}
+            </Button>
+            <Button
+              size="sm"
+              type="button"
+              onClick={() => void refreshScoringData()}
+              data-crm-refresh-scoring-data
+              className="h-8 border border-white/30 bg-white/10 text-xs font-bold text-white hover:bg-white/20"
+              title="מרענן נתוני פרופילים והתאמות בלי לשנות ציונים"
+            >
+              <RefreshCw size={12} className="ml-1" />
+              רענן נתונים
             </Button>
             <a href="/crm">
               <Button size="sm" variant="outline" className="h-8 text-xs bg-white/10 border-white/30 text-white hover:bg-white/20">
@@ -2072,8 +2185,8 @@ export default function CRMMatchmaking() {
                                           <p className="text-[10px] text-[#727272]">מועמדות לבדיקה בלבד, טרם נוצרה או נשלחה התאמה</p>
                                           {m.warnings?.length > 0 && <p className="mt-1 text-[10px] font-bold text-amber-700">{m.warnings.join(" · ")}</p>}
                                           <button type="button" onClick={() => {
-                                            setCompatPersonA(single.id); setCompatPersonB(m.opponent.id);
-                                            setCompatResult(null); setActiveTab("compatibility");
+                                            selectCompatPersonA(single.id); selectCompatPersonB(m.opponent.id);
+                                            setActiveTab("compatibility");
                                           }} className="mt-2 w-full rounded-lg bg-[#191265] px-2 py-1.5 text-[10px] font-bold text-white">בדיקת התאמה לפני החלטה</button>
                                         </div>
                                       )}
@@ -2938,7 +3051,7 @@ export default function CRMMatchmaking() {
                 {!unmatchedLoading && <div className="flex flex-wrap gap-2 mt-2 text-[10px]"><span className="bg-orange-100 text-orange-800 rounded-full px-2 py-1">{unmatchedResult.summary.over14} מעל 14 יום</span><span className="bg-violet-100 text-violet-800 rounded-full px-2 py-1">{unmatchedResult.summary.fromFeedback} בעקבות משוב</span><span className="bg-red-100 text-red-800 rounded-full px-2 py-1">{unmatchedResult.summary.neverDelivered} מעולם לא קיבלו</span>{unmatchedResult.summary.blocked > 0 && <span className="bg-yellow-100 text-yellow-800 rounded-full px-2 py-1">{unmatchedResult.summary.blocked} עם הצעה פתוחה לטיפול</span>}{unmatchedResult.summary.missingPhoto > 0 && <span className="bg-slate-100 text-slate-700 rounded-full px-2 py-1">{unmatchedResult.summary.missingPhoto} חסרי תמונה</span>}</div>}
               </div>
               <button
-                onClick={() => { void refetchUnmatched(); void refetchSingles(); }}
+                onClick={() => { void refreshScoringData(); }}
                 className="text-xs text-[#191265] bg-[#f0eadc] px-3 py-1.5 rounded-lg hover:bg-[#ffe27c] transition-colors"
               >
                 <RefreshCw size={12} className="inline ml-1" />
@@ -3152,7 +3265,7 @@ export default function CRMMatchmaking() {
         )}
         {/* Missing Data Tab - singles with age=0 or empty city */}
         {activeTab === "missing_data" && (
-          <MissingDataTab />
+          <MissingDataTab onScoringDataChanged={() => { void refreshScoringData(); }} />
         )}
         {/* Compatibility Check Tab */}
         {activeTab === "compatibility" && (
@@ -3170,9 +3283,9 @@ export default function CRMMatchmaking() {
           <CompatibilityCheckTab
             allSingles={allSinglesForCompat}
             compatPersonA={compatPersonA}
-            setCompatPersonA={(id: number | null) => { setCompatPersonA(id); setCompatResult(null); }}
+            setCompatPersonA={selectCompatPersonA}
             compatPersonB={compatPersonB}
-            setCompatPersonB={(id: number | null) => { setCompatPersonB(id); setCompatResult(null); }}
+            setCompatPersonB={selectCompatPersonB}
             compatSearchA={compatSearchA}
             setCompatSearchA={setCompatSearchA}
             compatSearchB={compatSearchB}
@@ -3181,8 +3294,8 @@ export default function CRMMatchmaking() {
             setCompatDropdownA={setCompatDropdownA}
             compatDropdownB={compatDropdownB}
             setCompatDropdownB={setCompatDropdownB}
-            compatResult={compatResult}
-            comparisonProfiles={[compatResult?.personA, compatResult?.personB].map(person => {
+            compatResult={displayedCompatResult}
+            comparisonProfiles={[displayedCompatResult?.personA, displayedCompatResult?.personB].map(person => {
               if (!person) return undefined;
               const current = typedSingles.find(single => single.id === person.id);
               return current ? asMatchProfile(current) : person as MatchProfile;
@@ -3192,22 +3305,45 @@ export default function CRMMatchmaking() {
             onCheck={() => {
               if (!compatPersonA || !compatPersonB) { toast.error("בחר/י שני אנשים"); return; }
               if (compatPersonA === compatPersonB) { toast.error("בחר/י שני אנשים שונים"); return; }
-              checkCompatMutation.mutate({ idA: compatPersonA, idB: compatPersonB });
+              const idA = compatPersonA;
+              const idB = compatPersonB;
+              const epoch = ++manualPreviewGeneration.current;
+              const revision = scoringInputsRevision.current;
+              const signature = scoringInputsSignature;
+              manualPairRef.current = { idA, idB };
+              setCompatResult(null);
+              checkCompatMutation.mutate({ idA, idB }, {
+                onSuccess: (data) => {
+                  if (
+                    epoch !== manualPreviewGeneration.current
+                    || revision !== scoringInputsRevision.current
+                    || signature !== scoringInputsSignature
+                    || manualPairRef.current.idA !== idA
+                    || manualPairRef.current.idB !== idB
+                  ) return;
+                  setCompatResult({ ...data, __previewIdentity: { epoch, revision, signature, idA, idB } });
+                  toast.success("בדיקת ההתאמה הושלמה!");
+                },
+              });
             }}
             onSendMatch={(allowCriteriaOverride = false) => {
-              if (compatResult?.matchId) {
+              if (!isCurrentManualPreview(displayedCompatResult)) {
+                toast.error("הנתונים השתנו או שהזוג הוחלף. יש לבצע בדיקת התאמה חדשה לפני שליחה.");
+                return;
+              }
+              if (displayedCompatResult?.matchId) {
                 // Match record already exists — use approveMatch
-                approveMatch.mutate({ matchId: compatResult.matchId, hilitsNote: "", allowCriteriaOverride }, {
+                approveMatch.mutate({ matchId: displayedCompatResult.matchId, hilitsNote: "", allowCriteriaOverride }, {
                   onSuccess: () => {
-                    setCompatResult((prev: any) => prev ? { ...prev, matchStatus: 'proposed' } : prev);
+                    setCompatResult((prev: any) => isCurrentManualPreview(prev) ? { ...prev, matchStatus: 'proposed' } : prev);
                   }
                 });
-              } else if (compatPersonA && compatPersonB) {
+              } else if (displayedCompatResult && compatPersonA && compatPersonB) {
                 // No match record yet — create and send directly
                 createAndSendMatch.mutate({ idA: compatPersonA, idB: compatPersonB, allowCriteriaOverride });
               }
             }}
-            canSendDirectly={!!(compatPersonA && compatPersonB)}
+            canSendDirectly={!!displayedCompatResult}
             isSendingMatch={approveMatch.isPending || createAndSendMatch.isPending}
           />
           </>
@@ -3374,10 +3510,10 @@ export default function CRMMatchmaking() {
   );
 }
 // ── MissingDataTab ────────────────────────────────────────────────────────────────────────────────
-function MissingDataTab() { 
+function MissingDataTab({ onScoringDataChanged }: { onScoringDataChanged: () => void }) {
   const { data: rows = [], isLoading, refetch } = trpc.admin.getMissingData.useQuery();
   const patchMutation = trpc.admin.patchMissingData.useMutation({
-    onSuccess: () => { toast.success("נשמר!"); refetch(); },
+    onSuccess: () => { onScoringDataChanged(); toast.success("נשמר!"); refetch(); },
     onError: () => toast.error("שגיאה בשמירה"),
   });
 
@@ -3409,7 +3545,7 @@ function MissingDataTab() {
     patchMutation.mutate(patch);
   };
   const updateSingleInline = (trpc.matchmaking as any).updateSingleInline.useMutation({
-    onSuccess: () => { toast.success("נשמר!"); refetch(); setEditingId(null); },
+    onSuccess: () => { onScoringDataChanged(); toast.success("נשמר!"); refetch(); setEditingId(null); },
     onError: () => toast.error("שגיאה"),
   });
 

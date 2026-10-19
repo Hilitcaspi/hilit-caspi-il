@@ -29,7 +29,8 @@ describe("CRM compatibility direct-send refresh", () => {
 
   it("passes an explicit criteria override through both new and existing match paths", () => {
     expect(source).toContain("allowCriteriaOverride: canOverrideCriteria");
-    expect(source).toContain('approveMatch.mutate({ matchId: compatResult.matchId, hilitsNote: "", allowCriteriaOverride }');
+    expect(source).toContain('approveMatch.mutate({ matchId: displayedCompatResult.matchId, hilitsNote: "", allowCriteriaOverride }');
+    expect(source).toContain('if (!isCurrentManualPreview(displayedCompatResult))');
     expect(source).toContain("זו התראה בלבד. אפשר לאשר במפורש ולשלוח את ההתאמה בכל זאת.");
     expect(source).toContain("אשר חריגה ושלח לשני הצדדים");
   });

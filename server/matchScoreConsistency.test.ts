@@ -62,6 +62,31 @@ describe('staff score consistency', () => {
     expect(out.scoreSource).toBe('current_preview'); expect(out.savedScore).toBe(83);
     expect(out).not.toHaveProperty('savedScoreBreakdown'); expect(JSON.stringify(row)).toBe(before);
   });
+  it('does not trust a same-version saved total over the current unsent preview', () => {
+    const a = person(1), b = person(2);
+    const current = evaluateMatchPreview(a, b, [], []);
+    const oldTotal = current.score - 2;
+    const row = candidate({ score: oldTotal, scoreBreakdown: JSON.stringify({ ...current.breakdown, total: oldTotal }) });
+    const stored = JSON.stringify(row);
+    const out = presentMatchScore(row, a, b);
+    expect(out.score).toBe(current.score);
+    expect(out.savedScore).toBe(oldTotal);
+    expect(out.scoreSource).toBe('current_preview');
+    expect(JSON.parse(out.scoreBreakdown!).total).toBe(out.score);
+    expect(JSON.stringify(row)).toBe(stored);
+  });
+  it('reads changed profile inputs without changing the historical candidate record', () => {
+    const a = person(1), originalB = person(2);
+    const revisedB = person(2, { education: 'high_school' });
+    const row = candidate();
+    const original = presentMatchScore(row, a, originalB);
+    const revised = presentMatchScore(row, a, revisedB);
+    expect(revised.score).toBe(evaluateMatchPreview(a, revisedB, [], []).score);
+    expect(revised.score).toBe(scoreAdvancedPair(a, revisedB, [], []).score);
+    expect(revised.score).not.toBe(original.score);
+    expect(row.score).toBe(83);
+    expect(revised.savedScore).toBe(83);
+  });
   it.each([
     { status: 'proposed', ownerApprovedAt: 1 }, { status: 'matched' },
     { status: 'rejected', approvalTokenA: 'synthetic-token' }, { status: 'pending', approvalTokenB: 'synthetic-token' },

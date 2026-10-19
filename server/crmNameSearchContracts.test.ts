@@ -16,7 +16,7 @@ describe('CRM name search contracts',()=>{
   expect(crm).toContain('filterProfilesByName(eligibleFilterResults, filterName)');
   expect(crm).toContain('getProfileNameSuggestions(eligibleFilterResults, filterName)');
   expect(crm).toContain('isAdvancedMatchCandidate(s, advancedExclusions, filterCompatTarget');
-  expect(crm).toContain('if (filterCompatResult[s.id]?.alreadySent) return false');
+  expect(crm).toContain('if (freshFilterCompatResult[s.id]?.alreadySent) return false');
  });
  it('makes name suggestions explicit and manual, without changing the profile or other filters',()=>{
   expect(crm).toContain('שמות דומים לבדיקה');

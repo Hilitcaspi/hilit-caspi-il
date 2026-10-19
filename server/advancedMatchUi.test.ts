@@ -28,7 +28,7 @@ describe("advanced matchmaking UI contracts (no network or customer data)", () =
   it("ranks in bounded bulk requests with target and generation guards, without narrative calls", () => {
     const batch = ui.slice(ui.indexOf("const checkAllVisible"), ui.indexOf("const baseUrl =", ui.indexOf("const checkAllVisible")));
     expect(batch).toContain("offset += 2000");
-    expect(batch).toContain("generation !== batchGeneration.current || filterTargetRef.current !== targetId");
+    expect(batch).toContain("generation !== batchGeneration.current || revision !== scoringInputsRevision.current || signature !== scoringInputsSignature || filterTargetRef.current !== targetId");
     expect(batch).toContain("rankForFilter.mutateAsync");
     expect(batch).not.toContain("checkCompatForFilter.mutateAsync");
     for (const unsafe of ["approveMatch", "createAndSendMatch", "runMatching", "sendEmail", "sendSms"]) expect(batch).not.toContain(unsafe);
