@@ -1,7 +1,5 @@
 import { wasMatchProposalSent, type MatchDeliveryEvidence } from "./matchDelivery";
-import { hasMutualYes, type MatchLifecycleLike } from "./matchLifecycle";
-
-const PROPOSAL_WINDOW_MS = 48 * 60 * 60 * 1000;
+import { isBlockingMatch, type MatchAvailabilityMatch } from "./matchAvailability";
 
 /**
  * The subset of a match row used when building Advanced Match candidates.
@@ -9,10 +7,9 @@ const PROPOSAL_WINDOW_MS = 48 * 60 * 60 * 1000;
  * generated rows may have a `proposedAt` before a customer-facing proposal
  * was ever sent.
  */
-export type AdvancedMatchCandidateMatch = MatchDeliveryEvidence & MatchLifecycleLike & {
+export type AdvancedMatchCandidateMatch = MatchAvailabilityMatch & {
   singleAId: number;
   singleBId: number;
-  approvalExpiresAt?: number | null;
 };
 
 export type AdvancedMatchExclusions = {
@@ -31,30 +28,6 @@ export type AdvancedMatchCandidateSingle = {
 export type SentMatchHistoryRecord<T extends AdvancedMatchCandidateMatch = AdvancedMatchCandidateMatch> = T & {
   opponentId: number;
 };
-
-function hasBeenReturnedOrEnded(match: AdvancedMatchCandidateMatch): boolean {
-  return Boolean(match.returnedToPoolAt) || match.matchDetailStatus === "ended";
-}
-
-function proposalExpiresAt(match: AdvancedMatchCandidateMatch): number | null {
-  if (typeof match.approvalExpiresAt === "number") return match.approvalExpiresAt;
-  if (typeof match.proposedAt === "number") return match.proposedAt + PROPOSAL_WINDOW_MS;
-  return null;
-}
-
-function isCurrentSentProposal(match: AdvancedMatchCandidateMatch, now: number): boolean {
-  if (match.status !== "proposed" || !wasMatchProposalSent(match)) return false;
-  if (hasBeenReturnedOrEnded(match) || hasMutualYes(match)) return false;
-  if (match.approvedByA === false || match.approvedByB === false) return false;
-
-  const expiresAt = proposalExpiresAt(match);
-  return expiresAt !== null && now < expiresAt;
-}
-
-function isActiveMutualMatch(match: AdvancedMatchCandidateMatch): boolean {
-  if (hasBeenReturnedOrEnded(match)) return false;
-  return match.status === "matched" || hasMutualYes(match);
-}
 
 /**
  * Returns only proposals that have actual customer-facing delivery evidence.
@@ -86,7 +59,7 @@ export function buildAdvancedMatchExclusions(
   const unavailableIds = new Set<number>();
 
   for (const match of matches) {
-    if (!isActiveMutualMatch(match) && !isCurrentSentProposal(match, now)) continue;
+    if (!isBlockingMatch(match, now)) continue;
     unavailableIds.add(match.singleAId);
     unavailableIds.add(match.singleBId);
   }

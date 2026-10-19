@@ -31,6 +31,7 @@ import { AlarmClock, AlertTriangle, Users, Heart, Zap, Copy, RefreshCw, CheckCir
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getMatchTrackingSummary, hasMutualYes, isUnsuccessfulMatch, isWaitingForMatchResponses } from "@shared/matchLifecycle";
 import { wasMatchProposalSent } from "@shared/matchDelivery";
+import { getMatchAvailability, isBlockingMatch } from "@shared/matchAvailability";
 import { LEGACY_MATCH_SCORE_WEIGHTS, MATCH_SCORING_VERSION, MATCH_SCORE_WEIGHTS } from "@shared/matchScoringPolicy";
 
 const RELIGIOSITY_LABELS: Record<string, string> = {
@@ -88,7 +89,7 @@ function buildWhatsAppUrl(phone: string | null | undefined, message: string) {
 const MATCH_STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   pending:  { label: "ממתין",   color: "bg-yellow-100 text-yellow-800", icon: "⏳" },
   proposed: { label: "נשלח",    color: "bg-blue-100 text-blue-800",     icon: "📨" },
-  matched:  { label: "התאמה!",  color: "bg-green-100 text-green-800",   icon: "💛" },
+  matched:  { label: "התאמה הדדית פעילה", color: "bg-green-100 text-green-800", icon: "💛" },
   rejected: { label: "נדחה",    color: "bg-red-100 text-red-800",       icon: "❌" },
   expired:  { label: "פג תוקף", color: "bg-gray-100 text-gray-500",     icon: "⌛" },
 };
@@ -638,7 +639,8 @@ export default function CRMMatchmaking() {
     onSuccess: () => {
       refetchMatches();
       refetchSingles();
-      toast.success("שוחרר/ה מההתאמה הפעילה ✅");
+      refetchUnmatched();
+      toast.success("ההתאמה הסתיימה ושני הצדדים חזרו למאגר");
     },
     onError: (err: any) => toast.error(err?.message || "שגיאה בשחרור מהתאמה"),
   });
@@ -794,8 +796,9 @@ export default function CRMMatchmaking() {
     singleASubscriptionEnd?: number | null; singleBSubscriptionEnd?: number | null;
     singleAEmail?: string | null; singleBEmail?: string | null;
     singleAIsActive?: boolean | null; singleBIsActive?: boolean | null;
-    returnedToPoolAt?: number | null;
+    returnedToPoolAt?: number | null; contactRevealedAt?: number | null;
     approvalExpiresAt?: number | null; ownerApprovedAt?: number | null;
+    singleAToken?: string | null; singleBToken?: string | null;
     outcomeFeedback?: {
       participantA?: { status: string; rating?: number | null; comment?: string | null; testimonialText?: string | null; publicityScope: string; submittedAt: number } | null;
       participantB?: { status: string; rating?: number | null; comment?: string | null; testimonialText?: string | null; publicityScope: string; submittedAt: number } | null;
@@ -811,19 +814,47 @@ export default function CRMMatchmaking() {
     usedByEmail?: string | null; createdAt: number; expiresAt?: number | null;
   }>;
 
-  // Set of single IDs currently in an active (proposed) match
+  // Keep each CRM surface on the same availability policy as the send guard.
+  // One render timestamp also prevents a row near its deadline from disagreeing
+  // with another CRM list during this render.
+  const matchAvailabilityNow = Date.now();
   const activeMatchSingleIds = new Set<number>(
     typedMatches
-      .filter(m => m.status === "proposed" && m.proposedAt && (Date.now() - (m.proposedAt as number)) < 48 * 60 * 60 * 1000)
+      .filter(m => isBlockingMatch(m, matchAvailabilityNow))
       .flatMap(m => [m.singleAId, m.singleBId])
   );
-  // Map: singleId -> active match details (partner name, days, matchId, proposedAt)
-  const MATCH_EXPIRY_MS = 48 * 60 * 60 * 1000; // 48 hours
-  const activeMatchBySingleId = new Map<number, { matchId: number; opponentName: string; opponentId: number; daysInMatch: number; proposedAt: number; approvedByA: boolean | null; approvedByB: boolean | null; isA: boolean }>();
-  typedMatches.filter(m => m.status === "proposed").forEach(m => {
-    const daysInMatch = m.proposedAt ? Math.floor((Date.now() - (m.proposedAt as number)) / (1000 * 60 * 60 * 24)) : 0;
-    activeMatchBySingleId.set(m.singleAId, { matchId: m.id, opponentName: m.singleBName || "?", opponentId: m.singleBId, daysInMatch, proposedAt: m.proposedAt as number, approvedByA: m.approvedByA, approvedByB: m.approvedByB, isA: true });
-    activeMatchBySingleId.set(m.singleBId, { matchId: m.id, opponentName: m.singleAName || "?", opponentId: m.singleAId, daysInMatch, proposedAt: m.proposedAt as number, approvedByA: m.approvedByA, approvedByB: m.approvedByB, isA: false });
+  type ActiveMatchBlocker = {
+    matchId: number; opponentName: string; opponentId: number; daysInMatch: number;
+    deadline: number | null; reason: "current_proposal" | "active_connection" | "needs_review";
+    approvedByA: boolean | null; approvedByB: boolean | null; isA: boolean;
+    priority: number; startedAt: number;
+  };
+  // The API is newest-first. Preserve its first blocking row for each profile,
+  // except that a confirmed connection deliberately outranks a proposal.
+  const activeMatchBySingleId = new Map<number, ActiveMatchBlocker>();
+  const addActiveMatchBlocker = (singleId: number, blocker: ActiveMatchBlocker) => {
+    const existing = activeMatchBySingleId.get(singleId);
+    if (!existing || blocker.priority > existing.priority) {
+      activeMatchBySingleId.set(singleId, blocker);
+    }
+  };
+  typedMatches.forEach(m => {
+    if (!isBlockingMatch(m, matchAvailabilityNow)) return;
+    const availability = getMatchAvailability(m, matchAvailabilityNow);
+    if (availability.reason !== "current_proposal" && availability.reason !== "active_connection" && availability.reason !== "needs_review") return;
+    const startedAt = Number(m.matchedAt || m.contactRevealedAt || m.proposedAt || m.createdAt || 0);
+    const daysInMatch = startedAt > 0 ? Math.max(0, Math.floor((matchAvailabilityNow - startedAt) / (1000 * 60 * 60 * 24))) : 0;
+    const priority = availability.reason === "active_connection" ? 2 : 1;
+    addActiveMatchBlocker(m.singleAId, {
+      matchId: m.id, opponentName: m.singleBName || "הצד השני", opponentId: m.singleBId,
+      daysInMatch, deadline: availability.deadline, reason: availability.reason,
+      approvedByA: m.approvedByA, approvedByB: m.approvedByB, isA: true, priority, startedAt,
+    });
+    addActiveMatchBlocker(m.singleBId, {
+      matchId: m.id, opponentName: m.singleAName || "הצד השני", opponentId: m.singleAId,
+      daysInMatch, deadline: availability.deadline, reason: availability.reason,
+      approvedByA: m.approvedByA, approvedByB: m.approvedByB, isA: false, priority, startedAt,
+    });
   });
 
   // Helper: check if a pending match is blocked because one/both persons are in an active proposal
@@ -835,18 +866,23 @@ export default function CRMMatchmaking() {
     const aBlocked = blockedA && blockedA.matchId !== m.id;
     const bBlocked = blockedB && blockedB.matchId !== m.id;
     if (!aBlocked && !bBlocked) return null;
-    const blockedPersons: Array<{ name: string; opponentName: string; hoursLeft: number }> = [];
+    const blockedPersons: Array<{ name: string; opponentName: string; hoursLeft: number | null; label: string }> = [];
     if (aBlocked && blockedA) {
-      const elapsed = Date.now() - blockedA.proposedAt;
-      const hoursLeft = Math.max(0, Math.ceil((MATCH_EXPIRY_MS - elapsed) / (1000 * 60 * 60)));
-      blockedPersons.push({ name: "", opponentName: blockedA.opponentName, hoursLeft });
+      const hoursLeft = blockedA.reason === "current_proposal" && blockedA.deadline
+        ? Math.max(0, Math.ceil((blockedA.deadline - matchAvailabilityNow) / (1000 * 60 * 60)))
+        : null;
+      const label = blockedA.reason === "active_connection" ? "התאמה הדדית פעילה" : blockedA.reason === "needs_review" ? "נדרש לבדוק התאמה ללא מועד" : "הצעה ממתינה לתשובה";
+      blockedPersons.push({ name: "", opponentName: blockedA.opponentName, hoursLeft, label });
     }
     if (bBlocked && blockedB) {
-      const elapsed = Date.now() - blockedB.proposedAt;
-      const hoursLeft = Math.max(0, Math.ceil((MATCH_EXPIRY_MS - elapsed) / (1000 * 60 * 60)));
-      blockedPersons.push({ name: "", opponentName: blockedB.opponentName, hoursLeft });
+      const hoursLeft = blockedB.reason === "current_proposal" && blockedB.deadline
+        ? Math.max(0, Math.ceil((blockedB.deadline - matchAvailabilityNow) / (1000 * 60 * 60)))
+        : null;
+      const label = blockedB.reason === "active_connection" ? "התאמה הדדית פעילה" : blockedB.reason === "needs_review" ? "נדרש לבדוק התאמה ללא מועד" : "הצעה ממתינה לתשובה";
+      blockedPersons.push({ name: "", opponentName: blockedB.opponentName, hoursLeft, label });
     }
-    return { aBlocked: !!aBlocked, bBlocked: !!bBlocked, blockedPersons, maxHoursLeft: Math.max(...blockedPersons.map(p => p.hoursLeft)) };
+    const remainingHours = blockedPersons.flatMap(person => person.hoursLeft === null ? [] : [person.hoursLeft]);
+    return { aBlocked: !!aBlocked, bBlocked: !!bBlocked, blockedPersons, maxHoursLeft: remainingHours.length ? Math.max(...remainingHours) : null };
   };
   // Map: singleId -> proposals that were actually delivered or exposed to a participant.
   const matchHistoryBySingleId = new Map<number, Array<{ matchId: number; opponentName: string; status: string; score?: number | null; proposedAt?: number | null; opponentPhotoUrl?: string | null; returnedToPoolAt?: number | null; proposalSource?: "regular" | "boost"; sourceLabel: string }>>();
@@ -872,19 +908,21 @@ export default function CRMMatchmaking() {
   // Mutual approval is historical truth. Returning to the pool changes the
   // current tracking state, but never removes the pair from the mutual-yes history.
 
-  // Hide pending matches where either person is already in an active proposal (within 48h)
+  // Hide pending candidates only when another row is a policy-confirmed blocker.
   const isMatchBlocked = (m: any) => {
     if (m.status !== "pending") return false;
     return activeMatchSingleIds.has(m.singleAId) || activeMatchSingleIds.has(m.singleBId);
   };
 
-  // IDs of singles currently in a "matched" match (not just proposed)
+  // Kept for the pending-list reference to a confirmed, unreleased connection.
   const matchedSingleIds = new Set<number>(
-    typedMatches.filter(m => m.status === "matched" && !m.returnedToPoolAt).flatMap(m => [m.singleAId, m.singleBId])
+    typedMatches
+      .filter(m => isBlockingMatch(m, matchAvailabilityNow) && getMatchAvailability(m, matchAvailabilityNow).reason === "active_connection")
+      .flatMap(m => [m.singleAId, m.singleBId])
   );
   const unavailableForNewMatchIds = new Set<number>(
     typedMatches
-      .filter(m => m.status === "proposed" || (m.status === "matched" && !m.returnedToPoolAt && m.matchDetailStatus !== "ended"))
+      .filter(m => isBlockingMatch(m, matchAvailabilityNow))
       .flatMap(m => [m.singleAId, m.singleBId])
   );
 
@@ -990,10 +1028,9 @@ export default function CRMMatchmaking() {
 
   const baseUrl = window.location.origin;
 
-  // Build set of singles already in active match proposals (only 'proposed' = sent to members, not 'pending' = not yet sent)
-  const proposedSingleIds = new Set<number>(
-    (pendingMatches as any[]).filter(m => m.status === 'proposed').flatMap((m: any) => [m.singleAId, m.singleBId])
-  );
+  // The existing hide toggle now means unavailable for a new match, including
+  // a confirmed connection and excluding expired, returned, ended, or unsent rows.
+  const proposedSingleIds = unavailableForNewMatchIds;
 
   // Filter singles by search query and optionally hide those already in active proposals
   const filteredSingles = typedSingles
@@ -1573,8 +1610,8 @@ export default function CRMMatchmaking() {
             )}
             {filteredSingles.map(single => (
               <div key={single.id} className={`rounded-xl p-4 shadow-sm border-r-4 ${(single as any).isCoachingClient ? "bg-pink-50 border-pink-400 ring-1 ring-pink-200" : single.isActive ? "bg-white border-green-400" : "bg-white border-gray-200"}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       {/* Clickable photo thumbnail */}
                       {single.photoUrl && (
@@ -1604,14 +1641,24 @@ export default function CRMMatchmaking() {
                       {single.occupation && <span className="text-xs text-[#727272]">💼 {single.occupation}</span>}
                       {activeMatchBySingleId.has(single.id) && (() => {
                         const am = activeMatchBySingleId.get(single.id)!;
+                        const availabilityLabel = am.reason === "active_connection"
+                          ? "התאמה הדדית פעילה"
+                          : am.reason === "needs_review"
+                            ? "נדרש לבדוק התאמה ללא מועד"
+                            : "הצעה ממתינה לתשובה";
+                        const availabilityColor = am.reason === "active_connection"
+                          ? "bg-green-100 text-green-700 border-green-200"
+                          : am.reason === "needs_review"
+                            ? "bg-amber-100 text-amber-800 border-amber-200"
+                            : "bg-blue-100 text-blue-700 border-blue-200";
                         return (
                           <div className="flex items-center gap-1 flex-wrap">
-                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-                              📨 בהתאמה פעילה עם {am.opponentName}
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${availabilityColor}`}>
+                              {am.reason === "active_connection" ? "💛" : am.reason === "needs_review" ? "⚠️" : "📨"} {availabilityLabel} עם {am.opponentName}
                             </span>
-                            <span className="text-xs text-blue-600">({am.daysInMatch} ימים)</span>
+                            {am.reason === "active_connection" && <span className="text-xs text-green-700">({am.daysInMatch} ימים)</span>}
                             <button
-                              onClick={(e) => { e.stopPropagation(); if (window.confirm(`לשחרר את ${am.opponentName} מההתאמה?`)) releaseFromMatch.mutate({ matchId: am.matchId }); }}
+                              onClick={(e) => { e.stopPropagation(); if (window.confirm("לסיים את ההתאמה ולהחזיר את שני הצדדים למאגר? לא יישלחו הודעות.")) releaseFromMatch.mutate({ matchId: am.matchId }); }}
                               disabled={releaseFromMatch.isPending}
                               className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200 hover:bg-red-200 transition-colors disabled:opacity-50"
                             >
@@ -2366,14 +2413,16 @@ export default function CRMMatchmaking() {
                           <Send size={12} />שלח התאמה
                         </button>
                       )}
-                      {/* 48h countdown for proposed matches */}
-                      {match.status === "proposed" && match.proposedAt && (() => {
-                        const elapsed = Date.now() - Number(match.proposedAt);
-                        const remaining = 48 * 60 * 60 * 1000 - elapsed;
-                        if (remaining <= 0) return <span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">⏰ פג תוקף</span>;
+                      {/* Availability policy supports an explicit deadline and legacy records with no usable deadline. */}
+                      {match.status === "proposed" && (() => {
+                        const availability = getMatchAvailability(match);
+                        if (availability.reason === "needs_review") return <span className="text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full">⚠️ נדרש לבדוק התאמה ללא מועד</span>;
+                        if (availability.reason === "expired_proposal") return <span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">⏰ פג תוקף</span>;
+                        if (availability.reason !== "current_proposal" || !availability.deadline) return null;
+                        const remaining = availability.deadline - Date.now();
                         const hoursLeft = Math.floor(remaining / (1000 * 60 * 60));
                         const minsLeft = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-                        return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${hoursLeft < 12 ? 'text-red-600 bg-red-50' : 'text-blue-600 bg-blue-50'}`}>⏱ {hoursLeft}:{String(minsLeft).padStart(2, '0')} שעות</span>;
+                        return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${hoursLeft < 12 ? 'text-red-600 bg-red-50' : 'text-blue-600 bg-blue-50'}`}>⏱ הצעה ממתינה לתשובה · {hoursLeft}:{String(minsLeft).padStart(2, '0')} שעות</span>;
                       })()}
                       <span className="text-xs text-[#727272]">
                         {new Date(match.proposedAt ? Number(match.proposedAt) : (typeof match.createdAt === 'number' ? match.createdAt : match.createdAt)).toLocaleDateString("he-IL")}
@@ -2627,7 +2676,7 @@ export default function CRMMatchmaking() {
                         <div className="flex gap-2 mb-3">
                           <button
                             onClick={() => {
-                              if (window.confirm(`לשחרר את ${match.singleAName} ו-${match.singleBName} מההתאמה הזו? שניהם יחזרו למאגר.`)) {
+                              if (window.confirm("לסיים את ההתאמה ולהחזיר את שני הצדדים למאגר? לא יישלחו הודעות.")) {
                                 releaseFromMatch.mutate({ matchId: match.id });
                               }
                             }}
@@ -2781,7 +2830,7 @@ export default function CRMMatchmaking() {
                           {/* Release button */}
                           <button
                             onClick={() => {
-                              if (window.confirm(`לשחרר את ${match.singleAName} ו-${match.singleBName} מההתאמה? שניהם יחזרו למאגר לקבלת התאמות חדשות.`)) {
+                              if (window.confirm("לסיים את ההתאמה ולהחזיר את שני הצדדים למאגר? לא יישלחו הודעות.")) {
                                 releaseFromMatch.mutate({ matchId: match.id });
                               }
                             }}
@@ -3924,7 +3973,7 @@ function CompatibilityCheckTab({
                 ) : compatResult.matchStatus === 'proposed' ? (
                   <><CheckCircle size={18} /> ההצעה כבר נשלחה</>
                 ) : compatResult.matchStatus === 'matched' ? (
-                  <><CheckCircle size={18} /> התאמה מאושרת!</>
+                  <><CheckCircle size={18} /> התאמה הדדית פעילה</>
                 ) : hasNonOverridableBlock ? (
                   <><AlertTriangle size={18} /> חסימה שאינה ניתנת לעקיפה</>
                 ) : (

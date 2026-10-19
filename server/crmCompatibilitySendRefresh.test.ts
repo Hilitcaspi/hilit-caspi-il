@@ -22,8 +22,9 @@ describe("CRM compatibility direct-send refresh", () => {
     expect(source).toContain("unmatchedLoading ? (");
     expect(source).toContain("unmatchedError ? (");
     expect(source).toContain("s.hasBlockingProposal &&");
-    expect(source).toContain("openAdvancedForUnmatched(s)");
-    expect(routerSource).toContain("canSuggestNewMatch(s, c, blockingProposalIds, previouslySentPairs)");
+    expect(source).toContain("openAdvancedForUnmatched(profile)");
+    expect(routerSource).toContain("const blockingProposalIds = new Set<number>()");
+    expect(routerSource).toContain("blocksNewMatch(match, queueNow)");
   });
 
   it("passes an explicit criteria override through both new and existing match paths", () => {

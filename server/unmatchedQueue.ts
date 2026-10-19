@@ -1,9 +1,9 @@
 import type { Match } from "../drizzle/schema";
+import { isBlockingMatch } from "../shared/matchAvailability";
 
-/** Mirror the direct-send endpoint's active-match guard, including failed deliveries. */
-export function blocksNewMatch(match: Pick<Match, "status" | "returnedToPoolAt" | "matchDetailStatus">): boolean {
-  return match.status === "proposed"
-    || (match.status === "matched" && !match.returnedToPoolAt && match.matchDetailStatus !== "ended");
+/** Shared with the direct-send endpoint, active-profile display and advanced search. */
+export function blocksNewMatch(match: Pick<Match, "status"> & Partial<Match>, now = Date.now()): boolean {
+  return isBlockingMatch(match, now);
 }
 
 export function matchPairKey(a: number, b: number): string {

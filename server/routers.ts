@@ -2,6 +2,8 @@ import { rankAdvancedCandidates } from "./advancedMatchRanking";
 import { evaluateMatchPreview, previewScoreDimensions } from "./matchScorePreview";
 import { loadMatchScoreInputs, presentMatchScore } from "./pendingMatchScore";
 import { getMatchResponseSummaries } from "./matchResponseMetrics";
+import { findBlockingMatchForSingle, visibleMatchSql, matchAvailabilityColumns, possibleBlockingMatchSql } from "./matchAvailabilityQueries";
+import { getMatchAvailability, isBlockingMatch } from "../shared/matchAvailability";
 // © 2024–2025 Hilit Caspi. All rights reserved. Proprietary and confidential.
 // שיטת ההתאמה, האלגוריתם והתכנים מוגנים בזכויות יוצרים ומהווים סוד מסחרי של הילית כספי.
 
@@ -2945,7 +2947,7 @@ export const appRouter = router({
               eq(matches.singleAId, profile.id),
               eq(matches.singleBId, profile.id)
             ),
-            or(isNull(matches.notes), notLike(matches.notes, `%${BOOST_CANDIDATE_NOTE_MARKER}%`)),
+            visibleMatchSql(BOOST_CANDIDATE_NOTE_MARKER),
           ))
           .orderBy(desc(matches.createdAt))
           .limit(10);
@@ -3215,32 +3217,19 @@ export const appRouter = router({
         let [singleB] = await db.select().from(singles).where(eq(singles.id, input.idB)).limit(1);
         if (!singleA || !singleB) throw new TRPCError({ code: "NOT_FOUND", message: "אחד מהאנשים לא נמצא" });
 
-        // Check if either single already has an active proposed match
-        const activeMatchA = await db.select({ id: matches.id }).from(matches).where(
-          and(
-            or(eq(matches.singleAId, input.idA), eq(matches.singleBId, input.idA)),
-            or(
-              eq(matches.status, "proposed"),
-              and(eq(matches.status, "matched"), isNull(matches.returnedToPoolAt), or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended"))),
-            )
-          )
-        ).limit(1);
-        const activeMatchB = await db.select({ id: matches.id }).from(matches).where(
-          and(
-            or(eq(matches.singleAId, input.idB), eq(matches.singleBId, input.idB)),
-            or(
-              eq(matches.status, "proposed"),
-              and(eq(matches.status, "matched"), isNull(matches.returnedToPoolAt), or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended"))),
-            )
-          )
-        ).limit(1);
+        // Use the same lifecycle rule as the CRM and advanced search.
+        const availabilityNow = Date.now();
+        const [activeMatchA, activeMatchB] = await Promise.all([
+          findBlockingMatchForSingle(db, input.idA, availabilityNow),
+          findBlockingMatchForSingle(db, input.idB, availabilityNow),
+        ]);
         const activeWarnings: string[] = [];
-        if (activeMatchA.length > 0) activeWarnings.push(`${singleA.firstName} כבר בהתאמה פעילה`);
-        if (activeMatchB.length > 0) activeWarnings.push(`${singleB.firstName} כבר בהתאמה פעילה`);
+        if (activeMatchA) activeWarnings.push(`${singleA.firstName} כבר בהתאמה פעילה`);
+        if (activeMatchB) activeWarnings.push(`${singleB.firstName} כבר בהתאמה פעילה`);
         if (activeWarnings.length > 0) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: `⚠️ שים לב: ${activeWarnings.join(" ו-")}. לא ניתן לשלוח התאמה נוספת בזמן שהתאמה אחרת ממתינה לתשובה.`
+            message: `שים לב: ${activeWarnings.join(" ו-")}. יש לבדוק את ההתאמה החוסמת בפרופיל לפני שליחה נוספת. סיום התאמה נעשה ידנית בלבד.`
           });
         }
 
@@ -4594,34 +4583,19 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           throw new TRPCError({ code: "BAD_REQUEST", message: verifiedBreakdown.details.find(detail => detail.startsWith("פסילה מוחלטת:")) || "ההתאמה סותרת קו אדום ולא תישלח." });
         }
 
-        // Check whether either person already has an active proposal or connection.
-        const activeMatchA = await db.select({ id: matches.id }).from(matches).where(
-          and(
-            or(eq(matches.singleAId, match.singleAId), eq(matches.singleBId, match.singleAId)),
-            or(
-              eq(matches.status, "proposed"),
-              and(eq(matches.status, "matched"), isNull(matches.returnedToPoolAt), or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended"))),
-            ),
-            ne(matches.id, input.matchId)
-          )
-        ).limit(1);
-        const activeMatchB = await db.select({ id: matches.id }).from(matches).where(
-          and(
-            or(eq(matches.singleAId, match.singleBId), eq(matches.singleBId, match.singleBId)),
-            or(
-              eq(matches.status, "proposed"),
-              and(eq(matches.status, "matched"), isNull(matches.returnedToPoolAt), or(isNull(matches.matchDetailStatus), ne(matches.matchDetailStatus, "ended"))),
-            ),
-            ne(matches.id, input.matchId)
-          )
-        ).limit(1);
+        // Exclude only this unsent draft; every other real blocker remains protected.
+        const availabilityNow = Date.now();
+        const [activeMatchA, activeMatchB] = await Promise.all([
+          findBlockingMatchForSingle(db, match.singleAId, availabilityNow, input.matchId),
+          findBlockingMatchForSingle(db, match.singleBId, availabilityNow, input.matchId),
+        ]);
         const activeWarnings: string[] = [];
-        if (activeMatchA.length > 0) activeWarnings.push(`${singleA.firstName} כבר בהתאמה פעילה`);
-        if (activeMatchB.length > 0) activeWarnings.push(`${singleB.firstName} כבר בהתאמה פעילה`);
+        if (activeMatchA) activeWarnings.push(`${singleA.firstName} כבר בהתאמה פעילה`);
+        if (activeMatchB) activeWarnings.push(`${singleB.firstName} כבר בהתאמה פעילה`);
         if (activeWarnings.length > 0) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: `⚠️ שים לב: ${activeWarnings.join(" ו-")}. לא ניתן לשלוח התאמה נוספת בזמן שהתאמה אחרת ממתינה לתשובה.`
+            message: `שים לב: ${activeWarnings.join(" ו-")}. יש לבדוק את ההתאמה החוסמת בפרופיל לפני שליחה נוספת. סיום התאמה נעשה ידנית בלבד.`
           });
         }
 
@@ -5265,7 +5239,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!db) return [];
 
       const rawMatches = await db.select().from(matches)
-        .where(or(isNull(matches.notes), notLike(matches.notes, `%${BOOST_CANDIDATE_NOTE_MARKER}%`)))
+        .where(visibleMatchSql(BOOST_CANDIDATE_NOTE_MARKER))
         .orderBy(desc(matches.createdAt), desc(matches.score)); // newest first, then by score
 
       // Keep every historical proposal. If the same pair was sent again later, each
@@ -5488,18 +5462,17 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         )),
       ]);
       const sentMatchRows = allMatchRows.filter(wasMatchProposalSent);
+      const queueNow = Date.now();
       const blockingProposalIds = new Set<number>();
       const blockingMatchStatusBySingle = new Map<number, "proposed" | "matched">();
       for (const match of allMatchRows) {
-        if (!blocksNewMatch(match)) continue;
+        if (!blocksNewMatch(match, queueNow)) continue;
         blockingProposalIds.add(match.singleAId);
         blockingProposalIds.add(match.singleBId);
-        if (match.status === "proposed" || match.status === "matched") {
-          blockingMatchStatusBySingle.set(match.singleAId, match.status);
-          blockingMatchStatusBySingle.set(match.singleBId, match.status);
-        }
+        const activeStatus = getMatchAvailability(match, queueNow).reason === "active_connection" ? "matched" : "proposed";
+        blockingMatchStatusBySingle.set(match.singleAId, activeStatus);
+        blockingMatchStatusBySingle.set(match.singleBId, activeStatus);
       }
-      const queueNow = Date.now();
       const fourteenDaysAgo = queueNow - (14 * 24 * 60 * 60 * 1000);
       const acceptedByMatchAndSingle = new Set(acceptedDeliveries.map(row => `${row.matchId}:${row.singleId}`));
       const feedbackAttentionIds = new Set(feedbackAttentionRows.map(row => Number(row.singleId)).filter(Boolean));
@@ -5510,7 +5483,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       for (const m of sentMatchRows) {
         for (const id of [m.singleAId, m.singleBId]) {
           if (!acceptedByMatchAndSingle.has(`${m.id}:${id}`)) continue;
-          const stillInActiveConnection = blocksNewMatch(m);
+          const stillInActiveConnection = blocksNewMatch(m, queueNow);
           if (stillInActiveConnection) activeProposalBySingle.set(id, true);
         }
       }
@@ -5680,28 +5653,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         // Get all singles currently UNAVAILABLE:
         // 1. In an active PROPOSED match (waiting for response)
         // 2. In a MATCHED state and haven't returned to pool yet
-        const allActiveMatches = await db.select({
-          singleAId: matches.singleAId,
-          singleBId: matches.singleBId,
-          status: matches.status,
-          returnedToPoolAt: matches.returnedToPoolAt,
-        }).from(matches).where(
-          or(
-            eq(matches.status, 'proposed'),
-            eq(matches.status, 'matched')
-          )
-        );
+        const availabilityNow = Date.now();
+        const allActiveMatches = await db.select(matchAvailabilityColumns).from(matches)
+          .where(possibleBlockingMatchSql());
         const unavailableSingleIds = new Set<number>();
         for (const am of allActiveMatches) {
-          if (am.status === 'proposed') {
-            // Both sides are locked in a proposed match
-            unavailableSingleIds.add(am.singleAId);
-            unavailableSingleIds.add(am.singleBId);
-          } else if (am.status === 'matched' && !am.returnedToPoolAt) {
-            // Both sides are in a successful match and haven't returned to pool
-            unavailableSingleIds.add(am.singleAId);
-            unavailableSingleIds.add(am.singleBId);
-          }
+          if (!isBlockingMatch(am, availabilityNow)) continue;
+          unavailableSingleIds.add(am.singleAId);
+          unavailableSingleIds.add(am.singleBId);
         }
         // Get inactive singles to exclude
         const inactiveSingles = await db.select({ id: singles.id })
@@ -5944,21 +5903,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) return null;
-        const activeMatches = await db.select().from(matches).where(
-          and(
-            or(
-              eq(matches.singleAId, input.singleId),
-              eq(matches.singleBId, input.singleId)
-            ),
-            or(
-              eq(matches.status, 'proposed'),
-              and(eq(matches.status, 'matched'), isNull(matches.returnedToPoolAt))
-            )
-          )
-        ).orderBy(desc(matches.createdAt)).limit(1);
-
-        if (activeMatches.length === 0) return null;
-        const m = activeMatches[0];
+        const now = Date.now();
+        const m = await findBlockingMatchForSingle(db, input.singleId, now);
+        if (!m) return null;
+        const availability = getMatchAvailability(m, now);
         const opponentId = m.singleAId === input.singleId ? m.singleBId : m.singleAId;
         const [opponent] = await db.select({
           id: singles.id, firstName: singles.firstName, lastName: singles.lastName,
@@ -5977,6 +5925,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           proposedAt: m.proposedAt,
           matchedAt: m.matchedAt,
           daysInMatch,
+          availabilityReason: availability.reason,
+          approvalExpiresAt: availability.deadline,
           approvedByA: m.approvedByA,
           approvedByB: m.approvedByB,
           isA: m.singleAId === input.singleId,

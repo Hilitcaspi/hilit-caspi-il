@@ -138,12 +138,12 @@ describe("advanced match candidate exclusions", () => {
     expect(isAdvancedMatchCandidate({ id: 60, isActive: false, isSeed: false }, exclusions, 10)).toBe(false);
     expect(isAdvancedMatchCandidate({ id: 70, isActive: true, isSeed: true }, exclusions, 10)).toBe(false);
   });
-  it("releases a proposal as soon as either participant declines, retaining prior history", () => {
+  it("does not treat legacy false defaults as declines without response evidence", () => {
     const exclusions = buildAdvancedMatchExclusions([
       match(10, 20, { status: "proposed", ownerApprovedAt: NOW - HOUR, approvalExpiresAt: NOW + HOUR, approvedByA: false }),
       match(30, 40, { status: "proposed", ownerApprovedAt: NOW - HOUR, approvalExpiresAt: NOW + HOUR, approvedByB: false }),
     ], 10, NOW);
-    expect(exclusions.unavailableIds.size).toBe(0);
+    expect(exclusions.unavailableIds).toEqual(new Set([10, 20, 30, 40]));
     expect(exclusions.previousPartnerIds).toEqual(new Set([20]));
   });
   it("expires at the exact deadline and respects explicit expiry over the 48h fallback", () => {

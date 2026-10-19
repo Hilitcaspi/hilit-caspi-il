@@ -7,8 +7,10 @@ const other = { id: 20, photoUrl: "https://example.test/b.jpg", email: "b@exampl
 // These tests protect the action as well as the queue counts: a recommendation
 // should not be offered if the direct-send endpoint would refuse it.
 describe("matchmaking waiting queue", () => {
-  it("recognizes proposed matches even if the provider never accepted delivery", () => {
-    expect(blocksNewMatch({ status: "proposed", returnedToPoolAt: null, matchDetailStatus: null })).toBe(true);
+  it("protects a current prepared proposal but does not block on an unsent placeholder", () => {
+    const now = 1_000_000_000;
+    expect(blocksNewMatch({ status: "proposed", returnedToPoolAt: null, matchDetailStatus: null }, now)).toBe(false);
+    expect(blocksNewMatch({ status: "proposed", ownerApprovedAt: now - 1000, approvalExpiresAt: now + 1000, returnedToPoolAt: null }, now)).toBe(true);
     expect(blocksNewMatch({ status: "matched", returnedToPoolAt: null, matchDetailStatus: "dating" })).toBe(true);
     expect(blocksNewMatch({ status: "matched", returnedToPoolAt: 123, matchDetailStatus: "dating" })).toBe(false);
     expect(blocksNewMatch({ status: "matched", returnedToPoolAt: null, matchDetailStatus: "ended" })).toBe(false);
