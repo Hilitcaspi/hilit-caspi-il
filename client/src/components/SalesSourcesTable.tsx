@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SalesIntelligence } from "../../../server/salesIntelligence";
-import { presentSalesSource, salesSourceJourney, summarizeSalesSources, explainSalesSourceEvidence, type SalesSourceGroup } from "../../../shared/salesSourcePresentation";
+import { presentSalesSource, salesSourceJourney, summarizeSalesSources, explainSalesSourceEvidence, hasMatchedMetaCreative, type SalesSourceGroup } from "../../../shared/salesSourcePresentation";
 
 import { DEFAULT_SALES_PRODUCT, SALES_PRODUCT_CHOICES, filterSalesByProduct, summarizeProductSales, additionalSalesProducts, type SalesProductFilter } from "../../../shared/salesProductPresentation";
 
@@ -37,7 +37,7 @@ function SourceDetails({ sale }: { sale: Sale }) {
       <p><span className="text-gray-500">הקישור האחרון לפני הרכישה: </span><strong>{journey.closingLabel}</strong></p>
       {journey.emailClosed && display.detail && <p className="text-gray-500">{display.detail}</p>}
       {sale.closing.channel === "Meta Ads (ממומן)" && display.detail && <p>קמפיין: {display.detail}</p>}
-      {sale.closing.channel === "Meta Ads (ממומן)" && sale.closing.confidence.includes("מזהה מודעה תואם") && display.creative && <p>מודעה: {display.creative}</p>}
+      {sale.closing.channel === "Meta Ads (ממומן)" && hasMatchedMetaCreative(sale.closing.confidence) && display.creative && <p>מודעה: {display.creative}</p>}
       <p className="text-gray-600">{explainSalesSourceEvidence(sale)}</p>
       {journey.emailClosed && !journey.acquisitionRecorded && <p className="text-gray-500">איך הגיעו לרשימת המיילים: לא מתועד. זה לא ערוץ נוסף.</p>}
       {sale.emailAssist?.clicked && !journey.emailClosed && <p className="text-gray-600">מייל נוסף שנלחץ לפני התשלום: {sale.emailAssist.campaign}. לא נספר כרכישה נוספת.</p>}

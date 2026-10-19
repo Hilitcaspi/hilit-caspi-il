@@ -194,7 +194,7 @@ function extractUtmCampaign(raw: string) {
   try { return decodeURIComponent(match[1].replace(/\+/g, " ")).trim(); } catch { return match[1].trim(); }
 }
 
-let metaDestinationsCache: { fetchedAt: number; data: Record<string, { labels: string[]; categories: string[]; utmCampaigns: string[]; activeAds: number; ads: number; campaignName: string; adReferences: Array<{ id: string; name: string }> }> } | null = null;
+let metaDestinationsCache: { fetchedAt: number; data: Record<string, { labels: string[]; categories: string[]; utmCampaigns: string[]; attributionUtmCampaigns: string[]; activeAds: number; ads: number; campaignName: string; adReferences: import('./metaDestinationAttribution').MetaAdUtmReference[] }> } | null = null;
 
 export async function fetchMetaCampaignDestinations() {
   if (metaDestinationsCache && Date.now() - metaDestinationsCache.fetchedAt < 10 * 60 * 1000) return metaDestinationsCache.data;
@@ -212,7 +212,7 @@ export async function fetchMetaCampaignDestinations() {
     activeAds: number;
     ads: number;
     campaignName: string;
-    adReferences: Array<{ id: string; name: string }>;
+    adReferences: import('./metaDestinationAttribution').MetaAdUtmReference[];
   }> = {};
   try {
     let next: string | null = `https://graph.facebook.com/v25.0/${accountId}/ads?fields=${fields}&limit=200&access_token=${token}`;
@@ -235,7 +235,8 @@ export async function fetchMetaCampaignDestinations() {
           campaignName: String(ad.campaign?.name || ""),
           adReferences: [],
         };
-        if (ad.id) byCampaign[id].adReferences.push({ id: String(ad.id), name: String(ad.name || "") });
+        const adUtmCampaigns: string[] = [];
+        if (ad.id) byCampaign[id].adReferences.push({ id: String(ad.id), name: String(ad.name || ""), utmCampaigns: adUtmCampaigns });
         byCampaign[id].ads += 1;
         const isActive = ad.effective_status === "ACTIVE";
         if (isActive) byCampaign[id].activeAds += 1;
@@ -254,6 +255,7 @@ export async function fetchMetaCampaignDestinations() {
           const utmCampaign = extractUtmCampaign(url);
           if (utmCampaign) {
             const normalizedUtm = utmCampaign.toLowerCase();
+            if (!adUtmCampaigns.includes(normalizedUtm)) adUtmCampaigns.push(normalizedUtm);
             byCampaign[id].utmCampaigns.add(normalizedUtm);
             if (isActive) byCampaign[id].activeUtmCampaigns.add(normalizedUtm);
           }
@@ -269,6 +271,7 @@ export async function fetchMetaCampaignDestinations() {
     labels: Array.from(value.activeAds > 0 ? value.activeLabels : value.labels).filter(Boolean).slice(0, 4),
     categories: Array.from(value.activeAds > 0 ? value.activeCategories : value.categories).filter(Boolean).slice(0, 4),
     utmCampaigns: Array.from(value.activeAds > 0 ? value.activeUtmCampaigns : value.utmCampaigns).filter(Boolean).slice(0, 8),
+    attributionUtmCampaigns: Array.from(value.utmCampaigns).filter(Boolean),
     activeAds: value.activeAds,
     ads: value.ads,
     campaignName: value.campaignName,

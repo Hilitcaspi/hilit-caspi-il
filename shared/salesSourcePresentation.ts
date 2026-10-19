@@ -14,6 +14,12 @@ const lifecycleChannel = (value: string) => ["paid_database", "paid_plus", "paid
 const unknownChannel = (value: string) => lifecycleChannel(value) || value === "ישיר / לא ידוע" || value === "שאלון DNA / מקור לא ידוע";
 const lower = (value?: string | null) => (value || "").trim().toLowerCase();
 const token = (value: string, word: string) => new RegExp(`(?:^|[_\\s-])(?:${word})(?:$|[_\\s-])`).test(value);
+const matchedMetaCreativeMarkers = ["מזהה מודעה תואם", "תיוג מודעה ייחודי תואם"];
+
+/** A creative name is safe to present only after an exact ad ID or unique ad tag match. */
+export function hasMatchedMetaCreative(confidence: string) {
+  return matchedMetaCreativeMarkers.some(marker => confidence.includes(marker));
+}
 
 /** Describe only the saved link type. A story or bio tag does not prove first discovery. */
 export function describeSourceLink(attribution: Attribution, creative?: string | null) {
@@ -68,6 +74,7 @@ export function presentSalesSource(sale: SaleSource) {
   let detail: string | null = link.detail;
   let creative = sale.creative || null;
   if (link.type === "unknown") { detail = link.note; creative = null; }
+  else if (closing.channel === "Meta Ads (ממומן)" && !hasMatchedMetaCreative(closing.confidence)) creative = null;
   else if (closing.channel === "Email") {
     const named = !genericCampaign(closing.campaign) ? closing.campaign : sale.emailAssist?.clicked ? sale.emailAssist.campaign : null;
     title = "מייל";
@@ -124,13 +131,13 @@ export function salesSourceJourney(sale: SaleSource) {
   return {
     group, label: groupNames[group], primaryLabel,
     primaryCampaign: !genericCampaign(attribution.campaign) && primary.type !== "untyped_social" && primary.type !== "organic" && primary.type !== "tagged_social" ? attribution.campaign : null,
-    primaryCreative: group === "meta" && attribution.confidence.includes("מזהה מודעה תואם") ? (hasRecordedAcquisition ? sale.acquisition.creative : sale.creative) || null : null,
+    primaryCreative: group === "meta" && hasMatchedMetaCreative(attribution.confidence) ? (hasRecordedAcquisition ? sale.acquisition.creative : sale.creative) || null : null,
     emailClosed: sale.closing.channel === "Email",
     acquisitionRecorded: hasRecordedAcquisition,
     acquisitionLabel: hasRecordedAcquisition ? acquisition.title : "מקור ההיכרות הקודם לא מתועד",
     acquisitionCampaign: hasRecordedAcquisition && !genericCampaign(sale.acquisition.campaign) ? sale.acquisition.campaign : null,
     closingLabel: display.title, closingDetail: display.detail,
-    acquisitionCreative: group === "meta" && hasRecordedAcquisition && attribution.confidence.includes("מזהה מודעה תואם") ? sale.acquisition.creative || null : null,
+    acquisitionCreative: group === "meta" && hasRecordedAcquisition && hasMatchedMetaCreative(attribution.confidence) ? sale.acquisition.creative || null : null,
     distinctAcquisition: !!display.original,
     evidence: hasRecordedAcquisition ? sale.acquisition.confidence : sale.closing.confidence,
   };
@@ -163,7 +170,9 @@ export function explainSalesSourceEvidence(sale: SaleSource) {
     if (sale.sourceDiagnostics && !sale.sourceDiagnostics.checkoutTagged) return "אין תיוג מקור בעסקה או בקופה המקושרת, ולא נמצא מקור קודם מתועד בשאלון, בפרופיל או בקליק רלוונטי לפני התשלום. סיבת אובדן התיוג עצמה אינה מתועדת; אי אפשר להסיק שזה ממומן או ישיר.";
     return "לא נשמר מקור לקישור הרכישה. אין בכך הוכחה לרכישה ישירה או ממומנת.";
   }
-  if (sale.closing.confidence.includes("מזהה מודעה תואם")) return "מזהה המודעה שנשמר בעסקה תואם למודעה בחשבון הישראלי.";
+  const confidences = [sale.acquisition.confidence, sale.closing.confidence];
+  if (confidences.some(confidence => confidence.includes("תיוג מודעה ייחודי תואם"))) return "התיוג שנשמר תואם למודעה בחשבון הישראלי; זהו שיוך לפי תיוג, ולא אימות הקלקה.";
+  if (confidences.some(confidence => confidence.includes("מזהה מודעה תואם"))) return "מזהה המודעה שנשמר בעסקה תואם למודעה בחשבון הישראלי.";
   if (sale.closing.channel === "Email") return sale.emailAssist?.clicked ? "תועד קליק במייל לפני התשלום. זהו המגע שנמדד, לא הוכחה שהמייל לבדו גרם לרכישה." : "נשמר תיוג של קישור ממייל, אך המייל המסוים לא זוהה.";
   return describeSourceLink(sale.closing, sale.creative).note;
 }

@@ -13,6 +13,7 @@ const context = {
     ['ad-men', {campaignId:'campaign-men',name:'שדכנית מודעה 4'}],
     ['ad-coffee', {campaignId:'campaign-cold',name:'קפה מודעה 1'}],
   ]),
+  uniqueUtmAds: new Map([['shabek_men_ad4', {campaignId:'campaign-men',name:'שדכנית מודעה 4'}]]),
 };
 const source = (overrides = {}) => ({
   channelSource:'fb',medium:'SHABEK_men',campaignRaw:'SHABEK_men_ad4',creative:'ad-men',
@@ -32,6 +33,26 @@ describe('exact Meta ad source evidence', () => {
   });
   it('allows exact unique creative UTM evidence without a stored ad identifier', () => {
     expect(resolveAttribution(source({creative:''}),context).campaign).toBe('קמפיין גברים');
+  });
+  it('returns the matched ad name and marks UTM matching without claiming a measured click', () => {
+    expect(resolveAttribution(source({channelSource:'ig',creative:''}),context)).toMatchObject({channel:'Meta Ads (ממומן)',creative:'שדכנית מודעה 4',confidence:'UTM שמור; תיוג מודעה ייחודי תואם'});
+  });
+  it.each(['', 'instagram.com', 'l.instagram.com', 'direct', 'dna_quiz'])('can resolve a unique documented tag from source %s', channelSource => {
+    expect(resolveAttribution(source({channelSource,creative:''}),context).metaCampaignId).toBe('campaign-men');
+  });
+  it.each([
+    {channelSource:'email',medium:'email',expected:'Email'},
+    {channelSource:'',medium:'email',expected:'Email'},
+    {channelSource:'whatsapp',medium:'message',expected:'WhatsApp'},
+    {channelSource:'sms',medium:'sms',expected:'SMS'},
+    {channelSource:'',medium:'sms',expected:'SMS'},
+    {channelSource:'site_upsell',medium:'onsite',expected:'הצעה באתר'},
+    {channelSource:'',medium:'onsite',expected:'הצעה באתר'},
+    {channelSource:'personal_area',medium:'onsite',expected:'הצעה באתר'},
+    {channelSource:'subscription',medium:'',expected:'חידוש'},
+    {channelSource:'google',medium:'cpc',expected:'Google Ads'},
+  ])('never reassigns explicit $expected from a reused Meta tag or campaign ID', ({expected,...overrides}) => {
+    expect(resolveAttribution(source({...overrides,metaCampaignId:'campaign-men'}),context).channel).toBe(expected);
   });
   it('never overwrites an email close with a reused Meta tag or ad reference', () => {
     expect(resolveAttribution(source({channelSource:'email',medium:'email'}),context).channel).toBe('Email');

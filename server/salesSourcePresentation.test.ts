@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { presentSalesSource, salesSourceJourney, summarizeSalesSources, explainSalesSourceEvidence } from "../shared/salesSourcePresentation";
 const source = (channel: string, campaign = "database", confidence = "UTM בתהליך תשלום מותאם לעסקה") => ({ channel, campaign, confidence });
 const sale = (channel: string, campaign = "database", creative: string | null = null) => ({
@@ -43,7 +44,9 @@ describe("human-readable purchase sources", () => {
     expect(input.closing.campaign).toBe("database");
   });
   it("retains paid creative and campaign names", () => {
-    const result = presentSalesSource(sale("Meta Ads (ממומן)", "קמפיין מכירה", "סרטון מודעה"));
+    const input = sale("Meta Ads (ממומן)", "קמפיין מכירה", "סרטון מודעה");
+    input.closing.confidence = "UTM בתהליך תשלום מותאם לעסקה; מזהה מודעה תואם";
+    const result = presentSalesSource(input);
     expect(result.title).toBe("קמפיין ממומן ב־Meta");
     expect(result.detail).toBe("קמפיין מכירה");
     expect(result.creative).toBe("סרטון מודעה");
@@ -141,6 +144,36 @@ describe("specific social link and visible source labels", () => {
   it("keeps a mapped paid story a paid ad, not an organic story", () => {
     const input = { ...sale("Meta Ads (ממומן)", "קמפיין מכירה", "מודעה"), closing: {...source("Meta Ads (ממומן)", "קמפיין מכירה", "מזהה מודעה תואם"),medium:"paid",content:"story_live"} };
     expect(salesSourceJourney(input)).toMatchObject({primaryLabel:"קמפיין ממומן ב־Meta",primaryCampaign:"קמפיין מכירה",primaryCreative:"מודעה",group:"meta"});
+  });
+  it("presents the real Meta ad after a unique UTM match, for onsite and email closes", () => {
+    const uniqueConfidence = "מקור ראשוני נפרד שנשמר בהרשמה; תיוג מודעה ייחודי תואם";
+    for (const closingChannel of ["הצעה באתר", "Email"]) {
+      const input = {
+        ...sale(closingChannel),
+        status: "included" as const,
+        amountAgorot: 29900,
+        acquisition: {
+          ...source("Meta Ads (ממומן)", "קמפיין גיוס", uniqueConfidence),
+          creative: "שם מודעה אמיתי",
+          content: "raw_unique_utm",
+        },
+      };
+      const journey = salesSourceJourney(input);
+      expect(journey).toMatchObject({
+        group: "meta", primaryCampaign: "קמפיין גיוס", primaryCreative: "שם מודעה אמיתי", acquisitionCreative: "שם מודעה אמיתי",
+      });
+      expect(journey.primaryCreative).not.toBe(input.acquisition.content);
+      expect(explainSalesSourceEvidence(input)).toBe("התיוג שנשמר תואם למודעה בחשבון הישראלי; זהו שיוך לפי תיוג, ולא אימות הקלקה.");
+      expect(summarizeSalesSources([input])).toEqual([{
+        group: "meta", label: "קמפיינים ממומנים ב־Meta", count: 1, revenueAgorot: 29900,
+        emailClosedCount: closingChannel === "Email" ? 1 : 0, closingOnlyCount: 0, linkTypes: [],
+      }]);
+    }
+  });
+  it("keeps Meta acquisition blue in the frontend rather than relabeling it organic", () => {
+    const ui = readFileSync(new URL("../client/src/components/SalesSourcesTable.tsx", import.meta.url), "utf8");
+    expect(ui).toContain('meta: { card: "border-blue-200 bg-blue-50 text-blue-950"');
+    expect(ui).toContain("hasMatchedMetaCreative(sale.closing.confidence)");
   });
   it("keeps social subtypes separate within the source summary and counts once", () => {
     const inputs = ["story_live","bio_link","rem_db"].map(content => ({...sale("Instagram (אורגני/לא ידוע)","database",content),status:"included" as const,amountAgorot:29900}));

@@ -8,7 +8,7 @@ import { getDb } from "./db";
 import { acquisitionActorKey } from "./acquisitionCapture";
 import { META_ADS_ACCOUNT_TIMEZONE } from "./dashboardMetaSpend";
 import { israelDateKey } from "./dashboardRevenue";
-
+import { buildMetaDestinationUtmIndex } from "./metaDestinationAttribution";
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const DUPLICATE_WINDOW_MS = 60 * 60 * 1000;
@@ -197,6 +197,7 @@ type MetaContext = {
   uniqueUtmCampaigns: Map<string, string>;
   activeCampaignIds: Set<string>;
   adReferences?: Map<string, { campaignId: string; name: string }>;
+  uniqueUtmAds?: Map<string, { campaignId: string; name: string }>;
 };
 
 function text(value: unknown): string {
@@ -299,18 +300,17 @@ function classifyChannel(sourceInput: unknown, mediumInput: unknown): string {
   const source = /(^|\.)facebook\.com$/.test(rawSource) ? "facebook" : /(^|\.)instagram\.com$/.test(rawSource) ? "instagram" : rawSource;
   const medium = lower(mediumInput);
   const paidMedium = /(?:^|[_\s-])(paid|cpc|ppc|paid_social|social_paid)(?:$|[_\s-])/.test(medium);
+  if (source === "email" || source === "brevo" || source === "newsletter" || medium === "email") return "Email";
+  if (source === "whatsapp") return "WhatsApp";
+  if (["sms", "vibrate"].includes(source) || medium === "sms") return "SMS";
+  if (source === "site_upsell" || medium === "onsite") return "הצעה באתר";
   if (!source || ["direct", "unknown", "(direct)", "none"].includes(source)) return "ישיר / לא ידוע";
-  if (source === "email" || source === "brevo" || medium === "email") return "Email";
   if (source === "google") return paidMedium ? "Google Ads" : "Google / SEO";
   if (["meta", "meta_ads", "meta_lead_guide", "meta_lead_dna", "meta_lead_call"].includes(source)) return "Meta Ads (ממומן)";
   if (["facebook", "fb", "instagram", "ig"].includes(source)) {
     return paidMedium ? "Meta Ads (ממומן)" : `${source === "instagram" || source === "ig" ? "Instagram" : "Facebook"} (אורגני/לא ידוע)`;
   }
-  if (source === "whatsapp") return "WhatsApp";
-  if (["sms", "vibrate"].includes(source) || medium === "sms") return "SMS";
-  if (source === "site_upsell" || medium === "onsite") return "הצעה באתר";
   if (source === "referral" || source === "shahar") return "הפניה";
-  if (source === "newsletter") return "Email";
   if (source === "personal_area") return "אזור אישי";
   if (source === "subscription") return "חידוש";
   if (source === "dna_quiz") return "שאלון DNA / מקור לא ידוע";
@@ -359,7 +359,9 @@ export function resolveAttribution(value: InternalAttribution, meta: MetaContext
   // An Email click remains Email even if its generic UTM happens to resemble a
   // Meta creative. Only explicit paid evidence may bridge it to Meta.
   const isEmailLayer = channel === "Email";
-  const isMetaLayer = /^(?:meta|meta_ads|fb|facebook|ig|instagram|facebook_shabek|meta_lead_guide|meta_lead_dna|meta_lead_call)$/.test(lower(value.channelSource));
+  const isMetaLayer = channel === "Meta Ads (ממומן)" || /^(?:Facebook|Instagram)/.test(channel)
+    || (["ישיר / לא ידוע", "שאלון DNA / מקור לא ידוע", "facebook_shabek"].includes(channel)
+      && /^(?:facebook_shabek|dna_quiz|direct|unknown|\(direct\)|none)?$/.test(lower(value.channelSource)));
   const adReference = isMetaLayer && !isEmailLayer ? meta.adReferences?.get(text(value.creative)) : undefined;
   const byExactAd = adReference ? meta.campaigns.get(adReference.campaignId) : undefined;
   if (byExactAd) return {
@@ -370,24 +372,27 @@ export function resolveAttribution(value: InternalAttribution, meta: MetaContext
     metaCampaignId: byExactAd.id,
     creative: sanitizeSalesLabel(adReference!.name, "מודעת Meta"),
   };
-  const byId = !isEmailLayer && value.metaCampaignId ? meta.campaigns.get(value.metaCampaignId) : undefined;
-  const byRawId = !isEmailLayer && rawCampaign ? meta.campaigns.get(rawCampaign) : undefined;
+  const byId = isMetaLayer && !isEmailLayer && value.metaCampaignId ? meta.campaigns.get(value.metaCampaignId) : undefined;
+  const byRawId = isMetaLayer && !isEmailLayer && rawCampaign ? meta.campaigns.get(rawCampaign) : undefined;
   const byUniqueUtmId = isMetaLayer && !isEmailLayer && rawCampaignKey ? meta.uniqueUtmCampaigns.get(rawCampaignKey) : undefined;
   const mapped = byId || byRawId || (byUniqueUtmId ? meta.campaigns.get(byUniqueUtmId) : undefined);
   if (mapped) {
+    const uniqueAd = byUniqueUtmId ? meta.uniqueUtmAds?.get(rawCampaignKey) : undefined;
+    const matchedUniqueAd = uniqueAd?.campaignId === mapped.id ? uniqueAd : undefined;
     const mapping = byId || byRawId
       ? "מזהה קמפיין Meta תואם"
       : "UTM קריאטיב ייחודי תואם";
     return {
       channel: "Meta Ads (ממומן)",
       campaign: sanitizeSalesLabel(mapped.name, "קמפיין Meta לא מזוהה"),
-      confidence: value.confidence,
+      confidence: matchedUniqueAd ? `${value.confidence}; תיוג מודעה ייחודי תואם` : value.confidence,
       mapping,
       metaCampaignId: mapped.id,
+      ...(matchedUniqueAd ? { creative: sanitizeSalesLabel(matchedUniqueAd.name, "מודעת Meta") } : {}),
     };
   }
 
-  if (!isEmailLayer && value.metaCampaignId) {
+  if (isMetaLayer && !isEmailLayer && value.metaCampaignId) {
     return {
       channel: "Meta Ads (ממומן)",
       campaign: "מקור Meta מתועד; קמפיין לא ממופה",
@@ -617,7 +622,6 @@ async function getMetaContext(startDate: number, endDate: number): Promise<MetaC
     }
     // Only an exact creative UTM which belongs to precisely one campaign is
     // eligible. Names and generic aliases are deliberately never inferred.
-    const candidateUtmIds = new Map<string, Set<string>>();
     const activeCampaignIds = new Set<string>();
     const adReferences = new Map<string, { campaignId: string; name: string }>();
     for (const [id, destination] of Object.entries(destinations || {})) {
@@ -625,21 +629,10 @@ async function getMetaContext(startDate: number, endDate: number): Promise<MetaC
       if (!campaigns.has(id)) campaigns.set(id, { id, name: destination.campaignName, spend: 0, purchases: 0 });
       for (const ad of destination.adReferences) adReferences.set(ad.id, { campaignId: id, name: ad.name });
       if (destination.activeAds > 0) activeCampaignIds.add(id);
-      for (const utm of destination.utmCampaigns) {
-        const key = lower(utm);
-        if (!key) continue;
-        const ids = candidateUtmIds.get(key) || new Set<string>();
-        ids.add(id);
-        candidateUtmIds.set(key, ids);
-      }
     }
-    const uniqueUtmCampaigns = new Map<string, string>();
-    for (const [utm, ids] of Array.from(candidateUtmIds.entries())) {
-      const id = Array.from(ids)[0];
-      if (ids.size === 1 && id) uniqueUtmCampaigns.set(utm, id);
-    }
+    const { uniqueUtmCampaigns, uniqueUtmAds } = buildMetaDestinationUtmIndex(destinations || {});
     for (const campaign of Array.from(campaigns.values())) if (campaign.spend > 0) activeCampaignIds.add(campaign.id);
-    return { status: insights.status, campaigns, uniqueUtmCampaigns, activeCampaignIds, adReferences };
+    return { status: insights.status, campaigns, uniqueUtmCampaigns, uniqueUtmAds, activeCampaignIds, adReferences };
   } catch {
     return { status: "unavailable", campaigns: new Map(), uniqueUtmCampaigns: new Map(), activeCampaignIds: new Set() };
   }
