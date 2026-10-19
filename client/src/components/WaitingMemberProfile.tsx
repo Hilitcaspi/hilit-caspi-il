@@ -14,6 +14,7 @@ import {
 import { getWaitingProfileCompleteness } from "@shared/waitingProfileCompleteness";
 import { LEGACY_PERSONAL_EVIDENCE_SOURCE_LABEL, UNMATCHED_QUEUE_HISTORY_DISCLAIMER } from "@shared/unmatchedQueuePresentation";
 import MatchProfileCard, { type MatchProfile } from "./MatchProfileCard";
+import ProfileStaffMarkers, { profileStaffSurface } from "./ProfileStaffMarkers";
 import ProfileClosureDialog from "./ProfileClosureDialog";
 
 type WaitingProfile = MatchProfile & {
@@ -173,14 +174,16 @@ export default function WaitingMemberProfile({
     : null;
   const membershipStartedAt = profile.membershipStartedAt ?? profile.subscriptionStartedAt;
   const createdAt = formatDate(profile.createdAt);
+  const coachingProfile = profile.isCoachingClient === true;
 
   return (
-    <article dir="rtl" className="overflow-hidden rounded-2xl border border-[#191265]/15 bg-[#fffdf7] shadow-[0_12px_30px_rgba(25,18,101,0.08)]">
-      <header className="border-b border-[#191265]/10 bg-[#191265] px-4 py-4 text-white sm:px-6">
+    <article dir="rtl" className={`overflow-hidden rounded-2xl border border-[#191265]/15 ${profileStaffSurface(profile, "bg-[#fffdf7]")} shadow-[0_12px_30px_rgba(25,18,101,0.08)]`}>
+      <header className={`border-b px-4 py-4 sm:px-6 ${coachingProfile ? "border-pink-200 bg-pink-100 text-[#191265]" : "border-[#191265]/10 bg-[#191265] text-white"}`}>
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="break-words text-xl font-black">{displayName}</h2>
+              <ProfileStaffMarkers profile={profile} compact />
               <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${active ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}`}>
                 {active ? "פעיל במאגר" : "לא פעיל במאגר"}
               </span>
@@ -191,12 +194,12 @@ export default function WaitingMemberProfile({
                 <span className="rounded-full bg-fuchsia-100 px-2.5 py-1 text-xs font-black text-fuchsia-900">אישור Boost פעיל</span>
               )}
             </div>
-            <p className="mt-1 text-sm text-white/80">פרופיל מורחב לממתינים להתאמה</p>
+            <p className={`mt-1 text-sm ${coachingProfile ? "text-[#191265]/75" : "text-white/80"}`}>פרופיל מורחב לממתינים להתאמה</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {emailHref && (
-              <a href={emailHref} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe27c]">
+              <a href={emailHref} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe27c] ${coachingProfile ? "border border-pink-200 bg-white text-[#191265] hover:bg-pink-50" : "bg-white/10 text-white hover:bg-white/20"}`}>
                 <Mail className="size-3.5" aria-hidden="true" />
                 מייל ידני
               </a>

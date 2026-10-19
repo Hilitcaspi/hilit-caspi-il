@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ProfileStaffMarkers, { profileStaffSurface } from "@/components/ProfileStaffMarkers";
 
 const STATE_LABELS: Record<string, { label: string; className: string }> = {
   overdue: { label: "באיחור", className: "border-red-200 bg-red-50 text-red-800" },
@@ -121,11 +122,13 @@ export default function DatabaseNowSlaSection() {
       {rows.length === 0 ? <div className="rounded-2xl border border-dashed border-[#191265]/20 bg-white p-10 text-center text-slate-500">אין רוכשי NOW שמתאימים למסנן שבחרת.</div> : <div className="space-y-3">{rows.map((row: any) => {
         const state = STATE_LABELS[row.state] || STATE_LABELS.active;
         const fulfilledWithinSla = row.firstMatchSentAt && row.dueAt && row.firstMatchSentAt <= row.dueAt;
-        return <Card key={row.email} className={`border shadow-sm ${row.state === "overdue" ? "border-red-300" : row.state === "due_soon" ? "border-amber-300" : "border-[#191265]/10"}`}>
+        const linkedProfile = row.singleId ? row : null;
+        return <Card key={row.email} className={`border shadow-sm ${row.state === "overdue" ? "border-red-300" : row.state === "due_soon" ? "border-amber-300" : "border-[#191265]/10"} ${profileStaffSurface(linkedProfile, "")}`}>
           <CardContent className="p-4 sm:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-[#191265]">{fullName(row)}</h3><Badge variant="outline" className={state.className}>{state.label}</Badge>{row.task?.status === "in_progress" && <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800">בטיפול</Badge>}</div>
+                {linkedProfile && <ProfileStaffMarkers profile={linkedProfile} compact />}
                 <p className="mt-1 break-all text-sm text-slate-600">{row.email}{row.phone ? ` · ${row.phone}` : ""}</p>
                 <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs text-slate-500">רכישה מאומתת</span><strong className="mt-1 block text-slate-800">{formatDate(row.paidAt)}</strong></div>

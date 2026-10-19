@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { getDb } from "./db";
-import { liveOctoberQuestions, liveOctoberTickets } from "../drizzle/schema";
+import { liveOctoberQuestions, liveOctoberTickets, singles } from "../drizzle/schema";
 import { ticketJoinUrl } from "./liveZoomDelivery";
 import { liveQuestionTicket } from "./liveQuestionAccess";
 import { confirmLiveAttendance, readLiveQuestionAccess } from "./liveAttendance";
@@ -109,6 +109,9 @@ export const liveOctoberRouter = router({
     const tickets = await db.select({
       id: liveOctoberTickets.id, name: liveOctoberTickets.name,
       email: liveOctoberTickets.email, source: liveOctoberTickets.source,
+      singleId: liveOctoberTickets.singleId,
+      isCoachingClient: singles.isCoachingClient,
+      isNotBasic: singles.isNotBasic,
       voucherCode: liveOctoberTickets.voucherCode, amountAgorot: liveOctoberTickets.amountAgorot,
       issuedAt: liveOctoberTickets.issuedAt, zoomDeliveryState: liveOctoberTickets.zoomDeliveryState,
       zoomAttemptCount: liveOctoberTickets.zoomAttemptCount, zoomLastError: liveOctoberTickets.zoomLastError,
@@ -118,13 +121,17 @@ export const liveOctoberRouter = router({
       eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG),
       sql`${liveOctoberTickets.revokedAt} is null`,
       sql`${liveOctoberTickets.voucherCode} not like 'TEST-%'`,
-    )).orderBy(desc(liveOctoberTickets.issuedAt)).limit(300);
+    )).leftJoin(singles, eq(liveOctoberTickets.singleId, singles.id)).orderBy(desc(liveOctoberTickets.issuedAt)).limit(300);
     const questions = await db.select({
       id: liveOctoberQuestions.id, name: liveOctoberTickets.name,
       email: liveOctoberTickets.email, body: liveOctoberQuestions.body,
+      singleId: liveOctoberTickets.singleId,
+      isCoachingClient: singles.isCoachingClient,
+      isNotBasic: singles.isNotBasic,
       createdAt: liveOctoberQuestions.createdAt,
     }).from(liveOctoberQuestions)
       .innerJoin(liveOctoberTickets, eq(liveOctoberQuestions.ticketId, liveOctoberTickets.id))
+      .leftJoin(singles, eq(liveOctoberTickets.singleId, singles.id))
       .where(and(eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG), sql`${liveOctoberTickets.voucherCode} not like 'TEST-%'`))
       .orderBy(desc(liveOctoberQuestions.createdAt)).limit(300);
     return {

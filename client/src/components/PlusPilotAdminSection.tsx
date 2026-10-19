@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import PlusCancellationQueue from "@/components/PlusCancellationQueue";
+import ProfileStaffMarkers, { profileStaffSurface } from "@/components/ProfileStaffMarkers";
 
 const STATUS_LABELS: Record<string, string> = {
   waitlist: "רשימת המתנה",
@@ -301,7 +302,7 @@ export default function PlusPilotAdminSection() {
 
       {serviceDepartureView !== "archived" && <div className="mt-4 max-h-[420px] overflow-y-auto space-y-2">
         {rows.map((row: any) => (
-          <article key={row.pilot.id} className="rounded-xl border border-[#ebe8d7] bg-white p-3">
+          <article key={row.pilot.id} className={`rounded-xl border border-[#ebe8d7] p-3 ${profileStaffSurface(row.single)}`}>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -309,6 +310,7 @@ export default function PlusPilotAdminSection() {
                   <span className="rounded-full bg-[#f3f1fb] px-2 py-0.5 text-[9px] font-bold text-[#4c3f8f]">{STATUS_LABELS[row.pilot.status]}</span>
                   {row.pilot.eligibilityScore != null && <span className="text-[9px] text-[#777]">ציון זכאות {row.pilot.eligibilityScore}</span>}
                 </div>
+                <ProfileStaffMarkers profile={row.single} compact />
                 <p className="mt-1 text-[10px] text-[#777]">{row.single.email} · {row.single.phone || "ללא טלפון"} · {row.single.age || "?"} · {row.single.city || ""}</p>
                 <p className="mt-1 text-[9px] text-[#999]">נרשם/ה לרשימה: {new Date(row.pilot.waitlistedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold">
@@ -327,7 +329,7 @@ export default function PlusPilotAdminSection() {
                     <div className="flex items-center justify-between gap-2"><strong className="text-[11px] text-[#191265]">הצעות Plus במחזור השירות</strong><span className="text-sm font-black text-[#191265]">{row.cycleMatchCount} מתוך {row.cycleProgress.target}</span></div>
                     <p className="mt-1 text-[9px] text-[#888]">{formatDate(row.cycleProgress.cycleStart)} עד {formatDate(row.cycleProgress.cycleEnd)} · {row.cycleProgress.daysRemaining} ימים נותרו</p>
                     <div className="mt-2 space-y-1 text-[10px] text-[#666]">
-                      {row.cycleMatches.length > 0 ? row.cycleMatches.map((match: any) => <div key={match.id} className="flex items-start justify-between gap-2 rounded-lg bg-white px-2 py-1.5"><span>{match.other ? `${match.other.firstName} ${match.other.lastName || ""}`.trim() : `התאמה #${match.id}`}<small className="block text-[9px] text-[#999]">{MATCH_STATUS_LABELS[match.status] || match.status}</small></span><span className="shrink-0 text-left">{match.source === "boost" ? "בוסט" : "הצעת Plus"}<small className="block text-[9px] text-[#999]">{formatDate(match.proposedAt)}</small></span></div>) : <span>טרם נשלחו הצעות במחזור השירות הנוכחי</span>}
+                      {row.cycleMatches.length > 0 ? row.cycleMatches.map((match: any) => <div key={match.id} className={`flex items-start justify-between gap-2 rounded-lg px-2 py-1.5 ${profileStaffSurface(match.other)}`}><span>{match.other ? `${match.other.firstName} ${match.other.lastName || ""}`.trim() : `התאמה #${match.id}`} {match.other && <ProfileStaffMarkers profile={match.other} compact />}<small className="block text-[9px] text-[#999]">{MATCH_STATUS_LABELS[match.status] || match.status}</small></span><span className="shrink-0 text-left">{match.source === "boost" ? "בוסט" : "הצעת Plus"}<small className="block text-[9px] text-[#999]">{formatDate(match.proposedAt)}</small></span></div>) : <span>טרם נשלחו הצעות במחזור השירות הנוכחי</span>}
                     </div>
                   </div>
                   <div className={`rounded-xl border p-3 ${row.boostBenefit.used ? "border-violet-200 bg-violet-50" : row.boostBenefit.inProgress ? "border-blue-200 bg-blue-50" : row.boostBenefit.available ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-gray-50"}`}>
@@ -343,7 +345,7 @@ export default function PlusPilotAdminSection() {
                       <div className="flex flex-wrap items-center justify-between gap-1.5 text-[#625d73]"><strong className="text-[#191265]">מחזור שירות 30 יום #{period.cycleIndex + 1}</strong><span>{formatDate(period.serviceStart)}–{formatDate(period.serviceEnd)}</span><span className="rounded-full bg-[#f3f1fb] px-2 py-0.5 text-[9px]">עזר: {period.calendarMonthLabel}</span></div>
                       <p className="mt-1 text-[9px] text-[#777]">{period.manualProposalCount} הצעות ידניות שנשלחו בפועל מתוך יעד {period.target}; בוסט ומועמדים שנוצרו לא נספרים.</p>
                       {period.manualProposals.length > 0 && <ol className="mt-1.5 space-y-1 border-r border-[#e6e1f2] pr-2 text-[9px] text-[#666]">
-                        {period.manualProposals.map((proposal: any) => <li key={proposal.id} className="flex flex-wrap justify-between gap-x-2"><span>{proposal.other ? `${proposal.other.firstName} ${proposal.other.lastName || ""}`.trim() : `התאמה #${proposal.id}`} · {MATCH_STATUS_LABELS[proposal.status] || proposal.status || "נשלחה"}</span><time>{formatDate(proposal.proposedAt)}</time></li>)}
+                        {period.manualProposals.map((proposal: any) => <li key={proposal.id} className={`flex flex-wrap justify-between gap-x-2 rounded px-1 ${profileStaffSurface(proposal.other, "")}`}><span>{proposal.other ? `${proposal.other.firstName} ${proposal.other.lastName || ""}`.trim() : `התאמה #${proposal.id}`} {proposal.other && <ProfileStaffMarkers profile={proposal.other} compact />} · {MATCH_STATUS_LABELS[proposal.status] || proposal.status || "נשלחה"}</span><time>{formatDate(proposal.proposedAt)}</time></li>)}
                         {period.omittedManualProposalCount > 0 && <li>ועוד {period.omittedManualProposalCount} הצעות מתועדות</li>}
                       </ol>}
                     </div>)}
@@ -384,8 +386,9 @@ export default function PlusPilotAdminSection() {
         <h4 className="text-xs font-bold text-[#777]">מנויי Plus שהסתיימו · ארכיון ({archivedRows.length})</h4>
         <p className="mt-2 text-[10px] leading-5 text-[#888]">ההיסטוריה נשמרת. אלה אינם מופיעים ברשימת המנויים הפעילים או בתור ההתאמות.</p>
         <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
-          {archivedRows.map((row: any) => <article key={row.pilot.id} className="rounded-lg border bg-white p-3 text-xs text-[#777]">
+          {archivedRows.map((row: any) => <article key={row.pilot.id} className={`rounded-lg border p-3 text-xs text-[#777] ${profileStaffSurface(row.single)}`}>
             <strong>{row.single.firstName} {row.single.lastName}</strong>
+            <ProfileStaffMarkers profile={row.single} compact />
             <ServiceDepartureNotice serviceDeparture={row.serviceDeparture} cancellationPending={row.cancellationPending} archived endedAt={row.pilot.endedAt} />
             <span className="mt-1 block text-[10px]">מחזור אחרון: {formatDate(row.cycleProgress.cycleStart)} עד {formatDate(row.cycleProgress.cycleEnd)} · {row.cycleProgress.delivered} הצעות ידניות</span>
             {row.serviceHistory?.periods?.length > 0 && <details className="mt-2 rounded-lg bg-[#f8f7f4] p-2 text-[10px]"><summary className="cursor-pointer font-bold text-[#5d557d]">היסטוריית שירות של 30 יום ({row.serviceHistory.periods.length})</summary><p className="mt-1 text-[9px]">חלונות שירות בלבד; תווית החודש אינה גבול השירות ואינה מאמתת תשלום.</p>{row.serviceHistory.periods.map((period: any) => <div key={period.cycleIndex} className="mt-1 flex flex-wrap justify-between gap-x-2 border-t pt-1"><span>#{period.cycleIndex + 1} · {formatDate(period.serviceStart)}–{formatDate(period.serviceEnd)} · עזר: {period.calendarMonthLabel}</span><span>{period.manualProposalCount}/{period.target} ידניות</span></div>)}</details>}

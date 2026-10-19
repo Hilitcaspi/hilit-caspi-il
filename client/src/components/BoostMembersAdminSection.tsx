@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { RefreshCw, Search, Sparkles } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import ProfileStaffMarkers, { profileStaffSurface, type ProfileStaffFlags } from "@/components/ProfileStaffMarkers";
 
 const STATUS_LABELS: Record<string, string> = {
   approved: "אישור בתוקף",
@@ -137,8 +138,12 @@ export default function BoostMembersAdminSection() {
       </div>
 
       <div className="mt-4 max-h-[520px] space-y-2 overflow-y-auto">
-        {rows.map((row) => (
-          <article key={row.membershipId} className="rounded-xl border border-[#ece4ef] bg-white p-3">
+        {rows.map((row) => {
+          const linkedProfile: ProfileStaffFlags | null = row.singleId
+            ? { isCoachingClient: (row as typeof row & ProfileStaffFlags).isCoachingClient, isNotBasic: (row as typeof row & ProfileStaffFlags).isNotBasic }
+            : null;
+          return (
+          <article key={row.membershipId} className={`rounded-xl border border-[#ece4ef] p-3 ${profileStaffSurface(linkedProfile)}`}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -148,13 +153,14 @@ export default function BoostMembersAdminSection() {
                   {!row.isActive && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-bold text-gray-700">פרופיל לא פעיל</span>}
                   {!row.isPaid && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-800">ללא תשלום מאגר</span>}
                 </div>
+                {linkedProfile && <ProfileStaffMarkers profile={linkedProfile} compact />}
                 <p className="mt-1 break-words text-[10px] text-[#777]">{row.email || "ללא מייל"} · {row.phone || "ללא טלפון"} · {row.age || "?"} · {row.city || "ללא עיר"}</p>
                 <p className="mt-1 text-[9px] text-[#999]">אישור: {row.consentedAt ? new Date(row.consentedAt).toLocaleDateString("he-IL") : "לא תועד"} · גרסה: {row.consentVersion || "ללא גרסה"}</p>
               </div>
               <div className="text-[10px] text-[#777]">{row.gender === "female" ? "אישה" : row.gender === "male" ? "גבר" : "לא צוין"}</div>
             </div>
           </article>
-        ))}
+        ); })}
         {rows.length === 0 && <div className="rounded-xl bg-white py-10 text-center text-xs text-[#888]">אין חברים לפי הסינון הנוכחי.</div>}
       </div>
 

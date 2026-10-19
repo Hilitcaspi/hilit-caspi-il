@@ -20,6 +20,8 @@ export type LiveFirstMatchQueueRow = {
   paidRegistrationAt: number;
   issuedAt: number;
   questionnaireCompletedAt: number | null;
+  isCoachingClient: boolean;
+  isNotBasic: boolean;
   firstProposalDeliveredAt: number | null;
   activeMatchHold: boolean;
   state: LiveFirstMatchQueueState;
@@ -44,6 +46,8 @@ type RawQueueRow = {
   seeking_gender: string | null;
   photo_url: string | null;
   questionnaire_completed_at: number | null;
+  is_coaching_client: unknown;
+  is_not_basic: unknown;
   is_active: unknown;
   is_paid: unknown;
   is_seed: unknown;
@@ -133,6 +137,8 @@ export async function loadLiveFirstMatchQueue(now = Date.now()) {
         s.seekingGender,
         s.photoUrl,
         s.questionnaireCompletedAt,
+        s.isCoachingClient,
+        s.isNotBasic,
         s.isActive,
         s.isPaid,
         s.isSeed,
@@ -208,6 +214,8 @@ export async function loadLiveFirstMatchQueue(now = Date.now()) {
         rs.seekingGender AS seeking_gender,
         rs.photoUrl AS photo_url,
         rs.questionnaireCompletedAt AS questionnaire_completed_at,
+        rs.isCoachingClient AS is_coaching_client,
+        rs.isNotBasic AS is_not_basic,
         rs.isActive AS is_active,
         rs.isPaid AS is_paid,
         rs.isSeed AS is_seed,
@@ -313,6 +321,8 @@ function buildQueueRow(memberRows: RawQueueRow[], now: number): LiveFirstMatchQu
     paidRegistrationAt,
     issuedAt: asNumber(base.ticket_issued_at) || paidRegistrationAt,
     questionnaireCompletedAt: asNumber(base.questionnaire_completed_at),
+    isCoachingClient: base.is_coaching_client === true || Number(base.is_coaching_client) === 1,
+    isNotBasic: base.is_not_basic === true || Number(base.is_not_basic) === 1,
     firstProposalDeliveredAt: acceptedDeliveredAt,
     activeMatchHold,
     state: policy.state,

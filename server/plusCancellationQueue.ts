@@ -16,7 +16,9 @@ export function buildPlusCancellationQueue(rows: any[], requests: any[], tasks: 
     return [{
       plusMemberId: row.pilot.id,
       single: { id: row.single.id, firstName: row.single.firstName, lastName: row.single.lastName,
-        email: row.single.email, phone: row.single.phone },
+        email: row.single.email, phone: row.single.phone,
+        isCoachingClient: row.single.isCoachingClient,
+        isNotBasic: row.single.isNotBasic },
       requestedAt: request?.requestedAt || row.pilot.cancelledAt || task?.createdAt || null,
       legacy: !request, pushStatus: delivery("pushStatus"), emailStatus: delivery("emailStatus"), smsStatus: delivery("smsStatus"),
     }];

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { getPairPreferenceIndicators } from "@shared/pairPreferenceIndicators";
 import { PairCriterionIndicator } from "./PairCriterionIndicator";
+import ProfileStaffMarkers, { profileStaffSurface, type ProfileStaffFlags } from "./ProfileStaffMarkers";
 
-export type MatchProfile = {
+export type MatchProfile = ProfileStaffFlags & {
   id: number; firstName?: string | null; lastName?: string | null; name?: string | null;
   gender?: string | null; age?: number | null; city?: string | null; photoUrl?: string | null;
   dnaType?: string | null; occupation?: string | null; education?: string | null;
@@ -17,7 +18,6 @@ export type MatchProfile = {
   smokingStatus?: string | null; about?: string | null; partnerDescription?: string | null;
   createdAt?: Date | number | string | null; subscriptionStartedAt?: number | null; subscriptionRenewsAt?: number | null;
   plusStatus?: string | null; plusBillingStatus?: string | null; boostStatus?: string | null;
-  isCoachingClient?: boolean; isNotBasic?: boolean;
 };
 const EDUCATION: Record<string, string> = { high_school: "תיכון", vocational: "הכשרה מקצועית", technician: "הנדסאי", student: "לימודים אקדמיים בתהליך", bachelor: "תואר ראשון", master: "תואר שני", phd: "דוקטורט", other: "אחר" };
 const RELIGION: Record<string, string> = { secular: "חילוניות", traditional: "מסורתיות", religious: "דתיות", orthodox: "חרדיות", datlash: "דתל״ש" };
@@ -33,11 +33,12 @@ export function ProfilePhoto({ profile, onPhoto, size = "large" }: { profile: Ma
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const name = profile.name || `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
   const cls = size === "small" ? "h-10 w-10 rounded-lg" : size === "comparison" ? "h-16 w-16 rounded-xl" : "h-24 w-24 sm:h-28 sm:w-28 rounded-xl";
+  const coachingBorder = profile.isCoachingClient === true ? "border-pink-300" : "border-[#191265]/15";
   return profile.photoUrl && failedUrl !== profile.photoUrl ? (
-    <button type="button" onClick={(event) => { event.stopPropagation(); onPhoto?.(profile.photoUrl!); }} aria-label={`הגדלת תמונה של ${name}`} className={`shrink-0 overflow-hidden border-2 border-[#191265]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191265] cursor-zoom-in ${cls}`}>
+    <button type="button" onClick={(event) => { event.stopPropagation(); onPhoto?.(profile.photoUrl!); }} aria-label={`הגדלת תמונה של ${name}`} className={`shrink-0 overflow-hidden border-2 ${coachingBorder} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191265] cursor-zoom-in ${cls}`}>
       <img src={profile.photoUrl} alt={name} loading="lazy" onError={() => setFailedUrl(profile.photoUrl!)} className="h-full w-full object-cover object-[center_20%]" />
     </button>
-  ) : <div aria-label="אין תמונת פרופיל" className={`shrink-0 border border-dashed border-[#191265]/20 bg-[#191265]/5 text-[#191265]/50 flex items-center justify-center text-xs ${cls}`}>אין תמונה</div>;
+  ) : <div aria-label="אין תמונת פרופיל" className={`shrink-0 border border-dashed ${coachingBorder} bg-[#191265]/5 text-[#191265]/50 flex items-center justify-center text-xs ${cls}`}>אין תמונה</div>;
 }
 export function MatchPreferenceFacts({ profile }: { profile: MatchProfile }) {
   return <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#555]">
@@ -69,17 +70,14 @@ export function MatchProfileFacts({ profile, sentCount }: { profile: MatchProfil
 export default function MatchProfileCard({ profile, otherProfile, onPhoto, sentCount, horizontal = false, comparison = false }: { profile: MatchProfile; otherProfile?: MatchProfile; onPhoto?: (url: string) => void; sentCount?: number; horizontal?: boolean; comparison?: boolean }) {
   if (comparison) return <ComparisonProfile profile={profile} otherProfile={otherProfile} onPhoto={onPhoto} sentCount={sentCount} />;
   const name = profile.name || `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
-  return <article className={`min-w-0 rounded-xl p-3 ${profile.isCoachingClient ? "bg-pink-50 ring-1 ring-pink-200" : "bg-[#f8f6f0]"}`}>
+  return <article className={`min-w-0 rounded-xl p-3 ${profileStaffSurface(profile, "bg-[#f8f6f0]")}`}>
     <div className={`flex gap-3 items-start ${horizontal ? "flex-row" : "flex-col sm:flex-row"}`}>
       <ProfilePhoto profile={profile} onPhoto={onPhoto} />
       <div className="min-w-0 flex-1">
         <h4 className="text-sm sm:text-base font-bold text-[#191265] break-words">{name}</h4>
         <p className="text-xs text-[#727272] mt-1">{profile.gender === "female" ? "אישה" : profile.gender === "male" ? "גבר" : ""} · {profile.age || "גיל לא צוין"} · {profile.city || "עיר לא צוינה"}</p>
-        <div className="flex flex-wrap gap-1 mt-1 text-[10px] font-bold">
-          {profile.dnaType && <span className="text-[#1800ad]">{DNA[profile.dnaType] || profile.dnaType}</span>}
-          {profile.isCoachingClient && <span className="rounded-full bg-pink-200 px-2 text-pink-800">מלווה</span>}
-          {profile.isNotBasic && <span className="rounded-full bg-amber-100 px-2 text-amber-800">דורש תשומת לב</span>}
-        </div>
+        {profile.dnaType && <p className="mt-1 text-[10px] font-bold text-[#1800ad]">{DNA[profile.dnaType] || profile.dnaType}</p>}
+        <ProfileStaffMarkers profile={profile} />
         {horizontal && <div className="hidden sm:block mt-2"><MatchProfileFacts profile={profile} sentCount={sentCount} /></div>}
       </div>
     </div>
@@ -113,17 +111,14 @@ function ComparisonProfile({ profile, otherProfile, onPhoto, sentCount }: { prof
   const joined = profile.subscriptionStartedAt || profile.createdAt;
   const date = joined ? new Date(joined) : null;
   const indicators = otherProfile ? getPairPreferenceIndicators(profile, otherProfile) : undefined;
-  return <article className="min-w-0" data-match-comparison="classic">
+  return <article className={`min-w-0 ${profileStaffSurface(profile, "")}`} data-match-comparison="classic">
     <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-3 mb-2">
       <ProfilePhoto profile={profile} onPhoto={onPhoto} size="comparison" />
       <div className="w-full sm:w-auto flex-1 min-w-0">
         <h4 className="font-bold text-[#191265] text-sm truncate" title={name}>{name}</h4>
         <p className="text-xs leading-5 text-[#727272]">{profile.gender === "female" ? "אישה" : profile.gender === "male" ? "גבר" : "מגדר לא צוין"}<PairCriterionIndicator criterion="מגדר" indicator={indicators?.gender} /> · {profile.age || "גיל לא צוין"}<PairCriterionIndicator criterion="גיל" indicator={indicators?.age} /> · {profile.city || "עיר לא צוינה"}<PairCriterionIndicator criterion="מגורים" indicator={indicators?.location} /></p>
         {profile.dnaType && <p className="text-xs text-[#1800ad] font-medium">{DNA[profile.dnaType] || profile.dnaType}</p>}
-        <div className="flex flex-wrap gap-1 mt-1 text-[9px] font-bold">
-          {profile.isCoachingClient && <span className="rounded-full bg-pink-200 text-pink-800 px-1.5">מלווה</span>}
-          {profile.isNotBasic && <span className="rounded-full bg-amber-200 text-amber-800 px-1.5">דורש תשומת לב</span>}
-        </div>
+        <ProfileStaffMarkers profile={profile} compact />
       </div>
     </div>
     <div className="space-y-1 text-xs text-[#727272]">

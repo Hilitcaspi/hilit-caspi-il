@@ -1,4 +1,5 @@
 import * as React from "react";
+import ProfileStaffMarkers, { profileStaffSurface } from "@/components/ProfileStaffMarkers";
 
 export type PlusCancellationDeliveryStatus = "pending" | "sending" | "accepted" | "failed" | "unknown" | "not_recorded";
 
@@ -10,6 +11,8 @@ export type PlusCancellationQueueRow = {
     lastName: string | null;
     email: string | null;
     phone: string | null;
+    isCoachingClient?: boolean | null;
+    isNotBasic?: boolean | null;
   };
   requestedAt: number | null;
   legacy: boolean;
@@ -92,13 +95,14 @@ export default function PlusCancellationQueue({ rows, refreshing, onRefresh, onE
             const sms = deliveryStatus("sms", row.smsStatus);
             const fullName = `${row.single.firstName} ${row.single.lastName || ""}`.trim();
             return (
-              <article key={row.plusMemberId} className="rounded-xl border border-amber-200 bg-white p-3" data-cancellation-request={row.plusMemberId}>
+              <article key={row.plusMemberId} className={`rounded-xl border border-amber-200 p-3 ${profileStaffSurface(row.single)}`} data-cancellation-request={row.plusMemberId}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <strong className="text-xs text-[#191265]">{fullName}</strong>
                       {row.legacy && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-bold text-slate-800">בקשה ישנה · סטטוסי שליחה לא תועדו</span>}
                     </div>
+                    <ProfileStaffMarkers profile={row.single} compact />
                     <p className="mt-1 text-[10px] text-slate-700">{row.single.email || "ללא כתובת מייל"} · {row.single.phone || "ללא טלפון"}</p>
                     <time className="mt-1 block text-[10px] text-slate-500">הבקשה התקבלה: {formatIsraelDateTime(row.requestedAt)}</time>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold">

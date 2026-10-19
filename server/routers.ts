@@ -3190,8 +3190,8 @@ export const appRouter = router({
           warnings, hasHardBlock, hardBlockReason, canOverrideCriteria,
           breakdown: previewScoreDimensions(preview),
           narrative,
-          personA: { id: singleA.id, firstName: singleA.firstName, lastName: singleA.lastName, age: singleA.age, city: singleA.city, gender: singleA.gender, photoUrl: singleA.photoUrl },
-          personB: { id: singleB.id, firstName: singleB.firstName, lastName: singleB.lastName, age: singleB.age, city: singleB.city, gender: singleB.gender, photoUrl: singleB.photoUrl },
+          personA: { id: singleA.id, firstName: singleA.firstName, lastName: singleA.lastName, age: singleA.age, city: singleA.city, gender: singleA.gender, photoUrl: singleA.photoUrl, isCoachingClient: singleA.isCoachingClient, isNotBasic: singleA.isNotBasic },
+          personB: { id: singleB.id, firstName: singleB.firstName, lastName: singleB.lastName, age: singleB.age, city: singleB.city, gender: singleB.gender, photoUrl: singleB.photoUrl, isCoachingClient: singleB.isCoachingClient, isNotBasic: singleB.isNotBasic },
         };
       }),
 
@@ -3578,6 +3578,8 @@ export const appRouter = router({
         maritalStatus: singles.maritalStatus,
         isActive: singles.isActive,
         isPaid: singles.isPaid,
+        isCoachingClient: singles.isCoachingClient,
+        isNotBasic: singles.isNotBasic,
         questionnaireCompletedAt: singles.questionnaireCompletedAt,
         questionnaireToken: singles.questionnaireToken,
         createdAt: singles.createdAt,
@@ -5201,6 +5203,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         lastActiveAt: matchBoostMemberships.lastActiveAt,
         membershipUpdatedAt: matchBoostMemberships.updatedAt,
         firstName: singles.firstName,
+        isCoachingClient: singles.isCoachingClient,
+        isNotBasic: singles.isNotBasic,
         lastName: singles.lastName,
         email: singles.email,
         phone: singles.phone,

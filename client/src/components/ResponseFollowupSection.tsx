@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { buildNonResponseFollowupMessage, type MatchResponseSummary } from "@shared/matchResponseSummary";
 import { matchesProfileName } from "@shared/profileNameSearch";
 import { ProfilePhoto, type MatchProfile } from "./MatchProfileCard";
+import ProfileStaffMarkers, { profileStaffSurface } from "./ProfileStaffMarkers";
 
 type Profile = MatchProfile & { phone?: string | null; isActive?: boolean; isSeed?: boolean };
 function whatsappUrl(phone?: string | null, message = "") {
@@ -32,9 +33,9 @@ export default function ResponseFollowupSection({ profiles, summaries, loading, 
     {error ? <p className="text-sm text-red-700">נתוני התגובות לא נטענו. אין להסיק שאין צורך במעקב; אפשר לרענן.</p> : loading ? <p className="text-sm text-[#727272]">בודק תגובות ומסירות...</p> : rows.length === 0 ? <p className="text-sm text-[#727272]">{searchQuery.trim() ? "לא נמצאו ממתינים בשם הזה" : "אין כרגע רצף אי־מענה שמצריך פנייה."}</p> : <div className="grid gap-3 md:grid-cols-2">
       {rows.map(profile => {
         const summary = summaries[profile.id];
-        return <article key={profile.id} className="rounded-xl bg-rose-50/60 border border-rose-100 p-3">
+        return <article key={profile.id} className={`rounded-xl p-3 ${profileStaffSurface(profile, "bg-rose-50/60 border border-rose-100")}`}>
           <div className="flex gap-3 items-start"><ProfilePhoto profile={profile} onPhoto={onPhoto} size="small" />
-            <div className="flex-1 min-w-0"><h4 className="font-bold text-sm text-[#191265]">{profile.firstName} {profile.lastName}</h4><p className="text-xs text-[#727272]">{profile.age} · {profile.city}</p>
+            <div className="flex-1 min-w-0"><div className="flex flex-wrap items-center gap-1"><h4 className="font-bold text-sm text-[#191265]">{profile.firstName} {profile.lastName}</h4><ProfileStaffMarkers profile={profile} compact /></div><p className="text-xs text-[#727272]">{profile.age} · {profile.city}</p>
               <p className="text-xs font-semibold text-rose-800 mt-1">{summary.consecutiveUnanswered} הצעות אחרונות ללא תגובה</p>
               <p className="text-xs text-[#727272] mt-1">בסך הכול: {summary.respondedCount} תגובות · {summary.unansweredCount} ללא תגובה · {summary.waitingCount} עדיין פתוחות</p>
               {summary.lastRespondedAt ? <p className="text-[11px] text-[#727272]">תגובה אחרונה: {new Date(summary.lastRespondedAt).toLocaleDateString("he-IL")}</p> : null}

@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import MatchProfileCard, { MatchProfileFacts, MatchPreferenceFacts, ProfilePhoto, preferenceRange, type MatchProfile } from "@/components/MatchProfileCard";
+import ProfileStaffMarkers, { profileStaffSurface } from "@/components/ProfileStaffMarkers";
 import { PairCriteriaLegend } from "@/components/PairCriterionIndicator";
 import { buildAdvancedMatchExclusions, isAdvancedMatchCandidate } from "@shared/advancedMatchCandidates";
 import { getAdvancedMatchFilterDefaults } from "@shared/advancedMatchFilterDefaults";
@@ -1191,11 +1192,11 @@ export default function CRMMatchmaking() {
                           {filterTargetIsSuggestion && <p className="px-4 py-2 text-xs text-[#727272]" data-profile-name-suggestions="target">{filterTargetChoices.length ? "לא נמצא שם תואם. שמות דומים לבדיקה ובחירה:" : "לא נמצא שם תואם. אפשר לחפש גם לפי השם הפרטי."}</p>}
                           {filterTargetChoices.slice(0, filterTargetVisibleLimit).map(s => (
                             <button key={s.id} disabled={!!batchProgress} onClick={() => selectFilterTarget(s)}
-                              className="w-full text-right px-4 py-2 text-sm hover:bg-[#f0eadc] text-[#191265]">
+                              className={`w-full text-right px-4 py-2 text-sm ${s.isCoachingClient ? "hover:bg-pink-100" : "hover:bg-[#f0eadc]"} text-[#191265] ${profileStaffSurface(s)}`} data-crm-profile-row={s.id}>
                               <div className="flex gap-3 items-center">
                                 <span className="shrink-0">{s.photoUrl ? <img src={s.photoUrl} alt="" loading="lazy" className="w-10 h-10 rounded-lg object-cover" /> : <span className="text-xs">אין תמונה</span>}</span>
                                 <span className="min-w-0"><b>{s.firstName} {s.lastName}</b> · {displayAge(s.age)} · {s.city}
-                                  <span className="block text-[11px] text-[#727272]">גיל רצוי {preferenceRange(s.minAgePreference, s.maxAgePreference)} · {s.education ? EDUCATION_LABELS[s.education] || s.education : "השכלה לא צוינה"} · {s.religiosity ? RELIGIOSITY_LABELS[s.religiosity] || s.religiosity : "רמה דתית לא צוינה"}</span>
+                                  <ProfileStaffMarkers profile={s} compact /><span className="block text-[11px] text-[#727272]">גיל רצוי {preferenceRange(s.minAgePreference, s.maxAgePreference)} · {s.education ? EDUCATION_LABELS[s.education] || s.education : "השכלה לא צוינה"} · {s.religiosity ? RELIGIOSITY_LABELS[s.religiosity] || s.religiosity : "רמה דתית לא צוינה"}</span>
                                 </span>
                               </div>
                             </button>
@@ -1205,7 +1206,7 @@ export default function CRMMatchmaking() {
                       )}
                     </div>
                     {filterCompatTarget && (
-                      <p className="text-xs text-[#191265] mt-1 font-semibold">בדיקת התאמה מול: {filterTargetProfile?.firstName} {filterTargetProfile?.lastName}</p>
+                      <div className={`text-xs text-[#191265] mt-1 font-semibold rounded-lg p-2 flex flex-wrap items-center gap-2 ${profileStaffSurface(filterTargetProfile)}`}>בדיקת התאמה מול: {filterTargetProfile?.firstName} {filterTargetProfile?.lastName}<ProfileStaffMarkers profile={filterTargetProfile} compact /></div>
                     )}
                   </div>}
                 </div>
@@ -1253,7 +1254,7 @@ export default function CRMMatchmaking() {
                 <div className="bg-white rounded-xl p-8 text-center text-[#727272]">
                   <div className="text-4xl mb-2">🔍</div>
                   <p>לא נמצאו תוצאות לפי השם והמסננים הנוכחיים.</p>
-                  {candidateNameSuggestions.length > 0 && <div className="mt-3" data-profile-name-suggestions="candidates"><p className="text-xs">שמות דומים לבדיקה. הבחירה תשנה רק את חיפוש השם:</p><div className="mt-2 flex flex-wrap justify-center gap-2">{candidateNameSuggestions.map(single => <button type="button" key={single.id} onClick={() => setFilterName(`${single.firstName} ${single.lastName || ""}`.trim())} className="rounded-lg border border-[#191265]/20 px-3 py-2 text-xs font-bold text-[#191265]">{single.firstName} {single.lastName} · {displayAge(single.age)} · {single.city}</button>)}</div></div>}
+                  {candidateNameSuggestions.length > 0 && <div className="mt-3" data-profile-name-suggestions="candidates"><p className="text-xs">שמות דומים לבדיקה. הבחירה תשנה רק את חיפוש השם:</p><div className="mt-2 flex flex-wrap justify-center gap-2">{candidateNameSuggestions.map(single => <button type="button" key={single.id} onClick={() => setFilterName(`${single.firstName} ${single.lastName || ""}`.trim())} className={`rounded-lg border border-[#191265]/20 px-3 py-2 text-xs font-bold text-[#191265] ${profileStaffSurface(single)}`}>{single.firstName} {single.lastName} · {displayAge(single.age)} · {single.city}<ProfileStaffMarkers profile={single} compact /></button>)}</div></div>}
                   {filterName && <button type="button" onClick={() => setFilterName("")} className="mt-3 text-xs underline text-[#191265]">ניקוי השם בלבד, בלי לשנות את שאר המסננים</button>}
                 </div>
               ) : (
@@ -1264,7 +1265,7 @@ export default function CRMMatchmaking() {
                   const hasNonOverridableBlock = compatData?.hasHardBlock === true && compatData?.canOverrideCriteria !== true;
                   const scoreColor = compatData ? (compatData.score >= 75 ? "border-green-500" : compatData.score >= 60 ? "border-amber-500" : compatData.score >= 45 ? "border-orange-400" : "border-red-300") : "border-[#191265]/20";
                   return (
-                    <div key={single.id} className={`bg-white rounded-xl p-4 shadow-sm border-r-4 ${scoreColor}`}>
+                    <div key={single.id} data-crm-profile-row={single.id} className={`rounded-xl p-4 shadow-sm border-r-4 ${scoreColor} ${profileStaffSurface(single)}`}>
                       <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -1285,8 +1286,7 @@ export default function CRMMatchmaking() {
                             {single.city && <span className="text-sm text-[#727272]">📍 {single.city}</span>}
                             {single.religiosity && <Badge className="text-xs bg-[#f0eadc] text-[#191265]">{RELIGIOSITY_LABELS[single.religiosity] || single.religiosity}</Badge>}
                             {single.dnaType && <Badge className="text-xs bg-[#ffe27c]/50 text-[#191265]">{DNA_LABELS[single.dnaType] || single.dnaType}</Badge>}
-                            {single.isCoachingClient && <span className="text-[10px] rounded-full bg-pink-100 px-2 py-1 font-bold text-pink-800">💜 מלווה</span>}
-                            {single.isNotBasic && <span className="text-[10px] rounded-full bg-amber-100 px-2 py-1 font-bold text-amber-800">⭐ דורש תשומת לב</span>}
+                            <ProfileStaffMarkers profile={single} compact />
                           </div>
                           <div className="mt-3"><MatchProfileFacts profile={asMatchProfile(single)} sentCount={matchHistoryBySingleId.get(single.id)?.length || 0} /></div>
                           <div className="flex gap-3 mt-1 text-xs text-[#727272] flex-wrap">
@@ -1366,7 +1366,7 @@ export default function CRMMatchmaking() {
                           <summary className="cursor-pointer text-sm font-bold text-[#191265]">השוואה זוגית · {Math.round(compatData.score)}%</summary>
                           <PairCriteriaLegend />
                           <div className="grid grid-cols-2 gap-3 mt-3">
-                            {[filterTargetProfile, single].map(profile => <div key={profile.id} className={`rounded-xl p-3 ${profile.isCoachingClient ? 'bg-pink-50 ring-1 ring-pink-200' : 'bg-[#f8f6f0]'}`}>
+                            {[filterTargetProfile, single].map(profile => <div key={profile.id} className={`rounded-xl p-3 ${profileStaffSurface(profile, "bg-[#f8f6f0]")}`}>
                               <MatchProfileCard profile={asMatchProfile(profile)} otherProfile={asMatchProfile(profile.id === filterTargetProfile.id ? single : filterTargetProfile)} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(profile.id)?.length || 0} />
                             </div>)}
                           </div>
@@ -1591,8 +1591,7 @@ export default function CRMMatchmaking() {
                         </button>
                       )}
                       <span className="font-bold text-[#191265]">{single.firstName} {single.lastName || ""}</span>
-                      {(single as any).isCoachingClient && <span className="text-[9px] bg-pink-200 text-pink-800 font-bold px-1.5 py-0.5 rounded-full">💜 מלווה</span>}
-                      {(single as any).isNotBasic && <span className="text-[9px] bg-amber-200 text-amber-800 font-bold px-1.5 py-0.5 rounded-full">⭐ דורש תשומת לב</span>}
+                      <ProfileStaffMarkers profile={single} compact />
                       {!responsesError && responseSummaries[single.id]?.needsFollowup && (
                         <span className="text-[9px] bg-red-200 text-red-800 font-bold px-1.5 py-0.5 rounded-full" title="הצעות אחרונות שנמסרו ונשארו ללא תגובה אחרי זמן המענה. סירוב נחשב תגובה.">
                           רצף ללא תגובה ({responseSummaries[single.id].consecutiveUnanswered})
@@ -2307,10 +2306,10 @@ export default function CRMMatchmaking() {
                         {match.scoreSource === "unavailable" && <span className="text-xs text-red-600">לא ניתן לחשב ציון — פרופיל חסר</span>}
                         <Badge className={`text-xs ${cfg.color}`}>{cfg.icon} {cfg.label}</Badge>
                         <div className="flex items-center gap-2 flex-wrap text-sm font-semibold text-[#191265]">
-                          <ProfilePhoto profile={{ id: match.singleAId, name: match.singleAName, photoUrl: match.singleAPhotoUrl }} size="small" onPhoto={setLightboxUrl} />
-                          <span>{match.singleAName}</span><span className="text-[#727272]">+</span>
-                          <ProfilePhoto profile={{ id: match.singleBId, name: match.singleBName, photoUrl: match.singleBPhotoUrl }} size="small" onPhoto={setLightboxUrl} />
-                          <span>{match.singleBName}</span>
+                          <ProfilePhoto profile={comparisonProfile(persons[0])} size="small" onPhoto={setLightboxUrl} />
+                          <span className={`inline-flex flex-wrap items-center gap-1 rounded-lg px-2 py-1 ${profileStaffSurface(comparisonProfile(persons[0]), "")}`}>{match.singleAName}<ProfileStaffMarkers profile={comparisonProfile(persons[0])} compact /></span><span className="text-[#727272]">+</span>
+                          <ProfilePhoto profile={comparisonProfile(persons[1])} size="small" onPhoto={setLightboxUrl} />
+                          <span className={`inline-flex flex-wrap items-center gap-1 rounded-lg px-2 py-1 ${profileStaffSurface(comparisonProfile(persons[1]), "")}`}>{match.singleBName}<ProfileStaffMarkers profile={comparisonProfile(persons[1])} compact /></span>
                         </div>
                         {!(match as any).singleAQuestionnaireCompleted && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-semibold">⚠️ {match.singleAName?.split(" ")[0]} ללא שאלון</span>}
                         {!(match as any).singleBQuestionnaireCompleted && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-semibold">⚠️ {match.singleBName?.split(" ")[0]} ללא שאלון</span>}
@@ -2390,7 +2389,7 @@ export default function CRMMatchmaking() {
                       {/* Two profile cards side by side */}
                       <div className="grid grid-cols-2 gap-3 mb-4">
                         {persons.map((s, i) => (
-                          <div key={i} className={`rounded-xl p-3 ${(s as any).isCoachingClient ? 'bg-pink-50 ring-1 ring-pink-200' : 'bg-[#f8f6f0]'}`}>
+                          <div key={i} className={`rounded-xl p-3 ${profileStaffSurface(comparisonProfile(s), "bg-[#f8f6f0]")}`}>
                             <MatchProfileCard profile={comparisonProfile(s)} otherProfile={comparisonProfile(persons[i === 0 ? 1 : 0])} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(s.id)?.length || 0} />
                             {/* Per-person status badge */}
                             {s.personStatus && (
@@ -2921,7 +2920,7 @@ export default function CRMMatchmaking() {
                       <ProfilePhoto profile={profile} onPhoto={setLightboxUrl} size="comparison" />
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap gap-2 items-center">
-                          <h3 className="font-bold text-[#191265]">{s.firstName} {s.lastName || ""}</h3>
+                          <h3 className="font-bold text-[#191265]">{s.firstName} {s.lastName || ""}</h3><ProfileStaffMarkers profile={profile} compact />
                           <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-800">{s.waitingDays} ימים ללא התאמה שנשלחה</span>
                           {!s.lastMatchAt && <span className="rounded-full bg-red-50 px-2 py-1 text-xs text-red-700">טרם תועדה שליחה</span>}
                           {profile.plusStatus === "active" && profile.plusBillingStatus === "active" && <span className="rounded-full bg-[#191265] text-[#ffe27c] px-2 py-1 text-xs font-bold">Plus פעיל</span>}
@@ -3060,11 +3059,11 @@ export default function CRMMatchmaking() {
               </div>
             )}
             {(inactiveSingles as any[]).map((s: any) => (
-              <div key={s.id} className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-yellow-400">
+              <div key={s.id} data-crm-profile-row={s.id} className={`rounded-xl p-4 shadow-sm border-r-4 border-yellow-400 ${profileStaffSurface(s)}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-[#191265]">{s.firstName} {s.lastName}</span>
+                      <span className="font-bold text-[#191265]">{s.firstName} {s.lastName}</span><ProfileStaffMarkers profile={s} compact />
                       <Badge className="text-xs bg-yellow-100 text-yellow-700">⏳ לא השלים שאלון</Badge>
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-sm text-[#727272] flex-wrap">
@@ -3177,7 +3176,7 @@ export default function CRMMatchmaking() {
                 const changes = JSON.parse(req.req.changesJson || "{}");
                 const single = req.single;
                 return (
-                  <div key={req.req.id} className="bg-white rounded-2xl shadow-sm p-5 text-right border border-[#f0f0f0]">
+                  <div key={req.req.id} data-crm-profile-row={single.id} className={`rounded-2xl shadow-sm p-5 text-right border border-[#f0f0f0] ${profileStaffSurface(single)}`}>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex gap-2">
                         <button
@@ -3196,7 +3195,7 @@ export default function CRMMatchmaking() {
                         </button>
                       </div>
                       <div>
-                        <h3 className="font-black text-[#191265] text-lg">{single.firstName} {single.lastName}</h3>
+                        <h3 className="font-black text-[#191265] text-lg">{single.firstName} {single.lastName}</h3><ProfileStaffMarkers profile={single} compact />
                         <p className="text-sm text-[#727272]">{single.email} • {single.phone}</p>
                         <p className="text-xs text-[#aaa]">{new Date(req.req.createdAt).toLocaleString("he-IL")}</p>
                       </div>
@@ -3247,15 +3246,15 @@ export default function CRMMatchmaking() {
             ) : (
               <div className="space-y-2">
                 {(allInactiveSingles as any[]).map((s: any) => (
-                  <div key={s.id} className="bg-white rounded-xl p-4 shadow-sm border-r-4 border-red-300">
+                  <div key={s.id} data-crm-profile-row={s.id} className={`rounded-xl p-4 shadow-sm border-r-4 border-red-300 ${profileStaffSurface(s)}`}>
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-[#191265]">{s.firstName} {s.lastName}</span>
+                          <span className="font-bold text-[#191265]">{s.firstName} {s.lastName}</span><ProfileStaffMarkers profile={s} compact />
                           {s.gender && <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">{s.gender === 'male' ? 'גבר' : 'אישה'}</span>}
                           {s.age > 0 && <span className="text-xs text-[#727272]">{s.age}</span>}
                           {s.city && <span className="text-xs text-[#727272]">📍 {s.city}</span>}
-                          {s.isCoachingClient && <span className="text-xs bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded">💜 מלווה</span>}
+
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-[#727272] flex-wrap">
                           {s.height && <span>{s.height} ס"מ</span>}
@@ -3418,11 +3417,11 @@ function MissingDataTab() {
         const smsText = `היי ${row.firstName}, חסרים לנו כמה פרטים בפרופיל שלך במאגר של הילית כספי. השלימו כאן: ${completionLink}`;
         const waLink = row.phone ? `https://wa.me/972${row.phone?.replace(/^0/, '')}?text=${encodeURIComponent(smsText)}` : '';
         return (
-        <div key={row.id} className={`bg-white rounded-xl p-4 shadow-sm border-r-4 ${borderColor}`}>
+        <div key={row.id} data-crm-profile-row={row.id} className={`rounded-xl p-4 shadow-sm border-r-4 ${borderColor} ${profileStaffSurface(row)}`}>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="font-bold text-[#191265]">{row.firstName} {row.lastName}</span>
+                <span className="font-bold text-[#191265]">{row.firstName} {row.lastName}</span><ProfileStaffMarkers profile={row} compact />
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${missingCount >= 5 ? "bg-red-100 text-red-700" : missingCount >= 3 ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700"}`}>{missingCount} חוסרים</span>
                 {row.questionnaireCompletedAt ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">✓ שאלון</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold">⏳ ללא שאלון</span>}
                 {row.createdAt && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-semibold">📅 {new Date(row.createdAt).toLocaleDateString('he-IL')}</span>}
@@ -3609,11 +3608,11 @@ function PersonSelector({
       <button
         type="button"
         onClick={() => setDropdownOpen(!dropdownOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-white border-2 border-[#e9e8e8] rounded-xl text-right hover:border-[#191265] transition-colors focus:outline-none focus:border-[#191265]"
+        className={`w-full flex items-center justify-between px-4 py-3 border-2 border-[#e9e8e8] rounded-xl text-right hover:border-[#191265] transition-colors focus:outline-none focus:border-[#191265] ${profileStaffSurface(selectedPerson)}`}
       >
         {selectedPerson ? (
-          <span className="text-[#191265] font-semibold text-sm">
-            {selectedPerson.firstName} {selectedPerson.lastName}
+          <span className="text-[#191265] font-semibold text-sm inline-flex flex-wrap items-center gap-1">
+            <ProfileStaffMarkers profile={selectedPerson} compact />{selectedPerson.firstName} {selectedPerson.lastName}
             {selectedPerson.age && selectedPerson.age > 0 ? ` (${selectedPerson.age})` : ""}
             {selectedPerson.city ? ` · ${selectedPerson.city}` : ""}
           </span>
@@ -3652,7 +3651,7 @@ function PersonSelector({
                   key={s.id}
                   type="button"
                   onClick={() => { onSelect(s.id); setDropdownOpen(false); setSearch(""); }}
-                  className={`w-full text-right px-4 py-2.5 hover:bg-[#f9f7f3] transition-colors flex items-center gap-3 ${selectedId === s.id ? "bg-[#f0eadc]" : ""}`}
+                  className={`w-full text-right px-4 py-2.5 ${s.isCoachingClient ? "hover:bg-pink-100" : "hover:bg-[#f9f7f3]"} transition-colors flex items-center gap-3 ${profileStaffSurface(s, selectedId === s.id ? "bg-[#f0eadc]" : "bg-white")}`} data-crm-profile-row={s.id}
                 >
                   {s.photoUrl ? (
                     <img src={s.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover object-[center_20%] flex-shrink-0" />
@@ -3662,7 +3661,7 @@ function PersonSelector({
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-[#191265] text-sm">{s.firstName} {s.lastName}</div>
+                    <div className="font-semibold text-[#191265] text-sm flex flex-wrap gap-1 items-center">{s.firstName} {s.lastName}<ProfileStaffMarkers profile={s} compact /></div>
                     <div className="text-xs text-[#727272] truncate">
                       {s.age && s.age > 0 ? `${s.age} · ` : ""}{s.city || ""}{s.gender ? ` · ${s.gender === "female" ? "אישה" : "גבר"}` : ""}
                     </div>
@@ -3830,7 +3829,7 @@ function CompatibilityCheckTab({
               </div>
               <div className="flex gap-4 flex-wrap">
                 {/* Person A */}
-                <div className="text-center">
+                <div className={`text-center rounded-xl p-2 ${profileStaffSurface(comparisonProfiles?.[0] || compatResult.personA, "")}`}>
                   {compatResult.personA?.photoUrl ? (
                     <img src={compatResult.personA.photoUrl} alt="" className="w-16 h-16 rounded-full object-cover object-[center_20%] mx-auto mb-1 border-2 border-white shadow" />
                   ) : (
@@ -3838,12 +3837,12 @@ function CompatibilityCheckTab({
                       {(compatResult.personA?.firstName || "?")[0]}
                     </div>
                   )}
-                  <div className="text-sm font-bold text-[#191265]">{compatResult.personA?.firstName} {compatResult.personA?.lastName}</div>
+                  <div className="text-sm font-bold text-[#191265]">{compatResult.personA?.firstName} {compatResult.personA?.lastName}</div><ProfileStaffMarkers profile={comparisonProfiles?.[0] || compatResult.personA} compact />
                   <div className="text-xs text-[#727272]">{compatResult.personA?.age && compatResult.personA.age > 0 ? `${compatResult.personA.age} · ` : ""}{compatResult.personA?.city || ""}</div>
                 </div>
                 <div className="flex items-center text-2xl text-[#727272]">💛</div>
                 {/* Person B */}
-                <div className="text-center">
+                <div className={`text-center rounded-xl p-2 ${profileStaffSurface(comparisonProfiles?.[1] || compatResult.personB, "")}`}>
                   {compatResult.personB?.photoUrl ? (
                     <img src={compatResult.personB.photoUrl} alt="" className="w-16 h-16 rounded-full object-cover object-[center_20%] mx-auto mb-1 border-2 border-white shadow" />
                   ) : (
@@ -3851,7 +3850,7 @@ function CompatibilityCheckTab({
                       {(compatResult.personB?.firstName || "?")[0]}
                     </div>
                   )}
-                  <div className="text-sm font-bold text-[#191265]">{compatResult.personB?.firstName} {compatResult.personB?.lastName}</div>
+                  <div className="text-sm font-bold text-[#191265]">{compatResult.personB?.firstName} {compatResult.personB?.lastName}</div><ProfileStaffMarkers profile={comparisonProfiles?.[1] || compatResult.personB} compact />
                   <div className="text-xs text-[#727272]">{compatResult.personB?.age && compatResult.personB.age > 0 ? `${compatResult.personB.age} · ` : ""}{compatResult.personB?.city || ""}</div>
                 </div>
               </div>
@@ -3863,7 +3862,7 @@ function CompatibilityCheckTab({
               <h3 className="text-sm font-bold text-[#191265]">השוואה זוגית לפי ההעדפות</h3>
               <PairCriteriaLegend />
               <div className="grid grid-cols-2 gap-3">
-                {comparisonProfiles.map((profile, index) => profile && <div key={profile.id} className="min-w-0 rounded-xl bg-[#f8f6f0] p-3">
+                {comparisonProfiles.map((profile, index) => profile && <div key={profile.id} className={`min-w-0 rounded-xl p-3 ${profileStaffSurface(profile, "bg-[#f8f6f0]")}`}>
                   <MatchProfileCard profile={profile} otherProfile={comparisonProfiles[index === 0 ? 1 : 0]} comparison onPhoto={onPhoto} />
                 </div>)}
               </div>

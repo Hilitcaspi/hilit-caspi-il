@@ -326,6 +326,8 @@ export const plusPilotRouter = router({
         age: singles.age,
         city: singles.city,
         photoUrl: singles.photoUrl,
+        isCoachingClient: singles.isCoachingClient,
+        isNotBasic: singles.isNotBasic,
       },
     }).from(plusPilotMembers)
       .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
@@ -368,7 +370,13 @@ export const plusPilotRouter = router({
         amountAgorot: plusPaymentEvents.amountAgorot,
         providerTransactionId: plusPaymentEvents.providerTransactionId,
       }).from(plusPaymentEvents),
-      db.select({ id: singles.id, firstName: singles.firstName, lastName: singles.lastName }).from(singles),
+      db.select({
+        id: singles.id,
+        firstName: singles.firstName,
+        lastName: singles.lastName,
+        isCoachingClient: singles.isCoachingClient,
+        isNotBasic: singles.isNotBasic,
+      }).from(singles),
       db.select({
         id: plusCheckoutIntents.id,
         fullName: plusCheckoutIntents.fullName,
@@ -444,7 +452,13 @@ export const plusPilotRouter = router({
             ...proposal,
             status: match?.status || null,
             matchDetailStatus: match?.matchDetailStatus || null,
-            other: other ? { id: other.id, firstName: other.firstName, lastName: other.lastName } : null,
+            other: other ? {
+              id: other.id,
+              firstName: other.firstName,
+              lastName: other.lastName,
+              isCoachingClient: other.isCoachingClient,
+              isNotBasic: other.isNotBasic,
+            } : null,
           };
         }),
       }));
@@ -462,7 +476,13 @@ export const plusPilotRouter = router({
             returnedToPoolAt: match.returnedToPoolAt,
             score: match.score,
             source: match.proposalSource,
-            other: other ? { id: other.id, firstName: other.firstName, lastName: other.lastName } : null,
+            other: other ? {
+              id: other.id,
+              firstName: other.firstName,
+              lastName: other.lastName,
+              isCoachingClient: other.isCoachingClient,
+              isNotBasic: other.isNotBasic,
+            } : null,
           };
         });
       const monthMatches = memberMatches
@@ -478,7 +498,13 @@ export const plusPilotRouter = router({
             matchDetailStatus: match.matchDetailStatus,
             score: match.score,
             source: match.proposalSource,
-            other: other ? { id: other.id, firstName: other.firstName, lastName: other.lastName } : null,
+            other: other ? {
+              id: other.id,
+              firstName: other.firstName,
+              lastName: other.lastName,
+              isCoachingClient: other.isCoachingClient,
+              isNotBasic: other.isNotBasic,
+            } : null,
           };
         });
       const memberBoostRequests = boostRows.filter(request => request.singleId === row.single.id);
