@@ -55,6 +55,13 @@ describe("attraction editorial guide and funnel", () => {
     expect(article).not.toMatch(/rounded-|bg-\[|grid|תכלס|נסי את זה|אפשר לומר|מה לקחת/);
     expect(blocks.filter(block => block.kind === "quote")).toHaveLength(2);
   });
+  it("starts with a direct engaging hook and connects to the unchanged date scene", () => {
+    expect(attractionIntro[0].startsWith("הוא מצא חן בעינייך? מעולה.")).toBe(true);
+    expect(attractionIntro[0]).toContain("אישה שרוצה אותו, אבל לא שוכחת את עצמה בגללו");
+    expect(attractionIntro[0]).toContain("וזה בדיוק מה שאני רוצה ללמד אותך");
+    expect(attractionIntro[0]).not.toContain("פרויקט ניהול");
+    expect(attractionIntro[1].startsWith("היה דייט טוב. צחקתם, הייתה כימיה")).toBe(true);
+  });
   it("retains the requested personal quote without adjacent disclaimer", () => {
     const heading = page.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<br\s*\/>/g, " ").replace(/<[^>]+>/g, "");
     expect(heading).toBe("״אין גבר שרציתי ולא השגתי.״");
