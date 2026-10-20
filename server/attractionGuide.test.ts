@@ -51,6 +51,15 @@ describe("attraction guide content and funnel", () => {
     expect(page).toContain("אין התחייבות למספר התאמות, לתדירות או לתוצאה");
     expect(page).toContain("המדריך החינמי אינו מקנה חברות במאגר");
   });
+  it("keeps the original book-inspired themes concrete without copying or claiming research", () => {
+    const content = attractionChapters.flatMap(chapter => [...chapter.paragraphs, chapter.exercise]).join(" ");
+    expect(content).toContain("להיות נעימה לא אומר להסכים לכל דבר");
+    expect(content).toContain("העצמאות שלך לא נועדה לגרום לו לרדוף");
+    expect(content).toContain("גבול לא דורש ריב, הסברים ארוכים או עונש");
+    expect(content).toContain("בחרי איכות אחת שאת אוהבת בעצמך");
+    expect(page).toContain("אני נעימה, אבל לא אומרת כן לכל דבר");
+    expect(content + page).not.toMatch(/מחקרים מוכיחים|מובטח שכל גבר|עקרון המשיכה מספר|100 עקרונות/);
+  });
   it("opens without a lead gate, outbound messages or checkout", () => {
     expect(page).not.toMatch(/leads\.submit|startJourney|useMutation|GrowWallet|trackLead|trackPurchase|type="email"/);
     expect(page).toContain("המדריך פתוח כאן");
