@@ -55,12 +55,13 @@ describe("attraction editorial guide and funnel", () => {
     expect(article).not.toMatch(/rounded-|bg-\[|grid|תכלס|נסי את זה|אפשר לומר|מה לקחת/);
     expect(blocks.filter(block => block.kind === "quote")).toHaveLength(2);
   });
-  it("starts with a direct engaging hook and connects to the unchanged date scene", () => {
-    expect(attractionIntro[0].startsWith("הוא מצא חן בעינייך? מעולה.")).toBe(true);
-    expect(attractionIntro[0]).toContain("אישה שרוצה אותו, אבל לא שוכחת את עצמה בגללו");
-    expect(attractionIntro[0]).toContain("וזה בדיוק מה שאני רוצה ללמד אותך");
-    expect(attractionIntro[0]).not.toContain("פרויקט ניהול");
-    expect(attractionIntro[1].startsWith("היה דייט טוב. צחקתם, הייתה כימיה")).toBe(true);
+  it("uses a single author-observer voice rather than alternating reader instructions and examples", () => {
+    expect(attractionIntro[0]).toContain("אחרי דייט טוב");
+    expect(attractionIntro[0]).toContain("בעיניי");
+    expect(attractionIntro[1]).toContain("כשאמרתי בפודקאסט");
+    expect(attractionIntro[1]).toContain("בין לרצות אדם לבין להזדקק לאישור שלו");
+    expect(allContent + page).not.toMatch(/תני לו|תשאירי|חייכי|תהיי|תעשי|תצחקי|תספרי|שאלי את עצמך|בואי נדבר|בעינייך|ההומור שלך|פנויה ורוצה/);
+    expect(attractionChapters.every(chapter => !chapter.title.includes("?") || chapter.id === "boundaries")).toBe(true);
   });
   it("retains the requested personal quote without adjacent disclaimer", () => {
     const heading = page.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<br\s*\/>/g, " ").replace(/<[^>]+>/g, "");
@@ -81,39 +82,42 @@ describe("attraction editorial guide and funnel", () => {
     expect(page + allContent).not.toMatch(/שיבושי החשיבה|לקריאת המדריך החינמי|[—–]|[\u0590-\u05ff]\/[\u0590-\u05ff]/);
   });
   it("connects the end of each section to the subject of the next", () => {
-    expect(attractionIntro.join(" ")).toContain("תהיי פחות ממהרת");
-    expect(attractionChapters[0].blocks.at(-1)).toMatchObject({ kind: "paragraph", text: expect.stringContaining("הוא לא מתקשר בקצב שקיווית") });
-    expect(attractionChapters[1].blocks.at(-1)).toMatchObject({ kind: "paragraph", text: expect.stringContaining("לחזור לערב שלך") });
-    expect(attractionChapters[2].blocks.at(-1)).toMatchObject({ kind: "paragraph", text: expect.stringContaining("מקום לראות גם אותו") });
+    expect(attractionIntro.join(" ")).toContain("המקום שנותר לצד השני להתקרב");
+    expect(attractionChapters[0].blocks.at(-1)).toMatchObject({ kind: "paragraph", text: expect.stringContaining("קשה לשאת את סימן השאלה") });
+    expect(attractionChapters[1].blocks.at(-1)).toMatchObject({ kind: "paragraph", text: expect.stringContaining("לחזור לערב שכבר היה לנו") });
+    expect(attractionChapters[2].blocks.at(-1)).toMatchObject({ kind: "paragraph", text: expect.stringContaining("אם בכלל נכון לבחור בו") });
   });
   it("shows warmth on dates, his initiative and ordinary autonomy without threats or fabricated unavailability", () => {
-    expect(allContent).toContain("אחרי הדייט? תני לו ליזום");
-    expect(allContent).toContain("שיתקשר. שיציע להיפגש. שיתכנן");
-    expect(allContent).toContain("אם נוח לך, גם שיציע לאסוף אותך");
-    expect(allContent).toContain("אין צורך להתנצל באריכות, ואין צורך לענות בקור");
-    expect(allContent).toContain("לא צריך לחשב כמה דקות לחכות לפני תשובה");
-    expect(allContent).toContain("כשכבר נבנתה היכרות, אפשר לדבר");
-    expect(allContent).toContain("לא הסכמה לחוסר יחס");
+    expect(allContent).toContain("לתת לגבר ליזום");
+    expect(allContent).toContain("להתקשר, להציע פגישה, לתכנן אותה");
+    expect(allContent).toContain("אם זה נוח לשני הצדדים, גם להציע לאסוף");
+    expect(allContent).toContain("אפשר להיות חמה ונוכחת");
+    expect(allContent).toContain("אין בעיניי טעם לחשב כמה דקות לחכות לפני תשובה");
+    expect(allContent).toContain("כשההיכרות מתקדמת, אפשר לדבר בפשטות");
+    expect(allContent).toContain("אינה הסכמה לחוסר יחס מתמשך");
     expect(allContent).not.toMatch(/שלחי לו ראשונה|העמידי פנים|תגרמי לו לקנא/);
   });
   it("uses exactly the supplied anonymous clinic case without invented dialogue, identity or outcome", () => {
     const cases = blocks.filter(block => block.kind === "clinic");
     expect(cases).toHaveLength(1);
     const story = cases[0].paragraphs.join(" ");
-    expect(story).toContain("השבוע אחת הנשים שאני מלווה, בתחילתו של קשר");
+    expect(cases[0].title).toContain("השבוע");
+    expect(cases[0].title).toContain("אחת הנשים שאני מלווה");
+    expect(story).toContain("היא הייתה בתחילתו של קשר");
     expect(story).toContain("לא התקשר בתדירות שציפתה");
     expect(story).toContain("הודעה שהיא לא מעוניינת");
     expect(story).not.toMatch(/״|בת \d+|דייטים? \d+|חזר אליה|הם ביחד|שלח לה פרחים|@|\+972/);
     expect(page).toContain("data-guide-clinic-case");
   });
   it("includes concrete everyday action and strengths without diagnostic or scientific promises", () => {
-    expect(allContent).toContain("קבעת ערב עם חברה");
-    expect(allContent).toContain("הכלים מהפסיכולוגיה החיובית".replace("הכלים", "בכלים"));
-    expect(allContent).toContain("ההומור שלך, החום, הסקרנות, התעוזה");
+    expect(allContent).toContain("נקבע ערב עם חברה");
+    expect(allContent).toContain("כלים מהפסיכולוגיה החיובית");
+    expect(allContent).toContain("הומור, חום, סקרנות ותעוזה");
     expect(page + allContent).not.toMatch(/מחקרים מוכיחים|מובטח שכל גבר|עקרון המשיכה מספר|100 עקרונות/);
   });
   it("keeps mutual choice and realistic database terms", () => {
-    expect(allContent).toContain("אם הוא לא בעניין, אני לא מתווכחת עם זה. אני ממשיכה.");
+    expect(allContent).toContain("אם הוא לא בעניין, אני ממשיכה");
+    expect(allContent).toContain("אין לי צורך לשכנע מישהו לרצות את מה שאינו רוצה");
     expect(page).toContain("פרטי הקשר נחשפים רק לאחר אישור הדדי");
     expect(page).toContain("אין התחייבות למספר התאמות, לתדירות או לתוצאה");
     expect(page).toContain("המדריך החינמי אינו מקנה חברות במאגר");
@@ -127,12 +131,13 @@ describe("attraction editorial guide and funnel", () => {
     expect(links[1].label).toContain("בתשלום");
     expect(article).not.toMatch(/attractionHref\("database"|data-guide-cta="database"/);
     const understanding = page.slice(page.indexOf('data-guide-path="self-understanding"'), page.indexOf('data-guide-path="new-relationship"'));
-    expect(understanding).toContain("בין אם את לפני קשר ובין אם את בתוך קשר");
+    expect(understanding).toContain("לפני קשר או בתוך קשר");
     expect(understanding).toContain('attractionHref("dna", "self_understanding")');
     expect(understanding).not.toContain('attractionHref("database"');
     const newRelationship = page.slice(page.indexOf('data-guide-path="new-relationship"'), page.indexOf("</main>"));
-    expect(newRelationship).toContain("פנויה ורוצה להכיר מישהו שיתאים לך?");
-    expect(newRelationship).toContain("להכיר מישהו שמתאים לך וליישם את מה שאני מלמדת");
+    expect(newRelationship).toContain("לקראת היכרות חדשה");
+    expect(newRelationship).toContain("אם אין כרגע קשר זוגי");
+    expect(newRelationship).toContain("להכיר אדם מתאים וליישם את הדברים שעליהם כתבתי");
     expect(newRelationship).toContain('attractionHref("database", "main")');
   });
   it("opens without lead gate, outbound messages or checkout", () => {

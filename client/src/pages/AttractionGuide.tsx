@@ -9,7 +9,7 @@ import { track } from "@/lib/track";
 import { trackViewContent } from "@/lib/metaPixel";
 
 const PORTRAIT = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
-const GUIDE_NAME = "תני לו לרצות אותך. בלי להפסיק להיות את.";
+const GUIDE_NAME = "על משיכה, חיזור והחיים שביניהם";
 
 export default function AttractionGuide() {
   const viewed = useRef(false);
@@ -79,10 +79,10 @@ export default function AttractionGuide() {
       <header className="overflow-hidden bg-[#191265] px-5 pb-9 pt-8 text-white sm:px-10 md:py-12">
         <div className="mx-auto grid max-w-6xl items-center gap-7 md:grid-cols-[1.5fr_0.8fr] md:gap-14">
           <div>
-            <p className="mb-5 text-xs font-medium tracking-wide text-[#ffb5d0]">תני לו לרצות אותך. בלי להפסיק להיות את.</p>
+            <p className="mb-5 text-xs font-medium tracking-wide text-[#ffb5d0]">על משיכה, חיזור והחיים שביניהם</p>
             <h1 data-guide-quote className="max-w-3xl text-[clamp(2.7rem,6vw,4.8rem)] font-black leading-[1.12] tracking-tight">״אין גבר שרציתי<br /><span className="text-[#ffe27c]">ולא השגתי.״</span></h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-white/95">לא כי אני הכי יפה. לא כי אני הכי צעירה. לא כי אני הכי אטרקטיבית.</p>
-            <p className="mt-3 max-w-xl text-base leading-8 text-white/80">זה קשור לאנרגיה שאני מביאה. לקלילות, לביטחון וליכולת להראות עניין בלי להפוך את כל החיים שלי להמתנה לתגובה שלו. בואי נדבר על איך עושים את זה.</p>
+            <p className="mt-3 max-w-xl text-base leading-8 text-white/80">עם השנים הבנתי שהכוח שלי אינו בניסיון להרשים, אלא ביכולת ליהנות מהמפגש בלי לאבד בתוכו את עצמי. אני מביאה עניין, הומור וקלילות, ומשאירה מקום גם לרצון שלו.</p>
           </div>
           <div className="flex items-center gap-4 md:block">
             <img src={PORTRAIT} alt="הילית כספי" width={320} height={400} className="h-24 w-24 shrink-0 rounded-full object-cover object-top md:h-auto md:w-full md:rounded-[8rem_8rem_1.25rem_1.25rem]" fetchPriority="high" />
@@ -110,24 +110,24 @@ export default function AttractionGuide() {
               <span data-guide-milestone={`chapter_${i + 1}`} aria-hidden="true" className="block h-px w-px" />
             </section>
           ))}
-          <p className="mt-7 text-[21px] font-bold leading-8 text-[#94265b]">תני לו מקום לרצות אותך. תשאירי לעצמך מקום לבחור.</p>
+          <p className="mt-7 text-[21px] font-bold leading-8 text-[#94265b]">יש מקום לרצות, ויש מקום לבחור. חיזור טוב משאיר מקום לשניהם.</p>
         </article>
 
         <section id="next-step" className="scroll-mt-6 border-t border-[#191265]/15 bg-[#f0e8ed] px-5 py-9 sm:px-8 md:py-10">
           <div className="mx-auto max-w-[43rem]">
-            <h2 data-guide-milestone="next_step" className="text-[29px] font-black leading-tight text-[#191265] sm:text-[35px]">ועכשיו, מה נכון לך?</h2>
-            <p className="mt-4 text-[17px] leading-8">להבין את עצמך בזוגיות ולהכיר אדם חדש הם שני צעדים שונים. את לא חייבת לעשות את שניהם. התחילי במה שמתאים למקום שבו את נמצאת.</p>
+            <h2 data-guide-milestone="next_step" className="text-[29px] font-black leading-tight text-[#191265] sm:text-[35px]">מהקריאה אל החיים</h2>
+            <p className="mt-4 text-[17px] leading-8">המחשבות האלה פוגשות כל אחד במקום אחר: לפעמים בתוך קשר שמעורר שאלות, ולפעמים עם רצון להתחיל היכרות חדשה. מכאן אפשר להמשיך בדרך שמתאימה לשלב שבו נמצאים.</p>
             <div data-guide-path="self-understanding" className="mt-7">
-              <h3 className="text-[22px] font-bold leading-snug text-[#191265]">רוצה להכיר את עצמך בזוגיות?</h3>
-              <p className="mt-3 text-[17px] leading-8">בין אם את לפני קשר ובין אם את בתוך קשר, אני מזמינה אותך לשאלון DNA הזוגי החינמי. זו הזדמנות לעצור, להתבונן במה שחשוב לך ולהתחיל להבין את הדרך שבה את נכנסת לקשרים.</p>
+              <h3 className="text-[22px] font-bold leading-snug text-[#191265]">להכיר את עצמנו בזוגיות</h3>
+              <p className="mt-3 text-[17px] leading-8">לפני קשר או בתוך קשר, שאלון DNA הזוגי החינמי מאפשר להתחיל מהשאלות האישיות: מה חשוב לנו בזוגיות ואיך אנחנו ניגשים להיכרות. זו הזמנה שלי לעצור לרגע ולהתבונן, בלי צורך לקבל מיד החלטה על הקשר.</p>
               <Link href={attractionHref("dna", "self_understanding")} onClick={() => clicked("dna", "self_understanding")} data-guide-cta="dna" className={`mt-3 inline-flex items-center gap-2 ${textLink}`}>לשאלון DNA הזוגי החינמי <ArrowLeft size={16} aria-hidden="true" /></Link>
-              <p className="mt-4 text-sm leading-7 text-[#514452]">ואם את רוצה להעמיק ולעבוד על דפוסי הבחירה שלך, <Link href={attractionHref("guide", "secondary")} onClick={() => clicked("guide", "secondary")} data-guide-cta="paid-guide" className={textLink}>״לבחור נכון״ הוא המדריך בתשלום</Link> עם שאלון ותרגילים מעשיים. לא עוד עצות מהצד, אלא עבודה על הבחירות שלך.</p>
+              <p className="mt-4 text-sm leading-7 text-[#514452]">להעמקה בדפוסי הבחירה, <Link href={attractionHref("guide", "secondary")} onClick={() => clicked("guide", "secondary")} data-guide-cta="paid-guide" className={textLink}>״לבחור נכון״ הוא המדריך בתשלום</Link> עם שאלון ותרגילים מעשיים לעבודה על הבחירות שמובילות לקשר.</p>
             </div>
             <div data-guide-path="new-relationship" className="mt-7 border-t border-[#191265]/15 pt-7">
-              <h3 className="text-[22px] font-bold leading-snug text-[#191265]">פנויה ורוצה להכיר מישהו שיתאים לך?</h3>
-              <p className="mt-3 text-[17px] leading-8">אם את רוצה להכיר מישהו שמתאים לך וליישם את מה שאני מלמדת, אני מזמינה אותך להצטרף למאגר ההיכרויות שלי. אנחנו מתחילים מהפרופיל שלך, מההעדפות ומהשאלונים של שני הצדדים, כדי לבדוק חיבורים אפשריים.</p>
+              <h3 className="text-[22px] font-bold leading-snug text-[#191265]">לקראת היכרות חדשה</h3>
+              <p className="mt-3 text-[17px] leading-8">אם אין כרגע קשר זוגי ויש רצון להכיר אדם מתאים וליישם את הדברים שעליהם כתבתי, אני מזמינה להצטרף למאגר ההיכרויות שלי. אנחנו מתחילים מפרופיל אישי, מההעדפות ומהשאלונים של שני הצדדים, כדי לבדוק חיבורים אפשריים.</p>
               <p className="mt-3 text-[17px] leading-8">המערכת ואני בודקות התאמות, ואני עוברת על ההצעה לפני שהיא נשלחת. כל צד מחליט בנפרד אם להתקדם, ופרטי הקשר נחשפים רק לאחר אישור הדדי.</p>
-              <Link href={attractionHref("database", "main")} onClick={() => clicked("database", "main")} data-guide-cta="database" className={`mt-5 inline-flex w-full items-center justify-center gap-3 rounded-full bg-[#191265] px-6 py-4 text-center font-bold text-white transition-colors hover:bg-[#2d247e] sm:w-auto ${focusClass}`}>אני רוצה להכיר דרך המאגר <ArrowLeft size={18} className="shrink-0" aria-hidden="true" /></Link>
+              <Link href={attractionHref("database", "main")} onClick={() => clicked("database", "main")} data-guide-cta="database" className={`mt-5 inline-flex w-full items-center justify-center gap-3 rounded-full bg-[#191265] px-6 py-4 text-center font-bold text-white transition-colors hover:bg-[#2d247e] sm:w-auto ${focusClass}`}>להיכרות דרך המאגר <ArrowLeft size={18} className="shrink-0" aria-hidden="true" /></Link>
               <p className="mt-3 text-xs leading-6 text-[#605765]">הצטרפות בתשלום חד־פעמי למאגר. במסלול הרגיל אין התחייבות למספר התאמות, לתדירות או לתוצאה. המדריך החינמי אינו מקנה חברות במאגר.</p>
             </div>
           </div>
@@ -135,7 +135,7 @@ export default function AttractionGuide() {
 
         <section className="px-5 py-7 sm:px-8">
           <div className="mx-auto max-w-[43rem] space-y-5 text-sm leading-7 text-[#514452]">
-            <p>ולגברים שהציצו עד כאן: אישה שמראה עניין ונשארת לגמרי היא עצמה. זה מושך גם בעיניכם? תגיבו לסרטון הפודקאסט, אני רוצה לשמוע את הצד שלכם. ואם אתם פנויים ורוצים להכיר, <Link href={attractionHref("database", "men")} onClick={() => clicked("database", "men")} data-guide-cta="database-men" className={textLink}>המאגר פתוח גם לכם</Link>.</p>
+            <p>ומעניין אותי לשמוע גם מהצד השני של החיזור: מה מושך יותר, עניין שממהר לדרוש תשובות או עניין שמשאיר מקום להתקרב? אפשר להגיב לסרטון הפודקאסט ולהוסיף גם את נקודת המבט הזאת. לקראת קשר חדש, <Link href={attractionHref("database", "men")} onClick={() => clicked("database", "men")} data-guide-cta="database-men" className={textLink}>המאגר פתוח לנשים ולגברים</Link>.</p>
             <p className="flex flex-wrap items-center gap-x-2"><MessageCircle size={17} aria-hidden="true" />נמשיך לדבר על זה? <a href={attractionHref("community", "footer")} onClick={() => clicked("community", "footer")} target="_blank" rel="noopener noreferrer" className={textLink}>לקבוצת הווטסאפ השקטה שלי</a>. תכנים ועדכונים, וההצטרפות בחינם.</p>
           </div>
         </section>
