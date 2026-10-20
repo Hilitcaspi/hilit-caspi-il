@@ -24,8 +24,29 @@ describe("attraction guide content and funnel", () => {
       for (const field of [chapter.title, chapter.scene, chapter.script, chapter.exercise, chapter.takeaway]) expect(field.length).toBeGreaterThan(15);
     }
   });
+  it("opens with the requested personal quote and no adjacent disclaimer", () => {
+    const heading = page.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<br\s*\/>/g, " ").replace(/<[^>]+>/g, "");
+    expect(heading).toBe("״אין גבר שרציתי ולא השגתי.״");
+    const hero = page.slice(page.indexOf("<header"), page.indexOf("</header>"));
+    expect(hero).toContain("לא כי אני הכי יפה. לא כי אני הכי צעירה. לא כי אני הכי אטרקטיבית.");
+    expect(hero).not.toMatch(/לא הבטחה|החוויה האישית|להתעלם מסירוב|דיסקליימר/);
+  });
+  it("keeps the guide naming, concrete advice and requested typography", () => {
+    expect(page).toContain("4 שיבושי החשיבה שהמוח מפעיל כשאת ממש רוצה אותו");
+    expect(page).toContain("לבחור נכון");
+    const content = attractionChapters.flatMap(chapter => [chapter.title, chapter.kicker, ...chapter.paragraphs, chapter.scene, chapter.script, chapter.exercise, chapter.takeaway]).join(" ");
+    expect(page + content).not.toMatch(/[—–]|[\u0590-\u05ff]\/[\u0590-\u05ff]/);
+    expect(attractionChapters.map(chapter => chapter.title)).toEqual([
+      "את מנסה להרשים אותו במקום ליהנות איתו",
+      "את מנסה לדעת לאן זה הולך לפני שהיה לכם כיף",
+      "את חושבת שעניין ברור מוריד לך את הערך",
+      "את שמה אותו במרכז לפני שהוא קיבל שם מקום",
+    ]);
+    const readingBody = page.slice(page.indexOf("<main>"), page.indexOf("</main>"));
+    expect(readingBody).not.toMatch(/py-20|py-14|text-8xl/);
+  });
   it("keeps mutual choice, consent and realistic database terms explicit", () => {
-    expect(page).toContain("סירוב לא מוכיח שמשהו חסר לך");
+    expect(attractionChapters[3].paragraphs.join(" ")).toContain("אם הוא לא בעניין, אני לא מתווכחת עם זה. אני ממשיכה.");
     expect(page).toContain("פרטי הקשר נחשפים רק לאחר אישור הדדי");
     expect(page).toContain("אין התחייבות למספר התאמות, לתדירות או לתוצאה");
     expect(page).toContain("המדריך החינמי אינו מקנה חברות במאגר");
