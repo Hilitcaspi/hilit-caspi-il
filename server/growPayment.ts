@@ -17,6 +17,8 @@
 // Native fetch + browser-like headers bypasses this.
 import { normalizeIsraeliPhone } from "../shared/profileValidation";
 import { PLUS_HOLIDAY_LAUNCH_COHORT } from "./plusLaunchOffer";
+import { requirePlusDatabaseCheckout } from "./plusDatabaseCheckout";
+import { isClosedSeasonalProduct, TU_BAV_CLOSED_MESSAGE } from "../shared/closedSeasonalOffers";
 
 export const PAYMENT_PHONE_INVALID = "PAYMENT_PHONE_INVALID";
 
@@ -174,6 +176,8 @@ export interface CreatePaymentResult {
 }
 
 export async function createPaymentProcess(input: CreatePaymentInput): Promise<CreatePaymentResult> {
+  if (isClosedSeasonalProduct(input.product)) throw new Error(TU_BAV_CLOSED_MESSAGE);
+  if (input.product === "plus") await requirePlusDatabaseCheckout(input.email, input.personalToken);
   const { notifyPaymentFailure } = await import("./paymentFailureAlert");
   const config = PRODUCT_CONFIGS[input.product];
   if (!config) throw new Error(`Unknown product: ${input.product}`);

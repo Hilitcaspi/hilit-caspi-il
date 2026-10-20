@@ -28,7 +28,7 @@ describe("Database Plus launch attribution", () => {
 
   it("captures link UTM values and passes them to the verified checkout flow", () => {
     const wallet = read("client/src/components/GrowWallet.tsx");
-    expect(wallet).toContain("sessionStorage.setItem(key, val)");
+    expect(wallet).toContain("const lastUtm = getLastUtmAcquisition();");
     expect(wallet).toContain("utmSource,");
     expect(wallet).toContain("utmMedium,");
     expect(wallet).toContain("utmCampaign,");

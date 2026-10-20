@@ -11,6 +11,7 @@ import { calculatePlusServiceProgress, plusDeliveryEvidenceSelection } from "./p
 import { wasMatchProposalSent } from "../shared/matchDelivery";
 import { isPlusArchived } from "../shared/plusServiceCycle";
 import { getPlusServiceDeparture } from "../shared/plusServiceDeparture";
+import { hasPaidDatabaseMembership } from "../shared/plusDatabaseEligibility";
 import { buildPlusServiceHistory } from "../shared/plusServiceHistory";
 import { endPlusLocally } from "./plusLocalEnd";
 import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
@@ -197,7 +198,7 @@ export const plusPilotRouter = router({
           email: single.email,
           phone: single.phone,
         },
-        databaseMembershipActive: Boolean(single.isPaid && single.isActive),
+        databaseMembershipActive: hasPaidDatabaseMembership(single),
         eligibility,
         cycleProgress: pilot[0] ? calculatePlusServiceProgress(pilot[0], memberMatches) : null,
         launchOffer: pilot[0] && isPlusWednesdayOfferCohort(pilot[0].pilotCohort)

@@ -122,7 +122,7 @@ describe("Plus cancellation queue UI", () => {
   });
 
   it("keeps cancellation access restrained while exposing failure and pending feedback", () => {
-    expect(dashboardSource).toContain('const { status, pilot, eligibility, benefits, cycleProgress, cancellationPending } = statusQuery.data;');
+    expect(dashboardSource).toContain('const { status, pilot, eligibility, benefits, cycleProgress, cancellationPending, databaseMembershipActive } = statusQuery.data;');
     expect(dashboardSource).toContain('const canRequestCancellation = status === "active"');
     expect(dashboardSource).toContain('pilot?.billingStatus === "active" || pilot?.billingStatus === "past_due"');
     expect(dashboardSource).toContain("&& !cancellationPending;");

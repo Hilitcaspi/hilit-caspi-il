@@ -76,6 +76,7 @@ const LaMekabel = lazy(() => import("@/pages/LaMekabel"));
 const Brain = lazy(() => import("@/pages/Brain"));
 const TermsSingleSession = lazy(() => import("@/pages/TermsSingleSession"));
 const TuBavBundle = lazy(() => import("@/pages/TuBavBundle"));
+const NovemberDatabaseSales = lazy(() => import("@/pages/NovemberDatabaseSales"));
 const ThankYouBundle = lazy(() => import("@/pages/ThankYouBundle"));
 const TeamLogin = lazy(() => import("@/pages/TeamLogin"));
 const SeptemberOffers = lazy(() => import("@/pages/SeptemberOffers"));
@@ -364,6 +365,7 @@ function HeRouter() {
           <Route path={"/lamekabel"} component={LaMekabel} />
           <Route path={"/brain"} component={Brain} />
           <Route path={"/tu-bav"} component={TuBavBundle} />
+          <Route path={"/november"} component={NovemberDatabaseSales} />
           <Route path={"/thank-you/bundle"} component={ThankYouBundle} />
           <Route path={"/upload-photo"} component={UploadPhoto} />
           <Route path={"/team/login"} component={TeamLogin} />

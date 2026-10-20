@@ -7925,6 +7925,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         origin: z.string().url().max(500).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        const { isClosedSeasonalProduct, TU_BAV_CLOSED_MESSAGE } = await import("../shared/closedSeasonalOffers");
+        if (isClosedSeasonalProduct(input.product)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: TU_BAV_CLOSED_MESSAGE });
+        }
         const { createPaymentProcess, getPlusCheckoutConfig, PRODUCT_CONFIGS } = await import("./growPayment");
         const db = await getDb();
         const normalizedCheckoutEmail = input.email.trim().toLowerCase();
@@ -7969,6 +7973,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           if (normalizedPhone.length < 9) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "יש להזין מספר טלפון תקין" });
           }
+          const { requirePlusDatabaseCheckout } = await import("./plusDatabaseCheckout");
+          const existingSingle = await requirePlusDatabaseCheckout(normalizedEmail, input.personalToken);
           const now = Date.now();
           const [existingIntent] = await db.select({ status: plusCheckoutIntents.status })
             .from(plusCheckoutIntents)
@@ -7976,21 +7982,6 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             .limit(1);
           if (existingIntent?.status === "paid_pending_profile" || existingIntent?.status === "active") {
             throw new TRPCError({ code: "CONFLICT", message: "התשלום עבור Plus כבר נקלט. אין צורך לשלם שוב" });
-          }
-          const [existingSingle] = await db.select({
-            id: singles.id,
-            gender: singles.gender,
-            isPaid: singles.isPaid,
-            isActive: singles.isActive,
-          })
-            .from(singles)
-            .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`)
-            .limit(1);
-          if (!existingSingle?.isPaid || !existingSingle.isActive) {
-            throw new TRPCError({
-              code: "PRECONDITION_FAILED",
-              message: "Database Plus זמין רק לחברי המאגר הפעילים. יש להשלים תחילה את ההצטרפות למאגר בסך 299 ₪, ולאחר אישור התשלום לחזור לעמוד Plus",
-            });
           }
           if (existingSingle) {
             const [priorPlusMember] = await db.select({

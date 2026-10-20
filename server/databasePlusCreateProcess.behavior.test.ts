@@ -64,6 +64,7 @@ const validInput = {
   plusRenewalAccepted: true as const,
   plusTermsAccepted: true as const,
   plusBoostAccepted: true as const,
+  personalToken: "synthetic-personal-token-123456",
   origin: "https://preview.example",
 };
 
@@ -104,7 +105,7 @@ describe("Database Plus public createProcess safeguards", () => {
     await expect(appRouter.createCaller(createPublicContext()).payment.createProcess(validInput))
       .rejects.toMatchObject({
         code: "PRECONDITION_FAILED",
-        message: expect.stringContaining("לחברי המאגר הפעילים"),
+        message: expect.stringContaining("השלים את ההרשמה והתשלום למאגר"),
       });
 
     expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
@@ -112,12 +113,36 @@ describe("Database Plus public createProcess safeguards", () => {
   });
 
   it("blocks Plus checkout for an unpaid or inactive database profile", async () => {
-    const db = createDbHarness([[], [{ id: 42, gender: "female", isPaid: false, isActive: true }]]);
+    const db = createDbHarness([[{ id: 42, gender: "female", isPaid: false, isActive: true }]]);
     mocks.getDb.mockResolvedValue(db);
 
     await expect(appRouter.createCaller(createPublicContext()).payment.createProcess(validInput))
       .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
 
     expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+  });
+  it("requires the member's personal link even with all consents", async () => {
+    const db = createDbHarness([[{ id: 42, isPaid: true, isActive: true }]]);
+    mocks.getDb.mockResolvedValue(db);
+    await expect(appRouter.createCaller(createPublicContext()).payment.createProcess({ ...validInput, personalToken: undefined }))
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(db.select).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+    expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+  });
+  it.each([{ isPaid: true, isActive: false }, { isPaid: true, isActive: true, isSeed: true }, { isPaid: true, isActive: true, market: "us" }])("rejects ineligible database records before intent or provider writes %#", async profile => {
+    const db = createDbHarness([[{ id: 42, ...profile }]]);
+    mocks.getDb.mockResolvedValue(db);
+    await expect(appRouter.createCaller(createPublicContext()).payment.createProcess(validInput)).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(db.insert).not.toHaveBeenCalled(); expect(db.update).not.toHaveBeenCalled();
+    expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+  });
+  it("blocks retired Tu B'Av checkout before touching the database or provider", async () => {
+    const db = createDbHarness();
+    mocks.getDb.mockResolvedValue(db);
+    await expect(appRouter.createCaller(createPublicContext()).payment.createProcess({ ...validInput, product: "bundle_tubav" }))
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(mocks.getDb).not.toHaveBeenCalled(); expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
   });
 });

@@ -113,8 +113,13 @@ describe("Database Plus hidden checkout", () => {
     const salesPage = fs.readFileSync(path.join(process.cwd(), "client/src/pages/DatabasePlusSales.tsx"), "utf8");
     const termsPage = fs.readFileSync(path.join(process.cwd(), "client/src/pages/TermsPlus.tsx"), "utf8");
 
-    expect(router).toContain("!existingSingle?.isPaid || !existingSingle.isActive");
-    expect(router).toContain("Database Plus זמין רק לחברי המאגר הפעילים");
+    expect(router).toContain("await requirePlusDatabaseCheckout(normalizedEmail, input.personalToken)");
+    const lookup = fs.readFileSync(path.join(process.cwd(), "server/plusDatabaseCheckout.ts"), "utf8");
+    const eligibility = fs.readFileSync(path.join(process.cwd(), "shared/plusDatabaseEligibility.ts"), "utf8");
+    expect(lookup).toContain("eq(singles.questionnaireToken, personalToken)");
+    expect(eligibility).toContain("profile?.isPaid === true && profile.isActive === true");
+    expect(eligibility).toContain("profile.isSeed !== true");
+    expect(salesPage).toContain("plusData?.databaseMembershipActive === true");
     expect(salesPage).toContain("Database Plus מיועד לחברי המאגר הפעילים בלבד");
     expect(salesPage).toContain('href="/database"');
     expect(salesPage).not.toContain("ההצטרפות פתוחה לכולם");

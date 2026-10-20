@@ -12,6 +12,7 @@ import { sendEmail } from "./brevo";
 import { getDb } from "./db";
 import { notifyOwner } from "./_core/notification";
 import { addOneBillingMonth } from "./plusSubscription";
+import { hasPaidDatabaseMembership } from "../shared/plusDatabaseEligibility";
 import { BOOST_CONSENT_VERSION } from "./matchBoostRouter";
 import { getMissingProfileFields } from "./matchmakingMetrics";
 import {
@@ -104,6 +105,13 @@ async function ensurePlusBoostMembership(db: any, singleId: number, now: number)
 export async function activatePlusForSingle(input: PlusActivationInput) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  const [databaseMember] = await db.select({
+    isPaid: singles.isPaid, isActive: singles.isActive, isSeed: singles.isSeed, market: singles.market,
+  }).from(singles).where(and(
+    eq(singles.id, input.single.id),
+    sql`LOWER(TRIM(${singles.email})) = ${input.email.trim().toLowerCase()}`,
+  )).limit(1);
+  if (!hasPaidDatabaseMembership(databaseMember)) throw new Error("PLUS_DATABASE_MEMBERSHIP_REQUIRED");
   const now = Date.now();
   const cycleStart = input.paidAt || now;
   const cycleEnd = addOneBillingMonth(cycleStart);

@@ -39,7 +39,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
   }
   if (!statusQuery.data) return null;
 
-  const { status, pilot, eligibility, benefits, cycleProgress, cancellationPending } = statusQuery.data;
+  const { status, pilot, eligibility, benefits, cycleProgress, cancellationPending, databaseMembershipActive } = statusQuery.data;
   const registered = (status as string) !== "none";
   const canRequestCancellation = status === "active"
     && (pilot?.billingStatus === "active" || pilot?.billingStatus === "past_due")
@@ -117,9 +117,12 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
         )}
 
         {(status === "eligible" || status === "invited" || !registered) && (
-          <p className="mt-4 border-t border-[#eadf9e] pt-4 text-[11px] font-bold leading-5 text-[#6b6250]">
-            ההצטרפות למסלול סגורה כרגע. נעדכן כאן כשהיא תיפתח מחדש.
-          </p>
+          <div className="mt-4 border-t border-[#eadf9e] pt-4 text-xs leading-6 text-[#6b6250]">
+            {databaseMembershipActive === true ? <>
+              <p>Plus הוא שירות המשך לחברי המאגר, בתשלום נוסף של 99 ₪ לחודש.</p>
+              <a href={`/database-plus?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`} referrerPolicy="no-referrer" className="mt-3 inline-block rounded-xl bg-[#191265] px-5 py-3 font-bold text-white">לפרטים ולהצטרפות ל־Plus</a>
+            </> : <p>ההצטרפות ל־Plus מתאפשרת רק לאחר השלמת ההרשמה והתשלום למאגר והפעלת החברות.</p>}
+          </div>
         )}
 
         {status === "active" && cancellationPending && (
