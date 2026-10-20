@@ -97,17 +97,15 @@ describe("attraction editorial guide and funnel", () => {
     expect(allContent).toContain("אינה הסכמה לחוסר יחס מתמשך");
     expect(allContent).not.toMatch(/שלחי לו ראשונה|העמידי פנים|תגרמי לו לקנא/);
   });
-  it("uses exactly the supplied anonymous clinic case without invented dialogue, identity or outcome", () => {
-    const cases = blocks.filter(block => block.kind === "clinic");
-    expect(cases).toHaveLength(1);
-    const story = cases[0].paragraphs.join(" ");
-    expect(cases[0].title).toContain("השבוע");
-    expect(cases[0].title).toContain("אחת הנשים שאני מלווה");
-    expect(story).toContain("היא הייתה בתחילתו של קשר");
-    expect(story).toContain("לא התקשר בתדירות שציפתה");
-    expect(story).toContain("הודעה שהיא לא מעוניינת");
-    expect(story).not.toMatch(/״|בת \d+|דייטים? \d+|חזר אליה|הם ביחד|שלח לה פרחים|@|\+972/);
-    expect(page).toContain("data-guide-clinic-case");
+  it("removes the personal case and keeps its general insight without identifying circumstances", () => {
+    expect(blocks.filter(block => block.kind === "clinic")).toHaveLength(0);
+    const section = attractionChapters.find(chapter => chapter.id === "certainty")!;
+    expect(section.title).toBe("לא כל סימן שאלה צריך תשובה מיידית");
+    expect(section.blocks.slice(0, 3).every(block => block.kind === "paragraph")).toBe(true);
+    expect(allContent).toContain("לא כל שקט הוא דחייה");
+    expect(allContent).toContain("לראות אם הרצון מתבטא גם ביוזמה, במפגשים ובמעשים");
+    expect(allContent).not.toMatch(/אחת הנשים שאני מלווה|הפער הזה קיבל השבוע|היא מיהרה|הודיעה על סיומו|לא התקשר בתדירות|הודעה שהיא לא מעוניינת|לפני פרידה כזאת|מה שמעניין אותי בדוגמה הזאת/);
+    expect(page).not.toContain("דוגמה מהקליניקה");
   });
   it("includes concrete everyday action and strengths without diagnostic or scientific promises", () => {
     expect(allContent).toContain("נקבע ערב עם חברה");

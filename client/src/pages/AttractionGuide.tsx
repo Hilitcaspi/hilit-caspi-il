@@ -22,7 +22,7 @@ export default function AttractionGuide() {
     const description = existingDescription ?? document.createElement("meta");
     const previousDescription = description.content;
     description.name = "description";
-    description.content = "אין גבר שרציתי ולא השגתי. מאמר אישי של הילית כספי על חיזור, קלילות וביטחון: עניין בדייט, מקום ליוזמה שלו וחיים מלאים. דוגמה מהקליניקה ודרך לבחור נכון.";
+    description.content = "אין גבר שרציתי ולא השגתי. מאמר אישי של הילית כספי על חיזור, קלילות וביטחון: עניין בדייט, מקום ליוזמה שלו, חיים מלאים ודרך לבחור נכון.";
     if (!existingDescription) document.head.appendChild(description);
     document.title = `${GUIDE_NAME} | הילית כספי`;
     return () => {
