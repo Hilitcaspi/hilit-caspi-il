@@ -72,6 +72,7 @@ const LiveSmsRedirect = lazy(() => import("@/pages/LiveSmsRedirect"));
 const October14SmsRedirect = lazy(() => import("@/pages/October14SmsRedirect"));
 const TermsLiveOctober = lazy(() => import("@/pages/TermsLiveOctober"));
 const SignsGuide = lazy(() => import("@/pages/SignsGuide"));
+const AttractionGuide = lazy(() => import("@/pages/AttractionGuide"));
 const LaMekabel = lazy(() => import("@/pages/LaMekabel"));
 const Brain = lazy(() => import("@/pages/Brain"));
 const TermsSingleSession = lazy(() => import("@/pages/TermsSingleSession"));
@@ -362,6 +363,7 @@ function HeRouter() {
           <Route path={"/my-profile"} component={UserDashboard} />
           <Route path={"/lead"} component={LeadCall} />
           <Route path={"/signs"} component={SignsGuide} />
+          <Route path={"/attraction"} component={AttractionGuide} />
           <Route path={"/lamekabel"} component={LaMekabel} />
           <Route path={"/brain"} component={Brain} />
           <Route path={"/tu-bav"} component={TuBavBundle} />
