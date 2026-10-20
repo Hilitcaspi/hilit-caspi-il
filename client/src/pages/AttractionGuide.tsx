@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ArrowDown, ArrowLeft, Check, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, MessageCircle, Sparkles } from "lucide-react";
 import { attractionChapters } from "@shared/attractionGuideContent";
 import { attractionHref, ATTRACTION_CAMPAIGN, type AttractionDestination } from "@shared/attractionFunnel";
 import { captureAcquisition } from "@/lib/acquisitionTracking";
@@ -9,7 +9,7 @@ import { track } from "@/lib/track";
 import { trackViewContent } from "@/lib/metaPixel";
 
 const PORTRAIT = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
-const GUIDE_NAME = "4 שיבושי החשיבה שהמוח מפעיל כשאת ממש רוצה אותו";
+const GUIDE_NAME = "תני לו לרצות אותך. בלי להפסיק להיות את.";
 
 export default function AttractionGuide() {
   const viewed = useRef(false);
@@ -22,7 +22,7 @@ export default function AttractionGuide() {
     const description = existingDescription ?? document.createElement("meta");
     const previousDescription = description.content;
     description.name = "description";
-    description.content = "אין גבר שרציתי ולא השגתי. מדריך חינמי של הילית כספי על קלילות, ביטחון ופלרטוט. ארבע טעויות שמפריעות לחיבור ומה לעשות במקומן.";
+    description.content = "אין גבר שרציתי ולא השגתי. הילית כספי על חיזור, קלילות וביטחון: לשדר עניין בדייט, לתת לו ליזום ולשמור על חיים מלאים. דוגמה מהקליניקה וכלים לבחירה.";
     if (!existingDescription) document.head.appendChild(description);
     document.title = `${GUIDE_NAME} | הילית כספי`;
     return () => {
@@ -67,7 +67,7 @@ export default function AttractionGuide() {
 
   return (
     <div dir="rtl" lang="he" className="min-h-screen bg-[#f8f4eb] font-rubik text-[#191265] selection:bg-[#ffe27c] selection:text-[#191265]">
-      <a href="#guide" className={`sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-4 ${focusClass}`}>דילוג למדריך</a>
+      <a href="#guide" className={`sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-4 ${focusClass}`}>דילוג לתוכן</a>
       <nav aria-label="ניווט המדריך" className="border-b border-white/15 bg-[#191265] px-5 py-5 text-white sm:px-10">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <Link href="/" className={`text-lg font-black ${focusClass}`}>הילית כספי<span className="mr-3 text-xs font-normal text-white/60">מילים שעושות סדר</span></Link>
@@ -78,13 +78,11 @@ export default function AttractionGuide() {
       <header className="overflow-hidden bg-[#191265] px-5 pb-10 pt-10 text-white sm:px-10 md:py-14">
         <div className="mx-auto grid max-w-6xl items-center gap-8 md:grid-cols-[1.4fr_0.8fr] md:gap-12">
           <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#ffe27c]/35 px-4 py-2 text-xs font-medium text-[#ffe27c]"><Sparkles size={14} aria-hidden="true" />מהפודקאסט למדריך חינמי</div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#ffe27c]/35 px-4 py-2 text-xs font-medium text-[#ffe27c]"><Sparkles size={14} aria-hidden="true" />מהפודקאסט. תכלס, על חיזור.</div>
             <h1 data-guide-quote className="text-[clamp(2.7rem,6vw,4.6rem)] font-black leading-[1.12] tracking-tight">״אין גבר שרציתי<br /><span className="text-[#ffe27c]">ולא השגתי.״</span></h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-white/90">לא כי אני הכי יפה. לא כי אני הכי צעירה. לא כי אני הכי אטרקטיבית.</p>
-            <p className="mt-3 max-w-xl text-base leading-8 text-white/80">זה קשור לאנרגיה שאני מביאה. לקלילות. לביטחון. ליכולת להראות עניין בלי להילחץ ממנו. ואת זה אני רוצה ללמד.</p>
-            <p className="mt-5 max-w-xl text-xl font-bold leading-relaxed text-[#ffb5d0]">{GUIDE_NAME}</p>
-            <a href="#guide" className={`mt-6 inline-flex items-center gap-3 rounded-full bg-[#ffe27c] px-7 py-4 font-bold text-[#191265] transition-transform duration-150 motion-reduce:transition-none active:scale-[0.97] ${focusClass}`}>לקריאת המדריך החינמי <ArrowDown size={18} aria-hidden="true" /></a>
-            <p className="mt-3 text-xs text-white/60">המדריך פתוח כאן. בלי הרשמה ובלי לחכות למייל.</p>
+            <p className="mt-3 max-w-xl text-base leading-8 text-white/80">זה קשור לאנרגיה שאני מביאה. אני יכולה להיות חמה, לפלרטט ולתת לו להרגיש שאני רוצה אותו. ובאותו זמן, להשאיר לו מקום לרצות, ליזום ולהתקרב בעצמו.</p>
+            <p className="mt-5 max-w-xl text-xl font-bold leading-relaxed text-[#ffb5d0]">תני לו לרצות אותך. בלי להפסיק להיות את.</p>
           </div>
           <div className="relative mx-auto w-full max-w-[300px] md:max-w-none">
             <div className="absolute -right-3 -top-3 h-full w-full rounded-[130px_130px_28px_28px] border border-[#ffe27c]/30" aria-hidden="true" />
@@ -99,15 +97,12 @@ export default function AttractionGuide() {
       <main>
         <section id="guide" className="scroll-mt-5 px-5 py-8 sm:px-10 md:py-10">
           <div className="mx-auto max-w-3xl">
-            <h2 className="text-3xl font-black leading-tight md:text-4xl">קלילות היא לא להעמיד פנים שלא אכפת לך.</h2>
+            <h2 className="text-3xl font-black leading-tight md:text-4xl">קצת קשה להשגה. מאוד נעים להיות איתך.</h2>
             <div className="mt-5 space-y-3 text-base leading-8 text-[#494453]">
-              <p>קלילות היא להיות איתו בלי לנסות להבטיח כבר עכשיו מה יקרה ביניכם. ליהנות מהשיחה. לצחוק. לפלרטט. להגיד מה את חושבת. בלי לחשב כל מילה כאילו היא תקבע אם הוא ירצה אותך.</p>
-              <p>כשאני רוצה גבר, אני לא מנסה להפוך לאישה שנדמה לי שהוא מחפש. אני נעימה, אבל לא אומרת כן לכל דבר. אני מראה עניין, אבל לא מנהלת לבד את כל ההיכרות. ויש לי חיים שאני לא מבטלת כי הגיע מישהו שמדליק אותי.</p>
-              <p className="font-bold text-[#191265]">אלה ארבע הטעויות שאני רוצה שתפסיקי לעשות.</p>
+              <p>זה בדיוק השילוב שאני אוהבת. כשאתם יחד, הוא מרגיש אותך. את לא יושבת מולו עם רשימת תנאים ולא מבקשת אישור לכל מילה. את נהנית, יש לך דעה, יש הומור ויש מתח. להיות נעימה לא אומר להסכים לכל דבר.</p>
+              <p>כשאתם לא יחד, את לא מחזיקה את כל הקשר עם הודעות. אני נעימה, אבל לא אומרת כן לכל דבר. אני מראה עניין, אבל לא מנהלת לבד את כל ההיכרות. היו לי חיים מלאים לפניו, והם ממשיכים גם אחריו.</p>
+              <p className="font-bold text-[#191265]">את לא צריכה להודיע שאת קשה להשגה. תני לו לפגוש אישה שהחיים שלה לא מחכים לטלפון שלו.</p>
             </div>
-            <nav aria-label="פרקי המדריך" className="mt-6 grid gap-2 sm:grid-cols-2">
-              {attractionChapters.map((chapter, i) => <a key={chapter.id} href={`#${chapter.id}`} className={`flex items-center gap-3 rounded-xl border border-[#191265]/10 bg-white px-4 py-3 text-sm font-bold transition-colors hover:bg-[#fff1f6] ${focusClass}`}><span className="text-xl text-[#a13567]">0{i + 1}</span>{chapter.title}<ArrowDown size={16} className="mr-auto shrink-0" aria-hidden="true" /></a>)}
-            </nav>
           </div>
         </section>
 
@@ -117,23 +112,25 @@ export default function AttractionGuide() {
               <p className="mb-3 text-xs font-bold text-[#a13567]">0{i + 1} · {chapter.kicker}</p>
               <h2 className="text-3xl font-black leading-tight md:text-4xl">{chapter.title}</h2>
               <div className="mt-5 space-y-3 text-base leading-8 text-[#494453]">{chapter.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
-              <div className="mt-5 rounded-xl border border-[#191265]/10 bg-[#f8f4eb] p-5"><p className="mb-2 text-xs font-bold text-[#a13567]">בפועל</p><p className="text-base leading-8 text-[#494453]">{chapter.scene}</p></div>
-              <div className="my-5 border-r-4 border-[#ff6c9c] pr-4"><p className="mb-2 text-xs font-bold text-[#a13567]">אפשר לומר</p><p className="text-xl font-bold leading-8">״{chapter.script}״</p></div>
+              {chapter.clinicCase && <section data-guide-clinic-case className="mt-5 rounded-xl border border-[#a13567]/20 bg-[#fff5e4] p-5"><h3 className="mb-3 text-xl font-black text-[#a13567]">{chapter.clinicCase.title}</h3><div className="space-y-3 text-base leading-8 text-[#494453]">{chapter.clinicCase.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div></section>}
+              <div className="mt-5 rounded-xl border border-[#191265]/10 bg-[#f8f4eb] p-5"><p className="mb-2 text-xs font-bold text-[#a13567]">תכלס</p><p className="text-base leading-8 text-[#494453]">{chapter.scene}</p></div>
+              <div className="my-5 border-r-4 border-[#ff6c9c] pr-4"><p className="mb-2 text-xs font-bold text-[#a13567]">{i === 1 ? "כשכבר נבנתה היכרות, אפשר לומר" : "אפשר לומר בפשטות"}</p><p className="text-xl font-bold leading-8">״{chapter.script}״</p></div>
               <div data-guide-milestone={`chapter_${i + 1}`} className="rounded-xl bg-[#191265] p-5 text-white"><p className="mb-2 flex items-center gap-2 text-xs font-bold text-[#ffe27c]"><Check size={16} aria-hidden="true" />נסי את זה</p><p className="text-base leading-8 text-white/85">{chapter.exercise}</p></div>
               <p className="mt-5 text-xl font-black leading-8 text-[#a13567]">{chapter.takeaway}</p>
+              <div className="mt-5 space-y-3 border-t border-[#191265]/10 pt-4">{chapter.links.map(link => <p key={`${link.destination}_${link.placement}`} className="text-sm leading-7 text-[#494453]">{link.text}{" "}<Link href={attractionHref(link.destination, link.placement)} onClick={() => clicked(link.destination, link.placement)} data-guide-inline-cta={link.destination} data-guide-placement={link.placement} className={`font-bold text-[#a13567] underline underline-offset-4 ${focusClass}`}>{link.label} <ArrowLeft size={14} className="inline" aria-hidden="true" /></Link></p>)}</div>
             </div>
           </article>
         ))}
 
         <section className="bg-[#ffe27c] px-5 py-8 sm:px-10">
-          <div className="mx-auto max-w-3xl"><h2 className="text-3xl font-black leading-tight md:text-4xl">מותר לך לרצות אותו.<br />את לא צריכה להתכווץ בשביל זה.</h2><p className="mt-4 text-base leading-8">תהיי ברורה. תהיי סקרנית. תני מקום להומור ולמשיכה. תראי לו שאת מעוניינת, ואז תראי מה הוא עושה עם זה. לא הכול תלוי בך, ולא הכול צריך לקרות ברגע הראשון.</p><p className="mt-4 text-xl font-bold leading-8">את לא צריכה עוד משחק. את צריכה יותר ביטחון להיות את.</p></div>
+          <div className="mx-auto max-w-3xl"><h2 className="text-3xl font-black leading-tight md:text-4xl">הוא יכול להיות מאוד רצוי.<br />הוא לא צריך להיות כל היום שלך.</h2><p className="mt-4 text-base leading-8">בדייט, תני לו להרגיש שאת נהנית. אחריו, השאירי מקום ליוזמה שלו. בלי הודעת בדיקה, בלי איום ובלי לפנות כל ערב למקרה שהוא יתקשר. תני לקשר להתפתח, ותראי אם הוא בוחר להתקרב.</p><p className="mt-4 text-xl font-bold leading-8">יש לך חיים. יש לך מה להציע. ויש לך זכות לבחור.</p></div>
         </section>
 
         <section id="next-step" className="scroll-mt-5 bg-[#191265] px-5 py-10 text-white sm:px-10 md:py-12">
           <div className="mx-auto max-w-5xl">
             <div data-guide-milestone="next_step"><p className="text-xs font-bold text-[#ffb5d0]">ועכשיו, עם מי עושים את זה?</p><h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight md:text-5xl">משיכה אפשר ליצור.<br /><span className="text-[#ffe27c]">התאמה צריך לבדוק.</span></h2></div>
             <div className="mt-6 grid gap-6 md:grid-cols-2 md:gap-10">
-              <div className="space-y-3 text-base leading-8 text-white/80"><p>לדעת לפלרטט זה נהדר. אבל את רוצה גם מישהו שמתאים לך. שרוצה קשר דומה, ושאפשר לבנות איתו משהו מעבר לדייט מוצלח.</p><p>במאגר ההיכרויות שלי אנחנו מתחילים ממה שחשוב לך ומה שחשוב לצד השני. שאלוני עומק, העדפות ובדיקה אישית שלי לפני שליחת הצעה. לא עוד שעות של גלילה וניחושים.</p><p>את מקבלת הצעה, בודקת ומחליטה. גם הצד השני מחליט בנפרד. פרטי הקשר נחשפים רק לאחר אישור הדדי.</p></div>
+              <div className="space-y-3 text-base leading-8 text-white/80"><p>את לא צריכה להיתקע על גבר אחד רק כי הוא האחרון שפגשת. אם את רוצה להרחיב את האפשרויות שלך, המאגר שלי נועד לחבר אותך לגברים חדשים לפי ההעדפות, הפרופיל והשאלונים של שני הצדדים.</p><p>לא צריך לעבור לבד על אלפי פרופילים. המערכת ואני בודקות התאמות אפשריות, ואני עוברת על ההצעה לפני שהיא נשלחת. את מקבלת הזדמנות להכיר, לא עוד רשימה לגלול בה.</p><p>את מקבלת הצעה, בודקת ומחליטה. גם הצד השני מחליט בנפרד. פרטי הקשר נחשפים רק לאחר אישור הדדי.</p></div>
               <div className="rounded-2xl border border-white/20 bg-white/5 p-6">
                 <h3 className="text-xl font-black text-[#ffe27c]">בואי נכיר מישהו שמתאים לך.</h3>
                 <ul className="mt-4 space-y-3 text-sm leading-6 text-white/85">{["שאלוני עומק והעדפות של שני הצדדים", "בדיקה אישית לפני שליחת הצעה", "כל צד בוחר בנפרד אם להתקדם", "פרטי הקשר נחשפים רק לאחר אישור הדדי"].map(text => <li key={text} className="flex items-start gap-3"><Check size={17} className="mt-1 shrink-0 text-[#ffe27c]" aria-hidden="true" />{text}</li>)}</ul>
@@ -141,7 +138,7 @@ export default function AttractionGuide() {
                 <p className="mt-3 text-xs leading-6 text-white/65">הצטרפות בתשלום חד־פעמי למאגר. במסלול הרגיל אין התחייבות למספר התאמות, לתדירות או לתוצאה. המדריך החינמי אינו מקנה חברות במאגר.</p>
               </div>
             </div>
-            <div className="mt-6 border-t border-white/15 pt-5 text-sm leading-7 text-white/80"><p>רוצה לעבוד גם על הבחירות שלך? במדריך בתשלום ״לבחור נכון״ מחכים שאלון אישי, תרגילים וכלים לבחירה. ואפשר להתחיל משאלון DNA החינמי.</p><div className="mt-3 flex flex-wrap gap-x-6 gap-y-3"><Link href={attractionHref("guide", "secondary")} onClick={() => clicked("guide", "secondary")} className={`font-bold text-[#ffb5d0] underline underline-offset-4 ${focusClass}`} data-guide-cta="paid-guide">למדריך בתשלום ״לבחור נכון״</Link><Link href={attractionHref("dna", "secondary")} onClick={() => clicked("dna", "secondary")} className={`text-[#ffe27c] underline underline-offset-4 ${focusClass}`}>לשאלון DNA החינמי</Link></div></div>
+            <div className="mt-6 border-t border-white/15 pt-5 text-sm leading-7 text-white/80"><p>ולפני שאת בוחרת את הבא, תביני טוב יותר את עצמך. ״לבחור נכון״ הוא מדריך עבודה בתשלום עם שאלון ותרגילים שיעזרו לזהות דפוסים ולבחור מלכתחילה, לא רק להשיג. רוצה להתחיל בחינם? שאלון DNA הזוגי מחכה לך.</p><div className="mt-3 flex flex-wrap gap-x-6 gap-y-3"><Link href={attractionHref("guide", "secondary")} onClick={() => clicked("guide", "secondary")} className={`font-bold text-[#ffb5d0] underline underline-offset-4 ${focusClass}`} data-guide-cta="paid-guide">למדריך בתשלום ״לבחור נכון״</Link><Link href={attractionHref("dna", "secondary")} onClick={() => clicked("dna", "secondary")} className={`text-[#ffe27c] underline underline-offset-4 ${focusClass}`}>לשאלון DNA החינמי</Link></div></div>
           </div>
         </section>
 
