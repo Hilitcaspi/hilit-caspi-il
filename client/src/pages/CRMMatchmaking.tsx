@@ -189,8 +189,8 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
     smokingPreference: single.smokingPreference || '',
     minAgePreference: single.minAgePreference || '',
     maxAgePreference: single.maxAgePreference || '',
-    minHeightPreference: single.minHeightPreference || '',
-    maxHeightPreference: single.maxHeightPreference || '',
+    minHeightPreference: single.minHeightPreference ?? '',
+    maxHeightPreference: single.maxHeightPreference ?? '',
     about: single.about || single.aboutMe || '',
     partnerDescription: single.partnerDescription || '',
     acceptsKids: single.acceptsKids ?? false,
@@ -199,6 +199,16 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
   const set = (key: string, val: any) => setForm(prev => ({ ...prev, [key]: val }));
 
   const handleSave = () => {
+    const minHeight = form.minHeightPreference === '' ? null : Number(form.minHeightPreference);
+    const maxHeight = form.maxHeightPreference === '' ? null : Number(form.maxHeightPreference);
+    if ([minHeight, maxHeight].some(value => value !== null && (!Number.isInteger(value) || value < 100 || value > 250))) {
+      toast.error('יש להזין גובה שלם בין 100 ל־250 ס״מ, או להשאיר את השדה ריק');
+      return;
+    }
+    if (minHeight !== null && maxHeight !== null && minHeight > maxHeight) {
+      toast.error('הגובה המינימלי לא יכול להיות גבוה מהגובה המקסימלי');
+      return;
+    }
     const payload: any = { id: single.id };
     if (form.firstName && form.firstName !== single.firstName) payload.firstName = form.firstName;
     if (form.lastName !== (single.lastName || '')) payload.lastName = form.lastName;
@@ -225,8 +235,8 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
     if (form.smokingPreference && form.smokingPreference !== single.smokingPreference) payload.smokingPreference = form.smokingPreference;
     if (form.minAgePreference && Number(form.minAgePreference) !== single.minAgePreference) payload.minAgePreference = Number(form.minAgePreference);
     if (form.maxAgePreference && Number(form.maxAgePreference) !== single.maxAgePreference) payload.maxAgePreference = Number(form.maxAgePreference);
-    if (form.minHeightPreference && Number(form.minHeightPreference) !== single.minHeightPreference) payload.minHeightPreference = Number(form.minHeightPreference);
-    if (form.maxHeightPreference && Number(form.maxHeightPreference) !== single.maxHeightPreference) payload.maxHeightPreference = Number(form.maxHeightPreference);
+    if (minHeight !== (single.minHeightPreference ?? null)) payload.minHeightPreference = minHeight;
+    if (maxHeight !== (single.maxHeightPreference ?? null)) payload.maxHeightPreference = maxHeight;
     if (form.about !== (single.about || single.aboutMe || '')) payload.about = form.about;
     if (form.partnerDescription !== (single.partnerDescription || '')) payload.partnerDescription = form.partnerDescription;
     if (form.acceptsKids !== (single.acceptsKids ?? false)) payload.acceptsKids = form.acceptsKids;
@@ -297,8 +307,8 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
           <div className="grid grid-cols-3 gap-3">
             <div><label className={labelCls}>גיל מינימום</label><input type="number" className={inputCls} value={form.minAgePreference} onChange={e => set('minAgePreference', e.target.value)} min={18} max={120} /></div>
             <div><label className={labelCls}>גיל מקסימום</label><input type="number" className={inputCls} value={form.maxAgePreference} onChange={e => set('maxAgePreference', e.target.value)} min={18} max={120} /></div>
-            <div><label className={labelCls}>גובה מינימלי (ס״מ)</label><input type="number" className={inputCls} value={form.minHeightPreference} onChange={e => set('minHeightPreference', e.target.value)} min={100} max={250} /></div>
-            <div><label className={labelCls}>גובה מקסימלי (ס״מ)</label><input type="number" className={inputCls} value={form.maxHeightPreference} onChange={e => set('maxHeightPreference', e.target.value)} min={100} max={250} /></div>
+            <div><label htmlFor="crm-edit-min-height" className={labelCls}>גובה מינימלי (ס״מ)</label><input id="crm-edit-min-height" type="number" className={inputCls} value={form.minHeightPreference} onChange={e => set('minHeightPreference', e.target.value)} min={100} max={250} step={1} /></div>
+            <div><label htmlFor="crm-edit-max-height" className={labelCls}>גובה מקסימלי (ס״מ)</label><input id="crm-edit-max-height" type="number" className={inputCls} value={form.maxHeightPreference} onChange={e => set('maxHeightPreference', e.target.value)} min={100} max={250} step={1} /></div>
             <div><label className={labelCls}>העדפת עישון</label><select className={selectCls} value={form.smokingPreference} onChange={e => set('smokingPreference', e.target.value)}><option value="">בחר</option><option value="no_smokers">לא מעשנים</option><option value="occasionally_ok">לפעמים בסדר</option><option value="doesnt_matter">לא משנה</option></select></div>
           </div>
         </div>
@@ -729,7 +739,7 @@ export default function CRMMatchmaking() {
     onError: (err: any) => toast.error('שגיאה בהעלאת התמונה: ' + err.message),
   });
 
-  const updateSingleInline = (trpc.matchmaking as any).updateSingleInline.useMutation({
+  const updateSingleInline = trpc.matchmaking.updateSingleInline.useMutation({
     onSuccess: () => { closeWaitingSearch(); void refreshScoringData(); toast.success('פרטים עודכנו!'); },
     onError: (err: any) => toast.error(err?.message || 'שגיאה בעדכון'),
   });
@@ -3544,9 +3554,9 @@ function MissingDataTab({ onScoringDataChanged }: { onScoringDataChanged: () => 
     if (e.occupation) patch.occupation = e.occupation;
     patchMutation.mutate(patch);
   };
-  const updateSingleInline = (trpc.matchmaking as any).updateSingleInline.useMutation({
+  const updateSingleInline = trpc.matchmaking.updateSingleInline.useMutation({
     onSuccess: () => { onScoringDataChanged(); toast.success("נשמר!"); refetch(); setEditingId(null); },
-    onError: () => toast.error("שגיאה"),
+    onError: (error) => toast.error(error.message || "שגיאה בעדכון"),
   });
 
   if (isLoading) return <div className="text-center py-12 text-[#727272]">טוען...</div>;

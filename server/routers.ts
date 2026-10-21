@@ -6083,15 +6083,30 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         smokingPreference: z.enum(["no_smokers", "occasionally_ok", "doesnt_matter"]).optional(),
         minAgePreference: z.number().optional(),
         maxAgePreference: z.number().optional(),
+        minHeightPreference: z.number().int().min(100).max(250).nullish(),
+        maxHeightPreference: z.number().int().min(100).max(250).nullish(),
         partnerDescription: z.string().optional(),
         acceptsKids: z.boolean().optional(),
         birthDate: z.string().optional(), // YYYY-MM-DD
-      }))
+      }).strict())
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const { id, ...fields } = input;
+        const editsHeight = input.minHeightPreference !== undefined || input.maxHeightPreference !== undefined;
+        if (editsHeight) {
+          const [stored] = await db.select({
+            minHeightPreference: singles.minHeightPreference,
+            maxHeightPreference: singles.maxHeightPreference,
+          }).from(singles).where(eq(singles.id, id)).limit(1);
+          if (!stored) throw new TRPCError({ code: "NOT_FOUND", message: "הפרופיל לא נמצא" });
+          const min = input.minHeightPreference !== undefined ? input.minHeightPreference : stored.minHeightPreference;
+          const max = input.maxHeightPreference !== undefined ? input.maxHeightPreference : stored.maxHeightPreference;
+          if (min != null && max != null && min > max) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "הגובה המינימלי לא יכול להיות גבוה מהגובה המקסימלי" });
+          }
+        }
         const patch: Record<string, any> = { updatedAt: Date.now() };
         for (const [key, val] of Object.entries(fields)) {
           if (val !== undefined) patch[key] = val;
@@ -6106,6 +6121,16 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           patch.age = age;
         }
         await db.update(singles).set(patch).where(eq(singles.id, id));
+        if (editsHeight) {
+          const [saved] = await db.select({
+            minHeightPreference: singles.minHeightPreference,
+            maxHeightPreference: singles.maxHeightPreference,
+          }).from(singles).where(eq(singles.id, id)).limit(1);
+          if (!saved || (input.minHeightPreference !== undefined && saved.minHeightPreference !== input.minHeightPreference)
+            || (input.maxHeightPreference !== undefined && saved.maxHeightPreference !== input.maxHeightPreference)) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא ניתן לאמת את שמירת טווח הגובה. יש לרענן את הפרופיל ולבדוק את הערכים" });
+          }
+        }
         await recordSelfServiceEventSafely(db, {
           eventKey: `profile:${id}:updated:${patch.updatedAt}`,
           actionKey: "profile.update",
