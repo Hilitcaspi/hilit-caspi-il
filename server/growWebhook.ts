@@ -911,7 +911,13 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   }
   // Propagate receipt-storage failures so the provider can retry the same identity.
   const accountingResult = await recordGrowPaymentOnce(accountingInput);
-  if (accountingResult === "pending") context.accountingRetry = true;
+  if (accountingResult === "pending") {
+    context.accountingRetry = true;
+    return;
+  }
+  // A persisted review receipt is not proof of payment. Leave it for
+  // reconciliation without activating a product, acknowledging or emailing.
+  if (accountingResult === "review") return;
 
   // Measurement is separate from legacy fulfillment lookup: never attach another checkout's cookies.
   const measurementTracking = purchaseTracking && matchesMetaCheckout({

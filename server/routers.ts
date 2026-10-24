@@ -2013,7 +2013,10 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        if (!db) throw new TRPCError({
+          code: input.market === "us" ? "INTERNAL_SERVER_ERROR" : "SERVICE_UNAVAILABLE",
+          message: input.market === "us" ? undefined : "כרגע לא ניתן לשמור את ההרשמה או לעבור לתשלום בגלל תקלה זמנית. נא לנסות שוב מאוחר יותר.",
+        });
 
         if (input.market !== "us") await recordAcquisitionSafely(input.email, input.firstTouch);
 
@@ -7956,6 +7959,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
         const { createPaymentProcess, getPlusCheckoutConfig, PRODUCT_CONFIGS } = await import("./growPayment");
         const db = await getDb();
+        if (!db) {
+          throw new TRPCError({
+            code: "SERVICE_UNAVAILABLE",
+            message: "התשלום אינו זמין כרגע בגלל תקלה זמנית בשמירת ההזמנה. לא נפתח מסך חיוב; נא לנסות שוב מאוחר יותר.",
+          });
+        }
         const normalizedCheckoutEmail = input.email.trim().toLowerCase();
         const paymentTracking = createPurchaseTrackingIdentity();
         let paymentTrackingSaved = false;
@@ -8292,6 +8301,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         // Do not open a payable wallet when that order cannot be verified later.
         if (preparedLiveCheckoutReference && !paymentTrackingSaved) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא ניתן לשמור את הטבת הלייב כרגע. אנא נסו שוב בעוד רגע." });
+        }
+        // Every product needs a durable order before returning a payable wallet.
+        // Never allow a database outage to create an unrecorded payment process.
+        if (!paymentTrackingSaved) {
+          throw new TRPCError({
+            code: "SERVICE_UNAVAILABLE",
+            message: "התשלום אינו זמין כרגע בגלל תקלה זמנית בשמירת ההזמנה. לא נפתח מסך חיוב; נא לנסות שוב מאוחר יותר.",
+          });
         }
 
         try {
