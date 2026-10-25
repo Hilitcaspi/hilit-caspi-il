@@ -602,6 +602,8 @@ export async function preparePaidBoostCheckout(input: {
   termsAccepted: true;
   entryChannel?: "email" | "personal_area" | "other" | "unknown";
   matchId?: number;
+  /** TEST1 only: validate eligibility without creating a request, consent event, or match activity. */
+  diagnosticTest?: boolean;
 }) {
   const { db, single } = await getVerifiedSingle(input.email, input.token);
   const context = await loadBoostContext(db, single);
@@ -611,6 +613,16 @@ export async function preparePaidBoostCheckout(input: {
     : eligibility.topCandidate;
   if (!eligibility.eligible || !selectedCandidate) {
     throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.blockers[0] || "הבוסט אינו זמין כרגע" });
+  }
+
+  const verifiedIdentity = {
+    singleId: single.id,
+    fullName: `${single.firstName || ""} ${single.lastName || ""}`.trim(),
+    email: String(single.email || input.email).trim().toLowerCase(),
+    phone: String(single.phone || "").trim(),
+  };
+  if (input.diagnosticTest) {
+    return { requestId: null, checkoutReference: null, ...verifiedIdentity };
   }
 
   const now = Date.now();
@@ -651,10 +663,7 @@ export async function preparePaidBoostCheckout(input: {
   return {
     requestId,
     checkoutReference: createBoostCheckoutReference(requestId, single.id),
-    singleId: single.id,
-    fullName: `${single.firstName || ""} ${single.lastName || ""}`.trim(),
-    email: String(single.email || input.email).trim().toLowerCase(),
-    phone: String(single.phone || "").trim(),
+    ...verifiedIdentity,
   };
 }
 

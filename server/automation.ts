@@ -1223,6 +1223,7 @@ export async function processCartAbandonment(options: { eligibleAfter?: number }
         lt(paymentLeads.createdAt, recoveryDelayCutoff),
         gt(paymentLeads.createdAt, oldestEligible),
         isNull(paymentLeads.confirmedAt),
+        sql`(${paymentLeads.couponCode} IS NULL OR UPPER(TRIM(${paymentLeads.couponCode})) <> 'TEST1')`,
       )
     )
     .orderBy(sql`${paymentLeads.createdAt} ASC`)

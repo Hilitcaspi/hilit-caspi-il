@@ -10,6 +10,8 @@ type References = { transactionId: string; transactionToken: string; processId?:
 export type AccountingInput = References & {
   product: string; email: string; amountAgorot: number; receivedAt: number; paymentDate?: unknown;
   statusCode?: unknown; couponCode?: string | null;
+  /** Server-derived only: a bound TEST1 diagnostic checkout. */
+  testCheckout?: boolean;
   utmSource?: string | null; utmMedium?: string | null; utmCampaign?: string | null; utmContent?: string | null;
 };
 export type AccountingResult = "recorded" | "duplicate" | "review" | "pending" | "disabled";
@@ -68,24 +70,27 @@ export async function recordGrowPaymentOnce(input: AccountingInput): Promise<Acc
     return "review";
   }
   if (existing && ["verified","duplicate_existing"].includes(existing.state)) return "duplicate";
-  let category = classifyGrowAccounting(input);
+  const diagnosticTest = input.testCheckout === true
+    && input.couponCode?.trim().toUpperCase() === "TEST1"
+    && input.amountAgorot === 100;
+  let category = diagnosticTest ? "test_checkout" : classifyGrowAccounting(input);
   const [previous] = canonical ? await db.select({product:completedPayments.product,amountAgorot:completedPayments.amountAgorot})
     .from(completedPayments).where(eq(completedPayments.transactionId,input.transactionId)).limit(1) : [];
-  const inquiry = category === "eligible" && !previous
+  const inquiry = (category === "eligible" || diagnosticTest) && !previous
     ? await verifyGrowTransaction({product:input.product,transactionId:input.transactionId,transactionToken:input.transactionToken,expectedAmountAgorot:input.amountAgorot})
     : null;
   const confirmed = inquiry?.state === "confirmed";
   const paidDate = confirmed && inquiry.verified.paymentDate ? inquiry.verified.paymentDate : input.paymentDate;
-  if (confirmed && classifyGrowAccounting({...input,paymentDate:paidDate}) !== "eligible") category = "provider_date_review";
+  if (!diagnosticTest && confirmed && classifyGrowAccounting({...input,paymentDate:paidDate}) !== "eligible") category = "provider_date_review";
   if (inquiry?.state === "mismatch") category = "provider_mismatch";
   if (previous && growReceiptConflict(previous,input)) category = "conflicting_existing_transaction";
-  const review = category !== "eligible";
+  const review = category !== "eligible" && category !== "test_checkout";
   const state = review ? "review" as const : previous ? "duplicate_existing" as const : confirmed ? "verified" as const : "notification_only" as const;
   const referencesEncrypted = encryptGrowReferences({transactionId:input.transactionId,transactionToken:input.transactionToken,processId:input.processId,processToken:input.processToken});
   const providerDate = growProviderDate(paidDate);
   const paidAt = growAccountingPaidAt(paidDate,input.receivedAt);
   const receipt = {receiptKey:key,product:input.product,amountAgorot:input.amountAgorot,state,
-    category:review ? category : previous ? "existing_ledger" : confirmed ? "provider_confirmed" : "provider_inquiry_unavailable",
+    category:diagnosticTest ? "test_checkout" : review ? category : previous ? "existing_ledger" : confirmed ? "provider_confirmed" : "provider_inquiry_unavailable",
     referencesEncrypted,providerDate,paidAt,receivedAt:input.receivedAt,updatedAt:input.receivedAt};
   try {
     return await db.transaction(async tx => {
@@ -98,6 +103,9 @@ export async function recordGrowPaymentOnce(input: AccountingInput): Promise<Acc
       if (review) return "review" as const;
       if (previous) return "duplicate" as const;
       if (!confirmed) return "pending" as const; // NEVER counts as revenue without provider confirmation.
+      // An exact, server-bound TEST1 payment remains in the encrypted receipt
+      // audit trail but never becomes a completed-payment/revenue row.
+      if (diagnosticTest) return "recorded" as const;
       await tx.insert(completedPayments).values({transactionId:input.transactionId,dedupeKey:`grow-v2:${key}`,email:input.email,product:input.product,
         couponCode:input.couponCode || null,utmSource:input.utmSource || null,utmMedium:input.utmMedium || null,
         utmCampaign:input.utmCampaign || null,utmContent:input.utmContent || null,amountAgorot:input.amountAgorot,

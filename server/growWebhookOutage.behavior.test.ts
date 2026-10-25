@@ -92,4 +92,47 @@ describe("Unverified Grow notifications do not fulfill products", () => {
     expect(mocks.feedback).toHaveBeenCalledOnce();
     expect(fetch).not.toHaveBeenCalled();
   });
+  it("stops a bound authorized TEST1 diagnostic after accounting without approval, fulfillment, messaging, or conversion work", async () => {
+    const previousOwner = process.env.LIVE_TEST_CHECKOUT_EMAIL;
+    process.env.LIVE_TEST_CHECKOUT_EMAIL = "synthetic@example.test";
+    let selectIndex = 0;
+    const tracking = {
+      id: 44, name: "Synthetic QA", phone: "0500000000", couponCode: "TEST1",
+      providerProcessToken: "synthetic-process", confirmedTransactionId: null,
+      utmSource: null, utmMedium: null, utmCampaign: null, utmContent: null,
+      confirmedAt: null, purchaseEventId: "test-event", fbp: null, fbc: null,
+      clientIp: null, clientUserAgent: null, attributionExpiresAt: null,
+    };
+    const db = {
+      select: vi.fn(() => {
+        const rows = selectIndex++ === 1 ? [tracking] : [];
+        const chain: any = {};
+        chain.from = vi.fn(() => chain);
+        chain.where = vi.fn(() => chain);
+        chain.orderBy = vi.fn(() => chain);
+        chain.limit = vi.fn().mockResolvedValue(rows);
+        return chain;
+      }),
+      insert: vi.fn(), update: vi.fn(),
+    };
+    mocks.getDb.mockResolvedValue(db);
+    mocks.accounting.mockResolvedValue("recorded");
+    try {
+      await handleGrowWebhook({ data: { ...notification.data, sum: "1" } });
+      expect(mocks.accounting).toHaveBeenCalledWith(expect.objectContaining({
+        couponCode: "TEST1", amountAgorot: 100, testCheckout: true,
+      }));
+      expect(mocks.approve).not.toHaveBeenCalled();
+      expect(db.insert).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+      expect(mocks.sendEmail).not.toHaveBeenCalled();
+      expect(mocks.capi).not.toHaveBeenCalled();
+      expect(mocks.feedback).not.toHaveBeenCalled();
+      expect(mocks.notifyOwner).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      if (previousOwner === undefined) delete process.env.LIVE_TEST_CHECKOUT_EMAIL;
+      else process.env.LIVE_TEST_CHECKOUT_EMAIL = previousOwner;
+    }
+  });
 });

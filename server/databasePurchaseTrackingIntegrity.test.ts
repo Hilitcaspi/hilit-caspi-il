@@ -43,6 +43,16 @@ describe("database purchase tracking integrity", () => {
     expect(capi).toContain("resolvePurchaseEventId(params)");
   });
 
+  it("keeps a bound TEST1 callback out of real fulfillment and conversion measurement", () => {
+    const webhook = read("server/growWebhook.ts");
+    const diagnosticReturn = webhook.indexOf("if (accountingInput.testCheckout) return;");
+    expect(diagnosticReturn).toBeGreaterThan(-1);
+    expect(diagnosticReturn).toBeLessThan(webhook.indexOf("capiPurchase({"));
+    expect(diagnosticReturn).toBeLessThan(webhook.indexOf("switch (product)"));
+    expect(webhook).toContain('purchaseTracking?.couponCode?.trim().toUpperCase() === "TEST1"');
+    expect(webhook).toContain('throw new Error("TEST1 checkout no longer authorized")');
+  });
+
   it("fires the browser Pixel only after the server returns a one-time confirmed status", () => {
     const tracker = read("client/src/components/VerifiedPurchaseTracker.tsx");
     const router = read("server/routers.ts");

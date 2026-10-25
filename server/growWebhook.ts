@@ -762,7 +762,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   const descProduct = detectProductByDesc(desc);
   if (descProduct) {
     // Description is more specific than processToken for bundles (bundle_tubav uses same pageCode as database)
-    if (descProduct === "bundle_tubav" || descProduct === "bundle_new_year" || descProduct === "match_boost" || descProduct === LIVE_PRODUCT || !product) {
+    if (descProduct === "bundle_tubav" || descProduct === "bundle_new_year" || descProduct === "match_boost" || descProduct === "plus" || descProduct === LIVE_PRODUCT || !product) {
       product = descProduct;
     }
   }
@@ -896,12 +896,26 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
 
   // Forward-only accounting is independent of fulfillment and legacy SDK callbacks.
   // Uncertain/mismatched notifications are retained for review, never guessed into revenue.
+  const boundTestCheckout = Boolean(
+    purchaseTracking?.couponCode?.trim().toUpperCase() === "TEST1"
+    && purchaseTracking.providerProcessToken
+    && purchaseTracking.providerProcessToken === liveProcessToken
+    && sum === 1
+  );
+  if (boundTestCheckout) {
+    const { isLiveTestCheckout } = await import("./liveTestCoupon");
+    if (!isLiveTestCheckout(product, purchaseTracking?.couponCode, email)) {
+      throw new Error("TEST1 checkout no longer authorized");
+    }
+  }
+
   const accountingInput = {
     transactionId, transactionToken: String(data.transactionToken || ""),
     processId: String(data.processId || ""), processToken: liveProcessToken,
     product, email, amountAgorot: Math.round(sum * 100), receivedAt: Date.now(),
     paymentDate: data.paymentDate, statusCode: data.statusCode,
     couponCode: measurementCheckoutUtm()?.couponCode,
+    testCheckout: boundTestCheckout,
     utmSource: measurementCheckoutUtm()?.utmSource, utmMedium: measurementCheckoutUtm()?.utmMedium,
     utmCampaign: measurementCheckoutUtm()?.utmCampaign, utmContent: measurementCheckoutUtm()?.utmContent,
   };
@@ -918,6 +932,11 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   // A persisted review receipt is not proof of payment. Leave it for
   // reconciliation without activating a product, acknowledging or emailing.
   if (accountingResult === "review") return;
+
+  // TEST1 is a provider diagnostic only. After the exact, bound ₪1 receipt is
+  // durably recorded, no approval, fulfillment, subscription/match mutation,
+  // email/SMS, campaign queue, or conversion event may run.
+  if (accountingInput.testCheckout) return;
 
   // Measurement is separate from legacy fulfillment lookup: never attach another checkout's cookies.
   const measurementTracking = purchaseTracking && matchesMetaCheckout({

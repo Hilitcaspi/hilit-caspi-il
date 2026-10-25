@@ -404,7 +404,9 @@ export default function GrowWallet({
       // Plus returns a hosted recurring-payment URL, so it must not
       // depend on the regular Grow wallet SDK. Other products still use the
       // embedded authCode flow and initialize the SDK before creating it.
-      if (product !== "plus") {
+      // An authorized TEST1 Plus checkout is a one-time diagnostic wallet,
+      // not a recurring subscription, and therefore needs the SDK too.
+      if (product !== "plus" || couponApplied?.code === "TEST1") {
         logStep("1_script_load_start");
         await preloadGrowSDKScript();
         if (!window.growPayment) throw new Error("Grow SDK not available after script load");
@@ -417,6 +419,10 @@ export default function GrowWallet({
         events: {
           onSuccess: (r: any) => {
             setWalletLoading(false);
+            if (activeCheckoutCouponRef.current === "TEST1") {
+              toast.success("בקשת תשלום הבדיקה הושלמה. לא הופעל מנוי ולא נשלחה התאמה; יש לוודא את החיוב ב־Grow.");
+              return;
+            }
             callbacksRef.current.onSuccess?.(r, activeCheckoutCouponRef.current);
           },
           onFailure: (r: any) => {

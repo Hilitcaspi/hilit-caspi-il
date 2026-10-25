@@ -145,4 +145,18 @@ describe("Database Plus public createProcess safeguards", () => {
       .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(mocks.getDb).not.toHaveBeenCalled(); expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
   });
+  it("keeps the retired bundle closed even when TEST1 is otherwise authorized", async () => {
+    const previous = process.env.LIVE_TEST_CHECKOUT_EMAIL;
+    process.env.LIVE_TEST_CHECKOUT_EMAIL = "test-owner@example.test";
+    try {
+      await expect(appRouter.createCaller(createPublicContext()).payment.createProcess({
+        ...validInput, product: "bundle_tubav", couponCode: "TEST1", email: "test-owner@example.test",
+      })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+      expect(mocks.getDb).not.toHaveBeenCalled();
+      expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.LIVE_TEST_CHECKOUT_EMAIL;
+      else process.env.LIVE_TEST_CHECKOUT_EMAIL = previous;
+    }
+  });
 });

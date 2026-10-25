@@ -89,6 +89,14 @@ describe("Grow forward accounting",()=>{
   expect(await recordGrowPaymentOnce({...input,receivedAt:input.receivedAt+600000})).toBe("recorded");
   expect(h.ledger).toHaveLength(1);expect([...h.receipts.values()][0].state).toBe("verified");
  });
+ it("records a bound TEST1 diagnostic receipt without creating a revenue ledger row",async()=>{
+  const h=harness();m.getDb.mockResolvedValue(h.db);
+  const diagnostic={...input,product:"plus",amountAgorot:100,couponCode:"TEST1",testCheckout:true};
+  expect(await recordGrowPaymentOnce(diagnostic)).toBe("recorded");
+  expect(h.ledger).toHaveLength(0);
+  expect([...h.receipts.values()][0]).toMatchObject({state:"verified",category:"test_checkout",amountAgorot:100});
+  expect(m.inquiry).toHaveBeenCalledWith(expect.objectContaining({product:"plus",expectedAmountAgorot:100}));
+ });
  it("separate Boosts and renewals are not collapsed by purchaser, time or amount",async()=>{
   const h=harness();m.getDb.mockResolvedValue(h.db);
   await recordGrowPaymentOnce({...input,product:"match_boost",amountAgorot:1990});

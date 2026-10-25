@@ -99,7 +99,7 @@ describe("TEST1 checkout protection", () => {
     for (const email of ["stranger@gmail.com", "owner+free@gmail.com", "owner+live-ticket@other.com"]) {
       expect(isLiveTestCheckout("database", "TEST1", email, now)).toBe(false);
     }
-    expect(isLiveTestCheckout("plus", "TEST1", "owner@gmail.com", now)).toBe(false);
+    expect(isLiveTestCheckout("plus", "TEST1", "owner@gmail.com", now)).toBe(true);
     expect(isLiveTestCheckout("database", "TEST1", "owner@gmail.com", LIVE_TEST_EXPIRES_AT)).toBe(false);
   });
 });

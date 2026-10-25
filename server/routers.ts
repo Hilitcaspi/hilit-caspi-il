@@ -7744,9 +7744,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           const { isLiveTestCheckout } = await import("./liveTestCoupon");
           if (!isLiveTestCheckout(input.product || "", requested, input.email))
             return { valid: false as const, error: "קוד הבדיקה אינו זמין עבור כתובת המייל או המוצר הזה" };
-          const { existingLiveTicket } = await import("./liveOctober");
-          if (await existingLiveTicket(input.email!))
-            return { valid: false as const, error: "כבר קיים כרטיס עבור כתובת המייל הזו" };
+          const { isClosedSeasonalProduct, TU_BAV_CLOSED_MESSAGE } = await import("../shared/closedSeasonalOffers");
+          if (isClosedSeasonalProduct(input.product || ""))
+            return { valid: false as const, error: TU_BAV_CLOSED_MESSAGE };
+          if (input.product === "live_october") {
+            const { existingLiveTicket } = await import("./liveOctober");
+            if (await existingLiveTicket(input.email!))
+              return { valid: false as const, error: "כבר קיים כרטיס עבור כתובת המייל הזו" };
+          }
           return { valid: true as const, code: "TEST1", fixedPrice: 1 };
         }
         const { isLiveCheckoutOpen } = await import("./liveOctober");
@@ -7970,6 +7975,14 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           });
         }
         const normalizedCheckoutEmail = input.email.trim().toLowerCase();
+        const reservedCode = input.couponCode?.trim().toUpperCase();
+        const diagnosticTest = reservedCode === "TEST1";
+        if (diagnosticTest) {
+          const { isLiveTestCheckout } = await import("./liveTestCoupon");
+          if (!isLiveTestCheckout(input.product, reservedCode, normalizedCheckoutEmail)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "קוד TEST1 אינו זמין עבור כתובת המייל או המוצר הזה" });
+          }
+        }
         const paymentTracking = createPurchaseTrackingIdentity();
         let paymentTrackingSaved = false;
 
@@ -7989,6 +8002,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             termsAccepted: true,
             matchId: input.boostMatchId,
             entryChannel: input.boostEntryChannel,
+            diagnosticTest,
           });
           preparedBoostRequestId = prepared.requestId;
           preparedBoostCheckoutReference = prepared.checkoutReference;
@@ -8046,7 +8060,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             const { appendPlusWednesdayOfferMarker, canApplyPlusWednesdayOfferCoupon, stripPlusWednesdayOfferMarker, isPlusBonusCouponCode } = await import("../shared/plusWednesdayOffer");
             const requestedCoupon = input.couponCode?.trim().toUpperCase();
             const cleanUtmTerm = stripPlusWednesdayOfferMarker(input.utmTerm);
-            if (requestedCoupon && !isPlusBonusCouponCode(requestedCoupon)) {
+            if (requestedCoupon && requestedCoupon !== "TEST1" && !isPlusBonusCouponCode(requestedCoupon)) {
               throw new TRPCError({ code: "BAD_REQUEST", message: "במסלול Plus קוד ההטבה PLUS תקף, והוא אינו משנה את המחיר של 99 ₪" });
             }
             if (isPlusBonusCouponCode(requestedCoupon) && !canApplyPlusWednesdayOfferCoupon({
@@ -8060,7 +8074,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               ? appendPlusWednesdayOfferMarker(cleanUtmTerm)
               : cleanUtmTerm || undefined;
           }
-          await db.insert(plusCheckoutIntents).values({
+          if (!diagnosticTest) await db.insert(plusCheckoutIntents).values({
             email: normalizedEmail,
             fullName: input.fullName.trim(),
             phone: input.phone?.trim() || normalizedPhone,
@@ -8096,7 +8110,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             paidAt: null,
             updatedAt: now,
           }});
-          preparedPlusCheckoutReference = createPlusCheckoutReference(normalizedEmail);
+          if (!diagnosticTest) preparedPlusCheckoutReference = createPlusCheckoutReference(normalizedEmail);
           verifiedPaymentIdentity = {
             fullName: input.fullName.trim(),
             email: normalizedEmail,
@@ -8105,7 +8119,6 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
 
         // Reserved live campaign/test codes are verified here, never priced by the browser.
-        const reservedCode = input.couponCode?.trim().toUpperCase();
         if ((reservedCode === "LIVE" && input.product !== "database") ||
             (reservedCode === "FRIENDS" && input.product !== "live_october")) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "קוד ההטבה אינו תקף למוצר הזה" });
@@ -8119,7 +8132,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             throw new TRPCError({ code: "FORBIDDEN", message: "קוד TEST1 אינו זמין עבור כתובת המייל או המוצר הזה" });
           }
         }
-        if (reservedCode === "LIVE" || reservedCode === "TEST1" || input.product === "live_october") {
+        if (reservedCode === "LIVE" || input.product === "live_october") {
           if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
           const { existingLiveTicket, getVerifiedLiveMember, liveCheckoutPrice, isLiveCheckoutOpen } = await import("./liveOctober");
           if (reservedCode !== "TEST1" && !isLiveCheckoutOpen(input.product, reservedCode))
@@ -8140,7 +8153,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail,
               reservedCode === "TEST1" ? "standalone_test" : reservedCode === "FRIENDS" ? "friends" : "standalone");
           }
-          if (reservedCode === "LIVE" || (reservedCode === "TEST1" && input.product === "database")) {
+          if (reservedCode === "LIVE") {
             const [existingMember] = await db.select({ isPaid: singles.isPaid }).from(singles)
               .where(eq(singles.email, normalizedCheckoutEmail)).limit(1);
             const [priorPurchase] = await db.select({ id: completedPayments.id }).from(completedPayments)
@@ -8151,8 +8164,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               throw new TRPCError({ code: "CONFLICT", message: "כבר שמור לך כרטיס ללייב. אין צורך להצטרף מחדש למאגר" });
             if (reservedCode === "LIVE") liveCheckoutPrice("database", "LIVE");
             const { createLiveCheckoutReference } = await import("./liveCheckoutReference");
-            preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail,
-              reservedCode === "TEST1" ? "database_live_test" : "database_live");
+            preparedLiveCheckoutReference = createLiveCheckoutReference(normalizedCheckoutEmail, "database_live");
           }
         }
 
@@ -8192,7 +8204,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
 
         // Save/update UTM + ga4ClientId + ga4SessionId in crm_leads so the webhook can use them later
-        if (db && input.product !== "plus" && (input.utmSource || input.utmMedium || input.utmCampaign || input.metaCampaignId || input.metaAdId || input.ga4ClientId || input.ga4SessionId)) {
+        if (!diagnosticTest && db && input.product !== "plus" && (input.utmSource || input.utmMedium || input.utmCampaign || input.metaCampaignId || input.metaAdId || input.ga4ClientId || input.ga4SessionId)) {
           try {
             const { crmLeads: crmLeadsTable } = await import("../drizzle/schema");
             // Upsert: update existing lead or insert new one
@@ -8243,7 +8255,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           }
         }
 
-        await recordAcquisitionSafely(normalizedCheckoutEmail, input.firstTouch);
+        if (!diagnosticTest) await recordAcquisitionSafely(normalizedCheckoutEmail, input.firstTouch);
 
         // Save short-lived browser attribution before opening Grow. The row is
         // reset on every new attempt and can become a Purchase only after the
@@ -8320,6 +8332,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             ...input,
             ...(verifiedPaymentIdentity || {}),
             sum: finalSum,
+            diagnosticTest,
             webhookReference: preparedBoostCheckoutReference || undefined,
             plusWebhookReference: preparedPlusCheckoutReference || undefined,
             liveWebhookReference: preparedLiveCheckoutReference || undefined,
@@ -8327,7 +8340,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           if (preparedLiveCheckoutReference && !result.processToken) {
             throw new Error("LIVE checkout missing Grow processToken");
           }
-          if (input.product === "plus" && db) {
+          if (input.product === "plus" && db && !diagnosticTest) {
             await db.update(plusCheckoutIntents)
               .set({ processToken: result.processToken || null, updatedAt: Date.now() })
               .where(eq(plusCheckoutIntents.email, input.email.trim().toLowerCase()));
@@ -8356,12 +8369,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             ...result,
             boostRequestId: preparedBoostRequestId,
             purchaseTrackingToken: paymentTrackingSaved ? paymentTracking.trackingToken : undefined,
+            testCheckout: diagnosticTest,
           };
         } catch (error: any) {
           if (preparedBoostRequestId) {
             await cancelPaidBoostCheckout(preparedBoostRequestId, error?.message || "grow_create_process_failed");
           }
-          if (input.product === "plus" && db) {
+          if (input.product === "plus" && db && !diagnosticTest) {
             await db.update(plusCheckoutIntents)
               .set({ status: "failed", updatedAt: Date.now() })
               .where(and(

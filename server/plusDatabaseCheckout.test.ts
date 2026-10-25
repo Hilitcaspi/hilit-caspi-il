@@ -88,6 +88,14 @@ describe("Closed Tu B'Av checkout, preserved historical fulfillment", () => {
     expect(lookup).toContain("eq(singles.questionnaireToken, personalToken)");
     expect(lookup).toContain("email.trim().toLowerCase()");
   });
+  it("does not let TEST1 reopen the retired bundle and restricts ticket checks to the live product", () => {
+    const source = readFileSync("server/routers.ts", "utf8");
+    const validation = source.slice(source.indexOf('if (requested === "TEST1")'), source.indexOf('if (requested === "FRIENDS"'));
+    expect(validation).toContain('isClosedSeasonalProduct(input.product || "")');
+    expect(validation).toContain('if (input.product === "live_october")');
+    const checkout = source.slice(source.indexOf("    createProcess: publicProcedure"));
+    expect(checkout.indexOf("isClosedSeasonalProduct(input.product)")).toBeLessThan(checkout.indexOf("const normalizedCheckoutEmail"));
+  });
   it("uses the same paid membership predicate in status, webhook and activation", () => {
     expect(readFileSync("server/plusPilotRouter.ts", "utf8")).toContain("databaseMembershipActive: hasPaidDatabaseMembership(single)");
     expect(readFileSync("server/growWebhook.ts", "utf8")).toContain('hasPaidDatabaseMembership(single) ? "active" : "paid_pending_profile"');

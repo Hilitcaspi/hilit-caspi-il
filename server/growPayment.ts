@@ -154,6 +154,8 @@ export interface CreatePaymentInput {
   phone?: string;
   /** Override price (e.g. coupon) */
   sum?: number;
+  /** Internal-only TEST1 diagnostic marker. Never accepted from a client. */
+  diagnosticTest?: boolean;
   /** Personal questionnaire token used to return Plus/Boost members to their account. */
   personalToken?: string;
   /** Signed server-generated reference used to bind a Boost webhook to one request. */
@@ -184,7 +186,9 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   const normalizedPhone = input.phone ? normalizeIsraeliPhone(input.phone) : null;
   if (input.phone && !normalizedPhone) throw new Error(PAYMENT_PHONE_INVALID);
 
-  const plusCheckout = input.product === "plus" ? getPlusCheckoutConfig() : null;
+  // TEST1 remains a regular, one-time provider process even for Plus. It must
+  // never enter Grow's recurring branch or create a standing instruction.
+  const plusCheckout = input.product === "plus" && !input.diagnosticTest ? getPlusCheckoutConfig() : null;
   if (plusCheckout && !plusCheckout.configured) {
     throw new Error("The Database Plus payment product is not configured yet");
   }
@@ -249,7 +253,11 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     };
   }
 
-  const pageCode = PAGE_CODES[input.product];
+  // The dedicated Plus page is recurring-only. An authorized diagnostic uses
+  // the ordinary one-time page while retaining the original product identity
+  // in its description, tracking row, and server-side webhook policy.
+  const providerProduct = input.diagnosticTest && input.product === "plus" ? "database" : input.product;
+  const pageCode = PAGE_CODES[providerProduct];
   const growUserId = GROW_USER_ID;
   if (!pageCode || !growUserId) {
     throw new Error("The selected Grow payment product is not configured yet");
@@ -275,7 +283,12 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     plus:         "/thank-you/plus",
   };
   const successPath = SUCCESS_PATHS[input.product] || "/thank-you/digital";
-  const successUrl = new URL(`${SITE_BASE}${successPath}`);
+  // A TEST1 payment is never product fulfillment. If Grow navigates after an
+  // inline payment, return to a neutral tagged URL rather than a real product
+  // thank-you page that could imply membership, a Boost, or delivered access.
+  const successUrl = new URL(input.diagnosticTest
+    ? `${SITE_BASE}/?test_checkout=1`
+    : `${SITE_BASE}${successPath}`);
   if (input.product === "database" && input.liveWebhookReference) successUrl.searchParams.set("offer", "live");
   if (input.product === "plus" || input.product === "match_boost") {
     successUrl.searchParams.set("email", input.email);
@@ -292,7 +305,9 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   params.append("pageField[email]", input.email);
   if (normalizedPhone) params.append("pageField[phone]", normalizedPhone);
 
-  if (config.paymentNum) {
+  if (input.diagnosticTest) {
+    params.append("paymentNum", "1");
+  } else if (config.paymentNum) {
     params.append("paymentNum", String(config.paymentNum));
   } else if (config.maxPaymentNum) {
     params.append("maxPaymentNum", String(config.maxPaymentNum));

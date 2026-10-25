@@ -55,6 +55,13 @@ describe("growPayment module", () => {
     expect(PRODUCT_CONFIGS.bundle_new_year.description).toContain("קורס");
   });
 
+  it("keeps the retired Tu B'Av bundle closed even for an internal TEST1 diagnostic", async () => {
+    await expect(createPaymentProcess({
+      product: "bundle_tubav", fullName: "Synthetic QA", email: "synthetic@example.test",
+      sum: 1, diagnosticTest: true,
+    })).rejects.toThrow("הטבת ט״ו באב הסתיימה");
+  });
+
   it("uses sandbox URL when GROW_ENV is not production", () => {
     // GROW_ENV is not set in test env → should use sandbox
     const isGrowProd = process.env.GROW_ENV === "production";

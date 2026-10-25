@@ -680,7 +680,6 @@ function MatchBoostCard({
                         termsPath="/terms/match-boost"
                         personalToken={token}
                         boostMatchId={option.matchId}
-                        showCoupon={false}
                         onSuccess={() => {
                           setResultMessage("התשלום התקבל והתאמת ה־Boost נשלחה לשני הצדדים. עכשיו חשוב לפתוח את המייל ולאשר או לדחות את ההתאמה.");
                           setTimeout(() => utils.matchBoost.getMyStatus.invalidate({ email, token }), 1800);
