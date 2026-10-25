@@ -1,0 +1,42 @@
+import { bigint, boolean, int, mysqlEnum, mysqlTable, text, uniqueIndex, index, varchar } from 'drizzle-orm/mysql-core';
+
+/** Server-only recipients. PII is returned only by an authenticated team listing. */
+export const purchaseRecoveryRecipients = mysqlTable('purchase_recovery_recipients', {
+  id: int('id').autoincrement().primaryKey(),
+  campaignKey: varchar('campaign_key', { length: 80 }).notNull(),
+  email: varchar('email', { length: 320 }).notNull(),
+  name: varchar('name', { length: 255 }),
+  phone: varchar('phone', { length: 32 }),
+  product: varchar('product', { length: 40 }).notNull(),
+  evidence: varchar('evidence', { length: 60 }).notNull(),
+  evidenceAt: bigint('evidence_at', { mode: 'number' }).notNull(),
+  emailConsent: boolean('email_consent').notNull().default(false),
+  smsConsent: boolean('sms_consent').notNull().default(false),
+  consentSource: varchar('consent_source', { length: 160 }),
+  suppressionReason: varchar('suppression_reason', { length: 160 }),
+  offerCode: varchar('offer_code', { length: 50 }),
+  sendAt: bigint('send_at', { mode: 'number' }),
+  sendExpiresAt: bigint('send_expires_at', { mode: 'number' }),
+  scheduleCronTaskUid: varchar('schedule_cron_task_uid', { length: 65 }),
+  emailState: mysqlEnum('email_state', ['draft','held','queued','processing','accepted','failed','skipped']).notNull().default('draft'),
+  smsState: mysqlEnum('sms_state', ['draft','held','queued','processing','accepted','failed','skipped']).notNull().default('draft'),
+  emailProviderMessageId: varchar('email_provider_message_id', { length: 255 }),
+  smsProviderMessageId: varchar('sms_provider_message_id', { length: 255 }),
+  emailSentAt: bigint('email_sent_at', { mode: 'number' }),
+  smsSentAt: bigint('sms_sent_at', { mode: 'number' }),
+  offerCheckoutRef: varchar('offer_checkout_ref', { length: 255 }),
+  offerReservedUntil: bigint('offer_reserved_until', { mode: 'number' }),
+  offerRedeemedAt: bigint('offer_redeemed_at', { mode: 'number' }),
+  offerTransactionId: varchar('offer_transaction_id', { length: 120 }),
+  giftGrantedAt: bigint('gift_granted_at', { mode: 'number' }),
+  metadata: text('metadata'),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+}, (t) => ({
+  recipientUnique: uniqueIndex('purchase_recovery_recipient_unique').on(t.campaignKey, t.email, t.product),
+  dueEmail: index('purchase_recovery_due_email').on(t.campaignKey, t.emailState, t.sendAt),
+  dueSms: index('purchase_recovery_due_sms').on(t.campaignKey, t.smsState, t.sendAt),
+  cronLookup: index('purchase_recovery_cron_lookup').on(t.scheduleCronTaskUid),
+  productEvidence: index('purchase_recovery_product_evidence').on(t.product, t.evidenceAt),
+}));
+export type PurchaseRecoveryRecipient = typeof purchaseRecoveryRecipients.$inferSelect;

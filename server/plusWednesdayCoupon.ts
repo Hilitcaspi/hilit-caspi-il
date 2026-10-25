@@ -20,5 +20,11 @@ export async function validatePlusWednesdayCoupon(input: { product?: string; ema
   if (!canApplyPlusWednesdayOfferCoupon({ couponCode: PLUS_WEDNESDAY_OFFER_CODE, paidAt: now, existingMember: priorPlus })) {
     return { valid: false as const, error: "הטבת PLUS מיועדת להצטרפות ראשונה בלבד, לא לחידוש מנוי" };
   }
-  return { valid: true as const, code: PLUS_WEDNESDAY_OFFER_CODE };
+  return {
+    valid: true as const,
+    code: PLUS_WEDNESDAY_OFFER_CODE,
+    discountPercent: undefined,
+    discountAmount: undefined,
+    fixedPrice: undefined,
+  };
 }

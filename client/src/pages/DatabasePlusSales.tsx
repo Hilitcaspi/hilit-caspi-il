@@ -52,7 +52,9 @@ export default function DatabasePlusSales() {
   const wednesdayOffer = checkoutConfig?.wednesdayOffer;
   const wednesdayMemberOffer = launchOffer?.type === "wednesday_three_manual_proposals" ? launchOffer : null;
   const activeWednesdayOffer = wednesdayMemberOffer || (wednesdayOffer?.available ? wednesdayOffer : null);
-  const requestedCoupon = isPlusBonusCouponCode(params.get("coupon")) ? "PLUS" : undefined;
+  const requestedCoupon = params.get("coupon")?.trim().toUpperCase() === "PLUSGIFT"
+    ? "PLUSGIFT"
+    : isPlusBonusCouponCode(params.get("coupon")) ? "PLUS" : undefined;
   const guideLaunchOffer = launchOffer?.type === "guide" ? launchOffer : null;
   const personalLinkMissingDatabaseMembership = Boolean(
     isPersonalLink && statusQuery.isSuccess && plusData?.databaseMembershipActive !== true,

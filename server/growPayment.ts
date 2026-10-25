@@ -164,6 +164,8 @@ export interface CreatePaymentInput {
   plusWebhookReference?: string;
   /** Signed reference for the October live ticket tier, without personal details. */
   liveWebhookReference?: string;
+  /** Signed reference binding a recovery-campaign checkout to one recipient offer. */
+  recoveryWebhookReference?: string;
   /** Browser origin used for the hosted Plus recurring-payment callback. */
   origin?: string;
   /** Campaign identifier used only to render the matching post-payment offer state. */
@@ -221,6 +223,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     form.append("cancelUrl", callbackBase);
     const notifyUrl = new URL(`${callbackBase}/api/grow/webhook`);
     if (input.plusWebhookReference) notifyUrl.searchParams.set("plus_ref", input.plusWebhookReference);
+    if (input.recoveryWebhookReference) notifyUrl.searchParams.set("recovery_ref", input.recoveryWebhookReference);
     form.append("notifyUrl", notifyUrl.toString());
 
     const response = await globalThis.fetch(GROW_PLUS_API_URL, {
@@ -300,6 +303,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   if (input.webhookReference) notifyUrl.searchParams.set("boost_ref", input.webhookReference);
   if (input.plusWebhookReference) notifyUrl.searchParams.set("plus_ref", input.plusWebhookReference);
   if (input.liveWebhookReference) notifyUrl.searchParams.set("live_ref", input.liveWebhookReference);
+  if (input.recoveryWebhookReference) notifyUrl.searchParams.set("recovery_ref", input.recoveryWebhookReference);
   params.append("notifyUrl", notifyUrl.toString());
   params.append("pageField[fullName]", input.fullName);
   params.append("pageField[email]", input.email);

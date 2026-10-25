@@ -1180,7 +1180,8 @@ export type InsertMatchBoostPilotInterest = typeof matchBoostPilotInterests.$inf
 export const matchBoostRequests = mysqlTable("match_boost_requests", {
   id: int("id").primaryKey().autoincrement(),
   singleId: int("single_id").notNull(),
-  matchId: int("match_id").notNull(),
+  // A reusable paid credit can exist before its member selects a Boost candidate.
+  matchId: int("match_id"),
   source: mysqlEnum("source", ["paid", "plus_included", "admin"]).notNull(),
   status: mysqlEnum("status", ["awaiting_payment", "paid", "queued", "reviewing", "approved", "rejected", "refunded", "cancelled"]).default("awaiting_payment").notNull(),
   amountAgorot: int("amount_agorot").default(1999).notNull(),
@@ -1685,3 +1686,6 @@ export const acquisitionFirstTouches = mysqlTable("acquisition_first_touches", {
   capturedAt: bigint("captured_at", { mode: "number" }).notNull(),
   recordedAt: bigint("recorded_at", { mode: "number" }).notNull(),
 });
+
+// One-off product-specific recovery campaign recipients and benefit receipts.
+export { purchaseRecoveryRecipients } from './purchaseRecoverySchema';

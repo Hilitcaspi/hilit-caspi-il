@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import CourseCompassAdminSection from "@/components/CourseCompassAdminSection";
+import PurchaseRecoveryPanel from "@/components/PurchaseRecoveryPanel";
 import { toast } from "sonner";
 import { format, formatDistanceToNow, isValid } from "date-fns";
 
@@ -931,6 +932,8 @@ export default function CRM() {
             </div>
           ))}
         </div>
+
+        <PurchaseRecoveryPanel />
 
         <CourseCompassAdminSection />
 

@@ -29,8 +29,8 @@ import { sendErrorAlert, installProcessErrorAlerts } from "./errorAlert";
 import { buildBoostEnrollmentNewsletter } from "../boostNewsletter";
 import { processBoostNewsletterWave, type BoostNewsletterWaveKey } from "../boostNewsletterCampaign";
 import { registerTestimonialMediaUpload } from "../testimonialMediaUpload";
+import { registerPurchaseRecoverySchedule } from "../purchaseRecoverySchedule";
 import { applyEmailUnsubscribe } from "../emailUnsubscribe";
-
 // Install process-level error alerts (uncaughtException / unhandledRejection).
 installProcessErrorAlerts();
 
@@ -76,6 +76,7 @@ async function startServer() {
     skip: (req) => req.path.startsWith("/api/email/"), // skip tracking pixels
   });
   app.use("/api/", apiLimiter);
+  registerPurchaseRecoverySchedule(app);
 
   // Stricter limit for form submissions: 20 per minute per IP
   const formLimiter = rateLimit({
@@ -270,7 +271,8 @@ async function startServer() {
       );
       const boostCheckoutReference = typeof req.query.boost_ref === "string" ? req.query.boost_ref : undefined;
       const plusCheckoutReference = typeof req.query.plus_ref === "string" ? req.query.plus_ref : undefined;
-      const context = { boostCheckoutReference, plusCheckoutReference, accountingRetry: false };
+      const recoveryCheckoutReference = typeof req.query.recovery_ref === "string" ? req.query.recovery_ref : undefined;
+      const context = { boostCheckoutReference, plusCheckoutReference, recoveryCheckoutReference, accountingRetry: false };
       await handleGrowWebhook(req.body, context);
       if (context.accountingRetry) return res.status(503).json({ error: "payment_inquiry_retry" });
       res.status(200).json({ ok: true });

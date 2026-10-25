@@ -55,7 +55,7 @@ export default function SingleSessionSales() {
   const [scrolled, setScrolled] = useState(false);
   const query = new URLSearchParams(window.location.search);
   const requestedCoupon = query.get("coupon")?.toUpperCase();
-  const recoveryCoupon = requestedCoupon === "LOVE10" || requestedCoupon === "BACK10"
+  const recoveryCoupon = requestedCoupon === "LOVE10DAY" || requestedCoupon === "LOVE10" || requestedCoupon === "BACK10"
     ? requestedCoupon
     : requestedCoupon === "PLUS50"
       ? "PLUS50"

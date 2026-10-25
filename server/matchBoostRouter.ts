@@ -1031,6 +1031,10 @@ export const matchBoostRouter = router({
       if (!REVIEWABLE_BOOST_STATUSES.includes(request.status as any)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "בקשת הבוסט אינה פתוחה לבדיקה" });
       }
+      if (request.matchId === null) {
+        throw new TRPCError({ code: "CONFLICT", message: "יש לבחור התאמת Boost לפני תחילת בדיקה" });
+      }
+      const reviewMatchId = request.matchId;
       const now = Date.now();
       await db.transaction(async (tx: any) => {
         await tx.update(matchBoostRequests).set({
@@ -1042,7 +1046,7 @@ export const matchBoostRouter = router({
           status: "in_progress",
           updatedAt: now,
         }).where(and(
-          eq(crmTeamTasks.matchId, request.matchId),
+          eq(crmTeamTasks.matchId, reviewMatchId),
           eq(crmTeamTasks.taskType, "match_review"),
           eq(crmTeamTasks.status, "todo"),
         ));
@@ -1414,7 +1418,7 @@ export const matchBoostRouter = router({
       }
 
       const now = Date.now();
-      await db.update(matchBoostRequests).set({
+      const claimResult = await db.update(matchBoostRequests).set({
         matchId: selectedCandidate.id,
         status: "queued",
         requestedAt: now,
@@ -1422,6 +1426,10 @@ export const matchBoostRouter = router({
         decisionReason: "boost_credit_redeemed",
         updatedAt: now,
       }).where(and(eq(matchBoostRequests.id, credit.id), eq(matchBoostRequests.status, "refunded")));
+      const claimedRows = Number((Array.isArray(claimResult) ? claimResult[0] : claimResult)?.affectedRows || 0);
+      if (claimedRows !== 1) {
+        throw new TRPCError({ code: "CONFLICT", message: "הקרדיט כבר ממומש או בטיפול. יש לרענן את האזור האישי." });
+      }
       try {
         return await dispatchAlgorithmicBoostProposal(db, credit.id);
       } catch (error: any) {

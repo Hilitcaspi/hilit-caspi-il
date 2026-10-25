@@ -50,6 +50,7 @@ import { ensureDatabaseNowMatchTask } from "./databaseNowFulfillment";
 import { ensureLiveTicket, ensurePlusLiveTicket, LIVE_PRODUCT } from "./liveOctober";
 import { verifyLiveCheckoutReference } from "./liveCheckoutReference";
 import { isProductionPurchaseMeasurement, isPaidGrowMeasurementNotification, metaNotificationPaidAt, matchesMetaCheckout } from "../shared/metaPurchasePolicy";
+import { verifyPurchaseRecoveryCheckoutReference, redeemPurchaseRecoveryOffer } from "./purchaseRecoveryOffers";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -671,7 +672,7 @@ function extractUtmFromWebhook(data: any): { utmSource?: string; utmMedium?: str
 }
 
 // ─── Main webhook handler (exported, registered in index.ts) ──────────────────
-export async function handleGrowWebhook(body: any, context: { boostCheckoutReference?: string; plusCheckoutReference?: string; liveCheckoutReference?: string; accountingRetry?: boolean } = {}): Promise<void> {
+export async function handleGrowWebhook(body: any, context: { boostCheckoutReference?: string; plusCheckoutReference?: string; liveCheckoutReference?: string; recoveryCheckoutReference?: string; accountingRetry?: boolean } = {}): Promise<void> {
   // Support both PaymentLinks (new) and legacy formats
   const data = body?.data ?? body;
   const email: string = (data.payerEmail || data.email || "").trim().toLowerCase();
@@ -684,6 +685,8 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   const processToken: string = data.paymentLinkProcessToken || data.processToken || "";
   const hasVerifiedPlusReference = verifyPlusCheckoutReference(context.plusCheckoutReference, email);
   const verifiedLiveTier = verifyLiveCheckoutReference(context.liveCheckoutReference, email);
+  const verifiedRecoveryReference = verifyPurchaseRecoveryCheckoutReference(context.recoveryCheckoutReference, email);
+  if (context.recoveryCheckoutReference && !verifiedRecoveryReference) throw new Error("purchase_recovery_reference_invalid");
   // A CreatePaymentProcess checkout uses processToken; Payment Links also carry
   // paymentLinkProcessToken, which may identify a different object.
   const liveProcessToken = String(data.processToken || data.paymentLinkProcessToken || "").trim();
@@ -768,6 +771,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   }
   if (hasVerifiedPlusReference) product = "plus";
   if (verifiedLiveTier) product = verifiedLiveTier.startsWith("database_live") ? "database" : LIVE_PRODUCT;
+  if (verifiedRecoveryReference) product = verifiedRecoveryReference.product;
   // 3. A 99₪ charge is ambiguous with the historical live event, and the temporary
   // Plus Sandbox uses 1₪. If this email has a pending Plus checkout, prefer Plus;
   // otherwise continue to the normal amount fallback.
@@ -937,6 +941,14 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   // durably recorded, no approval, fulfillment, subscription/match mutation,
   // email/SMS, campaign queue, or conversion event may run.
   if (accountingInput.testCheckout) return;
+  if (verifiedRecoveryReference) {
+    await redeemPurchaseRecoveryOffer({
+      reference: context.recoveryCheckoutReference,
+      email, product: verifiedRecoveryReference.product,
+      processToken: liveProcessToken, transactionId,
+      amountAgorot: accountingInput.amountAgorot,
+    });
+  }
 
   // Measurement is separate from legacy fulfillment lookup: never attach another checkout's cookies.
   const measurementTracking = purchaseTracking && matchesMetaCheckout({
@@ -1089,6 +1101,12 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       }
       case "plus": {
         await handlePlus(email, name, transactionId, sum, data);
+        if (verifiedRecoveryReference) {
+          const db = await getDb();
+          if (!db) throw new Error("purchase_recovery_database_unavailable");
+          const { grantPurchaseRecoveryPlusGift } = await import("./purchaseRecoveryGift");
+          await grantPurchaseRecoveryPlusGift(db, { email, transactionId });
+        }
         const { ensurePaidPlusLiveTicket } = await import("./liveOctober");
         await ensurePaidPlusLiveTicket(email).catch(() => console.warn("[GrowWebhook] Plus live voucher awaits an active membership"));
         break;
@@ -1163,7 +1181,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     console.log(`[GrowWebhook] ✓ Processed ${product} for ${email}`);
   } catch (err) {
     console.error(`[GrowWebhook] ✗ Failed to process ${product} for ${email}:`, err);
-    if (verifiedLiveTier) {
+    if (verifiedLiveTier || verifiedRecoveryReference) {
       // Allow Grow to retry the strict endpoint instead of swallowing the error
       // after the initial idempotency row was created.
       if (transactionId) {

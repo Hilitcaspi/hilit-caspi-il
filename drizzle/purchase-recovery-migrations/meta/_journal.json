@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1792920819963,
+      "tag": "0000_purchase_recovery_campaign",
+      "breakpoints": true
+    }
+  ]
+}

@@ -53,6 +53,7 @@ export default function GrowPayButton({
     code: string;
     discountPercent?: number;
     discountAmount?: number;
+    fixedPrice?: number;
   } | null>(null);
   const [couponError, setCouponError] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
@@ -77,6 +78,7 @@ export default function GrowPayButton({
           code: result.code,
           discountPercent: result.discountPercent,
           discountAmount: result.discountAmount,
+          fixedPrice: result.fixedPrice,
         });
         const label = result.discountPercent
           ? `${result.discountPercent}% הנחה`

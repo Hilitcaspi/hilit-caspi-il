@@ -74,6 +74,7 @@ import { usageRouter } from "./usageRouter";
 import { courseCompassRouter } from "./courseCompassRouter";
 import { liveOctoberRouter } from "./liveOctoberRouter";
 import { hasRegularMatchingAccess, regularMatchingAccessSql } from "./regularMatchingEligibility";
+import { purchaseRecoveryRouter } from "./purchaseRecoveryRouter";
 import { previewRegularCandidates } from "./regularMatchingSuggestions";
 import { loadBoostMonthlyStats } from "./boostMonthlyStats";
 import { getSafeEmailDomain, sanitizePaymentLogDetail } from "./paymentLogPrivacy";
@@ -672,6 +673,7 @@ export const appRouter = router({
   serviceHealth: router({
     check: publicProcedure.query(() => getServiceHealth()),
   }),
+  purchaseRecovery: purchaseRecoveryRouter,
   dashboard: dashboardRouter,
   plusPilot: plusPilotRouter,
   matchBoost: matchBoostRouter,
@@ -5268,6 +5270,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         .from(matchBoostRequests).where(isNotNull(matchBoostRequests.fulfilledAt)).orderBy(desc(matchBoostRequests.fulfilledAt));
       const boostSenderByMatch = new Map<number, number>();
       for (const request of boostRequestRows) {
+        if (request.matchId === null) continue; // An unused gift credit is not a match.
         if (!boostSenderByMatch.has(request.matchId)) boostSenderByMatch.set(request.matchId, request.singleId);
       }
       return allMatches.map(m => {
@@ -7736,6 +7739,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }))
       .mutation(async ({ input }) => {
         const requested = input.code.trim().toUpperCase();
+        const { isPurchaseRecoveryOfferCode, validatePurchaseRecoveryCoupon } = await import("./purchaseRecoveryOffers");
+        if (isPurchaseRecoveryOfferCode(requested)) {
+          return validatePurchaseRecoveryCoupon({ code: requested, product: input.product, email: input.email });
+        }
         if (requested === "PLUS" || requested === "PLUS3") {
           const { validatePlusWednesdayCoupon } = await import("./plusWednesdayCoupon");
           return validatePlusWednesdayCoupon(input);
@@ -7752,7 +7759,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             if (await existingLiveTicket(input.email!))
               return { valid: false as const, error: "כבר קיים כרטיס עבור כתובת המייל הזו" };
           }
-          return { valid: true as const, code: "TEST1", fixedPrice: 1 };
+          return {
+            valid: true as const,
+            code: "TEST1",
+            discountPercent: undefined,
+            discountAmount: undefined,
+            fixedPrice: 1,
+          };
         }
         const { isLiveCheckoutOpen } = await import("./liveOctober");
         if (requested === "FRIENDS" && !isLiveCheckoutOpen("live_october", "FRIENDS"))
@@ -7769,7 +7782,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             .where(and(sql`LOWER(TRIM(${completedPayments.email})) = ${input.email.trim().toLowerCase()}`, eq(completedPayments.product, "database"))).limit(1);
           if (existingMember?.isPaid || priorPurchase)
             return { valid: false as const, error: "הטבת LIVE למצטרפים חדשים בלבד. לחברי המאגר קיימת הטבת כרטיס FRIENDS" };
-          return { valid: true as const, code: "LIVE" };
+          return {
+            valid: true as const,
+            code: "LIVE",
+            discountPercent: undefined,
+            discountAmount: undefined,
+            fixedPrice: undefined,
+          };
         }
         if (requested === "FRIENDS" && input.product === "live_october") {
           const { getVerifiedLiveMember, existingLiveTicket } = await import("./liveOctober");
@@ -7779,7 +7798,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           if (member.plus) return { valid: false as const, error: "לחברי Plus פעילים יש כרטיס ללא עלות באזור האישי" };
           if (await existingLiveTicket(input.email!))
             return { valid: false as const, error: "כבר שמור לך כרטיס ללייב באזור האישי" };
-          return { valid: true as const, code: "FRIENDS", fixedPrice: 49 };
+          return {
+            valid: true as const,
+            code: "FRIENDS",
+            discountPercent: undefined,
+            discountAmount: undefined,
+            fixedPrice: 49,
+          };
         }
         if (requested === "LIVE" || requested === "FRIENDS")
           return { valid: false as const, error: "הקוד אינו תקף למוצר זה" };
@@ -7977,11 +8002,34 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const normalizedCheckoutEmail = input.email.trim().toLowerCase();
         const reservedCode = input.couponCode?.trim().toUpperCase();
         const diagnosticTest = reservedCode === "TEST1";
+        const recoveryProduct = input.product === "database" || input.product === "session" || input.product === "plus"
+          ? input.product
+          : null;
+        let validatedRecoveryCode: string | null = null;
+        let recoveryFixedPrice: number | undefined;
         if (diagnosticTest) {
           const { isLiveTestCheckout } = await import("./liveTestCoupon");
           if (!isLiveTestCheckout(input.product, reservedCode, normalizedCheckoutEmail)) {
             throw new TRPCError({ code: "FORBIDDEN", message: "קוד TEST1 אינו זמין עבור כתובת המייל או המוצר הזה" });
           }
+        }
+        const { isPurchaseRecoveryOfferCode, validatePurchaseRecoveryCoupon } = await import("./purchaseRecoveryOffers");
+        if (isPurchaseRecoveryOfferCode(reservedCode)) {
+          // Validate before any intent, lead, attribution, or provider write.
+          // reservePurchaseRecoveryOffer rechecks atomically before Grow opens.
+          const recoveryValidation = await validatePurchaseRecoveryCoupon({
+            code: reservedCode,
+            product: recoveryProduct || undefined,
+            email: normalizedCheckoutEmail,
+          });
+          if (!recoveryProduct || !recoveryValidation.valid) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: recoveryValidation.valid ? "לא ניתן לאמת את ההטבה עבור הפרטים שהוזנו" : recoveryValidation.error,
+            });
+          }
+          validatedRecoveryCode = recoveryValidation.code;
+          recoveryFixedPrice = recoveryValidation.fixedPrice;
         }
         const paymentTracking = createPurchaseTrackingIdentity();
         let paymentTrackingSaved = false;
@@ -7990,6 +8038,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         let preparedBoostCheckoutReference: string | null = null;
         let preparedPlusCheckoutReference: string | null = null;
         let preparedLiveCheckoutReference: string | null = null;
+        let preparedRecoveryCheckoutReference: string | null = null;
         let verifiedPaymentIdentity: { fullName: string; email: string; phone: string } | null = null;
 
         if (input.product === "match_boost") {
@@ -8060,7 +8109,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             const { appendPlusWednesdayOfferMarker, canApplyPlusWednesdayOfferCoupon, stripPlusWednesdayOfferMarker, isPlusBonusCouponCode } = await import("../shared/plusWednesdayOffer");
             const requestedCoupon = input.couponCode?.trim().toUpperCase();
             const cleanUtmTerm = stripPlusWednesdayOfferMarker(input.utmTerm);
-            if (requestedCoupon && requestedCoupon !== "TEST1" && !isPlusBonusCouponCode(requestedCoupon)) {
+            if (requestedCoupon && requestedCoupon !== "TEST1" && requestedCoupon !== validatedRecoveryCode && !isPlusBonusCouponCode(requestedCoupon)) {
               throw new TRPCError({ code: "BAD_REQUEST", message: "במסלול Plus קוד ההטבה PLUS תקף, והוא אינו משנה את המחיר של 99 ₪" });
             }
             if (isPlusBonusCouponCode(requestedCoupon) && !canApplyPlusWednesdayOfferCoupon({
@@ -8173,7 +8222,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (input.product === "live_october") finalSum = reservedCode === "FRIENDS" ? 49 : 149;
         if (reservedCode === "LIVE") finalSum = 299;
         if (reservedCode === "TEST1") finalSum = 1;
-        if (input.couponCode && db && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "FRIENDS" && reservedCode !== "TEST1") {
+        // Recovery discounts use their helper-provided amount exactly. Never
+        // derive 269.10 through generic whole-shekel coupon rounding.
+        if (validatedRecoveryCode) finalSum = recoveryFixedPrice;
+        if (input.couponCode && db && !validatedRecoveryCode && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "FRIENDS" && reservedCode !== "TEST1") {
           const { discountCodes } = await import("../drizzle/schema");
           const [code] = await db.select().from(discountCodes)
             .where(eq(discountCodes.code, input.couponCode.toUpperCase()))
@@ -8327,6 +8379,26 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           });
         }
 
+        if (validatedRecoveryCode && recoveryProduct) {
+          const { reservePurchaseRecoveryOffer } = await import("./purchaseRecoveryOffers");
+          try {
+            const reservation = await reservePurchaseRecoveryOffer({
+              email: normalizedCheckoutEmail,
+              product: recoveryProduct,
+              code: validatedRecoveryCode,
+            });
+            preparedRecoveryCheckoutReference = reservation.reference;
+            // Database/session recovery prices come only from the immutable
+            // reservation offer. Plus intentionally remains the normal 99 ₪
+            // monthly recurring checkout with its ordinary service cadence.
+            recoveryFixedPrice = reservation.offer.fixedPrice;
+            if (recoveryProduct !== "plus") finalSum = recoveryFixedPrice;
+          } catch {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "לא ניתן לאמת את ההטבה עבור הפרטים שהוזנו" });
+          }
+        }
+
+        let recoveryProviderProcessAccepted = false;
         try {
           const result = await createPaymentProcess({
             ...input,
@@ -8336,7 +8408,27 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             webhookReference: preparedBoostCheckoutReference || undefined,
             plusWebhookReference: preparedPlusCheckoutReference || undefined,
             liveWebhookReference: preparedLiveCheckoutReference || undefined,
+            recoveryWebhookReference: preparedRecoveryCheckoutReference || undefined,
           });
+          if (preparedRecoveryCheckoutReference && recoveryProduct) {
+            // A successful create-process response can represent a provider
+            // process even if its token is unexpectedly absent. Preserve the
+            // reservation/Plus intent rather than treating that as a proven
+            // failed setup that is safe to retry.
+            recoveryProviderProcessAccepted = true;
+            if (!result.processToken) {
+              throw new Error("Recovery checkout missing Grow processToken");
+            }
+            const { bindPurchaseRecoveryProviderProcess } = await import("./purchaseRecoveryOffers");
+            // Grow accepted a process, so a binding failure is ambiguous. Do not
+            // return a wallet, release the reservation, or retry Grow here.
+            await bindPurchaseRecoveryProviderProcess({
+              reference: preparedRecoveryCheckoutReference,
+              email: normalizedCheckoutEmail,
+              product: recoveryProduct,
+              processToken: result.processToken,
+            });
+          }
           if (preparedLiveCheckoutReference && !result.processToken) {
             throw new Error("LIVE checkout missing Grow processToken");
           }
@@ -8375,7 +8467,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           if (preparedBoostRequestId) {
             await cancelPaidBoostCheckout(preparedBoostRequestId, error?.message || "grow_create_process_failed");
           }
-          if (input.product === "plus" && db && !diagnosticTest) {
+          // A Grow token was returned, but its recovery binding failed. Retain
+          // the pending Plus intent for reconciliation rather than calling this
+          // an ordinary failed setup that implies a provider retry is safe.
+          if (input.product === "plus" && db && !diagnosticTest && !recoveryProviderProcessAccepted) {
             await db.update(plusCheckoutIntents)
               .set({ status: "failed", updatedAt: Date.now() })
               .where(and(

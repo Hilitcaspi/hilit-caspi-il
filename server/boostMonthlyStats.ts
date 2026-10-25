@@ -258,7 +258,8 @@ export async function loadBoostMonthlyStats(options: { now?: number } = {}): Pro
       : Promise.resolve([]),
   ]);
 
-  const requestRows = uniqueById([...fulfilledRequests, ...requestsForMarkedProposals]);
+  const requestRows = uniqueById([...fulfilledRequests, ...requestsForMarkedProposals])
+    .filter((row): row is typeof row & { matchId: number } => row.matchId !== null);
   const matchRows = uniqueById([...markedProposals, ...matchesForFulfilledRequests]);
   const initiatorIds = Array.from(new Set(requestRows.map(row => Number(row.singleId)).filter(Boolean)));
   const singleRows = initiatorIds.length > 0
