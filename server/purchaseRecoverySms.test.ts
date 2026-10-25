@@ -15,10 +15,11 @@ function build(product: typeof products[number]) {
 }
 
 describe("purchase recovery SMS drafts", () => {
-  it("labels every message as an advertisement from Hilit and includes an unsubscribe path", () => {
+  it("identifies Hilit without an advertisement label and preserves unsubscribe paths", () => {
     for (const product of products) {
       const sms = build(product);
-      expect(sms).toContain("הילית כספי | פרסומת");
+      expect(sms).toContain("הילית כספי |");
+      expect(sms).not.toContain("פרסומת");
       expect(sms).toContain("להסרה:");
       expect(sms).toContain(unsubscribeUrl);
       expect(sms).toContain(smsOfferUrl(product));

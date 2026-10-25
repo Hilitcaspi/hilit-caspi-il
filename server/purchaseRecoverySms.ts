@@ -112,7 +112,7 @@ export function buildPurchaseRecoverySms(input: PurchaseRecoverySmsInput) {
   const unsubscribeUrl = checkedUnsubscribeUrl(input.unsubscribeUrl);
   const disclaimer = input.product === "plus" ? " הצעות אינן הבטחת דייט או זוגיות." : "";
 
-  return `הילית כספי | פרסומת: ${messageFor(input.product, expiresAt)}${disclaimer}\n${offerUrl}\nלהסרה: ${unsubscribeUrl}`;
+  return `הילית כספי | ${messageFor(input.product, expiresAt)}${disclaimer}\n${offerUrl}\nלהסרה: ${unsubscribeUrl}`;
 }
 
 export const buildSms = buildPurchaseRecoverySms;

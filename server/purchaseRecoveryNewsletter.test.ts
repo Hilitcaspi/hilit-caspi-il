@@ -27,15 +27,24 @@ describe("purchase recovery newsletter drafts", () => {
 
     for (const product of products) {
       const email = build(product);
-      expect(email.subject).toMatch(/^פרסומת \| /);
+      expect(email.subject).not.toContain("פרסומת");
       expect(email.subject).toContain("התעניינת");
       expect(email.subject).toContain("🎁");
       expect(email.preheader).toContain(recoveryOfferCode(product));
       expect(email.htmlContent).toContain("database-now-hilit-hero_cde5a6ed.jpg");
-      expect(email.htmlContent).toContain("אתמול הייתה תקלה באתר. היא טופלה, ואפשר שוב להשלים את הרכישה.");
+      const opening = "אתמול לא ניתן היה להשלים רכישות באתר. כעת אפשר שוב";
+      for (const content of [email.htmlContent, email.textContent]) {
+        expect(content).toContain(opening);
+        expect(content.indexOf(opening)).toBeLessThan(content.indexOf("אני הילית כספי"));
+        expect(content).not.toContain("תקלה");
+        expect(content).not.toContain("שדרוג");
+      }
       expect(email.htmlContent).toContain("26.10.2026 בשעה 23:59, שעון ישראל");
       expect(email.htmlContent).not.toContain("UTC+2");
-      expect(email.htmlContent).toContain("פרסומת");
+      expect(email.htmlContent).not.toContain("פרסומת");
+      expect(email.textContent).not.toContain("פרסומת");
+      expect(email.htmlContent).toContain("הסרה מרשימת הדיוור");
+      expect(email.textContent).toContain(`להסרה: ${unsubscribeUrl}`);
       expect(email.htmlContent).toContain(unsubscribeUrl);
       expect(email.htmlContent).toContain(htmlOfferUrl(product));
       expect(email.textContent).toContain(emailOfferUrl(product));

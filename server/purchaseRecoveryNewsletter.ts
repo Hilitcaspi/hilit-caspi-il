@@ -120,6 +120,7 @@ type ProductCopy = {
   preheader: string;
   eyebrow: string;
   heroTitle: string;
+  recoveryIntro: string;
   lead: string;
   price: string;
   priceDetail: string;
@@ -138,8 +139,9 @@ function productCopy(product: PurchaseRecoveryProduct, expiresAt: string): Produ
       subject: "🎁 התעניינת במאגר שלי? שמרתי לך הטבה מיוחדת",
       preheader: `10% הנחה למאגר של הילית כספי עם ${code}, עד ${expiresAt}.`,
       eyebrow: "HILIT CASPI · מאגר ההיכרויות",
-      heroTitle: "הזדמנות להתחיל<br>עם יותר דיוק.",
-      lead: "אני הילית כספי, מאמנת למציאת זוגיות. בניתי את מאגר ההיכרויות שלי כדי שלא יהיה צריך להתחיל כל היכרות מאפס. שאלון DNA, פרופיל אישי ובדיקה אנושית עוזרים לנו להבין מי יכול להתאים לך באמת, מעבר לתמונה ולגיל. ראיתי את ההתעניינות שלך, ורציתי לתת לך סיבה טובה לעשות את הצעד הבא.",
+      heroTitle: "אפשר שוב להצטרף.<br>ההטבה שלך מחכה.",
+      recoveryIntro: "אתמול לא ניתן היה להשלים רכישות באתר. כעת אפשר שוב, ושמרתי לך 10% הנחה על ההצטרפות למאגר. זו ההזמנה שלי לעשות את הצעד הבא עם הטבה מיוחדת שמחכה לך כאן.",
+      lead: "אני הילית כספי, מאמנת למציאת זוגיות. בניתי את מאגר ההיכרויות שלי כדי שלא יהיה צריך להתחיל כל היכרות מאפס. שאלון DNA, פרופיל אישי ובדיקה אנושית עוזרים לנו להבין מי יכול להתאים לך באמת, מעבר לתמונה ולגיל.",
       price: "269.10 ₪",
       priceDetail: "במקום 299 ₪ · תשלום חד פעמי",
       code,
@@ -159,8 +161,9 @@ function productCopy(product: PurchaseRecoveryProduct, expiresAt: string): Produ
       subject: "🎁 התעניינת בפגישה? ההטבה שלך כבר מחכה כאן",
       preheader: `פגישה של 60 דקות ב־450 ₪ עם ${code}, עד ${expiresAt}.`,
       eyebrow: "HILIT CASPI · פגישה אישית",
-      heroTitle: "60 דקות<br>כדי לעשות סדר.",
-      lead: "אני הילית כספי, מאמנת למציאת זוגיות. לפעמים מה שחסר הוא לא עוד עצה, אלא שעה שבה מסתכלים ברצינות על הסיפור שלך: מה חוזר בקשרים, איפה יש תקיעות ומה נכון לעשות אחרת. ראיתי את ההתעניינות שלך בפגישה ורציתי להקל על הצעד הזה. אפשר לקיים את הפגישה בזום או בקליניקה, עם הילית או עם איש צוות מקצועי שהוכשר ועובד בליווי צמוד שלי.",
+      heroTitle: "אפשר שוב לקבוע פגישה.<br>עם הטבה ממני.",
+      recoveryIntro: "אתמול לא ניתן היה להשלים רכישות באתר. כעת אפשר שוב, ושמרתי לך 10% הנחה על פגישה אישית של 60 דקות. אפשר להשלים את הרכישה עכשיו עם ההטבה שמחכה לך כאן.",
+      lead: "אני הילית כספי, מאמנת למציאת זוגיות. לפעמים מה שחסר הוא לא עוד עצה, אלא שעה שבה מסתכלים ברצינות על הסיפור שלך: מה חוזר בקשרים, איפה יש תקיעות ומה נכון לעשות אחרת. אפשר לקיים את הפגישה בזום או בקליניקה, עם הילית או עם איש צוות מקצועי שהוכשר ועובד בליווי צמוד שלי.",
       price: "450 ₪",
       priceDetail: "במקום 500 ₪ · פגישה אחת של 60 דקות",
       code,
@@ -179,8 +182,9 @@ function productCopy(product: PurchaseRecoveryProduct, expiresAt: string): Produ
     subject: "🎁 התעניינת ב־Plus? מחכה לך עוד בוסט במתנה",
     preheader: `Plus ב־99 ₪ לחודש עם ${code}: בוסט מתנה נוסף בהצטרפות ראשונה, עד ${expiresAt}.`,
     eyebrow: "HILIT CASPI · DATABASE PLUS",
-    heroTitle: "עוד תשומת לב.<br>עוד הזדמנות להכיר.",
-    lead: "אני הילית כספי. אם כבר הצטרפת למאגר ורצית יותר תשומת לב לפרופיל ויותר הזדמנויות להיכרות, בשביל זה יצרתי את Plus. זהו שירות חודשי שבו אני בודקת אישית הצעות התאמה ומקדמת את התהליך שלך. ראיתי את ההתעניינות שלך ורציתי לשמור לך מתנת הצטרפות: בוסט נוסף, מעבר לבוסט שכבר כלול במסלול.",
+    heroTitle: "אפשר שוב להצטרף.<br>עם בוסט במתנה.",
+    recoveryIntro: "אתמול לא ניתן היה להשלים רכישות באתר. כעת אפשר שוב, ובהצטרפות ראשונה ל־Plus שמרתי לך בוסט נוסף במתנה, מעבר לבוסט שכבר כלול במסלול. ההטבה מחכה לך כאן, לחברי מאגר פעילים בלבד.",
+    lead: "אני הילית כספי. אם כבר הצטרפת למאגר ורצית יותר תשומת לב לפרופיל ויותר הזדמנויות להיכרות, בשביל זה יצרתי את Plus. זהו שירות חודשי שבו אני בודקת אישית הצעות התאמה ומקדמת את התהליך שלך.",
     price: "99 ₪",
     priceDetail: "לחודש · חיוב חודשי מתחדש עד לביטול",
     code,
@@ -208,13 +212,13 @@ export function buildPurchaseRecoveryNewsletter(input: PurchaseRecoveryNewslette
   const greeting = name ? `היי ${escapeHtml(name)},` : "היי,";
   const rows = copy.features.map(([number, title, body]) => `<tr><td class="pad" style="padding:25px 42px;border-bottom:1px solid #eadde1;background:#fbf5f1"><p style="margin:0;color:#ae718b;font-size:12px;letter-spacing:2px;font-weight:700">${number}</p><h2 style="margin:8px 0 9px;color:#301c2c;font-size:23px;line-height:1.35">${title}</h2><p style="margin:0;color:#66565e;font-size:16px;line-height:1.82">${body}</p></td></tr>`).join("");
 
-  const htmlContent = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting"><title>${escapeHtml(copy.subject)}</title><link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>body,table,td,p,a,h1,h2{font-family:Rubik,Arial,sans-serif!important}table{border-collapse:collapse}@media(max-width:640px){.shell{width:100%!important}.pad{padding-left:24px!important;padding-right:24px!important}.title{font-size:42px!important}.cta{display:block!important}}@media(prefers-color-scheme:dark){.shell{color-scheme:light}}</style></head><body style="margin:0;background:#e8e0dd;color:#301c2c;direction:rtl"><div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">${escapeHtml(copy.preheader)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 8px"><table role="presentation" class="shell" width="640" style="width:640px;max-width:640px;background:#fbf5f1" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:21px 18px;background:#251724;color:#f4d7df;font-size:13px;letter-spacing:2.7px;font-weight:700">${copy.eyebrow}</td></tr><tr><td style="padding:0"><img src="${HERO}" width="640" alt="הילית כספי" style="display:block;width:100%;height:auto;border:0"></td></tr><tr><td class="pad" align="center" style="padding:31px 42px;background:#eecfd8"><p style="margin:0 0 13px;color:#803b59;font-size:12px;font-weight:700">הטבה בעקבות התעניינות קודמת</p><h1 class="title" style="margin:0;color:#301c2c;font-size:53px;line-height:1.05;letter-spacing:-1.1px">${copy.heroTitle}</h1><p style="margin:18px 0 0;color:#6b2946;font-size:18px;line-height:1.65;font-weight:700">${copy.priceDetail}</p>${button(copy.cta, offerUrl)}</td></tr><tr><td class="pad" style="padding:28px 42px;background:#fbf5f1"><p style="margin:0 0 12px;color:#301c2c;font-size:18px;font-weight:700">${greeting}</p><p style="margin:0;color:#66565e;font-size:16px;line-height:1.85">${copy.lead}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px"><tr><td style="padding:15px 17px;border-right:4px solid #ae718b;background:#f3e8e7"><p style="margin:0;color:#59434f;font-size:15px;line-height:1.75"><strong style="color:#6b2946">עדכון קצר:</strong> אתמול הייתה תקלה באתר. היא טופלה, ואפשר שוב להשלים את הרכישה.</p></td></tr></table></td></tr>${rows}<tr><td class="pad" align="center" style="padding:35px 42px;background:#251724;color:#ffffff"><p style="margin:0 0 10px;color:#efb9cc;font-size:13px;font-weight:700">קוד ההטבה שלך</p><p style="margin:0;color:#f4d7df;font-size:35px;line-height:1;font-weight:800;letter-spacing:1px">${copy.code}</p><p style="margin:16px 0 0;color:#ffffff;font-size:47px;line-height:1;font-weight:800">${copy.price}</p><p style="margin:12px 0 0;color:#ead5dd;font-size:15px;line-height:1.7">${copy.priceDetail}</p>${button(copy.cta, offerUrl, true)}<p style="margin:17px 0 0;color:#dbc8d1;font-size:12px;line-height:1.8">${copy.terms}</p></td></tr><tr><td class="pad" style="padding:26px 42px;background:#ede3e6"><h2 style="margin:0 0 10px;color:#301c2c;font-size:21px;line-height:1.35">מה חשוב לדעת</h2><p style="margin:0;color:#59434f;font-size:15px;line-height:1.82">${copy.reassurance}</p></td></tr><tr><td class="pad" style="padding:29px 42px;background:#fbf5f1"><p style="margin:0;color:#66565e;font-size:16px;line-height:1.8">באהבה,<br><strong style="color:#6b2946">הילית כספי</strong></p></td></tr><tr><td align="center" style="padding:21px 24px;background:#d9c9cf;color:#64515c;font-size:11px;line-height:1.7">הילית כספי · פרסומת · בעקבות התעניינות קודמת<br><a href="${escapeHtml(unsubscribeUrl)}" style="color:#49283b;text-decoration:underline">הסרה מרשימת הדיוור</a></td></tr></table></td></tr></table></body></html>`;
+  const htmlContent = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting"><title>${escapeHtml(copy.subject)}</title><link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>body,table,td,p,a,h1,h2{font-family:Rubik,Arial,sans-serif!important}table{border-collapse:collapse}@media(max-width:640px){.shell{width:100%!important}.pad{padding-left:24px!important;padding-right:24px!important}.title{font-size:42px!important}.cta{display:block!important}}@media(prefers-color-scheme:dark){.shell{color-scheme:light}}</style></head><body style="margin:0;background:#e8e0dd;color:#301c2c;direction:rtl"><div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">${escapeHtml(copy.preheader)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 8px"><table role="presentation" class="shell" width="640" style="width:640px;max-width:640px;background:#fbf5f1" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:21px 18px;background:#251724;color:#f4d7df;font-size:13px;letter-spacing:2.7px;font-weight:700">${copy.eyebrow}</td></tr><tr><td style="padding:0"><img src="${HERO}" width="640" alt="הילית כספי" style="display:block;width:100%;height:auto;border:0"></td></tr><tr><td class="pad" align="center" style="padding:31px 42px;background:#eecfd8"><p style="margin:0 0 13px;color:#803b59;font-size:12px;font-weight:700">הטבה בעקבות התעניינות קודמת</p><h1 class="title" style="margin:0;color:#301c2c;font-size:53px;line-height:1.05;letter-spacing:-1.1px">${copy.heroTitle}</h1><p style="margin:18px 0 0;color:#6b2946;font-size:18px;line-height:1.65;font-weight:700">${copy.priceDetail}</p>${button(copy.cta, offerUrl)}</td></tr><tr><td class="pad" style="padding:28px 42px;background:#fbf5f1"><p style="margin:0 0 12px;color:#301c2c;font-size:18px;font-weight:700">${greeting}</p><p style="margin:0;color:#66565e;font-size:16px;line-height:1.85">${copy.recoveryIntro}</p><p style="margin:18px 0 0;color:#66565e;font-size:16px;line-height:1.85">${copy.lead}</p></td></tr>${rows}<tr><td class="pad" align="center" style="padding:35px 42px;background:#251724;color:#ffffff"><p style="margin:0 0 10px;color:#efb9cc;font-size:13px;font-weight:700">קוד ההטבה שלך</p><p style="margin:0;color:#f4d7df;font-size:35px;line-height:1;font-weight:800;letter-spacing:1px">${copy.code}</p><p style="margin:16px 0 0;color:#ffffff;font-size:47px;line-height:1;font-weight:800">${copy.price}</p><p style="margin:12px 0 0;color:#ead5dd;font-size:15px;line-height:1.7">${copy.priceDetail}</p>${button(copy.cta, offerUrl, true)}<p style="margin:17px 0 0;color:#dbc8d1;font-size:12px;line-height:1.8">${copy.terms}</p></td></tr><tr><td class="pad" style="padding:26px 42px;background:#ede3e6"><h2 style="margin:0 0 10px;color:#301c2c;font-size:21px;line-height:1.35">מה חשוב לדעת</h2><p style="margin:0;color:#59434f;font-size:15px;line-height:1.82">${copy.reassurance}</p></td></tr><tr><td class="pad" style="padding:29px 42px;background:#fbf5f1"><p style="margin:0;color:#66565e;font-size:16px;line-height:1.8">באהבה,<br><strong style="color:#6b2946">הילית כספי</strong></p></td></tr><tr><td align="center" style="padding:21px 24px;background:#d9c9cf;color:#64515c;font-size:11px;line-height:1.7">הילית כספי · בעקבות התעניינות קודמת<br><a href="${escapeHtml(unsubscribeUrl)}" style="color:#49283b;text-decoration:underline">הסרה מרשימת הדיוור</a></td></tr></table></td></tr></table></body></html>`;
 
   const textContent = `${greeting}
 
-${copy.lead}
+${copy.recoveryIntro}
 
-אתמול הייתה תקלה באתר. היא טופלה, ואפשר שוב להשלים את הרכישה.
+${copy.lead}
 
 ${copy.features.map(([, title, body]) => `${title}
 ${body}`).join("\n\n")}
@@ -231,10 +235,10 @@ ${copy.reassurance}
 באהבה,
 הילית כספי
 
-הילית כספי · פרסומת
+הילית כספי
 להסרה: ${unsubscribeUrl}`;
 
-  return { subject: `פרסומת | ${copy.subject}`, preheader: copy.preheader, htmlContent, textContent };
+  return { subject: copy.subject, preheader: copy.preheader, htmlContent, textContent };
 }
 
 export const buildNewsletter = buildPurchaseRecoveryNewsletter;
