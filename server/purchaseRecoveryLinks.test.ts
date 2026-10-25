@@ -4,6 +4,7 @@ import {
   RECOVERY_OFFER_EXPIRES_AT,
   RECOVERY_SEND_AT,
   RECOVERY_SEND_EXPIRES_AT,
+  RECOVERY_BUSINESS_WHATSAPP_URL,
   purchaseRecoveryOfferUrl,
   recoveryOfferCode,
 } from "../shared/purchaseRecoveryLinks";
@@ -14,6 +15,17 @@ describe("purchase recovery campaign links", () => {
     expect(RECOVERY_SEND_AT).toBe(Date.parse("2026-10-25T19:00:00+02:00"));
     expect(RECOVERY_SEND_EXPIRES_AT).toBe(Date.parse("2026-10-25T22:00:00+02:00"));
     expect(RECOVERY_OFFER_EXPIRES_AT).toBe(Date.parse("2026-10-26T23:59:59+02:00"));
+  });
+
+  it("keeps business WhatsApp separate from checkout and free of recipient data", () => {
+    const url = new URL(RECOVERY_BUSINESS_WHATSAPP_URL);
+    expect(url.protocol).toBe("https:");
+    expect(url.hostname).toBe("wa.me");
+    expect(url.pathname).toMatch(/^\/\d+$/);
+    expect(url.search).toBe("");
+    expect(url.hash).toBe("");
+    expect(url.username).toBe("");
+    expect(url.password).toBe("");
   });
 
   it.each([

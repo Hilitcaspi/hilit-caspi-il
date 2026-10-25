@@ -2,6 +2,9 @@ export const RECOVERY_CAMPAIGN = "recovery_oct25_2026" as const;
 export const RECOVERY_SEND_AT = Date.parse("2026-10-25T19:00:00+02:00");
 export const RECOVERY_SEND_EXPIRES_AT = Date.parse("2026-10-25T22:00:00+02:00");
 export const RECOVERY_OFFER_EXPIRES_AT = Date.parse("2026-10-26T23:59:59+02:00");
+// Same public business contact used on the Israeli home and session pages.
+// The destination contains no recipient identifiers and never sends a message automatically.
+export const RECOVERY_BUSINESS_WHATSAPP_URL = "https://wa.me/972552442334";
 
 export type PurchaseRecoveryProduct = "database" | "session" | "plus";
 export type PurchaseRecoveryChannel = "email" | "sms";

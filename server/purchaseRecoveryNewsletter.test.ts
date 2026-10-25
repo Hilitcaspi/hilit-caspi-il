@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildPurchaseRecoveryNewsletter } from "./purchaseRecoveryNewsletter";
-import { purchaseRecoveryOfferUrl, recoveryOfferCode, RECOVERY_CAMPAIGN, RECOVERY_OFFER_EXPIRES_AT } from "../shared/purchaseRecoveryLinks";
+import { purchaseRecoveryOfferUrl, recoveryOfferCode, RECOVERY_CAMPAIGN, RECOVERY_OFFER_EXPIRES_AT, RECOVERY_BUSINESS_WHATSAPP_URL } from "../shared/purchaseRecoveryLinks";
 
 const unsubscribeUrl = "https://hilitcaspi.com/unsubscribe?token=synthetic-signed-preview";
 const products = ["database", "session", "plus"] as const;
@@ -48,6 +48,9 @@ describe("purchase recovery newsletter drafts", () => {
       expect(email.htmlContent).toContain(unsubscribeUrl);
       expect(email.htmlContent).toContain(htmlOfferUrl(product));
       expect(email.textContent).toContain(emailOfferUrl(product));
+      expect(email.htmlContent).toContain(RECOVERY_BUSINESS_WHATSAPP_URL);
+      expect(email.textContent).toContain(RECOVERY_BUSINESS_WHATSAPP_URL);
+      expect(email.htmlContent).toContain("לעזרה בווטסאפ העסקי");
     }
   });
 
@@ -153,6 +156,7 @@ describe("purchase recovery newsletter drafts", () => {
     const allText = products.map(product => build(product).textContent)
       .join("\n")
       .replaceAll(unsubscribeUrl, "")
+      .replaceAll(RECOVERY_BUSINESS_WHATSAPP_URL, "")
       .replaceAll(emailOfferUrl("database"), "")
       .replaceAll(emailOfferUrl("session"), "")
       .replaceAll(emailOfferUrl("plus"), "");
