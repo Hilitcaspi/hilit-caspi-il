@@ -15,9 +15,9 @@ describe("Plus service-departure admin UI contract", () => {
     expect(source).toContain("remaining?: number;");
     expect(source).toContain('reason?: "target_met" | "cycle_elapsed" | null;');
     expect(source).toContain('useState<"active" | "finishing" | "archived">("active")');
-    expect(source).toContain('["active", "פעילים"]');
-    expect(source).toContain('["finishing", "מסיימים עם יתרת התאמות"]');
-    expect(source).toContain('["archived", "הפסיקו את השירות"]');
+    expect(source).toContain('["active", "שירות פעיל"]');
+    expect(source).toContain('["finishing", "מסיימים שירות עם יתרת התאמות"]');
+    expect(source).toContain('["archived", "שירות שהסתיים"]');
     expect(source).toContain('role="tablist"');
   });
 
@@ -31,7 +31,9 @@ describe("Plus service-departure admin UI contract", () => {
     const archive = section('{serviceDepartureView === "archived"', "<Dialog open=");
     expect(archive).toContain('serviceDepartureView === "archived"');
     expect(archive).toContain("archivedRows.map");
-    expect(archive).toContain('<ServiceDepartureNotice serviceDeparture={row.serviceDeparture} cancellationPending={row.cancellationPending} archived endedAt={row.pilot.endedAt} />');
+    expect(archive).toContain('<ServiceDepartureNotice serviceDeparture={row.serviceDeparture}');
+    expect(archive).toContain('cancellationPending={row.cancellationPending && cancellationByMemberId.get(row.pilot.id)?.providerStopEvidence !== "staff_confirmation" && cancellationByMemberId.get(row.pilot.id)?.providerStopEvidence !== "legacy_staff_confirmation"}');
+    expect(archive).toContain('archived endedAt={row.pilot.endedAt}');
   });
 
   it("explains timed completion without confusing a service cycle with a payment", () => {

@@ -18,6 +18,11 @@ import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserv
 import { recordPlusCancellation } from "./plusCancellation";
 import { notifyPlusCancellation } from "./plusCancellationNotifications";
 import { isPlusCancellationPending, loadPlusCancellationQueue } from "./plusCancellationQueue";
+import {
+  buildPlusCancellationTracking,
+  confirmPlusProviderStopped,
+  loadPlusCancellationTrackingEvidence,
+} from "./plusCancellationTracking";
 import { PLUS_CHECKOUT_PUBLICLY_AVAILABLE } from "./growPayment";
 import {
   PLUS_HOLIDAY_LAUNCH_COHORT,
@@ -333,7 +338,10 @@ export const plusPilotRouter = router({
     }).from(plusPilotMembers)
       .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
       .orderBy(desc(plusPilotMembers.updatedAt));
-    const cancellationQueue = await loadPlusCancellationQueue(db, rows);
+    const [cancellationQueue, cancellationEvidence] = await Promise.all([
+      loadPlusCancellationQueue(db, rows),
+      loadPlusCancellationTrackingEvidence(db),
+    ]);
     const cancellationPendingIds = new Set(cancellationQueue.map(row => row.plusMemberId));
 
     const [allMatches, boostRows, boostMembershipRows, paymentRows, matchSingles, pendingPaidProfiles, relaunchLogs, checkoutAttributionRows, holidayLaunchLogs] = await Promise.all([
@@ -521,7 +529,9 @@ export const plusPilotRouter = router({
         cancellationPending: cancellationPendingIds.has(row.pilot.id),
         archived: isPlusArchived(row.pilot) || serviceDeparture.state === "archived",
         serviceDeparture,
+        lastManualProposalAt,
         confirmedPayment: hasConfirmedProductionPlusPayment(paymentEvents),
+        paymentRecorded: paymentEvents.length > 0,
         cycleProgress,
         cycleMatches,
         cycleMatchCount: cycleMatches.filter(match => match.source !== "boost").length,
@@ -539,6 +549,20 @@ export const plusPilotRouter = router({
         launchAttribution: holidayLaunchTracking.attribution,
       };
     });
+    const { tracking: cancellationTracking, summary: cancellationSummary } = buildPlusCancellationTracking(
+      enrichedRows,
+      cancellationEvidence.requests,
+      cancellationEvidence.tasks,
+      new Map(enrichedRows.map(row => [row.pilot.id, {
+        cycleStart: row.cycleProgress.cycleStart,
+        cycleEnd: row.cycleProgress.cycleEnd,
+        target: row.cycleProgress.target,
+        delivered: row.cycleProgress.delivered,
+        remaining: row.cycleProgress.remaining,
+        lastManualProposalAt: row.lastManualProposalAt,
+      }])),
+      overviewNow,
+    );
     const counts = Object.fromEntries(PLUS_STATUSES.map(status => [status, enrichedRows.filter(row =>
       status === "churned" ? row.archived : row.pilot.status === status && !row.archived).length]));
     const invitedBase = counts.invited + counts.active + counts.declined + counts.churned;
@@ -594,6 +618,8 @@ export const plusPilotRouter = router({
     return {
       counts,
       cancellationQueue,
+      cancellationTracking,
+      cancellationSummary,
       commitment,
       serviceNeeds: { members: enrichedRows.filter(row => !row.archived && row.cycleProgress.needsMatches).length, proposals: enrichedRows.filter(row => !row.archived && row.cycleProgress.needsMatches).reduce((sum, row) => sum + row.cycleProgress.remaining, 0) },
       capacity,
@@ -704,7 +730,19 @@ export const plusPilotRouter = router({
       assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      return endPlusLocally(db, input.id);
+      const actor = ctx.user?.email || ctx.user?.openId || ctx.teamMember?.email || ctx.teamMember?.name;
+      return endPlusLocally(db, input.id, Date.now(), actor || undefined);
+    }),
+
+  adminConfirmProviderStopped: teamProcedure
+    .input(z.object({ id: z.number().int().positive(), confirmed: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const actor = ctx.user?.email || ctx.user?.openId || ctx.teamMember?.email || ctx.teamMember?.name;
+      if (!actor) throw new TRPCError({ code: "FORBIDDEN" });
+      return confirmPlusProviderStopped(db, input.id, actor);
     }),
 
   adminUpdateSubscription: teamProcedure

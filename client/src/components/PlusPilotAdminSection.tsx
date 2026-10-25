@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import PlusCancellationQueue from "@/components/PlusCancellationQueue";
+import PlusCancellationQueue, { type PlusCancellationSummary, type PlusCancellationTrackingRow } from "@/components/PlusCancellationQueue";
 import ProfileStaffMarkers, { profileStaffSurface } from "@/components/ProfileStaffMarkers";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -81,6 +81,8 @@ export default function PlusPilotAdminSection() {
   const [price, setPrice] = useState("99");
   const [endMember, setEndMember] = useState<{ id: number; name: string } | null>(null);
   const [providerStopped, setProviderStopped] = useState(false);
+  const [providerStopMember, setProviderStopMember] = useState<PlusCancellationTrackingRow | null>(null);
+  const [providerStopConfirmed, setProviderStopConfirmed] = useState(false);
   const overview = trpc.plusPilot.adminOverview.useQuery(undefined, {
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
@@ -88,6 +90,15 @@ export default function PlusPilotAdminSection() {
   const updateStatus = trpc.plusPilot.adminUpdateStatus.useMutation({ onSuccess: () => overview.refetch(), onError: error => toast.error(error.message) });
   const endMembership = trpc.plusPilot.adminEndMembership.useMutation({
     onSuccess: () => { setEndMember(null); setProviderStopped(false); overview.refetch(); toast.success("מנוי Plus הסתיים באתר והועבר לארכיון. החברות במאגר לא שונתה."); },
+    onError: error => toast.error(error.message),
+  });
+  const confirmProviderStopped = trpc.plusPilot.adminConfirmProviderStopped.useMutation({
+    onSuccess: () => {
+      setProviderStopMember(null);
+      setProviderStopConfirmed(false);
+      overview.refetch();
+      toast.success("עצירת החיוב ב־Grow תועדה. שירות Plus לא הסתיים.");
+    },
     onError: error => toast.error(error.message),
   });
 
@@ -109,6 +120,13 @@ export default function PlusPilotAdminSection() {
     const query = search.trim().toLowerCase();
     return (overview.data?.rows || []).filter(row => row.archived && (!query || `${row.single.firstName} ${row.single.lastName || ""} ${row.single.email || ""}`.toLowerCase().includes(query)));
   }, [overview.data?.rows, search]);
+
+  const cancellationTracking = (overview.data?.cancellationTracking || []) as PlusCancellationTrackingRow[];
+  const cancellationSummary = overview.data?.cancellationSummary as PlusCancellationSummary | undefined;
+  const cancellationByMemberId = useMemo(
+    () => new Map(cancellationTracking.map(row => [row.plusMemberId, row])),
+    [cancellationTracking],
+  );
 
   const verifiedPurchases = useMemo(() => {
     const active = (overview.data?.rows || [])
@@ -135,7 +153,6 @@ export default function PlusPilotAdminSection() {
   if (overview.isLoading) return <section className="h-44 rounded-2xl bg-white animate-pulse border border-[#e9e8e8]" />;
   if (!overview.data) return <section className="rounded-2xl border bg-white p-5"><p>לא ניתן לטעון את נתוני Plus כרגע.</p><button type="button" onClick={() => overview.refetch()}>ניסיון נוסף</button></section>;
   const { counts, commitment, capacity, capacityBreakdown, pendingPaidProfiles, relaunchStats, holidayLaunchStats, waitlistToInviteRate, inviteToActiveRate, retentionRate, serviceNeeds } = overview.data;
-  const cancellationQueue = overview.data.cancellationQueue;
 
   const changeStatus = (id: number, status: "waitlist" | "eligible" | "invited" | "active" | "declined" | "churned") => {
     updateStatus.mutate({
@@ -150,31 +167,36 @@ export default function PlusPilotAdminSection() {
     <section className="rounded-2xl border border-[#e4d27e] bg-gradient-to-br from-[#fffdf4] to-white p-5 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold text-[#8b7420]">מנוי פרימיום · יעד מדיד של 2 הצעות, או 3 במחזור ההשקה לזכאים</p>
+          <p className="text-[11px] font-bold text-[#8b7420]">ניהול שירות Plus</p>
           <h3 className="mt-1 text-lg font-black text-[#191265]">Database Plus</h3>
-          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">מחזור ההתאמות הידניות מתקדם אוטומטית כל 30 יום כל עוד Plus פעיל, גם אם הודעת החידוש מ־Grow לא נקלטה. מחזור שירות אינו אישור תשלום. מנוי שסיימת יופיע רק בארכיון המקופל למטה.</p>
+          <p className="mt-1 max-w-2xl text-xs leading-6 text-[#666]">חיוב ב־Grow וזכאות השירות מנוהלים בנפרד. אישור חיוב אינו מסיים את השירות.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <button type="button" onClick={() => overview.refetch()} disabled={overview.isFetching} className="rounded-xl border border-[#d8b67e] bg-white px-3 py-2 font-bold text-[#6f541d] disabled:opacity-50">
             {overview.isFetching ? "מרענן…" : "רענון עכשיו"}
           </button>
-          <label className="rounded-xl border bg-white px-3 py-2">קוהורט <input value={cohort} onChange={event => setCohort(event.target.value)} className="mr-2 w-24 outline-none" /></label>
-          <label className="rounded-xl border bg-white px-3 py-2">מחיר פיילוט ₪ <input type="number" min="0" value={price} onChange={event => setPrice(event.target.value)} className="mr-2 w-16 outline-none" /></label>
         </div>
       </div>
 
       <PlusCancellationQueue
-        rows={cancellationQueue}
+        rows={cancellationTracking}
+        summary={cancellationSummary || { requested: 0, pendingGrow: 0, confirmedGrow: 0, withRemaining: 0, archived: 0, subscriptionUnverified: 0 }}
         refreshing={overview.isFetching}
         onRefresh={() => overview.refetch()}
-        onEnd={request => {
-          const fullName = `${request.single.firstName} ${request.single.lastName || ""}`.trim();
-          setEndMember({ id: request.plusMemberId, name: fullName });
-          setProviderStopped(false);
+        onConfirmProviderStopped={request => {
+          setProviderStopMember(request);
+          setProviderStopConfirmed(false);
         }}
       />
 
-      <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-2">
+      <details className="mt-5 rounded-2xl border border-[#e4d27e] bg-white/70 p-4">
+        <summary className="cursor-pointer text-xs font-black text-[#191265]">נתוני פיילוט, קמפיינים והגדרות שירות</summary>
+        <p className="mt-1 text-[10px] leading-5 text-[#75674f]">הנתונים נשמרו כאן לעיון כדי שמעקב הפסקת Plus יישאר בראש המסך.</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <label className="rounded-xl border bg-white px-3 py-2">קוהורט <input value={cohort} onChange={event => setCohort(event.target.value)} className="mr-2 w-24 outline-none" /></label>
+          <label className="rounded-xl border bg-white px-3 py-2">מחיר פיילוט ₪ <input type="number" min="0" value={price} onChange={event => setPrice(event.target.value)} className="mr-2 w-16 outline-none" /></label>
+        </div>
+      <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-2">
         {[
           ["ממתינים", counts.waitlist + counts.eligible, "text-[#191265]"],
           ["הוזמנו", counts.invited, "text-blue-700"],
@@ -273,13 +295,14 @@ export default function PlusPilotAdminSection() {
         <button type="button" onClick={() => setStatusFilter("needs_matches")} className="mt-2 rounded-lg bg-[#ffe27c] px-3 py-2 text-xs font-black text-[#191265]">הצג מנויים שצריכים התאמות</button>
         <p className="mt-2 text-[10px] leading-5 text-white/65">ההתראה היא לצוות בלבד. אין שליחת התאמות או הודעות אוטומטית. זכאות הבוסט החינמי נשארת לפי מחזור החיוב המתועד, ללא שינוי במסגרת זו.</p>
       </div>
+      </details>
 
       <div className="mt-4 flex flex-col gap-2">
         <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="תצוגת סיום שירות Plus">
           {[
-            ["active", "פעילים"],
-            ["finishing", "מסיימים עם יתרת התאמות"],
-            ["archived", "הפסיקו את השירות"],
+            ["active", "שירות פעיל"],
+            ["finishing", "מסיימים שירות עם יתרת התאמות"],
+            ["archived", "שירות שהסתיים"],
           ].map(([view, label]) => <button
             key={view}
             type="button"
@@ -301,7 +324,10 @@ export default function PlusPilotAdminSection() {
       </div>
 
       {serviceDepartureView !== "archived" && <div className="mt-4 max-h-[420px] overflow-y-auto space-y-2">
-        {rows.map((row: any) => (
+        {rows.map((row: any) => {
+          const cancellationTrackingRow = cancellationByMemberId.get(row.pilot.id);
+          const providerStopConfirmed = cancellationTrackingRow?.providerStopEvidence === "staff_confirmation" || cancellationTrackingRow?.providerStopEvidence === "legacy_staff_confirmation";
+          return (
           <article key={row.pilot.id} className={`rounded-xl border border-[#ebe8d7] p-3 ${profileStaffSurface(row.single)}`}>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div className="min-w-0">
@@ -315,7 +341,7 @@ export default function PlusPilotAdminSection() {
                 <p className="mt-1 text-[9px] text-[#999]">נרשם/ה לרשימה: {new Date(row.pilot.waitlistedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold">
                   <span className={`rounded-full px-2 py-1 ${row.cycleProgress.state === "green" ? "bg-emerald-100 text-emerald-800" : row.cycleProgress.state === "red" ? "bg-red-100 text-red-800" : row.cycleProgress.state === "yellow" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"}`}>{row.cycleProgress.delivered} מתוך {row.cycleProgress.target} הצעות · {row.cycleProgress.daysRemaining} ימים</span>
-                  {row.cancellationPending ? <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-900">בקשת עצירה · ממתין לטיפול ב־Grow</span> : <span className={`rounded-full px-2 py-1 ${row.pilot.billingStatus === "active" ? "bg-blue-100 text-blue-800" : row.pilot.billingStatus === "past_due" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}>מצב חיוב רשום: {row.pilot.billingStatus}</span>}
+                  {cancellationTrackingRow?.subscriptionUnverified ? <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-950">רשומה ישנה לבירור · לא הופעל Plus</span> : cancellationTrackingRow ? providerStopConfirmed ? <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">עצירת Grow אושרה</span> : <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-900">בקשת עצירה · טרם אישרת עצירה ב־Grow</span> : <span className={`rounded-full px-2 py-1 ${row.pilot.billingStatus === "active" ? "bg-blue-100 text-blue-800" : row.pilot.billingStatus === "past_due" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}>מצב חיוב רשום: {row.pilot.billingStatus}</span>}
                   {row.cycleProgress.needsMatches && <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-900">נדרשות {row.cycleProgress.remaining} הצעות חדשות</span>}
                   {row.confirmedPayment && <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">תשלום הצטרפות מתועד</span>}
                   {row.holidayLaunchEntitlement && <span className="rounded-full bg-[#10182f] px-2 py-1 text-[#ffe27c]">הטבת השקה · יעד 3/3</span>}
@@ -323,7 +349,7 @@ export default function PlusPilotAdminSection() {
                   {row.pilot.premiumSupportEnabled && <span className="rounded-full bg-[#191265] px-2 py-1 text-[#ffe27c]">שירות פרימיום</span>}
                   {row.pilot.socialExposureConsent === "approved" && <span className="rounded-full bg-pink-100 px-2 py-1 text-pink-800">אושר לסושיאל</span>}
                 </div>
-                <ServiceDepartureNotice serviceDeparture={row.serviceDeparture} cancellationPending={row.cancellationPending} />
+                <ServiceDepartureNotice serviceDeparture={row.serviceDeparture} cancellationPending={row.cancellationPending && cancellationByMemberId.get(row.pilot.id)?.providerStopEvidence !== "staff_confirmation" && cancellationByMemberId.get(row.pilot.id)?.providerStopEvidence !== "legacy_staff_confirmation"} />
                 {row.pilot.status === "active" && <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <div className="rounded-xl border border-[#e4e0f4] bg-[#faf9ff] p-3">
                     <div className="flex items-center justify-between gap-2"><strong className="text-[11px] text-[#191265]">הצעות Plus במחזור השירות</strong><span className="text-sm font-black text-[#191265]">{row.cycleMatchCount} מתוך {row.cycleProgress.target}</span></div>
@@ -353,7 +379,7 @@ export default function PlusPilotAdminSection() {
                 </details>}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {row.pilot.status === "active" && <button type="button" disabled={endMembership.isPending} onClick={() => { setEndMember({ id: row.pilot.id, name: `${row.single.firstName} ${row.single.lastName || ""}`.trim() }); setProviderStopped(false); }} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[10px] font-bold text-red-800">סיום מנוי Plus</button>}
+                {row.pilot.status === "active" && (!cancellationTrackingRow || (!cancellationTrackingRow.subscriptionUnverified && cancellationTrackingRow.remaining === 0)) && <button type="button" disabled={endMembership.isPending} onClick={() => { setEndMember({ id: row.pilot.id, name: `${row.single.firstName} ${row.single.lastName || ""}`.trim() }); setProviderStopped(false); }} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[10px] font-bold text-red-800">סיום שירות Plus</button>}
                 {(["eligible", "invited", "active", "declined"] as const).map(status => (
                   <button
                     key={status}
@@ -379,7 +405,8 @@ export default function PlusPilotAdminSection() {
               </div>
             </div>
           </article>
-        ))}
+          );
+        })}
         {rows.length === 0 && <div className="py-8 text-center text-xs text-[#888]">אין נרשמים לפי הסינון הנוכחי</div>}
       </div>}
       {serviceDepartureView === "archived" && <div className="mt-4 rounded-xl border border-[#e9e5dd] bg-[#f8f7f4] p-4">
@@ -389,13 +416,24 @@ export default function PlusPilotAdminSection() {
           {archivedRows.map((row: any) => <article key={row.pilot.id} className={`rounded-lg border p-3 text-xs text-[#777] ${profileStaffSurface(row.single)}`}>
             <strong>{row.single.firstName} {row.single.lastName}</strong>
             <ProfileStaffMarkers profile={row.single} compact />
-            <ServiceDepartureNotice serviceDeparture={row.serviceDeparture} cancellationPending={row.cancellationPending} archived endedAt={row.pilot.endedAt} />
+            <ServiceDepartureNotice serviceDeparture={row.serviceDeparture} cancellationPending={row.cancellationPending && cancellationByMemberId.get(row.pilot.id)?.providerStopEvidence !== "staff_confirmation" && cancellationByMemberId.get(row.pilot.id)?.providerStopEvidence !== "legacy_staff_confirmation"} archived endedAt={row.pilot.endedAt} />
             <span className="mt-1 block text-[10px]">מחזור אחרון: {formatDate(row.cycleProgress.cycleStart)} עד {formatDate(row.cycleProgress.cycleEnd)} · {row.cycleProgress.delivered} הצעות ידניות</span>
             {row.serviceHistory?.periods?.length > 0 && <details className="mt-2 rounded-lg bg-[#f8f7f4] p-2 text-[10px]"><summary className="cursor-pointer font-bold text-[#5d557d]">היסטוריית שירות של 30 יום ({row.serviceHistory.periods.length})</summary><p className="mt-1 text-[9px]">חלונות שירות בלבד; תווית החודש אינה גבול השירות ואינה מאמתת תשלום.</p>{row.serviceHistory.periods.map((period: any) => <div key={period.cycleIndex} className="mt-1 flex flex-wrap justify-between gap-x-2 border-t pt-1"><span>#{period.cycleIndex + 1} · {formatDate(period.serviceStart)}–{formatDate(period.serviceEnd)} · עזר: {period.calendarMonthLabel}</span><span>{period.manualProposalCount}/{period.target} ידניות</span></div>)}</details>}
           </article>)}
           {!archivedRows.length && <p className="text-xs text-[#999]">אין מנויים שהסתיימו לפי החיפוש</p>}
         </div>
       </div>}
+      <Dialog open={Boolean(providerStopMember)} onOpenChange={open => { if (!open && !confirmProviderStopped.isPending) { setProviderStopMember(null); setProviderStopConfirmed(false); } }}>
+        <DialogContent dir="rtl" className="max-w-md text-right" data-provider-stop-dialog>
+          <DialogHeader>
+            <DialogTitle>אישור עצירת חיוב ב־Grow</DialogTitle>
+            <DialogDescription>עבור {providerStopMember ? `${providerStopMember.single.firstName} ${providerStopMember.single.lastName || ""}`.trim() : ""}</DialogDescription>
+          </DialogHeader>
+          <p className="rounded-lg bg-amber-50 p-3 text-xs leading-6 text-amber-950">יש לאשר רק לאחר שעצרת את החיוב ב־Grow. פעולה זו מתעדת אישור צוות בלבד ואינה מסיימת את שירות Plus או את הזכאות במחזור.</p>
+          <label className="flex items-start gap-2 text-sm leading-6"><input type="checkbox" checked={providerStopConfirmed} onChange={event => setProviderStopConfirmed(event.target.checked)} disabled={confirmProviderStopped.isPending} className="mt-1" data-provider-stop-checkbox />עצרתי את החיוב ב־Grow</label>
+          <div className="flex gap-2"><button type="button" disabled={!providerStopConfirmed || !providerStopMember || confirmProviderStopped.isPending} onClick={() => providerStopMember && providerStopConfirmed && confirmProviderStopped.mutate({ id: providerStopMember.plusMemberId, confirmed: true })} data-confirm-provider-stop-submit className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40">{confirmProviderStopped.isPending ? "מתעד…" : "אישור עצירת החיוב"}</button><button type="button" disabled={confirmProviderStopped.isPending} onClick={() => { setProviderStopMember(null); setProviderStopConfirmed(false); }} className="rounded-lg border px-4 py-2 text-sm">ביטול</button></div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={Boolean(endMember)} onOpenChange={open => { if (!open && !endMembership.isPending) { setEndMember(null); setProviderStopped(false); } }}>
         <DialogContent dir="rtl" className="max-w-md text-right">
           <DialogHeader><DialogTitle>סיום מנוי Plus באתר</DialogTitle><DialogDescription>סיום Plus עבור {endMember?.name}. המנוי יוסר מרשימת הפעילים ומתור ההתאמות ויועבר לארכיון. הטבות Plus יסתיימו מיד; החברות הרגילה במאגר והיסטוריית ההתאמות יישארו ללא שינוי.</DialogDescription></DialogHeader>

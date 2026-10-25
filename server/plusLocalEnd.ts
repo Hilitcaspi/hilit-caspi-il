@@ -3,7 +3,7 @@ import { and, eq, isNull, or } from "drizzle-orm";
 import { crmTeamTasks, plusCancellationRequests, plusPilotMembers } from "../drizzle/schema";
 
 /** Called only by the authorized team procedure after provider-stop confirmation. */
-export async function endPlusLocally(db: any, id: number, now = Date.now()) {
+export async function endPlusLocally(db: any, id: number, now = Date.now(), actor?: string) {
   return db.transaction(async (tx: any) => {
     const [member] = await tx.select().from(plusPilotMembers).where(eq(plusPilotMembers.id, id)).limit(1).for("update");
     if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "מנוי Plus לא נמצא" });
@@ -20,7 +20,14 @@ export async function endPlusLocally(db: any, id: number, now = Date.now()) {
       or(eq(crmTeamTasks.status, "todo"), eq(crmTeamTasks.status, "in_progress")),
     ));
     // This records staff confirmation, not an API-verified stop by the provider.
-    await tx.update(plusCancellationRequests).set({ resolvedAt: now, updatedAt: now }).where(and(
+    // The router supplies the authenticated actor; direct legacy callers keep a
+    // null actor rather than fabricating one.
+    await tx.update(plusCancellationRequests).set({
+      resolvedAt: now,
+      providerStoppedAt: now,
+      ...(actor ? { providerStoppedBy: actor } : {}),
+      updatedAt: now,
+    }).where(and(
       eq(plusCancellationRequests.plusMemberId, id), isNull(plusCancellationRequests.resolvedAt),
     ));
     await tx.update(crmTeamTasks).set({ status: "done", completedAt: now, updatedAt: now }).where(and(
@@ -32,6 +39,11 @@ export async function endPlusLocally(db: any, id: number, now = Date.now()) {
       singleId: member.singleId, taskType: "plus", title: "Plus: המנוי באתר הסתיים והועבר לארכיון",
       description: "סיום מקומי בידי הצוות לאחר אישור שהחיוב הופסק ב־Grow. אין פעולת ביטול אצל הספק ואין שינוי בחברות הרגילה במאגר.",
       priority: "normal", status: "done", completedAt: now, createdBy: "plus_local_end", createdAt: now, updatedAt: now,
+    });
+    await tx.insert(crmTeamTasks).values({
+      singleId: member.singleId, taskType: "plus", title: "Plus: עצירת חיוב ב־Grow אושרה על ידי הצוות",
+      description: "אישור צוות בלבד לעצירת החיוב אצל הספק. השירות המקומי של Plus הסתיים בפעולה זו בנפרד.",
+      priority: "normal", status: "done", completedAt: now, createdBy: "plus_provider_stop_confirmation", createdAt: now, updatedAt: now,
     });
     return { success: true, alreadyEnded: false, providerChanged: false };
   });
