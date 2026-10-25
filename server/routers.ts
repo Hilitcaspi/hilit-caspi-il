@@ -45,6 +45,7 @@ import {
   parseLegacyLeadUnsubscribeToken,
   verifySignedUnsubscribeToken,
 } from "./emailUnsubscribe";
+import { applySmsMarketingUnsubscribe, verifySignedSmsUnsubscribeToken } from "./smsMarketingUnsubscribe";
 import { sendSMS } from "./vibrate";
 import { sendInitialMatchSmsOnce } from "./matchSms";
 import { matchDeliveryEventKey, recordMatchDelivery, recordProposalEmailResults } from "./matchDeliveryLog";
@@ -3779,6 +3780,15 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        // SMS removal is phone-specific and must not cancel transactional email.
+        if (input.token?.startsWith("sms_unsubscribe_v1_")) {
+          const smsToken = verifySignedSmsUnsubscribeToken(input.token);
+          if (!smsToken) throw new TRPCError({ code: "BAD_REQUEST", message: "קישור הסרה לא תקין" });
+          const success = await applySmsMarketingUnsubscribe(smsToken);
+          if (!success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "לא ניתן להשלים הסרה כרגע" });
+          return { success: true };
+        }
 
         const boostNewsletterToken = input.token ? verifyBoostNewsletterUnsubscribeToken(input.token) : null;
         if (boostNewsletterToken) {

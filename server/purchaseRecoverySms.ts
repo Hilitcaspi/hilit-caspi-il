@@ -124,7 +124,7 @@ export function buildPurchaseRecoverySms(input: PurchaseRecoverySmsInput) {
   const offerUrl = checkedOfferUrl(input.product, input.offerUrl);
   const unsubscribeUrl = checkedUnsubscribeUrl(input.unsubscribeUrl);
 
-  return `הילית כספי | ${messageFor(input.product)}\n${offerUrl}\nההטבה האישית בתוקף עד ${expiresAt}.\n\nאם יש שאלה או צורך בעזרה לפני שמחליטים, אפשר לכתוב לי בוואטסאפ:\n${RECOVERY_BUSINESS_WHATSAPP_URL}\n\nלהסרה: ${unsubscribeUrl}`;
+  return `הילית כספי | ${messageFor(input.product)}\n${offerUrl}\nההטבה האישית בתוקף עד ${expiresAt}.\n\nאם יש שאלה או צורך בעזרה לפני שמחליטים, אפשר לכתוב לי בוואטסאפ:\n${RECOVERY_BUSINESS_WHATSAPP_URL}\n\nלביטול קבלת SMS שיווקי, לחצו כאן: ${unsubscribeUrl}`;
 }
 
 export const buildSms = buildPurchaseRecoverySms;

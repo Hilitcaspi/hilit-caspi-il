@@ -1689,3 +1689,5 @@ export const acquisitionFirstTouches = mysqlTable("acquisition_first_touches", {
 
 // One-off product-specific recovery campaign recipients and benefit receipts.
 export { purchaseRecoveryRecipients } from './purchaseRecoverySchema';
+// Independent marketing SMS suppression; service messaging is unchanged.
+export { smsMarketingOptouts } from './smsMarketingSchema';

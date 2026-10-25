@@ -27,6 +27,8 @@ export default function Unsubscribe() {
     }
   }, []);
 
+  const smsOnly = Boolean(token?.startsWith("sms_unsubscribe_v1_"));
+
   const handleUnsubscribe = () => {
     const email = legacyEmail || manualEmail.trim().toLowerCase();
     if (!token && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
@@ -44,7 +46,7 @@ export default function Unsubscribe() {
             <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#ffe27c] text-2xl font-black text-[#191265]">✓</div>
             <h1 className="text-2xl font-black text-[#191265] mb-3">ההסרה הושלמה</h1>
             <p className="text-[#727272] leading-relaxed">
-              לא יישלחו עוד מסרים שיווקיים אוטומטיים לכתובת הזאת.
+              {smsOnly ? "לא יישלחו עוד הודעות SMS שיווקיות למספר הזה. הודעות שירות ומיילים אינם משתנים." : "לא יישלחו עוד מסרים שיווקיים אוטומטיים לכתובת הזאת."}
             </p>
             <p className="text-[#727272] text-sm mt-4">
               אם זו הייתה טעות, אפשר {" "}
@@ -69,11 +71,11 @@ export default function Unsubscribe() {
         ) : (
           <>
             <div className="mx-auto mb-5 h-1.5 w-16 rounded-full bg-[#ffe27c]" />
-            <h1 className="text-2xl font-black text-[#191265] mb-3">הסרה מרשימת התפוצה</h1>
+            <h1 className="text-2xl font-black text-[#191265] mb-3">{smsOnly ? "ביטול קבלת SMS שיווקי" : "הסרה מרשימת התפוצה"}</h1>
             <p className="text-[#727272] leading-relaxed mb-6">
-              לחיצה על הכפתור תסיר את הכתובת מרשימת התפוצה האוטומטית של הילית כספי.
+              {smsOnly ? "לחיצה על הכפתור תבטל קבלת SMS שיווקי מהילית כספי למספר שקיבל את ההודעה." : "לחיצה על הכפתור תסיר את הכתובת מרשימת התפוצה האוטומטית של הילית כספי."}
               <br />
-              <span className="text-sm">לא יישלחו אליה עוד מיילים שיווקיים.</span>
+              <span className="text-sm">{smsOnly ? "מיילים והודעות שירות אינם משתנים." : "לא יישלחו אליה עוד מיילים שיווקיים."}</span>
             </p>
             <form onSubmit={event => { event.preventDefault(); handleUnsubscribe(); }}>
               {!token && !legacyEmail && <div className="mb-5 text-right"><label htmlFor="unsubscribe-email" className="mb-2 block font-semibold text-[#191265]">כתובת המייל הרשומה אצלנו</label><input id="unsubscribe-email" type="email" autoComplete="email" required value={manualEmail} onChange={event => setManualEmail(event.target.value)} dir="ltr" className="w-full rounded-xl border border-[#191265]/20 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#191265]" /><p className="mt-2 text-xs leading-5 text-[#727272]">ההסרה תתבצע רק אחרי הזנת הכתובת ולחיצה על הכפתור.</p></div>}
@@ -82,7 +84,7 @@ export default function Unsubscribe() {
                 disabled={unsubMutation.isPending || (!token && !legacyEmail && !manualEmail.trim())}
                 className="w-full bg-[#191265] text-white font-bold py-4 rounded-xl hover:bg-[#1800ad] transition-all disabled:opacity-60"
               >
-                {unsubMutation.isPending ? "הבקשה מתבצעת..." : "להסרה מרשימת התפוצה"}
+                {unsubMutation.isPending ? "הבקשה מתבצעת..." : (smsOnly ? "לביטול קבלת SMS שיווקי" : "להסרה מרשימת התפוצה")}
               </button>
             </form>
             <a href="/" className="block mt-4 text-sm text-[#727272] hover:text-[#191265]">

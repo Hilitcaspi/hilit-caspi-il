@@ -43,9 +43,9 @@ describe("purchase recovery SMS drafts", () => {
       expect(sms).toContain(smsOfferUrl(product));
       expect(sms).toContain("אם יש שאלה או צורך בעזרה לפני שמחליטים");
       expect(sms).toContain(RECOVERY_BUSINESS_WHATSAPP_URL);
-      expect(sms).toContain(`להסרה: ${unsubscribeUrl}`);
+      expect(sms).toContain(`לביטול קבלת SMS שיווקי, לחצו כאן: ${unsubscribeUrl}`);
       expect(sms.indexOf(smsOfferUrl(product))).toBeLessThan(sms.indexOf(RECOVERY_BUSINESS_WHATSAPP_URL));
-      expect(sms.indexOf(RECOVERY_BUSINESS_WHATSAPP_URL)).toBeLessThan(sms.indexOf(`להסרה: ${unsubscribeUrl}`));
+      expect(sms.indexOf(RECOVERY_BUSINESS_WHATSAPP_URL)).toBeLessThan(sms.indexOf(`לביטול קבלת SMS שיווקי, לחצו כאן: ${unsubscribeUrl}`));
     }
   });
 

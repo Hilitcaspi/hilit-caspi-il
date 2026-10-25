@@ -1,9 +1,10 @@
-import { and, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import { purchaseRecoveryRecipients, emailLog } from '../drizzle/schema';
 import type { PurchaseRecoveryRecipient } from '../drizzle/purchaseRecoverySchema';
 import { getDb } from './db';
 import { isPermanentlyBlockedEmail, sendEmailBatch } from './brevo';
 import { buildSignedUnsubscribeUrl } from './emailUnsubscribe';
+import { buildSignedSmsUnsubscribeUrl } from './smsMarketingUnsubscribe';
 import { sendSMSBulkDetailed, getVibrateSmsBalance, normalizeIsraeliMobile } from './vibrate';
 import { buildPurchaseRecoveryNewsletter } from './purchaseRecoveryNewsletter';
 import { readBrevoBlockedRecipientSet } from './liveLaunchCampaign';
@@ -113,11 +114,11 @@ export async function recoveryDependencies(taskUid?: string): Promise<RecoveryCa
       if((await smtpBlocks).has(row.email.trim().toLowerCase()))return {allowed:false,reason:'smtp_block'};
       return {allowed:true};
     },
-    claim: async (row,channel,now) => changed(await db.update(purchaseRecoveryRecipients).set(channel==='email'?{emailState:'processing',updatedAt:now}:{smsState:'processing',updatedAt:now}).where(and(eq(purchaseRecoveryRecipients.id,row.id),eq(stateField(channel),'queued'))))===1,
+    claim: async (row,channel,now) => changed(await db.update(purchaseRecoveryRecipients).set(channel==='email'?{emailState:'processing',updatedAt:now}:{smsState:'processing',updatedAt:now}).where(and(eq(purchaseRecoveryRecipients.id,row.id),eq(purchaseRecoveryRecipients.campaignKey,RECOVERY_CAMPAIGN),eq(stateField(channel),'queued'),eq(channel==='email'?purchaseRecoveryRecipients.emailConsent:purchaseRecoveryRecipients.smsConsent,true),isNull(purchaseRecoveryRecipients.offerRedeemedAt),...(channel==='sms'?[eq(purchaseRecoveryRecipients.phone,row.phone||'')]:[]))))===1,
     finish: async (row,channel,state,now,providerId,reason) => {
       await db.update(purchaseRecoveryRecipients).set(channel==='email'
         ?{emailState:state,emailProviderMessageId:providerId||null,...(state==='accepted'?{emailSentAt:now}:{}),suppressionReason:reason||null,updatedAt:now}
-        :{smsState:state,smsProviderMessageId:providerId||null,...(state==='accepted'?{smsSentAt:now}:{}),suppressionReason:reason||null,updatedAt:now}).where(eq(purchaseRecoveryRecipients.id,row.id));
+        :{smsState:state,smsProviderMessageId:providerId||null,...(state==='accepted'?{smsSentAt:now}:{}),updatedAt:now}).where(eq(purchaseRecoveryRecipients.id,row.id));
     },
     deliver: async (row,channel,now) => {
       if(!productOkay(row.product))return {accepted:false};
@@ -131,7 +132,7 @@ export async function recoveryDependencies(taskUid?: string): Promise<RecoveryCa
         personal.searchParams.set('token',members[0].token);
         offerUrl=personal.toString();
       }
-      const unsubscribeUrl=buildSignedUnsubscribeUrl({email:row.email});
+      const unsubscribeUrl=channel==='sms' ? buildSignedSmsUnsubscribeUrl({phone:row.phone||''}) : buildSignedUnsubscribeUrl({email:row.email});
       if(channel==='sms'){
         const message=buildPurchaseRecoverySms({product:row.product,offerUrl,unsubscribeUrl});
         const sent=await sendSMSBulkDetailed({messages:[{phone:row.phone||'',message}],idempotencyKey:`${RECOVERY_CAMPAIGN}:sms:${row.id}`,campaignId:RECOVERY_CAMPAIGN});
