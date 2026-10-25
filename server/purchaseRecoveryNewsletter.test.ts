@@ -27,6 +27,7 @@ describe("purchase recovery newsletter drafts", () => {
 
     for (const product of products) {
       const email = build(product);
+      expect(email.subject).toMatch(/^פרסומת \| /);
       expect(email.subject).toContain("התעניינת");
       expect(email.subject).toContain("🎁");
       expect(email.preheader).toContain(recoveryOfferCode(product));

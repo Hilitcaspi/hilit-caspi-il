@@ -234,7 +234,7 @@ ${copy.reassurance}
 הילית כספי · פרסומת
 להסרה: ${unsubscribeUrl}`;
 
-  return { subject: copy.subject, preheader: copy.preheader, htmlContent, textContent };
+  return { subject: `פרסומת | ${copy.subject}`, preheader: copy.preheader, htmlContent, textContent };
 }
 
 export const buildNewsletter = buildPurchaseRecoveryNewsletter;

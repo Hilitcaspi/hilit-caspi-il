@@ -6,7 +6,7 @@ import {
   RECOVERY_SEND_EXPIRES_AT,
   purchaseRecoveryOfferUrl,
   recoveryOfferCode,
-} from "./purchaseRecoveryLinks";
+} from "../shared/purchaseRecoveryLinks";
 
 describe("purchase recovery campaign links", () => {
   it("uses the agreed one-time campaign schedule in Israel local time", () => {
