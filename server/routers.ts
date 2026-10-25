@@ -13,6 +13,7 @@ import { acquisitionInputSchema, recordAcquisitionSafely } from "./acquisitionCa
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
+import { getServiceHealth } from "./serviceHealth";
 import { z } from "zod";
 import { getDb } from "./db";
 import { singles, dnaQuizResults, matches, matchDeliveryEvents, feedbackFollowups, leads, crmLeads, emailLog, blogPosts, freeAccessTokens, productAccessTokens, courseProgress, matchmakingAnswers, inviteTokens, analyticsEvents, paymentLeads, completedPayments, plusPilotMembers, plusCheckoutIntents, matchBoostMemberships, matchBoostRequests } from "../drizzle/schema";
@@ -668,6 +669,9 @@ export async function generateMatchesForSingle(singleId: number, gender: "female
 // ─── App Router ───────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
+  serviceHealth: router({
+    check: publicProcedure.query(() => getServiceHealth()),
+  }),
   dashboard: dashboardRouter,
   plusPilot: plusPilotRouter,
   matchBoost: matchBoostRouter,
