@@ -680,6 +680,12 @@ export default function GrowWallet({
               {couponApplied.discountPercent ? ` — ${couponApplied.discountPercent}% הנחה` : ""}
               {couponApplied.discountAmount ? ` — ₪${couponApplied.discountAmount} הנחה` : ""}
               {couponApplied.fixedPrice ? ` — מחיר לתשלום: ₪${couponApplied.fixedPrice}` : ""}
+              {product === "guide" && couponApplied.code === "CHOOSE50" && couponApplied.fixedPrice !== undefined && (
+                <span className="mt-2 flex items-baseline gap-3" aria-label={`במקום ${PRODUCT_CONFIGS.guide.sum} שקלים, מחיר המבצע ${couponApplied.fixedPrice.toFixed(2)} שקלים`}>
+                  <del className="text-sm font-normal text-gray-500">₪{PRODUCT_CONFIGS.guide.sum}</del>
+                  <span className="text-xl font-extrabold text-[#191265]">₪{couponApplied.fixedPrice.toFixed(2)}</span>
+                </span>
+              )}
             </span>
             <button onClick={() => { setCouponApplied(null); setCouponCode(""); }} className="text-xs text-gray-400 hover:text-red-500 transition-colors mr-2">✕</button>
           </div>
@@ -753,7 +759,9 @@ export default function GrowWallet({
             <span>מעבד...</span>
           </>
         ) : (
-          <span>{buttonLabel}</span>
+          <span>{product === "guide" && couponApplied?.code === "CHOOSE50" && couponApplied.fixedPrice !== undefined
+            ? `לרכישה המאובטחת ₪${couponApplied.fixedPrice.toFixed(2)} ←`
+            : buttonLabel}</span>
         )}
       </button>
 

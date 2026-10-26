@@ -4,6 +4,9 @@ import { loadMatchScoreInputs, presentMatchScore } from "./pendingMatchScore";
 import { getMatchResponseSummaries } from "./matchResponseMetrics";
 import { findBlockingMatchForSingle, visibleMatchSql, matchAvailabilityColumns, possibleBlockingMatchSql } from "./matchAvailabilityQueries";
 import { getMatchAvailability, isBlockingMatch } from "../shared/matchAvailability";
+import { pendingOwnerReviewSql, unclaimedHighBoostReviewSql } from "./boostRegularReview";
+import { regularReviewNotes } from "../shared/boostScorePolicy";
+import { CHOOSE50_CODE, validateChoose50Coupon } from "./choose50Coupon";
 // © 2024–2025 Hilit Caspi. All rights reserved. Proprietary and confidential.
 // שיטת ההתאמה, האלגוריתם והתכנים מוגנים בזכויות יוצרים ומהווים סוד מסחרי של הילית כספי.
 
@@ -4544,10 +4547,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!db) return [];
 
       const pendingMatches = await db.select().from(matches)
-        .where(and(
-          eq(matches.status, "pending"),
-          or(isNull(matches.notes), notLike(matches.notes, `%${BOOST_CANDIDATE_NOTE_MARKER}%`)),
-        ))
+        .where(pendingOwnerReviewSql())
         .orderBy(desc(matches.score ?? 0));
 
       const inputs = await loadMatchScoreInputs(db, Array.from(new Set(pendingMatches.flatMap(m => [m.singleAId, m.singleBId]))));
@@ -4577,6 +4577,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const [match] = await db.select().from(matches).where(eq(matches.id, input.matchId)).limit(1);
         if (!match) throw new TRPCError({ code: "NOT_FOUND" });
         if (match.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Match is not pending" });
+        if (String(match.notes || "").startsWith(BOOST_CANDIDATE_NOTE_MARKER)) {
+          const [manualCandidate] = await db.select({ id: matches.id }).from(matches)
+            .where(and(eq(matches.id, match.id), unclaimedHighBoostReviewSql())).limit(1);
+          if (!manualCandidate) {
+            throw new TRPCError({ code: "CONFLICT", message: "אפשרות Boost זו אינה זמינה לאישור במסלול הרגיל או קשורה לבקשת Boost בטיפול." });
+          }
+        }
 
         const [singleA] = await db.select().from(singles).where(eq(singles.id, match.singleAId)).limit(1);
         const [singleB] = await db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1);
@@ -4627,10 +4634,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const criteriaOverrideNote = criteriaOverrideApplied
           ? `[CRITERIA_OVERRIDE] ${criteriaWarnings.join(" | ") || "Admin-approved one-off match"}`
           : null;
-        const existingNotes = String(match.notes || "").trim();
+        const existingNotes = regularReviewNotes(match.notes).trim();
         const updatedNotes = criteriaOverrideNote && !existingNotes.includes("[CRITERIA_OVERRIDE]")
           ? [existingNotes, criteriaOverrideNote].filter(Boolean).join("\n")
-          : match.notes;
+          : existingNotes || null;
 
         await db.update(matches).set({
           status: "proposed",
@@ -5258,7 +5265,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       if (!db) return [];
 
       const rawMatches = await db.select().from(matches)
-        .where(visibleMatchSql(BOOST_CANDIDATE_NOTE_MARKER))
+        .where(or(visibleMatchSql(BOOST_CANDIDATE_NOTE_MARKER), unclaimedHighBoostReviewSql()))
         .orderBy(desc(matches.createdAt), desc(matches.score)); // newest first, then by score
 
       // Keep every historical proposal. If the same pair was sent again later, each
@@ -7822,7 +7829,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!db) return { valid: false as const, error: "שגיאת שרת" };
         const { discountCodes } = await import("../drizzle/schema");
         const [code] = await db.select().from(discountCodes)
-          .where(eq(discountCodes.code, input.code.toUpperCase()))
+          .where(eq(discountCodes.code, requested))
           .limit(1);
         if (!code) return { valid: false as const, error: "קוד קופון לא נמצא" };
         if (!code.isActive) return { valid: false as const, error: "קוד קופון אינו פעיל" };
@@ -7834,6 +7841,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           if (!allowedProducts.includes(input.product)) {
             return { valid: false as const, error: "קוד קופון זה אינו תקף למוצר זה" };
           }
+        }
+        if (code.code === CHOOSE50_CODE) {
+          // Respect the stored active/expiry/usage gates above; the dedicated
+          // guide offer also enforces its start date and exact half-shekel price.
+          const offer = validateChoose50Coupon({ code: requested, product: input.product });
+          return offer.valid ? { ...offer, discountAmount: undefined } : offer;
         }
         if (code.code === "PLUS50") {
           const { hasActivePlusCouponEntitlement, isPlus50ProductAllowed } = await import("./couponPolicy");
@@ -8012,6 +8025,21 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const normalizedCheckoutEmail = input.email.trim().toLowerCase();
         const reservedCode = input.couponCode?.trim().toUpperCase();
         const diagnosticTest = reservedCode === "TEST1";
+        let choose50FixedPrice: number | undefined;
+        if (reservedCode === CHOOSE50_CODE) {
+          const offer = validateChoose50Coupon({ code: reservedCode, product: input.product });
+          if (!offer.valid) throw new TRPCError({ code: "PRECONDITION_FAILED", message: offer.error });
+          const { discountCodes } = await import("../drizzle/schema");
+          const [storedCoupon] = await db.select().from(discountCodes)
+            .where(eq(discountCodes.code, CHOOSE50_CODE)).limit(1);
+          if (!storedCoupon?.isActive
+            || (storedCoupon.expiresAt && storedCoupon.expiresAt < Date.now())
+            || (storedCoupon.maxUses != null && storedCoupon.usedCount >= storedCoupon.maxUses)
+            || storedCoupon.product !== "guide") {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "קוד Choose50 אינו זמין כרגע. לא נפתח תשלום במחיר מלא." });
+          }
+          choose50FixedPrice = offer.fixedPrice;
+        }
         const recoveryProduct = input.product === "database" || input.product === "session" || input.product === "plus"
           ? input.product
           : null;
@@ -8235,7 +8263,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         // Recovery discounts use their helper-provided amount exactly. Never
         // derive 269.10 through generic whole-shekel coupon rounding.
         if (validatedRecoveryCode) finalSum = recoveryFixedPrice;
-        if (input.couponCode && db && !validatedRecoveryCode && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "FRIENDS" && reservedCode !== "TEST1") {
+        if (choose50FixedPrice !== undefined) finalSum = choose50FixedPrice;
+        if (input.couponCode && db && choose50FixedPrice === undefined && !validatedRecoveryCode && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "FRIENDS" && reservedCode !== "TEST1") {
           const { discountCodes } = await import("../drizzle/schema");
           const [code] = await db.select().from(discountCodes)
             .where(eq(discountCodes.code, input.couponCode.toUpperCase()))

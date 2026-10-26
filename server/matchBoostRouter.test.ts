@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, MIN_BOOST_SCORE, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, evaluateLoadedBoostContext, getBoostProfileReadiness, isDuplicateBoostRequestError, parseBoostCheckoutReference, selectOnDemandBoostCandidates, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
+import { BOOST_CANDIDATE_NOTE_MARKER, BOOST_CONSENT_VERSION, MAX_BOOST_SCORE, MIN_BOOST_SCORE, buildAnonymousBoostCard, createBoostCheckoutReference, evaluateBoostEligibility, evaluateLoadedBoostContext, getBoostProfileReadiness, isDuplicateBoostRequestError, parseBoostCheckoutReference, selectOnDemandBoostCandidates, syncBoostRequestAfterMatchDecision } from "./matchBoostRouter";
+import { buildMatchProposalEmail } from "./emailTemplates";
 
 const NOW = new Date("2026-08-25T12:00:00Z").getTime();
 
@@ -74,7 +75,9 @@ function pendingMatch(overrides: Record<string, unknown> = {}) {
     singleAId: 10,
     singleBId: 11,
     status: "pending",
-    score: 82,
+    score: 77,
+    scoreBreakdown: JSON.stringify({ source: "boost_on_demand" }),
+    notes: `${BOOST_CANDIDATE_NOTE_MARKER} synthetic pending candidate`,
     matchDetailStatus: null,
     returnedToPoolAt: null,
     ...overrides,
@@ -135,6 +138,7 @@ describe("match boost eligibility", () => {
     expect(options.map(option => option.candidate.id)).not.toContain(20);
     expect(options.map(option => option.candidate.id)).not.toContain(21);
     expect(options.every(option => option.score >= MIN_BOOST_SCORE)).toBe(true);
+    expect(options.every(option => option.score <= MAX_BOOST_SCORE)).toBe(true);
     expect(options.map(option => option.score)).toEqual([...options.map(option => option.score)].sort((a, b) => b - a));
   });
 
@@ -168,14 +172,18 @@ describe("match boost eligibility", () => {
     expect(state.eligible).toBe(false);
   });
 
-  it("opens Boost choices at 60 percent and excludes scores below the threshold", () => {
+  it("opens Boost choices at 60 percent and excludes every score outside 60–79", () => {
     expect(MIN_BOOST_SCORE).toBe(60);
+    expect(MAX_BOOST_SCORE).toBe(79);
     const result = evaluateBoostEligibility({
       single: completeSingle(),
       memberMatches: [
         pendingMatch({ id: 301, score: 59 }),
         pendingMatch({ id: 302, score: 60 }),
-        pendingMatch({ id: 303, score: 78 }),
+        pendingMatch({ id: 303, score: 79 }),
+        pendingMatch({ id: 304, score: 80 }),
+        pendingMatch({ id: 305, score: 86 }),
+        pendingMatch({ id: 306, score: 91 }),
       ],
       membership: activeMembership(),
       boostRequests: [],
@@ -183,6 +191,7 @@ describe("match boost eligibility", () => {
     });
     expect(result.eligible).toBe(true);
     expect(result.candidates.map(candidate => candidate.id)).toEqual([303, 302]);
+    expect(result.candidates.every(candidate => candidate.score >= 60 && candidate.score <= 79)).toBe(true);
   });
 
   it("allows a complete paid active member with a hidden pending candidate", () => {
@@ -195,7 +204,7 @@ describe("match boost eligibility", () => {
     });
     expect(result.eligible).toBe(true);
     expect(result.candidateCount).toBe(1);
-    expect(result.topScore).toBe(82);
+    expect(result.topScore).toBe(77);
   });
 
   it("does not block Boost only because the legacy free-text partner description is missing", () => {
@@ -215,8 +224,8 @@ describe("match boost eligibility", () => {
       single: completeSingle(),
       memberMatches: [
         pendingMatch({ id: 201, score: 74 }),
-        pendingMatch({ id: 202, score: 91 }),
-        pendingMatch({ id: 203, score: 83 }),
+        pendingMatch({ id: 202, score: 79 }),
+        pendingMatch({ id: 203, score: 77 }),
       ],
       membership: activeMembership(),
       boostRequests: [],
@@ -225,7 +234,26 @@ describe("match boost eligibility", () => {
     expect(result.eligible).toBe(true);
     expect(result.candidateCount).toBe(3);
     expect(result.candidates.map(candidate => candidate.id)).toEqual([202, 203, 201]);
-    expect(result.topScore).toBe(91);
+    expect(result.topScore).toBe(79);
+  });
+
+  it("never exposes high-score or regular-review pending drafts as a Boost card", () => {
+    const result = evaluateBoostEligibility({
+      single: completeSingle(),
+      memberMatches: [
+        pendingMatch({ id: 401, score: 79 }),
+        pendingMatch({ id: 402, score: 80 }),
+        pendingMatch({ id: 403, score: 86 }),
+        pendingMatch({ id: 404, score: 91 }),
+        pendingMatch({ id: 405, score: 77, notes: "[REGULAR_REVIEW] manual owner draft" }),
+      ],
+      membership: activeMembership(),
+      boostRequests: [],
+      now: NOW,
+    });
+    expect(result.eligible).toBe(true);
+    expect(result.candidates.map(candidate => candidate.id)).toEqual([401]);
+    expect(result.candidates[0]).toMatchObject({ score: 79, notes: expect.stringContaining(BOOST_CANDIDATE_NOTE_MARKER) });
   });
 
   it("does not offer a boost when the hidden candidate is no longer eligible", () => {
@@ -615,8 +643,11 @@ describe("match boost privacy and payment gate", () => {
     const generationSource = source.slice(source.indexOf("async function ensureBoostCandidatesForSingle"), source.indexOf("const EDUCATION_LABELS"));
     const routersSource = fs.readFileSync(path.join(process.cwd(), "server/routers.ts"), "utf8");
     expect(source).toContain("refreshOptions: publicProcedure");
-    expect(source).toContain(BOOST_CANDIDATE_NOTE_MARKER);
+    expect(source).toContain('from "../shared/boostScorePolicy"');
+    expect(source).toContain("BOOST_CANDIDATE_NOTE_MARKER");
     expect(generationSource).toContain('status: "pending"');
+    expect(generationSource).toContain("selectOnDemandRegularCandidates");
+    expect(generationSource).toContain("regular_review_on_demand");
     expect(generationSource).not.toContain("OPEN_BOOST_STATUSES.includes(request.status)");
     expect(generationSource).not.toContain("30 * DAY_MS");
     expect(source).not.toContain("orderBy(desc(matchBoostRequests.requestedAt)).limit(10)");
@@ -626,7 +657,7 @@ describe("match boost privacy and payment gate", () => {
     expect(generationSource).not.toContain("sendEmail(");
     expect(generationSource).not.toContain("sendInitialMatchWhatsAppsOnce(");
     expect(generationSource).not.toContain("preparePaidBoostCheckout(");
-    expect(routersSource).toContain("notLike(matches.notes, `%${BOOST_CANDIDATE_NOTE_MARKER}%`)");
+    expect(routersSource).toContain("pendingOwnerReviewSql()");
     expect(boostCardSource).toContain("didRefreshOptionsRef");
     expect(boostCardSource).toContain("refreshOptions.mutate({ email, token })");
     expect(boostCardSource).toContain("אין כרגע אפשרויות Boost זמינות");
@@ -652,7 +683,9 @@ describe("match boost privacy and payment gate", () => {
   });
 
   it("keeps the 60 percent eligibility rule without highlighting it in the personal-area sales copy", () => {
-    expect(source).toContain("MIN_BOOST_SCORE = 60");
+    expect(MIN_BOOST_SCORE).toBe(60);
+    expect(MAX_BOOST_SCORE).toBe(79);
+    expect(source).toContain("isBoostCandidate(match)");
     expect(boostCardSource).not.toContain("60% ומעלה");
     expect(boostCardSource).toContain("השם והתמונה מוסתרים כדי לשמור על הפרטיות");
     expect(demoSource).not.toContain("60% ומעלה");
@@ -683,7 +716,7 @@ describe("match boost privacy and payment gate", () => {
     expect(emailSource).toContain('proposalSource?: "manual" | "boost"');
     expect(emailSource).toContain('boostRole?: "sender" | "recipient"');
     expect(emailSource).toContain("בקשת ה־Boost שלך נשלחה ומחכה לאישור שלך");
-    expect(emailSource).toContain("נשלחה אליך התאמת Boost שמחכה לאישור שלך");
+    expect(emailSource).toContain("נשלחה עבורך התאמת Boost שמחכה לאישור שלך");
     expect(emailSource).toContain("התשלום ושליחת ה־Boost אינם אישור להתאמה");
     expect(emailSource).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
     expect(emailSource).toContain("const matchPhotoUrl = toEmailImageUrl(params.matchPhotoUrl)");
@@ -698,6 +731,27 @@ describe("match boost privacy and payment gate", () => {
     expect(emailSource).toContain('proposalSource?: "regular" | "boost"');
     expect(emailSource).toContain("התאמת ה־Boost עדיין ממתינה לאישור שלך");
     expect(emailSource).not.toContain("לפני שבוע שלחתי לך הצעה: ${params.matchFirstName}");
+
+    for (const recipientGender of ["female", "male"] as const) {
+      const recipient = buildMatchProposalEmail({
+        firstName: recipientGender === "female" ? "דנה" : "איתי",
+        recipientGender,
+        matchFirstName: "נועם",
+        matchAge: 35,
+        matchCity: "המרכז",
+        compatibilityScore: 77,
+        hilitsNote: "התאמה סינתטית בלבד",
+        yesUrl: "https://example.com/yes",
+        noUrl: "https://example.com/no",
+        recipientEmail: `${recipientGender}@example.com`,
+        singleId: recipientGender === "female" ? 1 : 2,
+        proposalSource: "boost",
+        boostRole: "recipient",
+      });
+      expect(recipient.htmlBody).toContain("נשלחה עבורך התאמת Boost שמחכה לאישור שלך");
+      expect(recipient.textBody).toContain("נשלחה עבורך התאמה במסגרת מסלול Boost והיא ממתינה לאישור שלך במייל");
+      expect(recipient.htmlBody).not.toContain("נשלחה אליך התאמת Boost");
+    }
   });
 
   it("requires separate approval from both Boost sides and shows the full profile without contact details", () => {

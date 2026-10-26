@@ -22,13 +22,13 @@ import { normalizeEmail, normalizedEmailEquals } from "./emailNormalization";
 import { getMissingProfileFields } from "./matchmakingMetrics";
 import { sendInitialMatchSmsOnce } from "./matchSms";
 import { isBoostExcludedProfile, loadBoostExclusionAnchors, type BoostExclusionAnchors } from "./boostExclusions";
+import { BOOST_CANDIDATE_NOTE_MARKER, REGULAR_REVIEW_NOTE_MARKER, isBoostCandidate, isBoostScore, isRegularReviewScore } from "../shared/boostScorePolicy";
+export { BOOST_CANDIDATE_NOTE_MARKER, MIN_BOOST_SCORE, MAX_BOOST_SCORE } from "../shared/boostScorePolicy";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const BOOST_PRICE_AGOROT = 1990;
 const LEGACY_BOOST_PRICE_AGOROT = 1999;
-export const MIN_BOOST_SCORE = 60;
 const MAX_BOOST_OPTIONS = 6;
-export const BOOST_CANDIDATE_NOTE_MARKER = "[BOOST_CANDIDATE]";
 export const BOOST_CONSENT_VERSION = "2026-08-29-v2";
 const OPEN_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
 const REVIEWABLE_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
@@ -107,7 +107,7 @@ function parseAnswersJson(raw: unknown) {
   }
 }
 
-export function selectOnDemandBoostCandidates(input: {
+type OnDemandCandidateInput = {
   single: any;
   candidateProfiles: any[];
   memberships: any[];
@@ -117,7 +117,9 @@ export function selectOnDemandBoostCandidates(input: {
   unavailableCandidateIds?: Set<number>;
   now?: number;
   limit?: number;
-}) {
+};
+
+function selectOnDemandCandidates(input: OnDemandCandidateInput, lane: "boost" | "regular") {
   const now = input.now ?? Date.now();
   const existingCandidateIds = input.existingCandidateIds ?? new Set<number>();
   const unavailableCandidateIds = input.unavailableCandidateIds ?? new Set<number>();
@@ -145,11 +147,19 @@ export function selectOnDemandBoostCandidates(input: {
         answersA,
         input.answersBySingle.get(candidate.id) ?? [],
       );
-      if (breakdown.total < MIN_BOOST_SCORE) return [];
+      if (!(lane === "boost" ? isBoostScore(breakdown.total) : isRegularReviewScore(breakdown.total))) return [];
       return [{ candidate, score: breakdown.total, breakdown }];
     })
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, input.limit ?? MAX_BOOST_OPTIONS);
+}
+
+export function selectOnDemandBoostCandidates(input: OnDemandCandidateInput) {
+  return selectOnDemandCandidates(input, "boost");
+}
+
+export function selectOnDemandRegularCandidates(input: OnDemandCandidateInput) {
+  return selectOnDemandCandidates(input, "regular");
 }
 
 export async function ensureBoostCandidatesForSingle(db: any, single: any, now = Date.now()) {
@@ -198,7 +208,7 @@ export async function ensureBoostCandidatesForSingle(db: any, single: any, now =
     match.singleAId === single.id ? match.singleBId : match.singleAId,
   ));
   const answersBySingle = new Map<number, any[]>((answerRows as any[]).map((row: any) => [row.singleId, parseAnswersJson(row.answersJson)]));
-  const ranked = selectOnDemandBoostCandidates({
+  const candidateInput = {
     single,
     candidateProfiles,
     memberships,
@@ -207,7 +217,11 @@ export async function ensureBoostCandidatesForSingle(db: any, single: any, now =
     existingCandidateIds,
     unavailableCandidateIds,
     now,
-  });
+  };
+  const ranked = [
+    ...selectOnDemandBoostCandidates(candidateInput).map(option => ({ ...option, lane: "boost" as const })),
+    ...selectOnDemandRegularCandidates(candidateInput).map(option => ({ ...option, lane: "regular" as const })),
+  ];
 
   let created = 0;
   for (const option of ranked) {
@@ -223,8 +237,10 @@ export async function ensureBoostCandidatesForSingle(db: any, single: any, now =
       singleAId: single.id,
       singleBId: candidate.id,
       score: option.score,
-      scoreBreakdown: JSON.stringify({ ...option.breakdown, algorithm: "v8.0", source: "boost_on_demand" }),
-      notes: `${BOOST_CANDIDATE_NOTE_MARKER} נוצרה כאפשרות אנונימית לפי דרישה; לא נשלחה הודעה ולא בוצע חיוב`,
+      scoreBreakdown: JSON.stringify({ ...option.breakdown, source: option.lane === "boost" ? "boost_on_demand" : "regular_review_on_demand" }),
+      notes: option.lane === "boost"
+        ? `${BOOST_CANDIDATE_NOTE_MARKER} נוצרה כאפשרות אנונימית לפי דרישה; לא נשלחה הודעה ולא בוצע חיוב`
+        : `${REGULAR_REVIEW_NOTE_MARKER} התאמה של 80 ומעלה ממתינה לבדיקה ידנית; לא נשלחה הודעה ולא בוצע חיוב`,
       status: "pending",
       updatedAt: now,
     } as any);
@@ -427,7 +443,7 @@ export function evaluateBoostEligibility(input: {
       !match.returnedToPoolAt
       && match.status === "pending"
       && !inFlightMatchIds.has(Number(match.id))
-      && Number(match.score || 0) >= MIN_BOOST_SCORE
+      && isBoostCandidate(match)
       && match.candidateEligible !== false,
     )
     .sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
@@ -588,6 +604,7 @@ export async function getEligibleBoostOpportunityForSingle(db: any, single: any,
   if (!eligibility.eligible) return null;
   const boostOptions = eligibility.candidates.slice(0, MAX_BOOST_OPTIONS).filter((candidate: any) =>
     candidate.singleId === single.id
+    && isBoostCandidate(candidate)
     && String(candidate.notes || "").startsWith(BOOST_CANDIDATE_NOTE_MARKER),
   );
   const option = matchId
@@ -611,7 +628,7 @@ export async function preparePaidBoostCheckout(input: {
   const selectedCandidate = input.matchId
     ? eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)
     : eligibility.topCandidate;
-  if (!eligibility.eligible || !selectedCandidate) {
+  if (!eligibility.eligible || !selectedCandidate || !isBoostCandidate(selectedCandidate)) {
     throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.blockers[0] || "הבוסט אינו זמין כרגע" });
   }
 
@@ -779,11 +796,17 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   if (!match || match.status !== "pending" || match.returnedToPoolAt) {
     throw new TRPCError({ code: "CONFLICT", message: "ההתאמה אינה זמינה עוד. לא תישלח הצעה." });
   }
-  const [singleA, singleB, memberships, exclusions] = await Promise.all([
+  // Covers old links and payments started before the policy changed. Paid
+  // callbacks retain their reusable credit through the existing failure flow.
+  if (!isBoostCandidate(match)) {
+    throw new TRPCError({ code: "CONFLICT", message: "האפשרות אינה בטווח Boost של 60 עד 79 אחוז. לא תישלח הצעה; תשלום שאושר יישמר כקרדיט." });
+  }
+  const [singleA, singleB, memberships, exclusions, answerRows] = await Promise.all([
     db.select().from(singles).where(eq(singles.id, match.singleAId)).limit(1),
     db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1),
     db.select().from(matchBoostMemberships).where(inArray(matchBoostMemberships.singleId, [match.singleAId, match.singleBId])),
     loadBoostExclusionAnchors(db),
+    db.select().from(matchmakingAnswers).where(inArray(matchmakingAnswers.singleId, [match.singleAId, match.singleBId])),
   ]);
   const partyA = singleA[0];
   const partyB = singleB[0];
@@ -808,6 +831,11 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   if (!bothConsented || !passesHardFilters(partyA, partyB).pass || !passesHardFilters(partyB, partyA).pass) {
     throw new TRPCError({ code: "CONFLICT", message: "אחד הצדדים אינו עומד עוד בתנאי מסלול Boost. לא תישלח הצעה." });
   }
+  const answerMap = new Map<number, any[]>((answerRows as any[]).map(row => [row.singleId, parseAnswersJson(row.answersJson)]));
+  const verifiedBreakdown = computeFullScore(partyA, partyB, answerMap.get(partyA.id) || [], answerMap.get(partyB.id) || []);
+  if (!isBoostScore(verifiedBreakdown.total)) {
+    throw new TRPCError({ code: "CONFLICT", message: "ציון ההתאמה המעודכן אינו בטווח Boost של 60 עד 79 אחוז. לא תישלח הצעה; תשלום שאושר יישמר כקרדיט." });
+  }
 
   const [newActiveRelationship] = await db.select({ id: matches.id }).from(matches).where(and(
     isNull(matches.returnedToPoolAt),
@@ -829,6 +857,8 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   const proposalClaimed = await db.transaction(async (tx: any) => {
     const updateResult = await tx.update(matches).set({
       status: "proposed",
+      score: verifiedBreakdown.total,
+      scoreBreakdown: JSON.stringify({ ...verifiedBreakdown, source: "boost_on_demand" }),
       approvalTokenA: tokenA,
       approvalTokenB: tokenB,
       approvedByA: false,
@@ -841,7 +871,7 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
       autoExplanation: "[BOOST] הצעת Boost אלגוריתמית שלא נבדקה ידנית על ידי הילית",
       notes: "[BOOST_SENT] נשלחה כהצעת Boost אלגוריתמית לאחר חיוב או מימוש קרדיט",
       updatedAt: now,
-    }).where(and(eq(matches.id, match.id), eq(matches.status, "pending"), isNull(matches.returnedToPoolAt)));
+    }).where(and(eq(matches.id, match.id), eq(matches.status, "pending"), isNull(matches.returnedToPoolAt), eq(matches.score, match.score), eq(matches.notes, match.notes)));
     const affectedRows = Number((Array.isArray(updateResult) ? updateResult[0] : updateResult)?.affectedRows || 0);
     if (affectedRows < 1) return false;
     await tx.update(matchBoostRequests).set({
@@ -856,9 +886,10 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   });
   if (!proposalClaimed) throw new TRPCError({ code: "CONFLICT", message: "ההתאמה כבר נשלחה או אינה זמינה עוד" });
 
-  const score = Math.round(Number(match.score || 0));
-  const cardA = buildAnonymousBoostCard(partyA, match, partyB);
-  const cardB = buildAnonymousBoostCard(partyB, match, partyA);
+  const score = Math.round(verifiedBreakdown.total);
+  const verifiedMatch = { ...match, score: verifiedBreakdown.total, scoreBreakdown: JSON.stringify(verifiedBreakdown) };
+  const cardA = buildAnonymousBoostCard(partyA, verifiedMatch, partyB);
+  const cardB = buildAnonymousBoostCard(partyB, verifiedMatch, partyA);
   const reasonText = (card: ReturnType<typeof buildAnonymousBoostCard>) => [
     ...card.reasons,
     card.participationReason,
@@ -1321,7 +1352,7 @@ export const matchBoostRouter = router({
       const selectedCandidate = input.matchId
         ? eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)
         : eligibility.topCandidate;
-      if (!eligibility.eligible || !selectedCandidate) {
+      if (!eligibility.eligible || !selectedCandidate || !isBoostCandidate(selectedCandidate)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.blockers[0] || "הבוסט אינו זמין כרגע" });
       }
 
@@ -1413,7 +1444,7 @@ export const matchBoostRouter = router({
       const selectedCandidate = input.matchId
         ? eligibility.candidates.find((candidate: any) => candidate.id === input.matchId)
         : eligibility.topCandidate;
-      if (!eligibility.eligible || !selectedCandidate) {
+      if (!eligibility.eligible || !selectedCandidate || !isBoostCandidate(selectedCandidate)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: eligibility.blockers[0] || "אין כרגע התאמה זמינה למימוש הקרדיט" });
       }
 
