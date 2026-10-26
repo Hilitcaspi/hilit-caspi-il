@@ -79,6 +79,10 @@ export function detectProductByAmount(sum: number): string | null {
   if (sum === 399 || sum === 449) return "bundle_new_year";
   if (sum === 349) return "bundle_tubav"; // Tu B'Av bundle: database + guide
   if (sum >= 3800 && sum <= 4500) return "coaching_mas"; // המסע full price (4200) or with coupon
+  // ₪450 is also the discounted introductory-session charge. Without a
+  // process token, canonical description, or bound checkout, do not guess
+  // that it is a coaching installment.
+  if (sum === 450) return null;
   if (sum >= 400 && sum <= 460) return "coaching_mas"; // המסע installment (4200/10 = 420)
   if (sum >= 2200 && sum <= 3200) return "coaching"; // הבנה full price (2960) or with coupon (2664)
   if (sum >= 340 && sum <= 400) return "coaching";   // הבנה installment (2960/8 = 370)
@@ -115,6 +119,8 @@ export function detectProductByDesc(desc: string): string | null {
   if (d.includes("חבילת שנה חדשה") || d.includes("bundle_new_year") || (d.includes("מאגר") && d.includes("מדריך") && d.includes("קורס"))) return "bundle_new_year";
   // IMPORTANT: bundle_tubav MUST be checked before guide/database because its description contains both "מדריך" and "מאגר"
   if (d.includes("חבילת טו באב") || d.includes("bundle_tubav") || (d.includes("מאגר") && d.includes("מדריך"))) return "bundle_tubav";
+  // This canonical product wording wins over generic coaching vocabulary.
+  if (d.includes("פגישת היכרות") || d.includes("פגישת הכרות")) return "session";
   if (d.includes("המסע") && (d.includes("ליווי") || d.includes("12"))) return "coaching_mas";
   if (d.includes("הבנה") && (d.includes("ליווי") || d.includes("8"))) return "coaching";
   if (d.includes("ליווי") || d.includes("coaching") || d.includes("8 פגישות") || d.includes("פגישות אישיות")) return "coaching";
@@ -278,7 +284,15 @@ async function handleCoaching(email: string, name: string) {
   }).catch(err => console.error("[GrowWebhook][Coaching] Email failed:", err));
 }
 
-async function handleCoachingMas(email: string, name: string) {
+export function buildCoachingMasOwnerNotification(name: string, email: string, verifiedSum: number) {
+  const amount = new Intl.NumberFormat("he-IL", { maximumFractionDigits: 2 }).format(verifiedSum);
+  return {
+    title: "רכישת ליווי אישי חדשה! 🌟 תהליך המסע",
+    content: `${name} (${email}) רכש תהליך המסע (12 פגישות) ב-${amount} ₪`,
+  };
+}
+
+async function handleCoachingMas(email: string, name: string, verifiedSum: number) {
   const db = await getDb();
   // Idempotency: skip if already processed (handles installment webhooks)
   if (db) {
@@ -291,7 +305,7 @@ async function handleCoachingMas(email: string, name: string) {
     }
   }
   const firstName = name.trim().split(" ")[0];
-  await notifyOwner({ title: "רכישת ליווי אישי חדשה! 🌟 תהליך המסע", content: `${name} (${email}) רכש תהליך המסע (12 פגישות) ב-4,200 ₪` });
+  await notifyOwner(buildCoachingMasOwnerNotification(name, email, verifiedSum));
   if (db) {
     await db.insert(leads).values({ name, email, phone: "", source: "paid_coaching_mas" }).catch(() => {});
     const now = Date.now();
@@ -1071,7 +1085,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       case "guide":    await handleGuide(email, name); break;
       case "course":   await handleCourse(email, name); break;
       case "coaching":     await handleCoaching(email, name); break;
-      case "coaching_mas": await handleCoachingMas(email, name); break;
+      case "coaching_mas": await handleCoachingMas(email, name, accountingInput.amountAgorot / 100); break;
       case "session":  await handleSession(email, name); break;
       case "database": {
         if (verifiedLiveTier !== "database_live_test") {
