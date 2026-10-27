@@ -1285,6 +1285,22 @@ export function passesAnswerHardFilters(
   return { pass: true };
 }
 
+/**
+ * Runs the strict eligibility checks in the same order as computeFullScore.
+ * Preview callers can use this to retain the strict block reason without
+ * calculating the complete strict score before their admin score.
+ */
+export function getStrictMatchEligibility(
+  a: Single,
+  b: Single,
+  answersA: MatchAnswer[],
+  answersB: MatchAnswer[],
+): { pass: boolean; reason?: string } {
+  const hardCheck = passesHardFilters(a, b);
+  if (!hardCheck.pass) return hardCheck;
+  return passesAnswerHardFilters(a, b, answersA, answersB);
+}
+
 function weightedCompatibilityScore(parts: {
   questionnaire: number;
   lifeStage: number;

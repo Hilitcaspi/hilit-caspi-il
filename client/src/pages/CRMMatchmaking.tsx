@@ -21,6 +21,7 @@ import DailyReportManagementSection from "@/components/DailyReportManagementSect
 import DatabaseNowSlaSection from "@/components/DatabaseNowSlaSection";
 import SelfServiceControlCenter from "@/components/SelfServiceControlCenter";
 import ProfileClosureDialog from "@/components/ProfileClosureDialog";
+import { ProgressiveList } from "@/lib/ProgressiveList";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -334,6 +335,7 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
+  const trpcUtils = trpc.useUtils();
   const [activeTab, setActiveTab] = useState<"self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "live_october" | "testimonials" | "daily_report">(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
     const allowedTabs = new Set(["self_service", "singles", "matches", "unmatched", "now", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "live_october", "testimonials", "daily_report"]);
@@ -381,6 +383,7 @@ export default function CRMMatchmaking() {
     setBatchProgress(null);
     setFilterCompatResult({});
     setCompatResult(null);
+    setCompatNarrativeLoading(false);
   }, []);
   useEffect(() => {
     filterTargetRef.current = filterCompatTarget;
@@ -413,6 +416,7 @@ export default function CRMMatchmaking() {
   const [compatDropdownA, setCompatDropdownA] = useState(false);
   const [compatDropdownB, setCompatDropdownB] = useState(false);
   const [compatResult, setCompatResult] = useState<any>(null);
+  const [compatNarrativeLoading, setCompatNarrativeLoading] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [matchSubTab, setMatchSubTab] = useState<"pending" | "proposed" | "unsuccessful" | "mutual_yes" | "followup">("pending");
   const [matchSearch, setMatchSearch] = useState("");
@@ -445,15 +449,52 @@ export default function CRMMatchmaking() {
   // Queries
   const { data: singles = [], refetch: refetchSingles, isLoading: singlesLoading } = trpc.matchmaking.listSingles.useQuery(undefined, {
     enabled: !!user && user.role === "admin",
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    trpc: { context: { skipBatch: true } },
   });
-  const { data: pendingMatches = [], refetch: refetchMatches } = trpc.matchmaking.listPendingMatches.useQuery(undefined, {
+  const {
+    data: crmMatchIndex = [],
+    refetch: refetchMatchIndex,
+    isLoading: matchIndexLoading,
+    isError: matchIndexError,
+    dataUpdatedAt: matchIndexUpdatedAt,
+  } = trpc.matchmaking.getCrmMatchIndex.useQuery(undefined, {
+    // The full compact index remains in memory so profile history, counts, and
+    // availability never silently omit off-tab records. Only row detail waits
+    // for the matches tab and one expanded card.
     enabled: !!user && user.role === "admin",
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    trpc: { context: { skipBatch: true } },
   });
+  const expandedMatchDetailsQuery = trpc.matchmaking.getCrmMatchDetails.useQuery(
+    { matchId: expandedMatch ?? 1 },
+    {
+      enabled: !!user && user.role === "admin" && activeTab === "matches" && expandedMatch !== null,
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      trpc: { context: { skipBatch: true } },
+    },
+  );
+  const refetchMatches = useCallback(async () => {
+    // The compact index is authoritative for lifecycle/counts. Detail is a
+    // one-row cache and must never outlive a refreshed index.
+    await trpcUtils.matchmaking.getCrmMatchDetails.invalidate(undefined, { refetchType: "none" });
+    return refetchMatchIndex();
+  }, [refetchMatchIndex, trpcUtils]);
+  const matchIndexReady = !matchIndexLoading && !matchIndexError;
   const { data: tokens = [], refetch: refetchTokens } = trpc.invites.getAll.useQuery(undefined, {
-    enabled: !!user && user.role === "admin",
+    enabled: !!user && user.role === "admin" && activeTab === "tokens",
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    trpc: { context: { skipBatch: true } },
   });
   const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } }, refetch: refetchUnmatched, isLoading: unmatchedLoading, isFetching: unmatchedFetching, isError: unmatchedError } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40, search: debouncedUnmatchedNameSearch || undefined }, {
     enabled: !!user && user.role === "admin" && activeTab === "unmatched",
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    trpc: { context: { skipBatch: true } },
   });
   const singlesWithoutMatches = unmatchedResult.items ?? [];
   const unmatchedSearchIsDebouncing = unmatchedNameSearch !== debouncedUnmatchedNameSearch;
@@ -526,18 +567,30 @@ export default function CRMMatchmaking() {
   };
   const { data: inactiveSingles = [] } = (trpc.matchmaking as any).listInactiveSingles.useQuery(undefined, {
     enabled: !!user && user.role === "admin" && activeTab === "inactive_leads",
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    trpc: { context: { skipBatch: true } },
   });
   const { data: updateRequests = [], refetch: refetchUpdateRequests } = trpc.profileUpdates.getAllPending.useQuery(undefined, {
     enabled: !!user && user.role === "admin" && activeTab === "update_requests",
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    trpc: { context: { skipBatch: true } },
   });
   // All singles for compatibility check dropdowns
   const { data: allSinglesForCompat = [], refetch: refetchAllSinglesForCompat } = trpc.admin.getAllSingles.useQuery(undefined, {
     enabled: !!user && user.role === "admin" && activeTab === "compatibility",
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    trpc: { context: { skipBatch: true } },
   });
 
   // All inactive singles (for the "לא פעילים" tab)
   const { data: allInactiveSingles = [], refetch: refetchInactive } = (trpc.matchmaking as any).listInactiveSingles.useQuery(undefined, {
     enabled: !!user && user.role === "admin" && activeTab === "inactive",
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    trpc: { context: { skipBatch: true } },
   });
 
   // This signature deliberately uses persisted profile revisions rather than
@@ -569,6 +622,18 @@ export default function CRMMatchmaking() {
     observedScoringInputsSignature.current = scoringInputsSignature;
     invalidateScoringPreviews();
   }, [invalidateScoringPreviews, scoringInputsSignature]);
+  useEffect(() => {
+    // A profile revision can change the on-demand current score and explanation
+    // for the expanded pair even when the match id remains selected.
+    void trpcUtils.matchmaking.getCrmMatchDetails.invalidate();
+  }, [scoringInputsSignature, trpcUtils]);
+  useEffect(() => {
+    // An index update can reflect lifecycle/status changes without a profile
+    // revision. Invalidate only on React Query's real update timestamp, never
+    // on render, so an expanded row refetches once without a query loop.
+    if (!matchIndexUpdatedAt) return;
+    void trpcUtils.matchmaking.getCrmMatchDetails.invalidate();
+  }, [matchIndexUpdatedAt, trpcUtils]);
 
   const approveUpdateMutation = trpc.profileUpdates.review.useMutation({
     onSuccess: () => {
@@ -587,11 +652,13 @@ export default function CRMMatchmaking() {
   const checkCompatMutation = trpc.admin.checkCompatibility.useMutation({
     onError: (err) => toast.error(`שגיאה: ${err.message}`),
   });
+  const checkCompatNarrativeMutation = trpc.admin.checkCompatibility.useMutation();
 
   // Top 3 matches for selected single
   const { data: topMatches = [], isLoading: topMatchesLoading } = (trpc.matchmaking as any).getTopMatchesForSingle.useQuery(
     { singleId: selectedSingle },
-    { enabled: !!user && user.role === "admin" && activeTab === "singles" && selectedSingle !== null }
+    { enabled: !!user && user.role === "admin" && activeTab === "singles" && selectedSingle !== null && matchIndexReady,
+      trpc: { context: { skipBatch: true } } }
   );
 
   // Mutations
@@ -765,8 +832,14 @@ export default function CRMMatchmaking() {
   // A decline is a response, and only personally exposed proposals can warn.
   const { data: responseSummaries = {}, refetch: refetchResponses, isLoading: responsesLoading, isError: responsesError } = trpc.matchmaking.getResponseSummaries.useQuery(undefined, {
     enabled: !!user && user.role === "admin",
-    refetchOnWindowFocus: true, staleTime: 0,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    trpc: { context: { skipBatch: true } },
   });
+  const profileById = useMemo(
+    () => new Map<number, any>((singles as Array<any>).map(single => [single.id, single])),
+    [singles],
+  );
 
   if (loading) {
     return <div className="min-h-screen bg-[#f0eadc] flex items-center justify-center" dir="rtl"><div className="text-[#191265]">טוענת...</div></div>;
@@ -805,7 +878,7 @@ export default function CRMMatchmaking() {
     hasPets?: boolean | null; petType?: string | null; acceptsPets?: boolean | null; smokingStatus?: string | null;
   }>;
 
-  const typedMatches = pendingMatches as Array<{
+  const typedMatches = ((crmMatchIndex as unknown) as Array<{
     id: number; singleAId: number; singleBId: number; score?: number | null;
     status: string; proposedAt?: number | null; createdAt: Date | number;
     approvalTokenA?: string | null; approvalTokenB?: string | null;
@@ -864,7 +937,13 @@ export default function CRMMatchmaking() {
       adminNote?: string | null;
       adminVerifiedAt?: number | null;
     };
-  }>;
+  }>).map(match => (
+    expandedMatchDetailsQuery.data?.id === match.id
+      && !expandedMatchDetailsQuery.isFetching
+      && expandedMatchDetailsQuery.dataUpdatedAt >= matchIndexUpdatedAt
+      ? { ...match, ...expandedMatchDetailsQuery.data }
+      : match
+  ));
 
   const typedTokens = (tokens as unknown) as Array<{
     id: number; token: string; note?: string | null; usedAt?: number | null;
@@ -1018,7 +1097,7 @@ export default function CRMMatchmaking() {
   };
 
   const advancedExclusions = buildAdvancedMatchExclusions(typedMatches, filterCompatTarget ?? undefined);
-  const filterTargetProfile = typedSingles.find(single => single.id === filterCompatTarget);
+  const filterTargetProfile = filterCompatTarget === null ? undefined : profileById.get(filterCompatTarget);
   const filterTargetExactChoices = filterProfilesByName(typedSingles, filterCompatSearch);
   const filterTargetIsSuggestion = filterTargetExactChoices.length === 0;
   const filterTargetChoices = filterTargetIsSuggestion ? getProfileNameSuggestions(typedSingles, filterCompatSearch) : filterTargetExactChoices;
@@ -1027,7 +1106,7 @@ export default function CRMMatchmaking() {
     wantsKids: single.wantsKids ?? single.wantsChildren, about: single.about ?? single.aboutMe,
   });
   const comparisonProfile = (person: any): MatchProfile => {
-    const current = typedSingles.find(single => single.id === person.id);
+    const current = profileById.get(person.id);
     return current ? asMatchProfile(current) : {
       ...person, photoUrl: person.photo, dnaType: person.dna, occupation: person.occ,
       locationPreference: person.locationPref, minAgePreference: person.minAge, maxAgePreference: person.maxAge,
@@ -1039,12 +1118,14 @@ export default function CRMMatchmaking() {
     manualPairRef.current = { ...manualPairRef.current, idA: id };
     setCompatPersonA(id);
     setCompatResult(null);
+    setCompatNarrativeLoading(false);
   };
   const selectCompatPersonB = (id: number | null) => {
     manualPreviewGeneration.current += 1;
     manualPairRef.current = { ...manualPairRef.current, idB: id };
     setCompatPersonB(id);
     setCompatResult(null);
+    setCompatNarrativeLoading(false);
   };
   const isCurrentManualPreview = (result: any) => {
     const identity = result?.__previewIdentity;
@@ -1095,7 +1176,9 @@ export default function CRMMatchmaking() {
     const revision = scoringInputsRevision.current;
     const signature = scoringInputsSignature;
     try {
-      const data = await checkCompatForFilter.mutateAsync({ idA: targetId, idB: candidateId });
+      // This explicit per-pair button also serves as "detailed explanation".
+      // Batch ranking remains narrative-free; retain detail only on request.
+      const data = await checkCompatForFilter.mutateAsync({ idA: targetId, idB: candidateId, includeNarrative: true });
       if (generation === batchGeneration.current && revision === scoringInputsRevision.current && signature === scoringInputsSignature && filterTargetRef.current === targetId) {
         setFilterCompatResult(prev => ({ ...prev, [candidateId]: { ...data, __previewIdentity: { generation, revision, signature, targetId, candidateId } } }));
       }
@@ -1161,6 +1244,16 @@ export default function CRMMatchmaking() {
     });
 
   const renderAdvancedSearch = (embedded = false) => {
+
+          if (!matchIndexReady) {
+            return (
+              <div className="rounded-2xl border border-[#191265]/15 bg-white p-6 text-center shadow-sm" role="status">
+                <p className="font-bold text-[#191265]">בודקת התאמות והיסטוריה…</p>
+                <p className="mt-1 text-sm text-[#727272]">החיפוש המתקדם ייפתח לאחר טעינת נתוני הזמינות והיסטוריית ההצעות.</p>
+                {matchIndexError && <button type="button" onClick={() => void refetchMatches()} className="mt-3 rounded-lg border border-[#191265]/20 px-3 py-1.5 text-xs font-bold text-[#191265]">נסי שוב</button>}
+              </div>
+            );
+          }
 
           const allSinglesForFilter = typedSingles;
           const eligibleFilterResults = allSinglesForFilter.filter(s => {
@@ -1488,7 +1581,7 @@ export default function CRMMatchmaking() {
                                       return;
                                     }
                                     const warningText = compatibilityWarnings.length > 0 ? `\n\nחריגות שאושרו ידנית:\n${compatibilityWarnings.join("\n")}` : "";
-                                    if (window.confirm(`לשלוח התאמה בין ${typedSingles.find(s => s.id === filterCompatTarget)?.firstName} ל-${single.firstName}?${warningText}`)) {
+                                    if (window.confirm(`לשלוח התאמה בין ${profileById.get(filterCompatTarget)?.firstName} ל-${single.firstName}?${warningText}`)) {
                                       if (compatData.matchId) {
                                         approveMatch.mutate({ matchId: compatData.matchId, hilitsNote: "", allowCriteriaOverride: canOverrideCriteria });
                                       } else {
@@ -1553,7 +1646,7 @@ export default function CRMMatchmaking() {
 
       {/* Edit Single Modal */}
       {editingSingleId && (() => {
-        const single = singles.find((s: any) => s.id === editingSingleId);
+        const single = profileById.get(editingSingleId);
         if (!single) return null;
         return (
           <EditSingleModal
@@ -1682,6 +1775,12 @@ export default function CRMMatchmaking() {
           <DatabaseNowSlaSection />
         )}
 
+        {!matchIndexReady && ["singles", "matches", "unmatched", "compatibility"].includes(activeTab) && (
+          <div className="mb-3 rounded-xl border border-[#191265]/15 bg-white p-3 text-sm text-[#191265]" role="status">
+            {matchIndexError ? "נתוני ההתאמות לא נטענו. אין להסיק שהפרופילים פנויים או שאין להם היסטוריה." : "האנשים נטענים בנפרד. בודקת התאמות פעילות והיסטוריית הצעות…"}
+            {matchIndexError && <button type="button" onClick={() => void refetchMatches()} className="mr-2 font-bold underline">נסי שוב</button>}
+          </div>
+        )}
         {/* Singles Tab */}
         {activeTab === "singles" && (
           <div className="space-y-2">
@@ -1725,13 +1824,22 @@ export default function CRMMatchmaking() {
               </button>
             </div>
 
-            {filteredSingles.length === 0 && (
+            {singlesLoading && <div className="rounded-xl bg-white p-8 text-center text-[#727272]" role="status">טוענת את האנשים במאגר…</div>}
+            {!singlesLoading && filteredSingles.length === 0 && (
               <div className="bg-white rounded-xl p-8 text-center text-[#727272]">
                 <div className="text-4xl mb-2">👥</div>
                 <p>{singlesSearch ? "לא נמצאו תוצאות לחיפוש" : "אין חברים במאגר עדיין"}</p>
               </div>
             )}
-            {filteredSingles.map(single => (
+            <ProgressiveList
+              items={filteredSingles}
+              resetKey={`${activeTab}|${singlesSearch}|${hideProposed}|${showOnlyUpdatedThisMonth}`}
+              getItemId={single => single.id}
+              forceVisibleIds={[selectedSingle]}
+              className="space-y-2"
+              moreLabel={(shown, total) => `הצג עוד חברים (${shown} מתוך ${total})`}
+            >
+            {single => (
               <div key={single.id} className={`rounded-xl p-4 shadow-sm border-r-4 ${(single as any).isCoachingClient ? "bg-pink-50 border-pink-400 ring-1 ring-pink-200" : single.isActive ? "bg-white border-green-400" : "bg-white border-gray-200"}`}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
@@ -1746,6 +1854,8 @@ export default function CRMMatchmaking() {
                           <img
                             src={single.photoUrl}
                             alt={single.firstName}
+                            loading="lazy"
+                            decoding="async"
                             className="w-8 h-8 rounded-full object-cover object-[center_20%] border-2 border-[#191265]/20 hover:border-[#ffe27c] transition-all cursor-zoom-in"
                           />
                         </button>
@@ -1762,7 +1872,8 @@ export default function CRMMatchmaking() {
                       {single.city && <span className="text-sm text-[#727272]">📍 {single.city}</span>}
                       {single.dnaType && <Badge className="text-xs bg-[#ffe27c]/50 text-[#191265]">{DNA_LABELS[single.dnaType] || single.dnaType}</Badge>}
                       {single.occupation && <span className="text-xs text-[#727272]">💼 {single.occupation}</span>}
-                      {activeMatchBySingleId.has(single.id) && (() => {
+                      {!matchIndexReady && <span className="text-xs text-[#727272]">זמינות והיסטוריה בבדיקה</span>}
+                      {matchIndexReady && activeMatchBySingleId.has(single.id) && (() => {
                         const am = activeMatchBySingleId.get(single.id)!;
                         const availabilityLabel = am.reason === "active_connection"
                           ? "התאמה הדדית פעילה"
@@ -2276,7 +2387,8 @@ export default function CRMMatchmaking() {
                   </div>
                 )}
               </div>
-            ))}
+            )}
+            </ProgressiveList>
           </div>
         )}
 
@@ -2375,7 +2487,15 @@ export default function CRMMatchmaking() {
                 )}
               </div>
             )}
-            {filteredMatchesBySubTab[matchSubTab].map(match => {
+            <ProgressiveList
+              items={filteredMatchesBySubTab[matchSubTab]}
+              resetKey={`${activeTab}|${matchSubTab}|${matchSearch}`}
+              getItemId={match => match.id}
+              forceVisibleIds={[expandedMatch]}
+              className="space-y-3"
+              moreLabel={(shown, total) => `הצג עוד התאמות (${shown} מתוך ${total})`}
+            >
+            {match => {
               // Determine display status badge based on actual match outcome
              const tracking = getMatchTrackingSummary(match);
              let displayStatus = tracking.mutualYes ? (match.returnedToPoolAt ? "released" : "matched") : match.status;
@@ -2557,6 +2677,17 @@ export default function CRMMatchmaking() {
                   {/* Expanded content */}
                   {isExpanded && (
                     <div className="border-t border-gray-100 p-4">
+                      {!expandedMatchDetailsQuery.isError && (expandedMatchDetailsQuery.isPending || expandedMatchDetailsQuery.isFetching || expandedMatchDetailsQuery.dataUpdatedAt < matchIndexUpdatedAt) ? (
+                        <div className="rounded-xl bg-[#f8f6f0] p-5 text-center text-sm text-[#727272]" role="status">
+                          טוענת פרטי התאמה מלאים…
+                        </div>
+                      ) : expandedMatchDetailsQuery.isError || expandedMatchDetailsQuery.data?.id !== match.id ? (
+                        <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-center text-sm text-red-800" role="alert">
+                          <p>לא ניתן לטעון את פרטי ההתאמה המלאים כרגע.</p>
+                          <button type="button" onClick={() => expandedMatchDetailsQuery.refetch()} className="mt-3 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-[#191265] underline">נסי שוב</button>
+                        </div>
+                      ) : (
+                        <>
                       <PairCriteriaLegend />
                       {/* Two profile cards side by side */}
                       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -3020,11 +3151,14 @@ export default function CRMMatchmaking() {
                           </div>
                         </div>
                       )}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
               );
-            })}
+            }}
+            </ProgressiveList>
           </div>
         )}
 
@@ -3081,7 +3215,7 @@ export default function CRMMatchmaking() {
               </div>
             ) : (<>
               {(singlesWithoutMatches as any[]).map((s: any) => {
-                const full = typedSingles.find(profile => profile.id === s.id);
+                const full = profileById.get(s.id);
                 const profile = { ...s, ...full, ...asMatchProfile(full || s) };
                 const missing = waitingProfileMissingFields(profile);
                 const isExpanded = waitingExpandedId === s.id;
@@ -3283,7 +3417,9 @@ export default function CRMMatchmaking() {
           {(compatPersonA || compatPersonB) && (
             <div className="mb-4 flex justify-end">
               <button type="button" disabled={singlesLoading} className="rounded-xl bg-[#191265] px-4 py-2 text-sm font-bold text-white disabled:opacity-40" onClick={() => {
-                const target = typedSingles.find(single => single.id === (compatPersonA ?? compatPersonB));
+                const selectedId = compatPersonA ?? compatPersonB;
+                if (selectedId === null) return;
+                const target = profileById.get(selectedId);
                 if (!target) { toast.error("הפרופיל עדיין לא נטען. אפשר לנסות שוב."); return; }
                 selectFilterTarget(target);
                 setActiveTab("filter_search");
@@ -3307,7 +3443,7 @@ export default function CRMMatchmaking() {
             compatResult={displayedCompatResult}
             comparisonProfiles={[displayedCompatResult?.personA, displayedCompatResult?.personB].map(person => {
               if (!person) return undefined;
-              const current = typedSingles.find(single => single.id === person.id);
+              const current = profileById.get(person.id);
               return current ? asMatchProfile(current) : person as MatchProfile;
             })}
             onPhoto={setLightboxUrl}
@@ -3322,22 +3458,36 @@ export default function CRMMatchmaking() {
               const signature = scoringInputsSignature;
               manualPairRef.current = { idA, idB };
               setCompatResult(null);
-              checkCompatMutation.mutate({ idA, idB }, {
+              setCompatNarrativeLoading(false);
+              const stillCurrent = () => epoch === manualPreviewGeneration.current
+                && revision === scoringInputsRevision.current
+                && signature === scoringInputsSignature
+                && manualPairRef.current.idA === idA && manualPairRef.current.idB === idB;
+              checkCompatMutation.mutate({ idA, idB, includeNarrative: false }, {
                 onSuccess: (data) => {
-                  if (
-                    epoch !== manualPreviewGeneration.current
-                    || revision !== scoringInputsRevision.current
-                    || signature !== scoringInputsSignature
-                    || manualPairRef.current.idA !== idA
-                    || manualPairRef.current.idB !== idB
-                  ) return;
+                  if (!stillCurrent()) return;
                   setCompatResult({ ...data, __previewIdentity: { epoch, revision, signature, idA, idB } });
-                  toast.success("בדיקת ההתאמה הושלמה!");
+                  setCompatNarrativeLoading(true);
+                  // The deterministic result is already usable. The narrative
+                  // must never hold the comparison or overwrite a changed pair.
+                  checkCompatNarrativeMutation.mutate({ idA, idB, includeNarrative: true }, {
+                    onSuccess: (detail) => {
+                      if (!stillCurrent()) return;
+                      setCompatResult((previous: any) => {
+                        if (!previous || previous.__previewIdentity?.epoch !== epoch || previous.score !== detail.score
+                          || previous.hasHardBlock !== detail.hasHardBlock
+                          || JSON.stringify(previous.warnings) !== JSON.stringify(detail.warnings)) return previous;
+                        return { ...previous, narrative: detail.narrative };
+                      });
+                    },
+                    onError: () => { if (stillCurrent()) toast.info("הציון מוצג; הנימוק המפורט לא נטען כרגע. אפשר לבצע בדיקה נוספת."); },
+                    onSettled: () => { if (stillCurrent()) setCompatNarrativeLoading(false); },
+                  });
                 },
               });
             }}
             onSendMatch={(allowCriteriaOverride = false) => {
-              if (!isCurrentManualPreview(displayedCompatResult)) {
+              if (!matchIndexReady || !isCurrentManualPreview(displayedCompatResult)) {
                 toast.error("הנתונים השתנו או שהזוג הוחלף. יש לבצע בדיקת התאמה חדשה לפני שליחה.");
                 return;
               }
@@ -3353,9 +3503,12 @@ export default function CRMMatchmaking() {
                 createAndSendMatch.mutate({ idA: compatPersonA, idB: compatPersonB, allowCriteriaOverride });
               }
             }}
-            canSendDirectly={!!displayedCompatResult}
+            canSendDirectly={matchIndexReady && !!displayedCompatResult}
             isSendingMatch={approveMatch.isPending || createAndSendMatch.isPending}
           />
+          {compatNarrativeLoading && displayedCompatResult && (
+            <p className="mt-3 rounded-xl bg-white p-3 text-center text-sm text-[#727272]" role="status">הציון וההשוואה מוכנים. מכינה את הנימוק המפורט…</p>
+          )}
           </>
         )}
         {/* Profile Update Requests Tab */}

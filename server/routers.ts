@@ -1,6 +1,7 @@
 import { rankAdvancedCandidates } from "./advancedMatchRanking";
 import { evaluateMatchPreview, previewScoreDimensions } from "./matchScorePreview";
 import { loadMatchScoreInputs, presentMatchScore } from "./pendingMatchScore";
+import { getCrmMatchIndex, getCrmMatchDetails } from "./crmMatchReadModel";
 import { getMatchResponseSummaries } from "./matchResponseMetrics";
 import { findBlockingMatchForSingle, visibleMatchSql, matchAvailabilityColumns, possibleBlockingMatchSql } from "./matchAvailabilityQueries";
 import { getMatchAvailability, isBlockingMatch } from "../shared/matchAvailability";
@@ -3185,21 +3186,31 @@ export const appRouter = router({
       .input(z.object({ targetId: z.number().int().positive(), candidateIds: z.array(z.number().int().positive()).max(2000) }))
       .mutation(async ({ input }) => rankAdvancedCandidates(input.targetId, input.candidateIds)),
     checkCompatibility: teamProcedure
-      .input(z.object({ idA: z.number(), idB: z.number() }))
+      .input(z.object({ idA: z.number(), idB: z.number(), includeNarrative: z.boolean().optional().default(true) }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const [singleA] = await db.select().from(singles).where(eq(singles.id, input.idA)).limit(1);
-        const [singleB] = await db.select().from(singles).where(eq(singles.id, input.idB)).limit(1);
+        const pairIds = [input.idA, input.idB];
+        const [pairProfiles, pairAnswers] = await Promise.all([
+          db.select().from(singles).where(inArray(singles.id, pairIds)),
+          db.select({ singleId: matchmakingAnswers.singleId, answersJson: matchmakingAnswers.answersJson })
+            .from(matchmakingAnswers).where(inArray(matchmakingAnswers.singleId, pairIds)),
+        ]);
+        const singleA = pairProfiles.find(person => person.id === input.idA);
+        const singleB = pairProfiles.find(person => person.id === input.idB);
         if (!singleA || !singleB) throw new TRPCError({ code: "NOT_FOUND", message: "אחד מהאנשים לא נמצא" });
-        const answersA = await db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleA.id)).limit(1);
-        const answersB = await db.select().from(matchmakingAnswers).where(eq(matchmakingAnswers.singleId, singleB.id)).limit(1);
+        // Preserve the prior limit(1) first-row semantics for legacy duplicate answers.
+        const answersA = pairAnswers.filter(row => row.singleId === singleA.id).slice(0, 1);
+        const answersB = pairAnswers.filter(row => row.singleId === singleB.id).slice(0, 1);
         const parsedA: MatchAnswer[] = answersA[0]?.answersJson ? (typeof answersA[0].answersJson === 'string' ? JSON.parse(answersA[0].answersJson) : answersA[0].answersJson as MatchAnswer[]) : [];
         const parsedB: MatchAnswer[] = answersB[0]?.answersJson ? (typeof answersB[0].answersJson === 'string' ? JSON.parse(answersB[0].answersJson) : answersB[0].answersJson as MatchAnswer[]) : [];
         const preview = evaluateMatchPreview(singleA as any, singleB as any, parsedA, parsedB);
         const { breakdown, warnings, hasHardBlock, hardBlockReason, canOverrideCriteria } = preview;
-        const narrative = await buildMatchExplanation(singleA as any, singleB as any, breakdown, parsedA, parsedB);
+        // Fast comparison reads never invoke narrative generation or a provider.
+        const narrative = input.includeNarrative
+          ? await buildMatchExplanation(singleA as any, singleB as any, breakdown, parsedA, parsedB)
+          : "";
         return {
           score: preview.score,
           warnings, hasHardBlock, hardBlockReason, canOverrideCriteria,
@@ -5259,6 +5270,20 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     /**
      * Admin: list all matches (all statuses) for CRM.
      */
+    getCrmMatchIndex: teamProcedure.query(async ({ ctx }) => {
+      if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      return db ? getCrmMatchIndex(db) : [];
+    }),
+    getCrmMatchDetails: teamProcedure
+      .input(z.object({ matchId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+        if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        return db ? getCrmMatchDetails(db, input.matchId) : null;
+      }),
     listPendingMatches: teamProcedure.query(async ({ ctx }) => {
       if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
@@ -5266,7 +5291,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
       const rawMatches = await db.select().from(matches)
         .where(or(visibleMatchSql(BOOST_CANDIDATE_NOTE_MARKER), unclaimedHighBoostReviewSql()))
-        .orderBy(desc(matches.createdAt), desc(matches.score)); // newest first, then by score
+        .orderBy(desc(matches.createdAt), desc(matches.score), desc(matches.id)); // newest first; stable ties
 
       // Keep every historical proposal. If the same pair was sent again later, each
       // proposal is a separate lifecycle event and must remain visible in the CRM.

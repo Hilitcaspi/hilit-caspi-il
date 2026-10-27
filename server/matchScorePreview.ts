@@ -1,21 +1,24 @@
 import type { Single } from "../drizzle/schema";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
-import { computeFullScore, computeFullScoreAdmin } from "./compatibility";
+import { computeFullScoreAdmin, getStrictMatchEligibility } from "./compatibility";
 
 /** A single read-only score contract for staff previews. Send eligibility stays strict. */
 export function evaluateMatchPreview(a: Single, b: Single, answersA: MatchAnswer[], answersB: MatchAnswer[]) {
-  const strict = computeFullScore(a, b, answersA, answersB);
   const breakdown = computeFullScoreAdmin(a, b, answersA, answersB);
-  const hardBlockReason = strict.details.find(detail => detail.startsWith("פסילה מוחלטת:"))
-    ?.replace(/^פסילה מוחלטת:\s*/, "") || null;
+  const strictEligibility = getStrictMatchEligibility(a, b, answersA, answersB);
+  const hardBlockReason = strictEligibility.reason || null;
   const warnings = [...breakdown.warnings];
   if (hardBlockReason && !warnings.some(warning => warning.includes(hardBlockReason))) {
     warnings.unshift(`⚠️ ${hardBlockReason}`);
   }
+  // A passing strict score equals the admin total. Keep the legacy total===0
+  // contract intact if a future scoring policy can validly compute zero.
+  const strictTotalIsZero = !strictEligibility.pass || breakdown.total === 0;
   return {
     score: breakdown.total, breakdown, warnings,
-    hasHardBlock: strict.total === 0, hardBlockReason,
-    canOverrideCriteria: strict.total === 0 && !!hardBlockReason && !hardBlockReason.includes("מגדר המבוקש"),
+    hasHardBlock: strictTotalIsZero,
+    hardBlockReason,
+    canOverrideCriteria: strictTotalIsZero && !!hardBlockReason && !hardBlockReason.includes("מגדר המבוקש"),
   };
 }
 

@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { HelmetProvider } from "react-helmet-async";
 import { COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink, TRPCClientError } from "@trpc/client";
+import { httpBatchLink, httpLink, splitLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
@@ -58,12 +58,10 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
-const trpcClient = trpc.createClient({
-  links: [
-    httpBatchLink({
-      url: "/api/trpc",
-      transformer: superjson,
-      headers() {
+const trpcTransportOptions = {
+  url: "/api/trpc",
+  transformer: superjson,
+  headers() {
         // Preview auto-login fallback: when the browser blocks iframe cookies
         // (Safari ITP / private browsing / WebView), the runtime mirrors the
         // session into sessionStorage so we can forward it as a Bearer token.
@@ -96,13 +94,22 @@ const trpcClient = trpc.createClient({
           }
         } catch {}
         return {};
-      },
-      fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
-      },
+  },
+  fetch(input: RequestInfo | URL, init?: RequestInit) {
+    return globalThis.fetch(input, {
+      ...(init ?? {}),
+      credentials: "include",
+    });
+  },
+};
+
+const trpcClient = trpc.createClient({
+  links: [
+    splitLink({
+      // Large CRM reads must not wait behind unrelated batched requests.
+      condition: op => op.context.skipBatch === true,
+      true: httpLink(trpcTransportOptions),
+      false: httpBatchLink(trpcTransportOptions),
     }),
   ],
 });
