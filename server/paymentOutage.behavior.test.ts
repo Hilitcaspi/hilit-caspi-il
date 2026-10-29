@@ -5,10 +5,18 @@ const mocks = vi.hoisted(() => ({
   getDb: vi.fn(), createPaymentProcess: vi.fn(), sendEmail: vi.fn(), notifyOwner: vi.fn(),
 }));
 vi.mock("./db", () => ({ getDb: mocks.getDb, resetDb: vi.fn() }));
+// These tests isolate product eligibility/attribution. Durable reservation and
+// concurrency run against the real module in checkoutReservationIntegration.test.ts.
+vi.mock("./checkoutReservation", async importOriginal => ({
+  ...await importOriginal<typeof import("./checkoutReservation")>(),
+  createCheckoutReservationFingerprint: () => "synthetic-isolated-product-test-binding",
+  withCheckoutReservation: async (_input: unknown, create: () => Promise<unknown>) => create(),
+}));
 vi.mock("./growPayment", () => ({
   PRODUCT_CONFIGS: { database: { sum: 299 }, guide: { sum: 149 }, course: { sum: 249 }, session: { sum: 500 } },
   getPlusCheckoutConfig: () => ({ configured: true, mode: "production", checkoutAmount: 99, displayAmount: 99 }),
   createPaymentProcess: mocks.createPaymentProcess,
+  isGrowCreateDefinitelyRejected: () => false,
 }));
 vi.mock("./brevo", () => ({ sendEmail: mocks.sendEmail, addContactToList: vi.fn() }));
 vi.mock("./_core/notification", () => ({ notifyOwner: mocks.notifyOwner }));

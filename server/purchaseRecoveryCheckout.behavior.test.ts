@@ -14,6 +14,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./db", () => ({ getDb: mocks.getDb, resetDb: vi.fn() }));
+// These tests isolate product eligibility/attribution. Durable reservation and
+// concurrency run against the real module in checkoutReservationIntegration.test.ts.
+vi.mock("./checkoutReservation", async importOriginal => ({
+  ...await importOriginal<typeof import("./checkoutReservation")>(),
+  createCheckoutReservationFingerprint: () => "synthetic-isolated-product-test-binding",
+  withCheckoutReservation: async (_input: unknown, create: () => Promise<unknown>) => create(),
+}));
 vi.mock("./growPayment", () => ({
   PRODUCT_CONFIGS: {
     database: { sum: 299 },
@@ -22,6 +29,7 @@ vi.mock("./growPayment", () => ({
   },
   getPlusCheckoutConfig: () => ({ configured: true, mode: "production", checkoutAmount: 99, displayAmount: 99 }),
   createPaymentProcess: mocks.createPaymentProcess,
+  isGrowCreateDefinitelyRejected: () => false,
 }));
 vi.mock("./purchaseRecoveryOffers", () => ({
   isPurchaseRecoveryOfferCode: mocks.isPurchaseRecoveryOfferCode,
@@ -202,7 +210,7 @@ describe("purchase recovery checkout plumbing", () => {
     mocks.bindPurchaseRecoveryProviderProcess.mockRejectedValue(new Error("synthetic bind failure"));
 
     await expect(appRouter.createCaller(context()).payment.createProcess(databaseInput))
-      .rejects.toThrow("synthetic bind failure");
+      .rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", message: expect.stringContaining("אין לשלם שוב לפני בדיקה") });
 
     expect(mocks.createPaymentProcess).toHaveBeenCalledOnce();
     expect(mocks.bindPurchaseRecoveryProviderProcess).toHaveBeenCalledOnce();
@@ -273,7 +281,7 @@ describe("purchase recovery checkout plumbing", () => {
       plusTermsAccepted: true,
       plusBoostAccepted: true,
       origin: "https://hilitcaspi.com",
-    })).rejects.toThrow("synthetic plus bind failure");
+    })).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", message: expect.stringContaining("אין לשלם שוב לפני בדיקה") });
 
     expect(mocks.createPaymentProcess).toHaveBeenCalledOnce();
     expect(mocks.bindPurchaseRecoveryProviderProcess).toHaveBeenCalledOnce();

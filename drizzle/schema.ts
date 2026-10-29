@@ -1693,3 +1693,6 @@ export const acquisitionFirstTouches = mysqlTable("acquisition_first_touches", {
 export { purchaseRecoveryRecipients } from './purchaseRecoverySchema';
 // Independent marketing SMS suppression; service messaging is unchanged.
 export { smsMarketingOptouts } from './smsMarketingSchema';
+
+// Durable duplicate-checkout coordination; no product or customer fulfillment changes.
+export { checkoutReservations } from './checkoutReservationSchema';

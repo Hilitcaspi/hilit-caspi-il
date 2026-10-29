@@ -53,7 +53,7 @@ describe("Choose50 exact-price integration", () => {
 
   it("shows the struck-through guide base price and exact promotional button amount", () => {
     expect(wallet).toContain('couponApplied.code === "CHOOSE50"');
-    expect(wallet).toContain('<del className="text-sm font-normal text-gray-500">₪{PRODUCT_CONFIGS.guide.sum}</del>');
+    expect(wallet).toMatch(/<del className="text-sm font-normal text-gray-500">\s*₪\{PRODUCT_CONFIGS\.guide\.sum\}\s*<\/del>/);
     expect(wallet).toContain("couponApplied.fixedPrice.toFixed(2)");
     expect(wallet).toContain('couponApplied?.code === "CHOOSE50"');
   });

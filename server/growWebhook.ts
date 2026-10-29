@@ -951,6 +951,20 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   // reconciliation without activating a product, acknowledging or emailing.
   if (accountingResult === "review") return;
 
+  // Terminalize only the authorization of a provider-confirmed paid receipt.
+  // This bookkeeping never charges, fulfills a product or sends a message.
+  if (process.env.NODE_ENV === "production" && liveProcessToken &&
+      ["recorded", "duplicate"].includes(accountingResult) && /^\d{3,30}$/.test(transactionId)) {
+    try {
+      const { markCheckoutReservationProviderConfirmed } = await import("./checkoutReservation");
+      await markCheckoutReservationProviderConfirmed(liveProcessToken);
+    } catch {
+      // Paid ledger/profile checks remain an independent safeguard. Never expose
+      // provider identity or block fulfillment of an already confirmed payment.
+      console.error("[CheckoutSafety] Could not persist verified completion marker");
+    }
+  }
+
   // TEST1 is a provider diagnostic only. After the exact, bound ₪1 receipt is
   // durably recorded, no approval, fulfillment, subscription/match mutation,
   // email/SMS, campaign queue, or conversion event may run.

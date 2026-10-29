@@ -8006,6 +8006,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           }
           return normalized;
         }),
+        // A retry keeps this opaque identity; the server also locks by buyer/product.
+        checkoutAttemptId: z.string().uuid().optional(),
         // Client passes coupon code; server validates and computes final price
         couponCode: z.string().max(50).optional(),
         // UTM tracking
@@ -8094,6 +8096,28 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           validatedRecoveryCode = recoveryValidation.code;
           recoveryFixedPrice = recoveryValidation.fixedPrice;
         }
+        const {
+          withCheckoutReservation, createCheckoutReservationFingerprint,
+          CheckoutReservationConflictError, CheckoutReservationInputError,
+        } = await import("./checkoutReservation");
+        let providerCreateStarted = false;
+        let providerCreateAccepted = false;
+        const { isGrowCreateDefinitelyRejected } = await import("./growPayment");
+        const canSafelyRetry = (error: unknown) => !providerCreateAccepted
+          && (!providerCreateStarted || isGrowCreateDefinitelyRejected(error));
+        try {
+        return await withCheckoutReservation({
+          email: normalizedCheckoutEmail,
+          product: input.product,
+          boostMatchId: input.boostMatchId ? String(input.boostMatchId) : undefined,
+          checkoutAttemptId: input.checkoutAttemptId,
+          diagnosticTest,
+          fingerprint: createCheckoutReservationFingerprint({
+            email: normalizedCheckoutEmail, product: input.product, phone: input.phone,
+            couponCode: reservedCode, personalToken: input.personalToken,
+            identity: input.fullName.trim(),
+          }),
+        }, async () => {
         const paymentTracking = createPurchaseTrackingIdentity();
         let paymentTrackingSaved = false;
 
@@ -8464,6 +8488,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
         let recoveryProviderProcessAccepted = false;
         try {
+          // Reserve ownership durably before this POST. A transport error is
+          // ambiguous and must not release a second payable process.
+          providerCreateStarted = true;
           const result = await createPaymentProcess({
             ...input,
             ...(verifiedPaymentIdentity || {}),
@@ -8474,6 +8501,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             liveWebhookReference: preparedLiveCheckoutReference || undefined,
             recoveryWebhookReference: preparedRecoveryCheckoutReference || undefined,
           });
+          providerCreateAccepted = true;
           if (preparedRecoveryCheckoutReference && recoveryProduct) {
             // A successful create-process response can represent a provider
             // process even if its token is unexpectedly absent. Preserve the
@@ -8528,13 +8556,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             testCheckout: diagnosticTest,
           };
         } catch (error: any) {
-          if (preparedBoostRequestId) {
-            await cancelPaidBoostCheckout(preparedBoostRequestId, error?.message || "grow_create_process_failed");
+          if (preparedBoostRequestId && canSafelyRetry(error)) {
+            await cancelPaidBoostCheckout(preparedBoostRequestId, "grow_create_process_rejected");
           }
           // A Grow token was returned, but its recovery binding failed. Retain
           // the pending Plus intent for reconciliation rather than calling this
           // an ordinary failed setup that implies a provider retry is safe.
-          if (input.product === "plus" && db && !diagnosticTest && !recoveryProviderProcessAccepted) {
+          if (input.product === "plus" && db && !diagnosticTest && !recoveryProviderProcessAccepted && canSafelyRetry(error)) {
             await db.update(plusCheckoutIntents)
               .set({ status: "failed", updatedAt: Date.now() })
               .where(and(
@@ -8543,6 +8571,22 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               ));
           }
           throw error;
+        }
+        }, { isSafeToRetry: canSafelyRetry });
+        } catch (error) {
+          if (error instanceof CheckoutReservationConflictError) {
+            throw new TRPCError({ code: "CONFLICT", message: error.safeMessage });
+          }
+          if (error instanceof CheckoutReservationInputError) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          }
+          if (error instanceof TRPCError) throw error;
+          // Preserve proved pre-provider business errors, but never expose SQL,
+          // connection details or provider references on an infrastructure fault.
+          if (canSafelyRetry(error) && error instanceof Error &&
+            /^(PAYMENT_PHONE_INVALID|קוד|הטבת|מסך|נדרש|נדרשת|יש לאשר)/.test(error.message)) throw error;
+          throw new TRPCError({ code: "SERVICE_UNAVAILABLE",
+            message: "לא ניתן לאמת את מצב התשלום כרגע. לא נפתח תהליך תשלום חדש. אם כבר ניסית לשלם, אין לשלם שוב לפני בדיקה." });
         }
       }),
 

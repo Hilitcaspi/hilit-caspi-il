@@ -22,6 +22,33 @@ import { isClosedSeasonalProduct, TU_BAV_CLOSED_MESSAGE } from "../shared/closed
 
 export const PAYMENT_PHONE_INVALID = "PAYMENT_PHONE_INVALID";
 
+export type GrowCreateProcessOutcome = "uncertain" | "safe_rejected";
+
+/**
+ * A POST that may have reached Grow must not be retried automatically. The
+ * checkout router uses this typed error to retain its durable create guard.
+ */
+export class GrowCreateProcessError extends Error {
+  readonly outcome: GrowCreateProcessOutcome;
+  readonly safeRejected: boolean;
+
+  constructor(message: string, outcome: GrowCreateProcessOutcome) {
+    super(message);
+    this.name = "GrowCreateProcessError";
+    this.outcome = outcome;
+    this.safeRejected = outcome === "safe_rejected";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export function isGrowCreateOutcomeUncertain(error: unknown): error is GrowCreateProcessError {
+  return error instanceof GrowCreateProcessError && error.outcome === "uncertain";
+}
+
+export function isGrowCreateDefinitelyRejected(error: unknown): error is GrowCreateProcessError {
+  return error instanceof GrowCreateProcessError && error.outcome === "safe_rejected";
+}
+
 export function isGrowPhoneValidationFailure(payload: unknown): boolean {
   const candidate = payload as { err?: { id?: number; message?: string } | string } | null;
   const id = typeof candidate?.err === "object" ? candidate.err?.id : undefined;
@@ -79,9 +106,12 @@ const PAGE_CODES: Record<string, string> = {
 const SITE_BASE = "https://hilitcaspi.com";
 
 export function shouldUseGrowCreateFallback(status: number, contentType: string | null, body: string): boolean {
-  return status === 403
-    || Boolean(contentType?.toLowerCase().includes("text/html"))
-    || /Incapsula|_Incapsula_Resource|Request unsuccessful/i.test(body);
+  // The fallback is another POST. It is safe only when Incapsula demonstrably
+  // blocked the direct request before Grow could start processing it.
+  return status === 403 && (
+    Boolean(contentType?.toLowerCase().includes("text/html"))
+    || /Incapsula|_Incapsula_Resource|Request unsuccessful/i.test(body)
+  );
 }
 
 async function postGrowCreatePayment(url: string, body: string, timeoutMs = 12000): Promise<Response> {
@@ -95,6 +125,21 @@ async function postGrowCreatePayment(url: string, body: string, timeoutMs = 1200
         "Content-Type": "application/x-www-form-urlencoded",
         ...BROWSER_HEADERS,
       },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function postGrowCreatePaymentForm(url: string, body: FormData, timeoutMs = 12000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await globalThis.fetch(url, {
+      method: "POST",
+      headers: { accept: "application/json", ...BROWSER_HEADERS },
+      body,
       signal: controller.signal,
     });
   } finally {
@@ -180,19 +225,29 @@ export interface CreatePaymentResult {
 }
 
 export async function createPaymentProcess(input: CreatePaymentInput): Promise<CreatePaymentResult> {
-  if (isClosedSeasonalProduct(input.product)) throw new Error(TU_BAV_CLOSED_MESSAGE);
-  if (input.product === "plus") await requirePlusDatabaseCheckout(input.email, input.personalToken);
+  if (isClosedSeasonalProduct(input.product)) {
+    throw new GrowCreateProcessError(TU_BAV_CLOSED_MESSAGE, "safe_rejected");
+  }
+  if (input.product === "plus") {
+    try {
+      await requirePlusDatabaseCheckout(input.email, input.personalToken);
+    } catch (error: any) {
+      throw new GrowCreateProcessError(error?.message || "Plus checkout is unavailable", "safe_rejected");
+    }
+  }
   const { notifyPaymentFailure } = await import("./paymentFailureAlert");
   const config = PRODUCT_CONFIGS[input.product];
-  if (!config) throw new Error(`Unknown product: ${input.product}`);
+  if (!config) throw new GrowCreateProcessError(`Unknown product: ${input.product}`, "safe_rejected");
   const normalizedPhone = input.phone ? normalizeIsraeliPhone(input.phone) : null;
-  if (input.phone && !normalizedPhone) throw new Error(PAYMENT_PHONE_INVALID);
+  if (input.phone && !normalizedPhone) {
+    throw new GrowCreateProcessError(PAYMENT_PHONE_INVALID, "safe_rejected");
+  }
 
   // TEST1 remains a regular, one-time provider process even for Plus. It must
   // never enter Grow's recurring branch or create a standing instruction.
   const plusCheckout = input.product === "plus" && !input.diagnosticTest ? getPlusCheckoutConfig() : null;
   if (plusCheckout && !plusCheckout.configured) {
-    throw new Error("The Database Plus payment product is not configured yet");
+    throw new GrowCreateProcessError("The Database Plus payment product is not configured yet", "safe_rejected");
   }
 
   if (plusCheckout?.mode === "production") {
@@ -226,32 +281,59 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     if (input.recoveryWebhookReference) notifyUrl.searchParams.set("recovery_ref", input.recoveryWebhookReference);
     form.append("notifyUrl", notifyUrl.toString());
 
-    const response = await globalThis.fetch(GROW_PLUS_API_URL, {
-      method: "POST",
-      headers: { accept: "application/json", ...BROWSER_HEADERS },
-      body: form,
-    });
-    const payload = await response.json().catch(() => null) as {
-      status?: number | boolean;
-      data?: { url?: string; processToken?: string };
-      err?: string;
-    } | null;
-    if (!response.ok || !(payload?.status === 1 || payload?.status === true) || !payload.data?.url) {
+    let response: Response;
+    try {
+      response = await postGrowCreatePaymentForm(GROW_PLUS_API_URL, form);
+    } catch (error: any) {
+      const message = `Grow Live create outcome is uncertain: ${error?.message || "network failure"}`;
       void notifyPaymentFailure({
         customerName: input.fullName,
         customerEmail: input.email,
         customerPhone: normalizedPhone || undefined,
         product: input.product,
         amount: config.sum,
-        errorMessage: payload?.err || `Grow Live returned HTTP ${response.status}`,
+        errorMessage: message,
         stage: "createProcess",
       });
-      throw new Error(payload?.err || "Grow Live did not return a hosted payment form");
+      throw new GrowCreateProcessError(message, "uncertain");
+    }
+    const responseText = await response.text();
+    type PlusCreatePayload = {
+      status?: number | boolean;
+      data?: { url?: string; processToken?: string };
+      err?: string;
+    };
+    let payload: PlusCreatePayload | null = null;
+    try {
+      payload = JSON.parse(responseText) as PlusCreatePayload;
+    } catch {
+      // A successful HTTP response with malformed content cannot prove whether a
+      // process was created, so it is intentionally treated as indeterminate.
+    }
+    const accepted = payload?.status === 1 || payload?.status === true;
+    const hasProviderIdentity = Boolean(payload?.data?.url && payload?.data?.processToken);
+    if (!response.ok || !accepted || !hasProviderIdentity) {
+      const safeRejected = (response.ok || (response.status >= 400 && response.status < 500))
+        && Boolean(payload)
+        && !accepted;
+      const message = safeRejected
+        ? (payload?.err || `Grow Live rejected the request with HTTP ${response.status}`)
+        : `Grow Live create outcome is uncertain (HTTP ${response.status})`;
+      void notifyPaymentFailure({
+        customerName: input.fullName,
+        customerEmail: input.email,
+        customerPhone: normalizedPhone || undefined,
+        product: input.product,
+        amount: config.sum,
+        errorMessage: message,
+        stage: "createProcess",
+      });
+      throw new GrowCreateProcessError(message, safeRejected ? "safe_rejected" : "uncertain");
     }
     return {
       authCode: "",
-      processToken: payload.data.processToken,
-      url: payload.data.url,
+      processToken: payload!.data!.processToken!,
+      url: payload!.data!.url!,
       checkoutMode: "production",
     };
   }
@@ -263,7 +345,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
   const pageCode = PAGE_CODES[providerProduct];
   const growUserId = GROW_USER_ID;
   if (!pageCode || !growUserId) {
-    throw new Error("The selected Grow payment product is not configured yet");
+    throw new GrowCreateProcessError("The selected Grow payment product is not configured yet", "safe_rejected");
   }
   const sum = input.sum ?? config.sum;
 
@@ -317,54 +399,71 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     params.append("maxPaymentNum", String(config.maxPaymentNum));
   }
 
-  let res: Response | null = null;
-  let directFailure = "";
+  let res: Response;
+  let responseText = "";
   try {
     res = await postGrowCreatePayment(GROW_API_URL, params.toString());
   } catch (fetchErr: any) {
-    directFailure = `Network error: ${fetchErr?.message || "fetch failed"}`;
-  }
-
-  if (res) {
-    const probe = await res.clone().text();
-    if (shouldUseGrowCreateFallback(res.status, res.headers.get("content-type"), probe)) {
-      directFailure = `Direct Grow blocked with HTTP ${res.status}`;
-      res = null;
-    }
-  }
-
-  if (!res) {
-    console.warn(`[GrowPayment] ${directFailure || "Direct Grow unavailable"}; trying established fallback`);
-    try {
-      res = await postGrowCreatePayment(GROW_CREATE_FALLBACK_URL, params.toString());
-    } catch (fallbackErr: any) {
-      directFailure = `Fallback network error: ${fallbackErr?.message || "fetch failed"}`;
-    }
-  }
-
-  if (!res || !res.ok) {
-    const text = res ? await res.text() : directFailure;
+    const message = `Grow create outcome is uncertain: ${fetchErr?.message || "network failure"}`;
     void notifyPaymentFailure({
       customerName: input.fullName,
       customerEmail: input.email,
-      customerPhone: input.phone,
+      customerPhone: normalizedPhone || undefined,
       product: input.product,
       amount: sum,
-      errorMessage: `${res ? `HTTP ${res.status}` : "No response"}: ${text.slice(0, 150)}`,
+      errorMessage: message,
       stage: "createProcess",
     });
-    throw new Error(`Grow API error ${res?.status || "network"}: ${text.slice(0, 300)}`);
+    throw new GrowCreateProcessError(message, "uncertain");
   }
 
-  const json = (await res.json()) as any;
-  console.log("[GrowPayment] createPaymentProcess response", {
-    status: json?.status,
-    hasAuthCode: Boolean(json?.data?.authCode),
-    hasProcessToken: Boolean(json?.data?.processToken),
-  });
+  responseText = await res.text();
+  if (shouldUseGrowCreateFallback(res.status, res.headers.get("content-type"), responseText)) {
+    console.warn(`[GrowPayment] Direct Grow confirmed blocked with HTTP ${res.status}; trying established fallback`);
+    try {
+      res = await postGrowCreatePayment(GROW_CREATE_FALLBACK_URL, params.toString());
+    } catch (fallbackErr: any) {
+      const message = `Grow create outcome is uncertain: fallback ${fallbackErr?.message || "network failure"}`;
+      void notifyPaymentFailure({
+        customerName: input.fullName,
+        customerEmail: input.email,
+        customerPhone: normalizedPhone || undefined,
+        product: input.product,
+        amount: sum,
+        errorMessage: message,
+        stage: "createProcess",
+      });
+      throw new GrowCreateProcessError(message, "uncertain");
+    }
+    responseText = await res.text();
+  }
 
-  if (!json.status || !json.data?.authCode) {
+  type OneTimeCreatePayload = {
+    status?: number | boolean | string;
+    data?: { authCode?: string; processToken?: string };
+    err?: unknown;
+  };
+  let json: OneTimeCreatePayload | null = null;
+  try {
+    json = JSON.parse(responseText) as OneTimeCreatePayload;
+  } catch {
+    // HTTP success with a non-JSON body can still represent a provider-created
+    // process. Never retry it or represent it as a definite rejection.
+  }
+  const accepted = json?.status === 1 || json?.status === true || json?.status === "1";
+  const hasProviderIdentity = Boolean(json?.data?.authCode);
+  const providerRejected = Boolean(json) && !accepted;
+  const safeRejected = res.status >= 400 && res.status < 500 && providerRejected
+    || res.ok && providerRejected;
+
+  if (!res.ok || !json || !accepted || !hasProviderIdentity) {
     const phoneValidationFailure = isGrowPhoneValidationFailure(json);
+    const outcome: GrowCreateProcessOutcome = safeRejected ? "safe_rejected" : "uncertain";
+    const message = phoneValidationFailure
+      ? PAYMENT_PHONE_INVALID
+      : outcome === "safe_rejected"
+        ? `Grow rejected the create request (HTTP ${res.status})`
+        : `Grow create outcome is uncertain (HTTP ${res.status})`;
     if (!phoneValidationFailure) {
       void notifyPaymentFailure({
         customerName: input.fullName,
@@ -372,17 +471,23 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
         customerPhone: normalizedPhone || undefined,
         product: input.product,
         amount: sum,
-        errorMessage: `Grow returned: ${JSON.stringify(json).slice(0, 150)}`,
+        errorMessage: message,
         stage: "createProcess",
       });
     }
-    if (phoneValidationFailure) throw new Error(PAYMENT_PHONE_INVALID);
-    throw new Error(`Grow API returned failure: ${JSON.stringify(json)}`);
+    throw new GrowCreateProcessError(message, phoneValidationFailure ? "safe_rejected" : outcome);
   }
+  const successfulJson = json;
+
+  console.log("[GrowPayment] createPaymentProcess response", {
+    status: successfulJson.status,
+    hasAuthCode: Boolean(successfulJson.data?.authCode),
+    hasProcessToken: Boolean(successfulJson.data?.processToken),
+  });
 
   return {
-    authCode: json.data.authCode,
-    processToken: json.data.processToken,
+    authCode: successfulJson.data!.authCode!,
+    processToken: successfulJson.data?.processToken,
   };
 }
 

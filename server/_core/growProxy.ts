@@ -18,45 +18,21 @@
  * request stream has already been consumed. We therefore MUST rebuild the
  * upstream body from the already-parsed `req.body` (never re-read the raw
  * stream — `req.on("end")` would never fire again and the request would hang
- * forever). We also wrap every upstream call in a hard AbortController timeout
- * with a fast Cloudflare Worker fallback so a slow/blocked Meshulam edge can
- * never freeze the wallet.
+ * forever). Every upstream call has a hard timeout. A fallback is permitted
+ * only when retrying cannot replay an unknown payment outcome.
  */
 import type { Express, Request, Response } from "express";
 import { addToPaymentLogBuffer } from "../routers";
 
 const PROXY_BASE = "/api/grow-proxy";
 
-// Fallback: the original Cloudflare Worker, used if Meshulam blocks our server
-// egress IP via Incapsula (HTTP 403 + Incapsula HTML) or if the direct call
-// times out. Cloudflare's network is not IP-blocked by Meshulam.
+// Fallback: the original Cloudflare Worker. It is intentionally not a general
+// retry path for payment mutations: a direct request may already have charged.
 const CF_WORKER_BASE = "https://grow-proxy.hilitcaspi.workers.dev";
 
 // Hard timeouts so a request can never hang indefinitely.
 const PRIMARY_TIMEOUT_MS = 8000;
 const FALLBACK_TIMEOUT_MS = 12000;
-
-function looksBlocked(status: number, body: Buffer): boolean {
-  // Incapsula blocks our server IP in multiple ways:
-  // 1. HTTP 500 empty response (sensitive endpoints like /doPayment)
-  // 2. HTTP 403 with Incapsula HTML
-  // 3. HTTP 404 redirect to grow.business HTML (newest form of blocking)
-  // Since Meshulam ALWAYS returns JSON for valid API calls, any non-JSON
-  // response is a sign of blocking.
-  if (status >= 500) return true;
-  if (status === 403 || status === 404) {
-    const head = body.subarray(0, 600).toString("utf8");
-    if (/Incapsula|_Incapsula_Resource|Request unsuccessful|grow\.business/i.test(head)) return true;
-    // If it's a 404 and doesn't look like JSON, it's likely a block
-    if (status === 404 && !head.trimStart().startsWith("{")) return true;
-  }
-  // Any response that isn't JSON from Meshulam is suspicious
-  if (body.length > 0) {
-    const firstChar = body.subarray(0, 1).toString("utf8").trim();
-    if (firstChar && firstChar !== "{" && firstChar !== "[" && status !== 200) return true;
-  }
-  return false;
-}
 
 // Browser-like headers to avoid Incapsula 403 blocking on server→Meshulam calls.
 const SPOOF_HEADERS: Record<string, string> = {
@@ -88,6 +64,51 @@ const HOP_BY_HOP = new Set([
 // IMPORTANT: The SDK's fetch interceptor (gs.min.js) strips the domain and keeps
 // the full path. So paths already containing /api/light/ must NOT be re-prefixed.
 const API_PREFIX = "/api/light/server/1.0";
+
+/**
+ * POST endpoints seen in the checked-in Grow SDK that only retrieve wallet or
+ * already-created payment state. This is an allowlist, not a naming heuristic:
+ * every other POST is treated as potentially state-changing and is never
+ * replayed after an ambiguous direct attempt.
+ */
+const READ_ONLY_POST_ENDPOINTS = new Set([
+  "drawWalletPageData",
+  "getBitPaymentStatus",
+  "getInstantPaymentDeepLink",
+  "getInstantPaymentStatus",
+  "getPayBoxTransactionStatus",
+]);
+
+export type GrowProxyRequestSafety = "safe-retry" | "mutation-or-unknown";
+
+function stripQuery(path: string): string {
+  return path.split("?", 1)[0] || "/";
+}
+
+function endpointFromPath(pathAfterBase: string): string | undefined {
+  let pathname = stripQuery(pathAfterBase);
+  if (pathname === "/prod") pathname = "/";
+  else if (pathname.startsWith("/prod/")) pathname = pathname.slice("/prod".length);
+
+  const segments = pathname.split("/").filter(Boolean);
+  return segments.at(-1);
+}
+
+/**
+ * Classifies whether an upstream attempt may be retried through the Worker.
+ * GET/HEAD are safe by HTTP semantics; POST is safe only for this explicit SDK
+ * lookup allowlist. Unknown POST/PUT/PATCH/DELETE routes are fail-closed.
+ */
+export function classifyGrowProxyRequest(
+  method: string,
+  pathAfterBase: string,
+): GrowProxyRequestSafety {
+  const normalizedMethod = method.toUpperCase();
+  if (normalizedMethod === "GET" || normalizedMethod === "HEAD") return "safe-retry";
+  return normalizedMethod === "POST" && READ_ONLY_POST_ENDPOINTS.has(endpointFromPath(pathAfterBase) || "")
+    ? "safe-retry"
+    : "mutation-or-unknown";
+}
 
 function needsPrefix(path: string): boolean {
   // If the path already starts with /api/light/ it came from the SDK with the
@@ -167,20 +188,168 @@ function buildBody(req: Request): { body?: string; contentType?: string } {
   return { body: String(raw), contentType: ct || undefined };
 }
 
-type FetchResponse = Awaited<ReturnType<typeof fetch>>;
+type GrowProviderPayload = {
+  status?: unknown;
+  err?: { id?: unknown } | string | null;
+};
 
-async function fetchWithTimeout(
+type UpstreamResult = {
+  buf: Buffer;
+  status: number;
+  contentType: string | null;
+  payload: GrowProviderPayload | null;
+};
+
+/** Parsing is diagnostic/classification only and must never turn into a retry. */
+function parseGrowPayload(buf: Buffer): GrowProviderPayload | null {
+  try {
+    const parsed: unknown = JSON.parse(buf.toString("utf8"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as GrowProviderPayload
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readUpstreamResponse(
   url: string,
   init: RequestInit,
   timeoutMs: number,
-): Promise<FetchResponse> {
+): Promise<UpstreamResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    // Keep the timer alive while consuming the body too: a server can send
+    // headers then stall indefinitely before a payload is available.
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    const buf = Buffer.from(await response.arrayBuffer());
+    return {
+      buf,
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      payload: parseGrowPayload(buf),
+    };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * A payment mutation can use the Worker only when the direct request was
+ * definitely stopped before application processing by Incapsula. Status alone
+ * is insufficient: 500/404 HTML, a missing body, and generic 403 pages are all
+ * ambiguous and must not be replayed.
+ */
+function isDefinitelyPreProcessingIncapsulaWaf(result: UpstreamResult): boolean {
+  if (result.status !== 403) return false;
+
+  const bodyHead = result.buf.subarray(0, 4096).toString("utf8");
+  const htmlLike =
+    /text\/html/i.test(result.contentType || "") ||
+    /^\s*<!doctype\s+html|^\s*<html[\s>]/i.test(bodyHead);
+  return htmlLike && /incapsula|_incapsula_resource|imperva/i.test(bodyHead);
+}
+
+function setCorsHeaders(req: Request, res: Response): void {
+  // CORS — allow the browser SDK (same-origin in prod, but be permissive).
+  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-API-KEY",
+  );
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS",
+  );
+}
+
+function logProxy(message: string): void {
+  // Callers pass route/status categories only. Never add URLs with query strings,
+  // request bodies, or provider response bodies to the payment log buffer.
+  console.log(message);
+  addToPaymentLogBuffer(message);
+}
+
+function logProxyWarning(message: string): void {
+  console.warn(message);
+  addToPaymentLogBuffer(message);
+}
+
+function errorKind(error: unknown): string {
+  return error instanceof Error && error.name ? error.name : "unknown";
+}
+
+type CheckoutPaymentReference = { authCode?: string; processToken?: string };
+
+function checkoutPaymentReferenceFromBody(raw: unknown): CheckoutPaymentReference | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const root = raw as Record<string, unknown>;
+  const nested = root.data && typeof root.data === "object"
+    ? root.data as Record<string, unknown>
+    : undefined;
+  const authCode = typeof root.authCode === "string"
+    ? root.authCode
+    : typeof nested?.authCode === "string" ? nested.authCode : undefined;
+  const processToken = typeof root.processToken === "string"
+    ? root.processToken
+    : typeof nested?.processToken === "string" ? nested.processToken : undefined;
+  return authCode || processToken ? { authCode, processToken } : undefined;
+}
+
+/**
+ * Persist a coordination-only lock for an ambiguous actual charge. This import
+ * stays dynamic to avoid a core/router dependency cycle. It is deliberately
+ * bounded and failures do not alter the fail-closed proxy response.
+ */
+async function markDoPaymentOutcomeUncertain(
+  pathAfterBase: string,
+  rawBody: unknown,
+): Promise<void> {
+  if (endpointFromPath(pathAfterBase) !== "doPayment") return;
+  const reference = checkoutPaymentReferenceFromBody(rawBody);
+  if (!reference) return;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      import("../checkoutReservation").then(({ markCheckoutReservationPaymentUncertain }) =>
+        markCheckoutReservationPaymentUncertain(reference),
+      ),
+      new Promise<void>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error("marker_timeout")), 750);
+      }),
+    ]);
+    logProxy("[GrowProxy] checkout uncertainty marker=recorded");
+  } catch (error: unknown) {
+    // No reference values or payloads in operational logs.
+    logProxyWarning(`[GrowProxy] checkout uncertainty marker=unavailable error=${errorKind(error)}`);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function sendOutcomeUnknown(res: Response): void {
+  res.status(502).json({
+    status: false,
+    err: {
+      category: "outcome_unknown",
+      message: "תוצאת התשלום אינה ידועה. אין לשלם שוב לפני בדיקה.",
+    },
+  });
+}
+
+function sendUnavailable(res: Response): void {
+  res.status(502).json({
+    status: false,
+    err: { category: "upstream_unavailable", message: "grow upstream unavailable" },
+  });
+}
+
+function sendUpstream(res: Response, result: UpstreamResult): void {
+  if (result.contentType) res.setHeader("Content-Type", result.contentType);
+  res.status(result.status).send(result.buf);
 }
 
 export function registerGrowProxy(app: Express): void {
@@ -188,14 +357,14 @@ export function registerGrowProxy(app: Express): void {
     try {
       const fullPath = req.originalUrl; // e.g. /api/grow-proxy/prod/api/...?x=1
       const afterBase = fullPath.slice(PROXY_BASE.length) || "/";
+      const route = stripQuery(afterBase);
       const upstreamUrl = resolveUpstream(afterBase);
+      const safety = classifyGrowProxyRequest(req.method, afterBase);
+      const method = req.method.toUpperCase();
 
-      // Never log payment tokens or personal fields. Route and body shape are
-      // sufficient for operational diagnostics.
-      const bodyKeys = req.body && typeof req.body === "object" ? Object.keys(req.body).slice(0, 20) : [];
-      const reqLog = `[GrowProxy] ${req.method} ${afterBase} → ${upstreamUrl} | bodyKeys=${bodyKeys.join(",") || "none"}`;
-      console.log(reqLog);
-      addToPaymentLogBuffer(reqLog);
+      // Do not log query values, payload keys/values, or full upstream URLs.
+      logProxy(`[GrowProxy] request method=${method} route=${route} safety=${safety}`);
+      setCorsHeaders(req, res);
 
       // Build forwarded headers from express-parsed request.
       const headers: Record<string, string> = { ...SPOOF_HEADERS };
@@ -207,121 +376,110 @@ export function registerGrowProxy(app: Express): void {
         else if (Array.isArray(value)) headers[key] = value.join(", ");
       }
 
-      const method = req.method.toUpperCase();
       const { body, contentType } = buildBody(req);
       if (contentType) headers["Content-Type"] = contentType;
 
       const init: RequestInit = { method, headers };
       if (body !== undefined) init.body = body;
 
-      // Primary attempt: direct from this server to Meshulam (hard timeout).
-      let upstream: FetchResponse | null = null;
-      let buf: Buffer | null = null;
-      let status = 0;
-      let contentTypeOut: string | null = null;
-      let primaryFailed = false;
-
+      let direct: UpstreamResult | undefined;
+      let directFailed = false;
       try {
-        upstream = await fetchWithTimeout(upstreamUrl, init, PRIMARY_TIMEOUT_MS);
-        buf = Buffer.from(await upstream.arrayBuffer());
-        status = upstream.status;
-        contentTypeOut = upstream.headers.get("content-type");
-        const responsePayload = JSON.parse(buf.toString("utf8")) as { status?: unknown; err?: { id?: unknown; message?: unknown } | string };
-        const errId = typeof responsePayload.err === "object" ? responsePayload.err?.id : undefined;
-        const respLog = `[GrowProxy] Direct response: HTTP ${status} | size=${buf.length}B | contentType=${contentTypeOut} | providerStatus=${String(responsePayload.status ?? "unknown")} | errId=${String(errId ?? "none")}`;
-        console.log(respLog);
-        addToPaymentLogBuffer(respLog);
-      } catch (e: any) {
-        primaryFailed = true;
-        const failMsg = `[GrowProxy] Direct Meshulam call failed/timed out: ${e?.name || e?.message || e}`;
-        console.warn(failMsg);
-        addToPaymentLogBuffer(failMsg);
+        direct = await readUpstreamResponse(upstreamUrl, init, PRIMARY_TIMEOUT_MS);
+        logProxy(
+          `[GrowProxy] direct response route=${route} http=${direct.status} json=${direct.payload ? "yes" : "no"}`,
+        );
+      } catch (error: unknown) {
+        directFailed = true;
+        logProxyWarning(`[GrowProxy] direct failed route=${route} error=${errorKind(error)}`);
       }
 
-      // Fallback: if direct attempt timed out, errored, or was Incapsula-blocked,
-      // retry via the Cloudflare Worker (different egress network).
-      const blocked = buf ? looksBlocked(status, buf) : false;
-      if (primaryFailed || blocked) {
-        const fbTrigger = `[GrowProxy] Triggering fallback (primaryFailed=${primaryFailed}, blocked=${blocked}, status=${status})`;
-        console.log(fbTrigger);
-        addToPaymentLogBuffer(fbTrigger);
-        try {
-          const fbUrl = `${CF_WORKER_BASE}${afterBase}`;
-          addToPaymentLogBuffer(`[GrowProxy] Fallback URL: ${fbUrl}`);
-          console.log(`[GrowProxy] Fallback URL: ${fbUrl}`);
-          const fb = await fetchWithTimeout(fbUrl, init, FALLBACK_TIMEOUT_MS);
-          const fbBuf = Buffer.from(await fb.arrayBuffer());
-          let fallbackStatus: unknown = "unknown";
-          let fallbackErrId: unknown = "none";
-          try {
-            const fallbackPayload = JSON.parse(fbBuf.toString("utf8")) as { status?: unknown; err?: { id?: unknown } | string };
-            fallbackStatus = fallbackPayload.status ?? "unknown";
-            fallbackErrId = typeof fallbackPayload.err === "object" ? fallbackPayload.err?.id ?? "none" : "none";
-          } catch { /* non-JSON block responses are classified below */ }
-          const fbRespLog = `[GrowProxy] Fallback response: HTTP ${fb.status} | size=${fbBuf.length}B | providerStatus=${String(fallbackStatus)} | errId=${String(fallbackErrId)}`;
-          console.log(fbRespLog);
-          addToPaymentLogBuffer(fbRespLog);
-          if (!looksBlocked(fb.status, fbBuf)) {
-            buf = fbBuf;
-            status = fb.status;
-            contentTypeOut = fb.headers.get("content-type");
-            console.log("[GrowProxy] ✓ Served via Cloudflare Worker fallback");
-            addToPaymentLogBuffer("[GrowProxy] ✓ Served via Cloudflare Worker fallback");
-          } else {
-            console.warn("[GrowProxy] ✗ Fallback also blocked!");
-            addToPaymentLogBuffer("[GrowProxy] ✗ Fallback also blocked!");
-          }
-        } catch (fbErr: any) {
-          const fbFailMsg = `[GrowProxy] Worker fallback failed: ${fbErr?.name || fbErr?.message || fbErr}`;
-          console.warn(fbFailMsg);
-          addToPaymentLogBuffer(fbFailMsg);
-        }
-      }
-
-      // CORS — allow the browser SDK (same-origin in prod, but be permissive).
-      res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, X-API-KEY",
-      );
-      res.setHeader(
-        "Access-Control-Allow-Methods",
-        "GET, POST, PUT, DELETE, OPTIONS",
+      // A safe lookup may retry a network failure, invalid/non-JSON edge page, or
+      // 5xx. A payment mutation may retry only the narrowly-proven pre-processing
+      // Incapsula 403 condition; all other ambiguous outcomes must not be replayed.
+      const shouldFallback = directFailed || (
+        direct !== undefined && (
+          safety === "safe-retry"
+            ? direct.status >= 500 || direct.payload === null
+            : isDefinitelyPreProcessingIncapsulaWaf(direct)
+        )
       );
 
-      if (buf == null) {
-        // Both attempts failed — return a fast error instead of hanging.
-        res
-          .status(502)
-          .json({ status: false, err: { message: "grow upstream unavailable" } });
+      if (shouldFallback && safety === "mutation-or-unknown" && !(
+        direct && isDefinitelyPreProcessingIncapsulaWaf(direct)
+      )) {
+        // A request that did not produce a trustworthy provider JSON response may
+        // have reached payment processing. Do not send it anywhere a second time.
+        logProxyWarning(`[GrowProxy] mutation outcome unknown route=${route}; fallback=blocked`);
+        await markDoPaymentOutcomeUncertain(afterBase, req.body);
+        sendOutcomeUnknown(res);
         return;
       }
 
-      if (contentTypeOut) res.setHeader("Content-Type", contentTypeOut);
-      res.status(status).send(buf);
-    } catch (err: any) {
-      const proxyErr = `[GrowProxy] Proxy error: ${err?.message || err}`;
+      if (shouldFallback) {
+        logProxy(`[GrowProxy] fallback allowed route=${route} safety=${safety}`);
+        try {
+          // Preserve the original query string in the actual fallback request,
+          // while deliberately keeping it out of every log entry.
+          const fallback = await readUpstreamResponse(
+            `${CF_WORKER_BASE}${afterBase}`,
+            init,
+            FALLBACK_TIMEOUT_MS,
+          );
+          logProxy(
+            `[GrowProxy] fallback response route=${route} http=${fallback.status} json=${fallback.payload ? "yes" : "no"}`,
+          );
+
+          // Never relay HTML/error pages as if they were provider responses. A
+          // 5xx from the Worker is also unknown for a mutation, even if JSON.
+          if (fallback.payload && (safety === "safe-retry" || fallback.status < 500)) {
+            sendUpstream(res, fallback);
+            return;
+          }
+        } catch (error: unknown) {
+          logProxyWarning(`[GrowProxy] fallback failed route=${route} error=${errorKind(error)}`);
+        }
+
+        if (safety === "mutation-or-unknown") {
+          await markDoPaymentOutcomeUncertain(afterBase, req.body);
+          sendOutcomeUnknown(res);
+        } else {
+          sendUnavailable(res);
+        }
+        return;
+      }
+
+      // A parsed provider JSON response below 5xx is a definitive semantic
+      // success/failure and is relayed unchanged. It is never retried.
+      if (direct?.payload && direct.status < 500) {
+        sendUpstream(res, direct);
+        return;
+      }
+
+      // This includes malformed/HTML and 5xx mutation responses. Do not expose
+      // an HTML edge page as success or replay a potentially charged payment.
+      if (safety === "mutation-or-unknown") {
+        logProxyWarning(`[GrowProxy] mutation outcome unknown route=${route}; response=ambiguous`);
+        await markDoPaymentOutcomeUncertain(afterBase, req.body);
+        sendOutcomeUnknown(res);
+      } else {
+        sendUnavailable(res);
+      }
+    } catch (error: unknown) {
+      // Do not include error.message: fetch errors can contain a URL/query string.
+      const proxyErr = `[GrowProxy] proxy error error=${errorKind(error)}`;
       console.error(proxyErr);
       addToPaymentLogBuffer(proxyErr);
+      setCorsHeaders(req, res);
       res
         .status(502)
-        .json({ status: false, err: { message: "grow proxy error" } });
+        .json({ status: false, err: { category: "proxy_error", message: "grow proxy error" } });
     }
   };
 
   // Preflight
   app.options(`${PROXY_BASE}/*`, (req, res) => {
-    res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-API-KEY",
-    );
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PUT, DELETE, OPTIONS",
-    );
+    setCorsHeaders(req, res);
     res.sendStatus(204);
   });
 
