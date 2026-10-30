@@ -24,6 +24,8 @@ describe("registration resume integrity", () => {
   it("preserves the original attribution when the draft is resumed", () => {
     expect(registerSource).toContain("utm_source: draft.utmSource");
     expect(registerSource).toContain("utm_campaign: draft.utmCampaign");
-    expect(registerSource).toContain("sessionStorage.setItem(key, value)");
+    expect(registerSource).toContain('safeStorageSet("session", key, value)');
+    expect(registerSource).toContain('resumeUrl.searchParams.set("resume", token)');
+    expect(registerSource).not.toContain('"", `/join?resume=${encodeURIComponent(token)}`');
   });
 });

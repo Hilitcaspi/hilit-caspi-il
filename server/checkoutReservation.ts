@@ -21,6 +21,13 @@ export interface CheckoutReservationInput {
   checkoutAttemptId?: string;
   /** Server-generated, keyed fingerprint; never send or store raw identity secrets here. */
   fingerprint?: string;
+  /**
+   * Server-only evidence that an unguessable registration-resume bearer token
+   * belongs to the current unpaid profile and its current identity. This never
+   * creates, rotates, releases, or broadens a reservation; it can only replay
+   * an existing open result with the same secure binding after paid checks pass.
+   */
+  verifiedOpenResume?: boolean;
   /** Binds an explicitly authorized diagnostic checkout to a separate reservation identity. */
   diagnosticTest?: boolean;
 }
@@ -390,6 +397,17 @@ export async function withCheckoutReservation<Result>(
         // only after paid evidence has been rechecked.
         if (existing.bindingHmac === bindingHmac && existing.attemptId === attemptId) return parseResult<Result>(existing);
         if (existing.bindingHmac === bindingHmac && !input.checkoutAttemptId) return parseResult<Result>(existing);
+        // A registration resume starts in a fresh browser session, so its opaque
+        // client attempt UUID can be lost even though the unpaid profile still
+        // proves the same buyer identity. The router may set this server-only bit
+        // only after validating that unguessable bearer token. It never applies
+        // to creating, uncertain, completed, or failed reservations, and paid
+        // evidence above always wins before the stored authorization is replayed.
+        if (existing.state === "open"
+          && existing.bindingHmac === bindingHmac
+          && Boolean(input.verifiedOpenResume)) {
+          return parseResult<Result>(existing);
+        }
         throw new CheckoutReservationConflictError("open", OPEN_MESSAGE);
       }
     }

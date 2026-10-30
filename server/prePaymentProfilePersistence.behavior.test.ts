@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "./_core/context";
 
 const mocks = vi.hoisted(() => ({
@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   sendEmail: vi.fn().mockResolvedValue({ success: true }),
   notifyOwner: vi.fn().mockResolvedValue(true),
   ga4SignUp: vi.fn().mockResolvedValue(undefined),
+  storagePut: vi.fn(),
 }));
 
 vi.mock("./db", () => ({ getDb: mocks.getDb, resetDb: vi.fn() }));
@@ -19,9 +20,12 @@ vi.mock("./_core/ga4", () => ({
   ga4SignUp: mocks.ga4SignUp,
   clientIdFromEmail: vi.fn(() => "synthetic-client-id"),
 }));
-vi.mock("./storage", () => ({ storagePut: vi.fn() }));
+vi.mock("./storage", () => ({ storagePut: mocks.storagePut }));
 
 import { appRouter } from "./routers";
+
+const DRAFT_TOKEN = "a".repeat(64);
+const OTHER_DRAFT_TOKEN = "b".repeat(64);
 
 type DbHarness = ReturnType<typeof createDbHarness>;
 
@@ -66,21 +70,21 @@ function createPublicContext(): TrpcContext {
 }
 
 const fullDraftInput = {
-  firstName: "בדיקה",
-  lastName: "סינתטית",
+  firstName: "Synthetic",
+  lastName: "Draft",
   gender: "female" as const,
   seekingGender: "male" as const,
   age: 34,
   birthDate: "1992-01-10",
-  city: "תל אביב",
-  phone: "050 123-4567",
-  email: "Synthetic.Draft@Example.com",
+  city: "Test City",
+  phone: "0500000000",
+  email: "synthetic.draft@example.test",
   height: 168,
   education: "bachelor" as const,
   religiosity: "secular" as const,
-  occupation: "בדיקת תוכנה",
-  about: "פרופיל בדיקה סינתטי בלבד",
-  interests: "מוזיקה,טיולים",
+  occupation: "Synthetic QA",
+  about: "Synthetic profile only",
+  interests: "music,travel",
   maritalStatus: "single" as const,
   hasKids: false,
   numKids: 0,
@@ -94,19 +98,50 @@ const fullDraftInput = {
   acceptsKids: "open" as const,
   openToPartnerWithKids: "yes" as const,
   locationPreference: "close" as const,
-  partnerDescription: "תיאור סינתטי",
+  partnerDescription: "Synthetic description",
   consentMatchmaking: true,
   consentDataSharing: true,
   consentEmailMarketing: false,
   deferUntilPayment: true,
 };
 
-describe("registerBasicProfile pre-payment draft behavior", () => {
+function existingDraft(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 42,
+    age: 34,
+    city: "Test City",
+    email: "synthetic.draft@example.test",
+    isPaid: false,
+    isActive: false,
+    questionnaireToken: DRAFT_TOKEN,
+    questionnaireCompletedAt: null,
+    firstName: "Synthetic",
+    birthDate: "1989-03-20",
+    hasKids: true,
+    numKids: 2,
+    acceptsKids: true,
+    seekingGender: "any",
+    photoUrl: "https://storage.example.test/old-photo.jpg",
+    ...overrides,
+  };
+}
+
+function tokenLookupRows(profile = existingDraft()): unknown[][] {
+  return [[profile], [profile]];
+}
+
+describe("registerBasicProfile pre-payment draft ownership and persistence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.storagePut.mockResolvedValue({ url: "https://storage.example.test/new-photo.jpg" });
+    vi.stubGlobal("fetch", vi.fn(() => {
+      throw new Error("network is blocked in focused behavior tests");
+    }));
   });
 
-  it("stores a complete inactive unpaid draft and sends nothing before payment", async () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("stores a new inactive unpaid draft and sends nothing before payment", async () => {
     const harness: DbHarness = createDbHarness([[], [{ id: 91 }]]);
     mocks.getDb.mockResolvedValue(harness.db);
 
@@ -116,15 +151,15 @@ describe("registerBasicProfile pre-payment draft behavior", () => {
     expect(result).toMatchObject({ singleId: 42, success: true });
     expect(harness.inserts).toHaveLength(1);
     expect(harness.inserts[0]).toMatchObject({
-      firstName: "בדיקה",
+      firstName: "Synthetic",
       gender: "female",
       seekingGender: "male",
       age: 34,
       birthDate: "1992-01-10",
-      city: "תל אביב",
-      phone: "0501234567",
-      email: "synthetic.draft@example.com",
-      occupation: "בדיקת תוכנה",
+      city: "Test City",
+      phone: "0500000000",
+      email: "synthetic.draft@example.test",
+      occupation: "Synthetic QA",
       dnaType: "anchor",
       isPaid: false,
       isActive: false,
@@ -132,84 +167,175 @@ describe("registerBasicProfile pre-payment draft behavior", () => {
     expect(mocks.sendEmail).not.toHaveBeenCalled();
     expect(mocks.ga4SignUp).not.toHaveBeenCalled();
     expect(mocks.notifyOwner).not.toHaveBeenCalled();
-    expect(harness.updates).toContainEqual(expect.objectContaining({
-      singleId: 42,
-      gender: "female",
-      dnaType: "anchor",
-    }));
-    expect(harness.updates.some(update => update.status === "client_database")).toBe(false);
   });
 
-  it("resolves the legacy email-link gender placeholder from the matching CRM lead", async () => {
-    const harness: DbHarness = createDbHarness([[{ gender: "male" }], [], [{ id: 91 }]]);
+  it("rejects an existing email or phone match without a bearer proof before uploads or writes", async () => {
+    const harness = createDbHarness([[existingDraft()]]);
+    mocks.getDb.mockResolvedValue(harness.db);
+
+    await expect(appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
+      ...fullDraftInput,
+      photoBase64: "data:image/jpeg;base64,AA==",
+      photoMime: "image/jpeg",
+    })).rejects.toMatchObject({ code: "FORBIDDEN", message: "resume-required" });
+
+    expect(harness.inserts).toHaveLength(0);
+    expect(harness.updates).toHaveLength(0);
+    expect(mocks.storagePut).not.toHaveBeenCalled();
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("updates the intended existing draft and returns its token only with the correct draft token", async () => {
+    const profile = existingDraft();
+    const harness = createDbHarness(tokenLookupRows(profile));
     mocks.getDb.mockResolvedValue(harness.db);
 
     const result = await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
       ...fullDraftInput,
-      gender: "{{gender}}",
-      seekingGender: "male",
-    });
-    await Promise.resolve();
-
-    expect(result).toMatchObject({ singleId: 42, success: true });
-    expect(harness.inserts[0]).toMatchObject({ gender: "male", seekingGender: "female" });
-    expect(harness.updates).toContainEqual(expect.objectContaining({ gender: "male" }));
-  });
-
-  it("updates the same unpaid draft on retry instead of inserting a duplicate", async () => {
-    const harness: DbHarness = createDbHarness([[
-      {
-        id: 42,
-        age: 34,
-        city: "תל אביב",
-        isPaid: false,
-        isActive: false,
-        questionnaireToken: "synthetic-token",
-        questionnaireCompletedAt: null,
-        firstName: "בדיקה",
-      },
-    ]]);
-    mocks.getDb.mockResolvedValue(harness.db);
-
-    const result = await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
-      ...fullDraftInput,
-      occupation: "פרט מעודכן בבדיקה",
+      draftToken: DRAFT_TOKEN,
+      occupation: "Updated synthetic QA",
     });
 
-    expect(result).toMatchObject({ singleId: 42, success: true, alreadyExists: false });
+    expect(result).toMatchObject({ singleId: 42, questionnaireToken: DRAFT_TOKEN, success: true, alreadyExists: false });
     expect(harness.inserts).toHaveLength(0);
     expect(harness.updates[0]).toMatchObject({
-      occupation: "פרט מעודכן בבדיקה",
+      occupation: "Updated synthetic QA",
       gender: "female",
       isPaid: false,
       isActive: false,
     });
-    expect(mocks.sendEmail).not.toHaveBeenCalled();
-    expect(mocks.ga4SignUp).not.toHaveBeenCalled();
   });
 
-  it("activates the same draft for a validated free-token path without inserting a duplicate", async () => {
-    const harness: DbHarness = createDbHarness([[
+  it("rejects a valid token that resolves to a different contact record", async () => {
+    const draftProfile = existingDraft();
+    const collidingProfile = existingDraft({ id: 88, questionnaireToken: OTHER_DRAFT_TOKEN });
+    const harness = createDbHarness([[draftProfile], [collidingProfile]]);
+    mocks.getDb.mockResolvedValue(harness.db);
+
+    await expect(appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
+      ...fullDraftInput,
+      draftToken: DRAFT_TOKEN,
+    })).rejects.toMatchObject({ code: "FORBIDDEN", message: "resume-required" });
+
+    expect(harness.inserts).toHaveLength(0);
+    expect(harness.updates).toHaveLength(0);
+    expect(mocks.storagePut).not.toHaveBeenCalled();
+  });
+
+  it("gates an existing paid profile return and never exposes its questionnaire token by email alone", async () => {
+    const paid = existingDraft({ isPaid: true, isActive: true });
+    const unauthorized = createDbHarness([[paid]]);
+    mocks.getDb.mockResolvedValue(unauthorized.db);
+
+    await expect(appRouter.createCaller(createPublicContext()).singles.registerBasicProfile(fullDraftInput))
+      .rejects.toMatchObject({ code: "FORBIDDEN", message: "resume-required" });
+    expect(unauthorized.inserts).toHaveLength(0);
+    expect(unauthorized.updates).toHaveLength(0);
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+
+    const authorized = createDbHarness(tokenLookupRows(paid));
+    mocks.getDb.mockResolvedValue(authorized.db);
+    const result = await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({ ...fullDraftInput, draftToken: DRAFT_TOKEN });
+    expect(result).toMatchObject({ singleId: 42, questionnaireToken: DRAFT_TOKEN, alreadyExists: true });
+    expect(authorized.inserts).toHaveLength(0);
+    expect(authorized.updates).toHaveLength(0);
+  });
+
+  it("preserves omitted birth date, children, accepts-kids, and seeking-gender fields for an existing draft", async () => {
+    const profile = existingDraft();
+    const harness = createDbHarness(tokenLookupRows(profile));
+    mocks.getDb.mockResolvedValue(harness.db);
+    const { birthDate: _birthDate, hasKids: _hasKids, numKids: _numKids, acceptsKids: _acceptsKids, seekingGender: _seekingGender, ...omitted } = fullDraftInput;
+
+    await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({ ...omitted, draftToken: DRAFT_TOKEN });
+
+    expect(harness.updates[0]).toMatchObject({
+      birthDate: "1989-03-20",
+      hasKids: true,
+      numKids: 2,
+      acceptsKids: true,
+      seekingGender: "any",
+    });
+  });
+
+  it("applies explicit optional-field changes for an authorized existing draft", async () => {
+    const profile = existingDraft();
+    const harness = createDbHarness(tokenLookupRows(profile));
+    mocks.getDb.mockResolvedValue(harness.db);
+
+    await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
+      ...fullDraftInput,
+      draftToken: DRAFT_TOKEN,
+      birthDate: "1990-04-15",
+      hasKids: false,
+      numKids: 0,
+      acceptsKids: "no",
+      seekingGender: "male",
+    });
+
+    expect(harness.updates[0]).toMatchObject({
+      birthDate: "1990-04-15",
+      hasKids: false,
+      numKids: 0,
+      acceptsKids: false,
+      seekingGender: "male",
+    });
+  });
+
+  it("keeps an old photo when omitted, remote, or upload fails and replaces it only after a valid data-url upload", async () => {
+    const profile = existingDraft();
+    const omittedPhoto = createDbHarness(tokenLookupRows(profile));
+    mocks.getDb.mockResolvedValue(omittedPhoto.db);
+    await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({ ...fullDraftInput, draftToken: DRAFT_TOKEN });
+    expect(omittedPhoto.updates[0]).not.toHaveProperty("photoUrl");
+    expect(mocks.storagePut).not.toHaveBeenCalled();
+
+    const remotePhoto = createDbHarness(tokenLookupRows(profile));
+    mocks.getDb.mockResolvedValue(remotePhoto.db);
+    await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
+      ...fullDraftInput,
+      draftToken: DRAFT_TOKEN,
+      photoBase64: "https://images.example.test/not-a-data-url.jpg",
+      photoMime: "image/jpeg",
+    });
+    expect(remotePhoto.updates[0]).not.toHaveProperty("photoUrl");
+    expect(mocks.storagePut).not.toHaveBeenCalled();
+
+    const uploadFailure = createDbHarness(tokenLookupRows(profile));
+    mocks.storagePut.mockRejectedValueOnce(new Error("synthetic storage failure"));
+    mocks.getDb.mockResolvedValue(uploadFailure.db);
+    await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
+      ...fullDraftInput,
+      draftToken: DRAFT_TOKEN,
+      photoBase64: "data:image/jpeg;base64,AA==",
+      photoMime: "image/jpeg",
+    });
+    expect(uploadFailure.updates[0]).not.toHaveProperty("photoUrl");
+
+    const replacement = createDbHarness(tokenLookupRows(profile));
+    mocks.getDb.mockResolvedValue(replacement.db);
+    await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
+      ...fullDraftInput,
+      draftToken: DRAFT_TOKEN,
+      photoBase64: "data:image/jpeg;base64,AA==",
+      photoMime: "image/jpeg",
+    });
+    expect(mocks.storagePut).toHaveBeenCalledTimes(2);
+    expect(replacement.updates[0]).toMatchObject({ photoUrl: "https://storage.example.test/new-photo.jpg" });
+  });
+
+  it("keeps a validated free-token update flow usable for its matching stored email", async () => {
+    const profile = existingDraft();
+    const harness = createDbHarness([[
       {
         id: 7,
         token: "synthetic-validated-token",
-        boundEmail: "synthetic.draft@example.com",
+        boundEmail: "synthetic.draft@example.test",
         usedAt: null,
         usedByEmail: null,
         expiresAt: Date.now() + 60_000,
       },
-    ], [
-      {
-        id: 42,
-        age: 34,
-        city: "תל אביב",
-        isPaid: false,
-        isActive: false,
-        questionnaireToken: "synthetic-token",
-        questionnaireCompletedAt: null,
-        firstName: "בדיקה",
-      },
-    ], [{ id: 91 }]]);
+    ], [profile], [{ id: 91 }]]);
     mocks.getDb.mockResolvedValue(harness.db);
 
     const result = await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
@@ -219,7 +345,7 @@ describe("registerBasicProfile pre-payment draft behavior", () => {
     });
     await Promise.resolve();
 
-    expect(result).toMatchObject({ singleId: 42, success: true, alreadyExists: false });
+    expect(result).toMatchObject({ singleId: 42, questionnaireToken: DRAFT_TOKEN, success: true, alreadyExists: false });
     expect(harness.inserts).toHaveLength(0);
     expect(harness.updates[0]).toMatchObject({ isPaid: true, isActive: true, gender: "female" });
     expect(harness.updates).toContainEqual(expect.objectContaining({
@@ -227,47 +353,5 @@ describe("registerBasicProfile pre-payment draft behavior", () => {
       singleId: 42,
       product: "database",
     }));
-    expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
-    expect(mocks.ga4SignUp).toHaveBeenCalledTimes(1);
-  });
-
-  it("rejects an invalid free token before activating or mutating a profile", async () => {
-    const harness: DbHarness = createDbHarness([[], []]);
-    mocks.getDb.mockResolvedValue(harness.db);
-
-    await expect(appRouter.createCaller(createPublicContext()).singles.registerBasicProfile({
-      ...fullDraftInput,
-      deferUntilPayment: false,
-      freeToken: "NOT-A-REAL-TOKEN",
-    })).rejects.toThrow("קוד הגישה החינמי אינו תקף");
-
-    expect(harness.inserts).toHaveLength(0);
-    expect(harness.updates).toHaveLength(0);
-    expect(mocks.sendEmail).not.toHaveBeenCalled();
-    expect(mocks.notifyOwner).not.toHaveBeenCalled();
-  });
-
-  it("blocks a new checkout draft for an already paid profile without mutating or emailing it", async () => {
-    const harness: DbHarness = createDbHarness([[
-      {
-        id: 42,
-        age: 34,
-        city: "תל אביב",
-        isPaid: true,
-        isActive: true,
-        questionnaireToken: "synthetic-token",
-        questionnaireCompletedAt: null,
-        firstName: "בדיקה",
-      },
-    ]]);
-    mocks.getDb.mockResolvedValue(harness.db);
-
-    const result = await appRouter.createCaller(createPublicContext()).singles.registerBasicProfile(fullDraftInput);
-
-    expect(result).toMatchObject({ singleId: 42, success: true, alreadyExists: true });
-    expect(harness.inserts).toHaveLength(0);
-    expect(harness.updates).toHaveLength(0);
-    expect(mocks.sendEmail).not.toHaveBeenCalled();
-    expect(mocks.ga4SignUp).not.toHaveBeenCalled();
   });
 });

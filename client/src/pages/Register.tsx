@@ -3,7 +3,7 @@
  * Route: /join?dna=leader&gender=female&session=xxx
  * Flow: Profile form → Payment (₪299) → Confirmation
  */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import React from "react";
 import { track } from "@/lib/track";
 import { trackCompleteRegistration } from "@/lib/metaPixel";
@@ -17,6 +17,19 @@ import GrowWallet from "@/components/GrowWallet";
 import LiveVoucherCard from "@/components/LiveVoucherCard";
 import { normalizeIsraeliPhone } from "@shared/profileValidation";
 import { getFirstTouchAcquisition, getLastUtmAcquisition } from "@/lib/acquisitionTracking";
+import {
+  createRegistrationDraftScope,
+  readRegistrationDraft,
+  registrationDraftCanContinueToPayment,
+  registrationDraftQueryFromSearch,
+  registrationPhotoPayload,
+  safeStorageGet,
+  safeStorageRemove,
+  safeStorageSet,
+  sameRegistrationIdentity,
+  saveRegistrationDraft,
+  type RegistrationDraftForm,
+} from "@/lib/registrationDraft";
 
 type Step = "profile" | "dna_select" | "compatibility_quiz" | "free_token_verify" | "payment" | "uploading" | "uploading_error" | "already_registered" | "done";
 
@@ -71,29 +84,39 @@ export default function Register() {
   const params = new URLSearchParams(search);
   const promotionalCoupon = (params.get("coupon") || "").trim().toUpperCase();
   const isNowHolidayOffer = promotionalCoupon === "NOW";
+  const registrationDraftQuery = registrationDraftQueryFromSearch(params);
   // Capture UTM params from URL and persist in BOTH sessionStorage AND localStorage
   // localStorage survives cross-domain redirects (Grow payment page → back to site)
   const utmKeysToCapture = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
   utmKeysToCapture.forEach(key => {
     const val = params.get(key);
     if (val) {
-      sessionStorage.setItem(key, val);
-      localStorage.setItem(key, val);
-      localStorage.setItem("utm_captured_at", String(Date.now()));
+      safeStorageSet("session", key, val);
+      safeStorageSet("local", key, val);
+      safeStorageSet("local", "utm_captured_at", String(Date.now()));
     }
   });
   // Read DNA from URL params, fall back to localStorage (saved when visiting /database-sales from DnaQuiz)
   const freeTokenFromUrl = (params.get("free_token") || "").trim().toLowerCase();
   const resumeTokenFromUrl = (params.get("resume") || "").trim().toLowerCase();
   const [dnaFromQuiz, setDnaFromQuiz] = useState<string | null>(
-    params.get("dna") || localStorage.getItem("dna_type")
+    params.get("dna") || safeStorageGet("local", "dna_type")
   );
   const [genderFromQuiz, setGenderFromQuiz] = useState<"female" | "male" | null>(
-    (params.get("gender") || localStorage.getItem("dna_gender")) as "female" | "male" | null
+    (params.get("gender") || safeStorageGet("local", "dna_gender")) as "female" | "male" | null
   );
   const [sessionId, setSessionId] = useState(
-    params.get("session") || localStorage.getItem("dna_session") || ""
+    params.get("session") || safeStorageGet("local", "dna_session") || ""
   );
+  const registrationDraftScope = useMemo(() => createRegistrationDraftScope({
+    resumeToken: resumeTokenFromUrl,
+    freeToken: freeTokenFromUrl,
+    // Use only the initial URL session for the storage namespace. An inline DNA
+    // result updates sessionId later and must not strand this form in a new key.
+    dnaSessionId: params.get("session") || undefined,
+    pathname: window.location.pathname,
+    query: registrationDraftQuery,
+  }), [search, resumeTokenFromUrl, freeTokenFromUrl]);
 
   // Listen for DNA result from DnaQuiz opened in a new tab
   useEffect(() => {
@@ -156,7 +179,7 @@ export default function Register() {
   // Pre-filled from DNA quiz URL params (name, email, phone)
   const recoveryPrefill = (() => {
     try {
-      const saved = JSON.parse(sessionStorage.getItem("registration_recovery_prefill") || "null");
+      const saved = JSON.parse(safeStorageGet("session", "registration_recovery_prefill") || "null");
       return saved?.sessionId === sessionId && Date.now() - saved.savedAt < 30 * 60 * 1000 ? saved : null;
     } catch { return null; }
   })();
@@ -169,7 +192,7 @@ export default function Register() {
   // Lock contact fields only when the DNA handoff supplied every required value.
   // Older journey emails included only a first name, which previously made the
   // empty email and phone fields read-only and blocked checkout permanently.
-  const fromDna = !!(nameFromDna && emailFromDna && phoneFromDna);
+  const fromDna = !!(nameFromDna && lastNameFromDna && emailFromDna && phoneFromDna);
 
   // Profile form state
   const [firstName, setFirstName] = useState(firstNameFromDna);
@@ -226,18 +249,90 @@ export default function Register() {
   const [currentQuizIndex, setCurrentQuizIndex] = useState(0);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const draftHydratedScopeRef = useRef<string>("");
 
   const [paymentLoading, setPaymentLoading] = useState(false);
 
   const [registerError, setRegisterError] = useState("");
+
+  // Restore only the draft belonging to this browser/session scope. A resume URL
+  // is always server-authoritative, so a local snapshot can never overwrite a
+  // profile returned for that opaque token.
+  useEffect(() => {
+    if (draftHydratedScopeRef.current === registrationDraftScope) return;
+    draftHydratedScopeRef.current = registrationDraftScope;
+    if (resumeTokenFromUrl) return;
+
+    const saved = readRegistrationDraft(registrationDraftScope);
+    if (!saved) return;
+    const draft = saved.form;
+    setFirstName(draft.firstName ?? "");
+    setLastName(draft.lastName ?? "");
+    if (draft.gender) setGender(draft.gender);
+    if (draft.seekingGender) setSeekingGender(draft.seekingGender);
+    setBirthDate(draft.birthDate ?? "");
+    setPhone(draft.phone ?? "");
+    setEmail(draft.email ?? "");
+    setCity(draft.city ?? "");
+    setHeight(draft.height ?? "");
+    setEducation(draft.education ?? "");
+    setReligiosity(draft.religiosity ?? "");
+    setShomerShabbat(draft.shomerShabbat ?? null);
+    setReligiosityOrigin(draft.religiosityOrigin ?? "");
+    setOccupation(draft.occupation ?? "");
+    setMaritalStatus(draft.maritalStatus ?? "");
+    setHasKids(Boolean(draft.hasKids));
+    setNumKids(draft.numKids ?? "0");
+    setWantsKids(draft.wantsKids ?? "");
+    setAbout(draft.about ?? "");
+    setPartnerDescription(draft.partnerDescription ?? "");
+    setMinAge(draft.minAge ?? "");
+    setMaxAge(draft.maxAge ?? "");
+    setMinHeight(draft.minHeight ?? "");
+    setMaxHeight(draft.maxHeight ?? "");
+    setReligiosityPref(draft.religiosityPref ?? []);
+    setAcceptsKids(draft.acceptsKids ?? "");
+    setOpenToPartnerWithKids(draft.openToPartnerWithKids ?? "");
+    setLocationPref(draft.locationPref ?? "");
+    setInterests(draft.interests ?? "");
+    setConsentMatchmaking(Boolean(draft.consentMatchmaking));
+    setConsentDataSharing(Boolean(draft.consentDataSharing));
+    setConsentEmailMarketing(Boolean(draft.consentEmailMarketing));
+    setDnaFromQuiz(draft.dnaFromQuiz ?? null);
+    setGenderFromQuiz(draft.genderFromQuiz ?? null);
+    setSessionId(draft.sessionId ?? "");
+    setQuizAnswers((draft.quizAnswers ?? {}) as Record<string, MatchAnswer>);
+    setCurrentQuizIndex(draft.currentQuizIndex ?? 0);
+    setShowMiniQuiz(Boolean(draft.showMiniQuiz));
+
+    const savedPhoto = registrationPhotoPayload(draft.photoPreview);
+    if (savedPhoto) {
+      setPhotoFile(null);
+      setPhotoPreview(savedPhoto.photoBase64);
+    }
+
+    // Local storage is only a continuity aid—not proof that a server draft was
+    // saved. Restore safe non-payment stages, otherwise return to the populated
+    // profile where the normal pre-payment save can run again.
+    if (draft.step === "dna_select") {
+      setShowMiniQuiz(true);
+      setStep("dna_select");
+    } else if (draft.step === "compatibility_quiz") {
+      setStep("compatibility_quiz");
+    } else {
+      setStep("profile");
+    }
+    setDraftSavedBeforePayment(false);
+  }, [registrationDraftScope, resumeTokenFromUrl]);
+
   const registerMutation = trpc.singles.register.useMutation({
     onSuccess: (data) => {
       setSingleId(data.singleId);
       setRegisterError("");
       // Clear DNA localStorage after successful registration
-      localStorage.removeItem("dna_type");
-      localStorage.removeItem("dna_gender");
-      localStorage.removeItem("dna_session");
+      safeStorageRemove("local", "dna_type");
+      safeStorageRemove("local", "dna_gender");
+      safeStorageRemove("local", "dna_session");
       setStep("done");
     },
     onError: (err) => {
@@ -289,8 +384,8 @@ export default function Register() {
       setPhotoPreview(compressed);
     } catch (error) {
       console.error("[ProfilePhoto] Failed to prepare image:", error);
-      setPhotoFile(null);
-      setPhotoPreview("");
+      // A replacement error must not erase a previously prepared local photo or
+      // a photo restored from an unpaid server draft.
       setPhotoError("לא הצלחנו להכין את התמונה. נסו לבחור תמונת JPG או PNG אחרת.");
     }
   };
@@ -411,32 +506,10 @@ export default function Register() {
       setFreeTokenVerified(true);
       setIsFreeTokenPath(true);
       setStep("uploading");
-      let photoBase64: string | undefined;
-      let photoMime: string | undefined;
-      if (photoFile && photoPreview) {
-        photoBase64 = photoPreview;
-        photoMime = photoFile.type;
-      }
-        registerBasicMutation.mutate({
-        firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email: freeTokenEmail,
-        city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
-        religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
-        maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
-        wantsKids: (wantsKids as any) || undefined, about: about || undefined,
-        partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
-        dnaSessionId: sessionId || undefined, minAgePreference: minAge ? parseInt(minAge) : undefined,
-        maxAgePreference: maxAge ? parseInt(maxAge) : undefined,
-        religiosityPreference: religiosityPref.join(",") || undefined, acceptsKids: (acceptsKids as any) || undefined,
-        openToPartnerWithKids: (openToPartnerWithKids as any) || undefined,
-        locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
-        photoBase64, photoMime, origin: window.location.origin,
+      registerBasicMutation.mutate({
+        ...buildRegisterPayload(),
+        email: freeTokenEmail,
         freeToken: freeTokenFromUrl || undefined,
-        consentMatchmaking, consentDataSharing, consentEmailMarketing,
-        firstTouch: getFirstTouchAcquisition(),
-        utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
-        utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
-        utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
-        utmContent: sessionStorage.getItem("utm_content") || localStorage.getItem("utm_content") || undefined,
       });
     } catch (err: any) {
       setFreeTokenError(err?.message || "שגיאה - אנא נסה שוב");
@@ -448,8 +521,17 @@ export default function Register() {
     if (currentQuizIndex > 0) {
       setCurrentQuizIndex(i => i - 1);
     } else {
+      setDraftSavedBeforePayment(false);
       setStep("profile");
     }
+  };
+
+  const returnToProfileForEditing = () => {
+    // A later payment-success callback must never rely on a draft that the
+    // customer may now change. handleProfileSubmit always saves fresh state.
+    setDraftSavedBeforePayment(false);
+    setGrowOpened(false);
+    setStep("profile");
   };
 
   const handleFreeTokenVerify = async (e: React.FormEvent) => {
@@ -461,33 +543,10 @@ export default function Register() {
       setIsFreeTokenPath(true);
       setStep("uploading");
       // Bug #2 fix: Use registerBasicProfile (sends questionnaire email) not register (which bypasses questionnaire)
-      let photoBase64: string | undefined;
-      let photoMime: string | undefined;
-      if (photoFile && photoPreview) {
-        photoBase64 = photoPreview;
-        photoMime = photoFile.type;
-      }
       registerBasicMutation.mutate({
-        firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email: freeTokenEmail,
-        city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
-        religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
-        maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
-        wantsKids: (wantsKids as any) || undefined, about: about || undefined,
-        partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
-        dnaSessionId: sessionId || undefined, minAgePreference: minAge ? parseInt(minAge) : undefined,
-        maxAgePreference: maxAge ? parseInt(maxAge) : undefined, minHeightPreference: minHeight ? parseInt(minHeight) : undefined,
-        maxHeightPreference: maxHeight ? parseInt(maxHeight) : undefined,
-        religiosityPreference: religiosityPref.join(",") || undefined, acceptsKids: (acceptsKids as any) || undefined,
-        openToPartnerWithKids: (openToPartnerWithKids as any) || undefined,
-        locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
-        photoBase64, photoMime, origin: window.location.origin,
+        ...buildRegisterPayload(),
+        email: freeTokenEmail,
         freeToken: freeTokenFromUrl || undefined,
-        consentMatchmaking, consentDataSharing, consentEmailMarketing,
-        firstTouch: getFirstTouchAcquisition(),
-        utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
-        utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
-        utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
-        utmContent: sessionStorage.getItem("utm_content") || localStorage.getItem("utm_content") || undefined,
       });
     } catch (err: any) {
       setFreeTokenError(err?.message || (gender === "female"
@@ -557,26 +616,9 @@ export default function Register() {
       const normalizedCode = couponCode.trim().toLowerCase();
       const emailToUse = couponBoundEmail || email;
       const data = await registerBasicMutation.mutateAsync({
-        firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone, email: emailToUse,
-        city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
-        religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
-        maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
-        wantsKids: (wantsKids as any) || undefined, about: about || undefined,
-        partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
-        dnaSessionId: sessionId || undefined, minAgePreference: minAge ? parseInt(minAge) : undefined,
-        maxAgePreference: maxAge ? parseInt(maxAge) : undefined,
-        religiosityPreference: religiosityPref.join(",") || undefined, acceptsKids: (acceptsKids as any) || undefined,
-        openToPartnerWithKids: (openToPartnerWithKids as any) || undefined,
-        locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
-        photoBase64: photoPreview || undefined, photoMime: photoFile?.type || undefined,
-        origin: window.location.origin,
+        ...buildRegisterPayload(),
+        email: emailToUse,
         freeToken: normalizedCode || undefined, // invite token → marks isPaid=true
-        consentMatchmaking, consentDataSharing, consentEmailMarketing,
-        firstTouch: getFirstTouchAcquisition(),
-        utmSource: sessionStorage.getItem("utm_source") || localStorage.getItem("utm_source") || undefined,
-        utmMedium: sessionStorage.getItem("utm_medium") || localStorage.getItem("utm_medium") || undefined,
-        utmCampaign: sessionStorage.getItem("utm_campaign") || localStorage.getItem("utm_campaign") || undefined,
-        utmContent: sessionStorage.getItem("utm_content") || localStorage.getItem("utm_content") || undefined,
       });
       // Redeem the invite token
       if (data && (data as any).singleId) {
@@ -600,9 +642,9 @@ export default function Register() {
       if (data?.questionnaireToken) setQuestionnaireToken(data.questionnaireToken);
       if (isFreeTokenPath) {
         // Free token path: go to done screen with questionnaire link
-        localStorage.removeItem("dna_type");
-        localStorage.removeItem("dna_gender");
-        localStorage.removeItem("dna_session");
+        safeStorageRemove("local", "dna_type");
+        safeStorageRemove("local", "dna_gender");
+        safeStorageRemove("local", "dna_session");
         setStep("done");
       } else {
         setGrowOpened(true);
@@ -610,8 +652,10 @@ export default function Register() {
     },
     onError: (err) => {
       console.error("[Payment] Failed to save basic profile:", err);
-      // Still open Grow and show confirmation even if save failed
-      setGrowOpened(true);
+      // A failed profile save is not proof of registration or payment success.
+      // Keep the form in memory and let the safe draft retry handle recovery.
+      setRegisterError(err.message || "לא הצלחנו לשמור את הפרטים. אין צורך להתחיל מחדש.");
+      setStep("uploading_error");
     },
   });
   const profileDraftMutation = trpc.singles.registerBasicProfile.useMutation();
@@ -619,7 +663,22 @@ export default function Register() {
   type ProfileDraftResult = Awaited<ReturnType<typeof profileDraftMutation.mutateAsync>>;
   const [draftSavedBeforePayment, setDraftSavedBeforePayment] = useState(false);
   const draftSaveInFlightRef = useRef<Promise<ProfileDraftResult> | null>(null);
-  const resumeAppliedRef = useRef(false);
+  const resumeAppliedRef = useRef<string | null>(null);
+  const replaceWithCanonicalResumeUrl = (token?: string) => {
+    if (!token || !/^[a-f0-9]{64}$/i.test(token) || resumeTokenFromUrl === token) return;
+    try {
+      const resumeUrl = new URL(window.location.href);
+      resumeUrl.pathname = "/join";
+      ["name", "email", "phone"].forEach(key => resumeUrl.searchParams.delete(key));
+      resumeUrl.searchParams.set("resume", token);
+      // The just-saved form is already current; changing the URL must not rehydrate
+      // an earlier query over those values. A different person's token still loads.
+      resumeAppliedRef.current = token;
+      window.history.replaceState(window.history.state, "", `${resumeUrl.pathname}${resumeUrl.search}`);
+    } catch {
+      // URL replacement is convenience only; the saved server draft remains valid.
+    }
+  };
   const resumeDraftQuery = trpc.singles.getRegistrationDraftByToken.useQuery(
     { token: resumeTokenFromUrl },
     {
@@ -631,8 +690,8 @@ export default function Register() {
 
   useEffect(() => {
     const result = resumeDraftQuery.data;
-    if (!resumeTokenFromUrl || !result || resumeAppliedRef.current) return;
-    resumeAppliedRef.current = true;
+    if (!resumeTokenFromUrl || !result || resumeAppliedRef.current === resumeTokenFromUrl) return;
+    resumeAppliedRef.current = resumeTokenFromUrl;
     if (result.status === "already_registered") {
       setSingleId(result.singleId);
       setExistingProfileToken(result.questionnaireToken);
@@ -672,6 +731,7 @@ export default function Register() {
     setLocationPref(draft.locationPreference || "");
     setInterests(draft.interests || "");
     setDnaFromQuiz(draft.dnaType || null);
+    setPhotoFile(null);
     setPhotoPreview(draft.photoUrl || null);
     setConsentMatchmaking(Boolean(draft.consentMatchmaking));
     setConsentDataSharing(Boolean(draft.consentDataSharing));
@@ -679,6 +739,56 @@ export default function Register() {
     setQuestionnaireToken(draft.questionnaireToken || "");
     setDraftSavedBeforePayment(true);
     setRegisterError("");
+    // A reload can happen after this person edits the profile but before the
+    // updated server save completes. Restore that local work only when both
+    // email and normalized phone prove it belongs to this server draft; never
+    // let another browser user's snapshot overwrite the resume result.
+    const localSnapshot = readRegistrationDraft(registrationDraftScope);
+    const hasMatchingLocalSnapshot = Boolean(localSnapshot && sameRegistrationIdentity(localSnapshot.form, { email: draft.email, phone: draft.phone }));
+    const hasMatchingLocalUnsavedSnapshot = hasMatchingLocalSnapshot && localSnapshot?.form.draftSavedBeforePayment !== true;
+    if (hasMatchingLocalUnsavedSnapshot && localSnapshot) {
+      const local = localSnapshot.form;
+      setFirstName(local.firstName ?? draft.firstName ?? "");
+      setLastName(local.lastName ?? draft.lastName ?? "");
+      if (local.gender) setGender(local.gender);
+      if (local.seekingGender) setSeekingGender(local.seekingGender);
+      setBirthDate(local.birthDate ?? draft.birthDate ?? "");
+      setPhone(local.phone ?? draft.phone ?? "");
+      setEmail(local.email ?? draft.email ?? "");
+      setCity(local.city ?? draft.city ?? "");
+      setHeight(local.height ?? (draft.height ? String(draft.height) : ""));
+      setEducation(local.education ?? draft.education ?? "");
+      setReligiosity(local.religiosity ?? draft.religiosity ?? "");
+      setShomerShabbat(local.shomerShabbat ?? draft.shomerShabbat ?? null);
+      setReligiosityOrigin(local.religiosityOrigin ?? draft.religiosityOrigin ?? "");
+      setOccupation(local.occupation ?? draft.occupation ?? "");
+      setMaritalStatus(local.maritalStatus ?? draft.maritalStatus ?? "");
+      setHasKids(local.hasKids ?? Boolean(draft.hasKids));
+      setNumKids(local.numKids ?? String(draft.numKids || 0));
+      setWantsKids(local.wantsKids ?? draft.wantsKids ?? "");
+      setAbout(local.about ?? draft.about ?? "");
+      setPartnerDescription(local.partnerDescription ?? draft.partnerDescription ?? "");
+      setMinAge(local.minAge ?? (draft.minAgePreference ? String(draft.minAgePreference) : ""));
+      setMaxAge(local.maxAge ?? (draft.maxAgePreference ? String(draft.maxAgePreference) : ""));
+      setMinHeight(local.minHeight ?? (draft.minHeightPreference ? String(draft.minHeightPreference) : ""));
+      setMaxHeight(local.maxHeight ?? (draft.maxHeightPreference ? String(draft.maxHeightPreference) : ""));
+      setReligiosityPref(local.religiosityPref ?? (draft.religiosityPreference || "").split(",").map(value => value.trim()).filter(Boolean));
+      setAcceptsKids(local.acceptsKids ?? (draft.acceptsKids === true ? "yes" : draft.acceptsKids === false ? "no" : ""));
+      setOpenToPartnerWithKids(local.openToPartnerWithKids ?? draft.openToPartnerWithKids ?? "");
+      setLocationPref(local.locationPref ?? draft.locationPreference ?? "");
+      setInterests(local.interests ?? draft.interests ?? "");
+      setConsentMatchmaking(local.consentMatchmaking ?? Boolean(draft.consentMatchmaking));
+      setConsentDataSharing(local.consentDataSharing ?? Boolean(draft.consentDataSharing));
+      setConsentEmailMarketing(local.consentEmailMarketing ?? Boolean(draft.consentEmailMarketing));
+      setDnaFromQuiz(local.dnaFromQuiz ?? draft.dnaType ?? null);
+      setSessionId(local.sessionId ?? "");
+      setQuizAnswers((local.quizAnswers ?? {}) as Record<string, MatchAnswer>);
+      setCurrentQuizIndex(local.currentQuizIndex ?? 0);
+      setShowMiniQuiz(Boolean(local.showMiniQuiz));
+      const localPhoto = registrationPhotoPayload(local.photoPreview);
+      if (localPhoto) setPhotoPreview(localPhoto.photoBase64);
+      setDraftSavedBeforePayment(false);
+    }
     const preservedUtm = {
       utm_source: draft.utmSource,
       utm_medium: draft.utmMedium,
@@ -687,11 +797,42 @@ export default function Register() {
     };
     Object.entries(preservedUtm).forEach(([key, value]) => {
       if (!value) return;
-      sessionStorage.setItem(key, value);
-      localStorage.setItem(key, value);
+      safeStorageSet("session", key, value);
+      safeStorageSet("local", key, value);
     });
-    setStep("payment");
-  }, [resumeDraftQuery.data, resumeTokenFromUrl]);
+    // A server draft can be legitimate but still incomplete (for example an
+    // older DNA handoff carried only a first name). The wallet requires a full
+    // name and cannot repair a hidden prefilled field, so return to the
+    // populated profile until this same draft is saved complete.
+    const paymentForm = hasMatchingLocalUnsavedSnapshot && localSnapshot
+      ? localSnapshot.form
+      : {
+          firstName: draft.firstName || "",
+          lastName: draft.lastName || "",
+          birthDate: draft.birthDate || "",
+          city: draft.city || "",
+          email: draft.email || "",
+          phone: draft.phone || "",
+          consentMatchmaking: Boolean(draft.consentMatchmaking),
+          consentDataSharing: Boolean(draft.consentDataSharing),
+          dnaFromQuiz: draft.dnaType || null,
+        };
+    const canContinueToPayment = registrationDraftCanContinueToPayment({
+      firstName: paymentForm.firstName,
+      lastName: paymentForm.lastName,
+      birthDate: paymentForm.birthDate,
+      city: paymentForm.city,
+      email: paymentForm.email,
+      phone: paymentForm.phone,
+      consentMatchmaking: paymentForm.consentMatchmaking,
+      consentDataSharing: paymentForm.consentDataSharing,
+      dnaFromQuiz: paymentForm.dnaFromQuiz,
+    });
+    // A matching local snapshot represents edits that have not yet been proved
+    // to the server. Show profile so Continue saves the current state before
+    // passing its resume proof to checkout.
+    setStep(!hasMatchingLocalUnsavedSnapshot && canContinueToPayment ? "payment" : "profile");
+  }, [registrationDraftScope, resumeDraftQuery.data, resumeTokenFromUrl]);
 
   const reportProfileSaveFailure = (error: unknown) => {
     const message = error instanceof Error ? error.message : "unknown_profile_save_error";
@@ -707,7 +848,9 @@ export default function Register() {
     });
   };
 
-  const buildRegisterPayload = () => ({
+  const buildRegisterPayload = () => {
+    const photo = registrationPhotoPayload(photoPreview, photoFile?.type);
+    return {
     firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone: normalizeIsraeliPhone(phone) || phone.trim(), email,
     city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
     religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
@@ -715,12 +858,14 @@ export default function Register() {
     wantsKids: (wantsKids as any) || undefined, about: about || undefined,
     partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
     dnaSessionId: sessionId || undefined, minAgePreference: minAge ? parseInt(minAge) : undefined,
-    maxAgePreference: maxAge ? parseInt(maxAge) : undefined,
+    maxAgePreference: maxAge ? parseInt(maxAge) : undefined, minHeightPreference: minHeight ? parseInt(minHeight) : undefined,
+    maxHeightPreference: maxHeight ? parseInt(maxHeight) : undefined,
     religiosityPreference: religiosityPref.join(",") || undefined, acceptsKids: (acceptsKids as any) || undefined,
     openToPartnerWithKids: (openToPartnerWithKids as any) || undefined,
     locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
-    photoBase64: photoPreview || undefined, photoMime: photoFile?.type || undefined,
+    ...photo,
     origin: window.location.origin,
+    draftToken: questionnaireToken || resumeTokenFromUrl || undefined,
     consentMatchmaking,
     consentDataSharing,
     consentEmailMarketing,
@@ -729,20 +874,97 @@ export default function Register() {
     utmCampaign: getLastUtmAcquisition()?.utmCampaign,
     utmContent: getLastUtmAcquisition()?.utmContent,
     firstTouch: getFirstTouchAcquisition(),
+    };
+  };
+
+  const buildRegistrationDraftForm = (): RegistrationDraftForm => ({
+    step,
+    firstName,
+    lastName,
+    gender,
+    seekingGender,
+    birthDate,
+    phone,
+    email,
+    city,
+    height,
+    education,
+    religiosity,
+    shomerShabbat,
+    religiosityOrigin,
+    occupation,
+    maritalStatus,
+    hasKids,
+    numKids,
+    wantsKids,
+    about,
+    partnerDescription,
+    minAge,
+    maxAge,
+    minHeight,
+    maxHeight,
+    religiosityPref,
+    acceptsKids,
+    openToPartnerWithKids,
+    locationPref,
+    interests,
+    consentMatchmaking,
+    consentDataSharing,
+    consentEmailMarketing,
+    dnaFromQuiz,
+    genderFromQuiz,
+    sessionId,
+    photoPreview: registrationPhotoPayload(photoPreview, photoFile?.type)?.photoBase64,
+    quizAnswers,
+    currentQuizIndex,
+    showMiniQuiz,
+    draftSavedBeforePayment,
   });
 
-  // Keep a same-device backup as soon as the main form has enough identifying
-  // fields. This complements the server draft saved on submit and lets a
-  // verified recovery link restore the exact answers after an interrupted flow.
+  // Persist every non-sensitive form step on the same device. The scope is
+  // bound to the opaque resume/DNA session or a per-tab anonymous nonce; this
+  // snapshot never contains payment or resume authorization values.
   useEffect(() => {
-    if (step !== "profile" || !firstName.trim() || !birthDate || !city.trim()
-      || !email.includes("@") || !normalizeIsraeliPhone(phone)) return;
-    const timer = window.setTimeout(() => {
-      try { localStorage.setItem("pending_profile_payload", JSON.stringify(buildRegisterPayload())); }
-      catch { /* Storage may be disabled or full; the server draft remains primary. */ }
-    }, 800);
-    return () => window.clearTimeout(timer);
-  });
+    // A slow network must not replace a previously saved local draft with the
+    // empty initial form while its server-authoritative resume is still loading.
+    if (resumeTokenFromUrl && (!resumeDraftQuery.data || resumeAppliedRef.current !== resumeTokenFromUrl)) return;
+    const persistSnapshot = () => {
+      saveRegistrationDraft(registrationDraftScope, {
+        form: buildRegistrationDraftForm(),
+        query: registrationDraftQuery,
+      });
+
+      // The legacy recovery page accepts this separate payload only after it
+      // verifies the same DNA lead. Keep it for that route, but never persist
+      // the server draft bearer token used by the normal resume flow.
+      if (firstName.trim() && birthDate && city.trim() && email.includes("@") && normalizeIsraeliPhone(phone)) {
+        const { draftToken: _draftToken, ...recoveryPayload } = buildRegisterPayload();
+        try { safeStorageSet("local", "pending_profile_payload", JSON.stringify(recoveryPayload)); } catch {}
+      }
+    };
+    const persistOnHide = () => {
+      if (document.visibilityState === "hidden") persistSnapshot();
+    };
+    const timer = window.setTimeout(persistSnapshot, 800);
+    window.addEventListener("pagehide", persistSnapshot);
+    document.addEventListener("visibilitychange", persistOnHide);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pagehide", persistSnapshot);
+      document.removeEventListener("visibilitychange", persistOnHide);
+    };
+  }, [
+    resumeTokenFromUrl, resumeDraftQuery.data,
+    registrationDraftScope, registrationDraftQuery.dna, registrationDraftQuery.gender, registrationDraftQuery.session,
+    registrationDraftQuery.source, registrationDraftQuery.coupon, registrationDraftQuery.utm_source,
+    registrationDraftQuery.utm_medium, registrationDraftQuery.utm_campaign, registrationDraftQuery.utm_content,
+    registrationDraftQuery.utm_term, step, firstName, lastName, gender, seekingGender, birthDate, phone, email,
+    city, height, education, religiosity, shomerShabbat, religiosityOrigin, occupation, maritalStatus, hasKids,
+    numKids, wantsKids, about, partnerDescription, minAge, maxAge, minHeight, maxHeight, religiosityPref,
+    acceptsKids, openToPartnerWithKids, locationPref, interests, consentMatchmaking, consentDataSharing,
+    consentEmailMarketing, dnaFromQuiz, genderFromQuiz, sessionId, photoPreview, photoFile, quizAnswers,
+    currentQuizIndex, showMiniQuiz, draftSavedBeforePayment,
+  ]);
 
   async function saveProfileDraftBeforePayment(overrides?: {
     gender?: "female" | "male";
@@ -756,17 +978,21 @@ export default function Register() {
         ...overrides,
         deferUntilPayment: true,
       };
-      try { localStorage.setItem("pending_profile_payload", JSON.stringify(payload)); } catch {}
+      const { draftToken: _draftToken, ...recoveryPayload } = payload;
+      try { safeStorageSet("local", "pending_profile_payload", JSON.stringify(recoveryPayload)); } catch {}
       let lastError: unknown;
       for (let retry = 1; retry <= 3; retry++) {
         try {
           const data = await profileDraftMutation.mutateAsync(payload);
           if (data?.alreadyExists) {
-            try { localStorage.removeItem("pending_profile_payload"); } catch {}
+            safeStorageRemove("local", "pending_profile_payload");
             if (data.questionnaireToken) setQuestionnaireToken(data.questionnaireToken);
             return data;
           }
-          if (data?.questionnaireToken) setQuestionnaireToken(data.questionnaireToken);
+          if (data?.questionnaireToken) {
+            setQuestionnaireToken(data.questionnaireToken);
+            replaceWithCanonicalResumeUrl(data.questionnaireToken);
+          }
           setDraftSavedBeforePayment(true);
           return data;
         } catch (error) {
@@ -791,21 +1017,22 @@ export default function Register() {
       gaSignUp("database");
     }
     if (draftSavedBeforePayment) {
-      try { localStorage.removeItem("pending_profile_payload"); } catch {}
+      safeStorageRemove("local", "pending_profile_payload");
       setGrowOpened(true);
       return;
     }
     // Fallback for a legacy or resumed checkout that reached Grow without a draft.
     const payload = buildRegisterPayload();
     // Save payload to localStorage as backup in case the request fails
-    try { localStorage.setItem('pending_profile_payload', JSON.stringify(payload)); } catch {}
+    const { draftToken: _draftToken, ...recoveryPayload } = payload;
+    try { safeStorageSet("local", "pending_profile_payload", JSON.stringify(recoveryPayload)); } catch {}
     // Try up to 3 times with delay
     let success = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         await registerBasicMutation.mutateAsync(payload);
         success = true;
-        try { localStorage.removeItem('pending_profile_payload'); } catch {}
+        safeStorageRemove("local", "pending_profile_payload");
         break;
       } catch (err) {
         console.error(`[Payment] registerBasicProfile attempt ${attempt}/3 failed:`, err);
@@ -965,7 +1192,10 @@ export default function Register() {
                 </p>
               </div>
 
-              <form onSubmit={handleProfileSubmit} className="space-y-6">
+              <form onSubmit={handleProfileSubmit}
+                onChangeCapture={() => setDraftSavedBeforePayment(false)}
+                onClickCapture={() => setDraftSavedBeforePayment(false)}
+                className="space-y-6">
 
                 {/* Photo */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm">
@@ -1015,8 +1245,8 @@ export default function Register() {
                           className={`w-full px-4 py-3 rounded-xl border-2 text-right ${fromDna ? "border-[#191265]/30 bg-[#191265]/5 text-[#191265] cursor-not-allowed" : "border-[#e9e8e8] focus:outline-none focus:border-[#191265]"}`} />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-[#191265] mb-1">שם משפחה</label>
-                        <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
+                        <label className="block text-sm font-medium text-[#191265] mb-1">שם משפחה *</label>
+                        <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} required
                           placeholder="שם משפחה"
                           className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] focus:outline-none focus:border-[#191265] text-right" />
                       </div>
@@ -1539,7 +1769,7 @@ export default function Register() {
                   </p>
                 </form>
               </div>
-              <button onClick={() => setStep("profile")}
+              <button onClick={returnToProfileForEditing}
                 className="mt-4 w-full text-center text-[#727272] text-sm hover:text-[#191265] transition-colors">
                 ← חזרה לפרופיל
               </button>
@@ -1585,7 +1815,7 @@ export default function Register() {
               />
               <button
                 type="button"
-                onClick={() => setStep("profile")}
+                onClick={returnToProfileForEditing}
                 className="text-[#727272] hover:text-[#191265] text-sm transition-colors w-full text-center mt-6"
               >
                 ← חזרה לפרופיל
@@ -1705,6 +1935,7 @@ export default function Register() {
                           prefillCoupon={promotionalCoupon || undefined}
                           customerGender={gender === "male" ? "male" : "female"}
                           onFreeAccessCode={validateManualFreeAccessCode}
+                          registrationResumeToken={questionnaireToken || resumeTokenFromUrl || undefined}
                           onSuccess={handlePaymentSuccess}
                         />
                       </div>
@@ -1760,7 +1991,7 @@ export default function Register() {
                 )}
               </div>
 
-              <button onClick={() => setStep("profile")}
+              <button onClick={returnToProfileForEditing}
                 className="mt-4 w-full text-center text-[#727272] text-sm hover:text-[#191265] transition-colors">
                 ← חזרה לפרופיל
               </button>
@@ -1800,26 +2031,28 @@ export default function Register() {
               </p>
               <div className="flex flex-col gap-3 max-w-xs mx-auto">
                 <button
-                  onClick={() => {
-                    setStep("uploading");
-                    // BUG FIX: Use registerBasicMutation (sends questionnaire email) not registerMutation (old path, no questionnaire email)
-                    registerBasicMutation.mutate({
-                      firstName, lastName: lastName || undefined, gender, seekingGender, age: parseInt(age), birthDate: birthDate || undefined, phone,
-                      email: freeTokenVerified ? freeTokenEmail : email,
-                      city, height: height ? parseInt(height) : undefined, education: (education as any) || undefined,
-                      religiosity: (religiosity as any) || undefined, religiosityOrigin: (religiosityOrigin as any) || undefined, shomerShabbat: shomerShabbat ?? undefined, occupation: occupation || undefined,
-                      maritalStatus: (maritalStatus as any) || undefined, hasKids, numKids: numKids ? parseInt(numKids) : 0,
-                      wantsKids: (wantsKids as any) || undefined, about: about || undefined,
-                      partnerDescription: partnerDescription || undefined, dnaType: (dnaFromQuiz as any) || undefined,
-                      dnaSessionId: sessionId || undefined, minAgePreference: minAge ? parseInt(minAge) : undefined,
-                      maxAgePreference: maxAge ? parseInt(maxAge) : undefined,
-                      religiosityPreference: religiosityPref.join(",") || undefined, acceptsKids: (acceptsKids as any) || undefined,
-                      openToPartnerWithKids: (openToPartnerWithKids as any) || undefined,
-                      locationPreference: (locationPref as any) || undefined, interests: interests || undefined,
-                      origin: window.location.origin,
-                      consentMatchmaking, consentDataSharing, consentEmailMarketing,
-        firstTouch: getFirstTouchAcquisition(),
-                    });
+                  disabled={paymentLoading}
+                  onClick={async () => {
+                    if (freeTokenFromUrl) {
+                      if (freeTokenStatus === "valid") await handleFreeTokenAutoRegister();
+                      else setStep("free_token_verify");
+                      return;
+                    }
+                    setPaymentLoading(true);
+                    setRegisterError("");
+                    try {
+                      const draft = await saveProfileDraftBeforePayment();
+                      if (draft?.alreadyExists) {
+                        setExistingProfileToken(draft.questionnaireToken || "");
+                        setStep("already_registered");
+                      } else {
+                        setStep("payment");
+                      }
+                    } catch (error) {
+                      setRegisterError(error instanceof Error ? error.message : "לא הצלחנו לשמור את הפרטים. הפרטים נשארו בטופס ולא נפתח חיוב.");
+                    } finally {
+                      setPaymentLoading(false);
+                    }
                   }}
                   className="bg-[#191265] text-white font-bold py-3 rounded-2xl hover:bg-[#1800ad] transition-all"
                 >
@@ -1855,7 +2088,7 @@ export default function Register() {
                 </a>
                 <button
                   type="button"
-                  onClick={() => setStep("profile")}
+                  onClick={returnToProfileForEditing}
                   className="border-2 border-[#191265] text-[#191265] font-bold py-3 rounded-2xl text-center hover:bg-[#191265] hover:text-white transition-all"
                 >
                   חזרה לפרטים

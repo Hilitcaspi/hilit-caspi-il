@@ -22,11 +22,15 @@ declare global {
 function hiddenUtmFields(): Record<string, string> {
   if (typeof window === "undefined") return {};
   const p = new URLSearchParams(window.location.search);
-  const get = (key: string) =>
-    p.get(key) ??
-    sessionStorage.getItem(key) ??
-    localStorage.getItem(key) ??
-    undefined;
+  const get = (key: string): string | undefined => {
+    const urlValue = p.get(key);
+    if (urlValue !== null) return urlValue;
+    try {
+      const stored = sessionStorage.getItem(key);
+      if (stored !== null) return stored;
+    } catch { /* Campaign storage is optional in privacy/embedded browsers. */ }
+    try { return localStorage.getItem(key) ?? undefined; } catch { return undefined; }
+  };
   const out: Record<string, string> = {};
   const s = get("utm_source");
   const m = get("utm_medium");
@@ -43,8 +47,10 @@ function hiddenUtmFields(): Record<string, string> {
 
 function push(event: Record<string, unknown>) {
   if (typeof window === "undefined") return;
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({ ...event, ...hiddenUtmFields() });
+  try {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ ...event, ...hiddenUtmFields() });
+  } catch { /* Analytics failures must never block registration or payment. */ }
 }
 
 // ─── Products catalogue ────────────────────────────────────────────────────────

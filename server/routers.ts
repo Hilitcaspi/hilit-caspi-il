@@ -43,6 +43,7 @@ import { createPlusCheckoutReference } from "./plusCheckoutReference";
 import { activatePendingPlusAfterRegistration } from "./plusFulfillment";
 import { hasPlusPilotCapacity } from "./plusPilotCapacity";
 import { normalizeFreeAccessToken, validateFreeAccessTokenState } from "./freeAccessTokenPolicy";
+import { DNA_SESSION_UUID_RE, REGISTRATION_DRAFT_TOKEN_RE, resolveRegistrationDraftOwnership } from "./registrationDraftOwnership";
 import { verifyBoostNewsletterUnsubscribeToken } from "./boostNewsletterCampaign";
 import {
   applyEmailUnsubscribe,
@@ -2004,6 +2005,7 @@ export const appRouter = router({
           photoMime: z.string().nullish(),
           origin: z.string().nullish(),
           freeToken: z.string().nullish(),
+          draftToken: z.string().regex(REGISTRATION_DRAFT_TOKEN_RE).optional(),
           firstTouch: acquisitionInputSchema.optional(),
           utmSource: z.string().nullish(),
           utmMedium: z.string().nullish(),
@@ -2029,8 +2031,6 @@ export const appRouter = router({
           message: input.market === "us" ? undefined : "כרגע לא ניתן לשמור את ההרשמה או לעבור לתשלום בגלל תקלה זמנית. נא לנסות שוב מאוחר יותר.",
         });
 
-        if (input.market !== "us") await recordAcquisitionSafely(input.email, input.firstTouch);
-
         // Normalize email and phone to match Grow webhook storage format
         const normalizedEmail = input.email.trim().toLowerCase();
         const normalizedPhone = input.phone.trim().replace(/[\s\-]/g, "");
@@ -2038,6 +2038,7 @@ export const appRouter = router({
           ? normalizeFreeAccessToken(input.freeToken)
           : null;
         let hasValidFreeToken = false;
+        let hasVerifiedEmailBoundFreeToken = false;
         if (normalizedRegistrationFreeToken) {
           const [inviteRow] = await db.select().from(inviteTokens)
             .where(sql`LOWER(TRIM(${inviteTokens.token})) = ${normalizedRegistrationFreeToken}`).limit(1);
@@ -2052,6 +2053,7 @@ export const appRouter = router({
               throw new TRPCError({ code: "BAD_REQUEST", message: "קוד הגישה החינמי אינו תקף" });
             }
             hasValidFreeToken = true;
+            hasVerifiedEmailBoundFreeToken = Boolean(inviteRow.boundEmail?.trim());
           } else {
             const [accessRow] = await db.select().from(freeAccessTokens)
               .where(sql`LOWER(TRIM(${freeAccessTokens.token})) = ${normalizedRegistrationFreeToken}`).limit(1);
@@ -2068,6 +2070,7 @@ export const appRouter = router({
               throw new TRPCError({ code: "BAD_REQUEST", message: "קוד הגישה החינמי אינו תקף" });
             }
             hasValidFreeToken = true;
+            hasVerifiedEmailBoundFreeToken = Boolean(accessRow?.email?.trim());
           }
         }
         let resolvedGender: "female" | "male";
@@ -2088,27 +2091,62 @@ export const appRouter = router({
           ? (resolvedGender === "female" ? "male" : "female")
           : (input.seekingGender ?? (resolvedGender === "female" ? "male" : "female"));
 
-        // Bug #1 fix: Prevent duplicate registrations
-        // Also handles race condition: Grow webhook may create skeleton record (age=0, city="") before form submission
-        // Search by normalized email OR phone to catch both cases
-        const existingProfiles = await db.select({
+        const existingProfileColumns = {
           id: singles.id,
           age: singles.age,
           city: singles.city,
+          email: singles.email,
           isPaid: singles.isPaid,
           isActive: singles.isActive,
           questionnaireToken: singles.questionnaireToken,
           questionnaireCompletedAt: singles.questionnaireCompletedAt,
           firstName: singles.firstName,
-        }).from(singles).where(
+          birthDate: singles.birthDate,
+          hasKids: singles.hasKids,
+          numKids: singles.numKids,
+          acceptsKids: singles.acceptsKids,
+          seekingGender: singles.seekingGender,
+          photoUrl: singles.photoUrl,
+        };
+        // A draft token identifies one intended record. Still load matching contact
+        // records to reject a supplied token that collides with someone else's email
+        // or phone instead of accidentally updating the wrong profile.
+        const [profileByDraftToken] = input.draftToken
+          ? await db.select(existingProfileColumns).from(singles)
+            .where(eq(singles.questionnaireToken, input.draftToken)).limit(1)
+          : [];
+        const identityProfiles = await db.select(existingProfileColumns).from(singles).where(
           or(
             sql`LOWER(${singles.email}) = ${normalizedEmail}`,
             normalizedPhone.length >= 9 ? eq(singles.phone, normalizedPhone) : sql`0=1`
           )
-        ).limit(1);
-        const existingProfile = existingProfiles[0] ?? null;
+        ).limit(2);
+        const existingProfile = profileByDraftToken ?? identityProfiles[0] ?? null;
+        const hasIdentityCollision = Boolean(
+          profileByDraftToken
+          && identityProfiles.some(profile => profile.id !== profileByDraftToken.id),
+        ) || (!profileByDraftToken && identityProfiles.length > 1);
 
         if (existingProfile) {
+          const [verifiedDnaSession] = input.dnaSessionId && DNA_SESSION_UUID_RE.test(input.dnaSessionId)
+            ? await db.select({ sessionId: dnaQuizResults.sessionId, singleId: dnaQuizResults.singleId })
+              .from(dnaQuizResults).where(eq(dnaQuizResults.sessionId, input.dnaSessionId)).limit(1)
+            : [];
+          const ownership = resolveRegistrationDraftOwnership({
+            existingProfile,
+            normalizedEmail,
+            draftToken: input.draftToken,
+            hasVerifiedFreeToken: hasVerifiedEmailBoundFreeToken,
+            dnaSessionId: input.dnaSessionId,
+            verifiedDnaSession,
+          });
+          // Email and phone locate a record for collision prevention only. They are
+          // never sufficient to reveal its questionnaire token or alter it.
+          if (hasIdentityCollision || !ownership.authorized) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "resume-required" });
+          }
+
+          if (input.market !== "us") await recordAcquisitionSafely(input.email, input.firstTouch);
           // Check if this is a skeleton record created by Grow webhook (age=0, city empty)
           const isSkeleton = existingProfile.age === 0 && (!existingProfile.city || existingProfile.city === "");
           const activatesWithFreeToken = hasValidFreeToken && !existingProfile.isPaid;
@@ -2127,7 +2165,12 @@ export const appRouter = router({
             // Update the skeleton record with the full profile data from the form
             console.log("[RegisterBasic] Updating Grow skeleton record id:", existingProfile.id, "for:", normalizedEmail);
             let photoUrl: string | undefined;
-            if (input.photoBase64 && input.photoMime) {
+            const hasUploadablePhoto = Boolean(
+              input.photoBase64
+              && input.photoMime?.startsWith("image/")
+              && /^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\s]+$/i.test(input.photoBase64),
+            );
+            if (hasUploadablePhoto && input.photoBase64 && input.photoMime) {
               try {
                 const base64Data = input.photoBase64.replace(/^data:[^;]+;base64,/, "");
                 const buffer = Buffer.from(base64Data, "base64");
@@ -2144,9 +2187,9 @@ export const appRouter = router({
               firstName: input.firstName,
               lastName: input.lastName,
               gender: resolvedGender,
-              seekingGender: resolvedSeekingGender,
+              seekingGender: input.seekingGender === undefined ? existingProfile.seekingGender : input.seekingGender,
               age: input.birthDate ? Math.floor((Date.now() - new Date(input.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : (input.age ?? 0),
-              birthDate: input.birthDate || null,
+              birthDate: input.birthDate === undefined ? existingProfile.birthDate : input.birthDate || null,
               city: input.city,
               phone: normalizedPhone || input.phone,
               email: normalizedEmail,
@@ -2159,8 +2202,8 @@ export const appRouter = router({
               about: input.about,
               interests: input.interests,
               maritalStatus: input.maritalStatus,
-              hasKids: input.hasKids ?? false,
-              numKids: input.numKids ?? 0,
+              hasKids: input.hasKids === undefined ? existingProfile.hasKids : input.hasKids,
+              numKids: input.numKids === undefined ? existingProfile.numKids : input.numKids,
               wantsKids: input.wantsKids,
               dnaType: input.dnaType,
               minAgePreference: input.minAgePreference,
@@ -2168,7 +2211,9 @@ export const appRouter = router({
               minHeightPreference: input.minHeightPreference,
               maxHeightPreference: input.maxHeightPreference,
               religiosityPreference: input.religiosityPreference,
-              acceptsKids: input.acceptsKids === "yes" ? true : input.acceptsKids === "no" ? false : null,
+              acceptsKids: input.acceptsKids === undefined
+                ? existingProfile.acceptsKids
+                : input.acceptsKids === "yes" ? true : input.acceptsKids === "no" ? false : null,
               openToPartnerWithKids: input.openToPartnerWithKids,
               locationPreference: input.locationPreference,
               partnerDescription: input.partnerDescription,
@@ -2285,8 +2330,14 @@ export const appRouter = router({
           return { singleId: existingProfile.id, questionnaireToken: existingProfile.questionnaireToken || "", success: true, alreadyExists: true };
         }
 
+        if (input.market !== "us") await recordAcquisitionSafely(input.email, input.firstTouch);
         let photoUrl: string | undefined;
-        if (input.photoBase64 && input.photoMime) {
+        const hasUploadablePhoto = Boolean(
+          input.photoBase64
+          && input.photoMime?.startsWith("image/")
+          && /^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\s]+$/i.test(input.photoBase64),
+        );
+        if (hasUploadablePhoto && input.photoBase64 && input.photoMime) {
           try {
             const base64Data = input.photoBase64.replace(/^data:[^;]+;base64,/, "");
             const buffer = Buffer.from(base64Data, "base64");
@@ -8008,6 +8059,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }),
         // A retry keeps this opaque identity; the server also locks by buyer/product.
         checkoutAttemptId: z.string().uuid().optional(),
+        // A separate bearer proof authorizes replay of the SAME open registration checkout.
+        // It is deliberately not part of the original payment identity fingerprint.
+        registrationResumeToken: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
         // Client passes coupon code; server validates and computes final price
         couponCode: z.string().max(50).optional(),
         // UTM tracking
@@ -8100,6 +8154,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           withCheckoutReservation, createCheckoutReservationFingerprint,
           CheckoutReservationConflictError, CheckoutReservationInputError,
         } = await import("./checkoutReservation");
+        let verifiedOpenResume = false;
+        if (input.registrationResumeToken) {
+          const { verifyRegistrationCheckoutResume } = await import("./registrationCheckoutResume");
+          verifiedOpenResume = await verifyRegistrationCheckoutResume({
+            product: input.product, token: input.registrationResumeToken,
+            email: normalizedCheckoutEmail, phone: input.phone, fullName: input.fullName,
+          }, db);
+          if (!verifiedOpenResume) throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "לא ניתן לאמת את קישור ההמשך עם הפרטים שהוזנו. אין צורך להתחיל מחדש; אפשר לחזור לפרטים השמורים או לפנות לתמיכה.",
+          });
+        }
         let providerCreateStarted = false;
         let providerCreateAccepted = false;
         const { isGrowCreateDefinitelyRejected } = await import("./growPayment");
@@ -8112,6 +8178,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           boostMatchId: input.boostMatchId ? String(input.boostMatchId) : undefined,
           checkoutAttemptId: input.checkoutAttemptId,
           diagnosticTest,
+          verifiedOpenResume,
           fingerprint: createCheckoutReservationFingerprint({
             email: normalizedCheckoutEmail, product: input.product, phone: input.phone,
             couponCode: reservedCode, personalToken: input.personalToken,

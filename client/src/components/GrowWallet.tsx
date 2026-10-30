@@ -34,6 +34,12 @@ import {
 } from "@/lib/purchaseTracking";
 import { isExpectedCheckoutRejection } from "@shared/paymentFailureClassification";
 import {
+  hasCompleteCheckoutPrefill,
+  isValidCheckoutEmail,
+  isValidCheckoutFullName,
+  normalizeCheckoutFullName,
+} from "@shared/checkoutIdentity";
+import {
   getFirstTouchAcquisition,
   getLastUtmAcquisition,
 } from "@/lib/acquisitionTracking";
@@ -321,6 +327,8 @@ interface GrowWalletProps {
   onFailure?: (response: any) => void;
   termsPath?: string;
   personalToken?: string;
+  /** Unpredictable draft bearer proof; only the server may authorize its use. */
+  registrationResumeToken?: string;
   boostMatchId?: number;
   showCoupon?: boolean;
   onFreeAccessCode?: (
@@ -364,6 +372,7 @@ export default function GrowWallet({
   onFailure,
   termsPath,
   personalToken,
+  registrationResumeToken,
   boostMatchId,
   showCoupon = true,
   onFreeAccessCode,
@@ -399,6 +408,18 @@ export default function GrowWallet({
   const activeCheckoutCouponRef = useRef<string | undefined>(undefined);
   const checkoutLockRef = useRef(false);
   const checkoutAttemptRef = useRef<LocalCheckoutAttempt | null>(null);
+  const identityTouchedRef = useRef({ name: false, email: false, phone: false });
+  const customerInputFrozen = walletLoading || walletOpen || paymentStatusAmbiguous || paymentCompleted;
+
+  // A saved registration draft can arrive after the wallet has mounted. Keep a
+  // pristine wallet synchronized with it, but never overwrite a user's edit or
+  // mutate an identity once it has been used for a checkout attempt.
+  useEffect(() => {
+    if (checkoutAttemptRef.current || checkoutLockRef.current || customerInputFrozen) return;
+    if (!identityTouchedRef.current.name && prefillName !== undefined) setName(prefillName || "");
+    if (!identityTouchedRef.current.email && prefillEmail !== undefined) setEmail(prefillEmail || "");
+    if (!identityTouchedRef.current.phone && prefillPhone !== undefined) setPhone(prefillPhone || "");
+  }, [prefillName, prefillEmail, prefillPhone, customerInputFrozen]);
 
   useEffect(() => {
     const requestedCode = prefillCoupon?.trim().toUpperCase();
@@ -511,15 +532,15 @@ export default function GrowWallet({
     // cannot prevent two click handlers from entering in the same event turn.
     if (checkoutLockRef.current || paymentCompleted || paymentStatusAmbiguous) return;
 
-    const fullName = name.trim();
+    const fullName = normalizeCheckoutFullName(name);
     const userEmail = email.trim();
     const userPhone = normalizeIsraeliPhone(phone);
 
-    if (!fullName || fullName.split(" ").filter(Boolean).length < 2) {
+    if (!isValidCheckoutFullName(fullName)) {
       toast.error("שם מלא נדרש — יש להזין שם פרטי ושם משפחה.");
       return;
     }
-    if (!userEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+    if (!isValidCheckoutEmail(userEmail)) {
       toast.error("אימייל לא תקין — יש להזין כתובת אימייל תקינה.");
       return;
     }
@@ -529,6 +550,7 @@ export default function GrowWallet({
       );
       return;
     }
+    if (name !== fullName) setName(fullName);
     if (phone !== userPhone) setPhone(userPhone);
     if (!ageConfirmed) {
       toast.error("יש לאשר שאתה/את בן/בת 18 ומעלה.");
@@ -884,6 +906,10 @@ export default function GrowWallet({
           fbp,
           fbc,
           personalToken,
+          // A server-verified registration token may only continue an existing
+          // matching open database checkout; it is never a provider credential.
+          registrationResumeToken:
+            product === "database" ? registrationResumeToken : undefined,
           boostTermsAccepted: product === "match_boost" ? true : undefined,
           boostMatchId: product === "match_boost" ? boostMatchId : undefined,
           boostEntryChannel:
@@ -995,6 +1021,7 @@ export default function GrowWallet({
     termsAccepted,
     ageConfirmed,
     personalToken,
+    registrationResumeToken,
     boostMatchId,
     couponApplied,
     couponCode,
@@ -1006,8 +1033,10 @@ export default function GrowWallet({
     paymentStatusAmbiguous,
   ]);
 
-  const hasAllDetails = prefillName && prefillEmail;
-  const customerInputFrozen = walletLoading || walletOpen || paymentStatusAmbiguous || paymentCompleted;
+  const hasAllDetails = hasCompleteCheckoutPrefill(
+    { fullName: name, email, phone },
+    normalizeIsraeliPhone(phone),
+  );
 
   return (
     <div
@@ -1030,7 +1059,10 @@ export default function GrowWallet({
               type="text"
               value={name}
               disabled={customerInputFrozen}
-              onChange={e => setName(e.target.value)}
+              onChange={e => {
+                identityTouchedRef.current.name = true;
+                setName(e.target.value);
+              }}
               placeholder="שם פרטי ושם משפחה"
               style={{ color: "#1a1a1a", backgroundColor: "white" }}
               className="text-right placeholder:text-gray-400 border-gray-300 focus:border-[#191265]"
@@ -1050,6 +1082,7 @@ export default function GrowWallet({
               value={email}
               disabled={customerInputFrozen}
               onChange={e => {
+                identityTouchedRef.current.email = true;
                 setEmail(e.target.value);
                 setCouponApplied(null);
                 setCouponError("");
@@ -1072,7 +1105,10 @@ export default function GrowWallet({
               type="tel"
               value={phone}
               disabled={customerInputFrozen}
-              onChange={e => setPhone(e.target.value)}
+              onChange={e => {
+                identityTouchedRef.current.phone = true;
+                setPhone(e.target.value);
+              }}
               placeholder="050-0000000"
               style={{ color: "#1a1a1a", backgroundColor: "white" }}
               className="text-right placeholder:text-gray-400 border-gray-300 focus:border-[#191265]"

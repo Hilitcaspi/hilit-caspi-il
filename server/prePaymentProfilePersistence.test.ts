@@ -23,7 +23,7 @@ describe("paid profile persistence before Grow", () => {
   });
 
   it("keeps missing email and phone editable for legacy DNA journey links", () => {
-    expect(registerSource).toContain("const fromDna = !!(nameFromDna && emailFromDna && phoneFromDna)");
+    expect(registerSource).toContain("const fromDna = !!(nameFromDna && lastNameFromDna && emailFromDna && phoneFromDna)");
     expect(registerSource).not.toContain("const fromDna = !!(nameFromDna || emailFromDna)");
   });
 

@@ -195,6 +195,7 @@ function ScrollToTop() {
   }, []);
 
   useEffect(() => {
+    try {
     if (isBackRef.current) {
       // Back navigation: restore saved scroll position
       isBackRef.current = false;
@@ -212,6 +213,12 @@ function ScrollToTop() {
       window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
     sessionStorage.setItem("__prev_path", location);
+    } catch {
+      // Scroll memory is optional. Storage restrictions must not unmount the
+      // registration form (or lose its in-memory values) on browser navigation.
+      isBackRef.current = false;
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
     // Track page view on every route change
     trackPageView(location);
     resetBehaviorTracker(location);

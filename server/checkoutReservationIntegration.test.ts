@@ -19,6 +19,7 @@ const input = { product: "database" as const, fullName: "Synthetic Checkout", em
 function harness() {
   const records = new Map<string, CheckoutReservationRecord>();
   let paid = false, exact = false, legacy = false;
+  let resumeProfile: { firstName: string; lastName: string | null; email: string; phone: string; isPaid: boolean } | null = null;
   const store: CheckoutReservationStore = {
     get: async key => records.get(key) || null,
     insert: async row => { if (records.has(row.reservationKey)) return false; records.set(row.reservationKey, { ...row }); return true; },
@@ -30,10 +31,13 @@ function harness() {
   };
   const persist = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
   const db = {
+    select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(async () => resumeProfile ? [resumeProfile] : []) })) })) })),
     insert: vi.fn(() => ({ values: vi.fn(() => ({ onDuplicateKeyUpdate: persist })) })),
     update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn().mockResolvedValue([{ affectedRows: 1 }]) })) })),
   };
-  return { records, store, db, persist, setPaid: () => { paid = true; exact = true; }, setLegacy: () => { legacy = true; } };
+  return { records, store, db, persist, setPaid: () => { paid = true; exact = true; }, setLegacy: () => { legacy = true; },
+    setResumeProfile: (value = { firstName: "Synthetic", lastName: "Checkout", email: input.email, phone: input.phone, isPaid: false }) => { resumeProfile = value; },
+  };
 }
 let h: ReturnType<typeof harness>;
 beforeEach(() => {
@@ -65,6 +69,33 @@ describe("checkout reservation at payment API boundary", () => {
   it("cannot bypass an open checkout by changing client attempt id", async () => {
     const caller = appRouter.createCaller(ctx()); await caller.payment.createProcess(input);
     await expect(caller.payment.createProcess({ ...input, checkoutAttemptId: "babacada-1111-4111-8111-123456789012" })).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(mocks.createPaymentProcess).toHaveBeenCalledOnce();
+  });
+  it("resumes the exact open provider process after losing the browser attempt id only with a verified personal registration link", async () => {
+    const caller = appRouter.createCaller(ctx());
+    const first = await caller.payment.createProcess(input);
+    h.setResumeProfile();
+    const resumed = await caller.payment.createProcess({ ...input, checkoutAttemptId: "babacada-1111-4111-8111-123456789012", registrationResumeToken: "a".repeat(64) });
+    expect(resumed).toEqual(first);
+    expect(mocks.createPaymentProcess).toHaveBeenCalledOnce();
+    expect(h.persist).toHaveBeenCalledOnce(); expect(h.db.update).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled(); expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+  it("rejects an unknown personal registration link before any payment, lead, or provider write", async () => {
+    await expect(appRouter.createCaller(ctx()).payment.createProcess({ ...input, registrationResumeToken: "b".repeat(64) })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(h.db.insert).not.toHaveBeenCalled(); expect(h.db.update).not.toHaveBeenCalled();
+    expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+  });
+  it.each(["creating", "uncertain", "completed"] as const)("a verified link cannot reopen a %s checkout or create a second process", async state => {
+    const caller = appRouter.createCaller(ctx()); await caller.payment.createProcess(input);
+    h.setResumeProfile(); [...h.records.values()][0].state = state;
+    await expect(caller.payment.createProcess({ ...input, checkoutAttemptId: "babacada-1111-4111-8111-123456789012", registrationResumeToken: "a".repeat(64) })).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(mocks.createPaymentProcess).toHaveBeenCalledOnce(); expect(h.persist).toHaveBeenCalledOnce();
+  });
+  it("a verified unpaid draft cannot replay an order when payment evidence has already arrived", async () => {
+    const caller = appRouter.createCaller(ctx()); await caller.payment.createProcess(input);
+    h.setResumeProfile(); h.setPaid();
+    await expect(caller.payment.createProcess({ ...input, checkoutAttemptId: "babacada-1111-4111-8111-123456789012", registrationResumeToken: "a".repeat(64) })).rejects.toMatchObject({ code: "CONFLICT" });
     expect(mocks.createPaymentProcess).toHaveBeenCalledOnce();
   });
   it("does not replay a paid process even for the same client attempt", async () => {

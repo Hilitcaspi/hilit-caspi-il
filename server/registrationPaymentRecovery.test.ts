@@ -54,7 +54,8 @@ describe("DNA payment recovery", () => {
     expect(client).toContain('sessionStorage.setItem("registration_recovery_prefill"');
     expect(client).not.toContain('encodeURIComponent(lead.email)');
     const register = readFileSync(new URL("../client/src/pages/Register.tsx", import.meta.url), "utf8");
-    expect(register).toContain('sessionStorage.getItem("registration_recovery_prefill")');
-    expect(register).toContain('localStorage.setItem("pending_profile_payload", JSON.stringify(buildRegisterPayload()))');
+    expect(register).toContain('safeStorageGet("session", "registration_recovery_prefill")');
+    expect(register).toContain('safeStorageSet("local", "pending_profile_payload", JSON.stringify(recoveryPayload))');
+    expect(register).toContain('draftToken: _draftToken, ...recoveryPayload');
   });
 });

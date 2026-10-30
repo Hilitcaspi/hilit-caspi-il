@@ -130,6 +130,43 @@ describe("withCheckoutReservation", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
+  it("replays the same open authorization after a new browser nonce only with server-verified matching resume evidence", async () => {
+    const create = vi.fn(async () => ({ processToken: "provider-process-1", authCode: "opaque-auth" }));
+    const original = await withCheckoutReservation(input(), create);
+
+    await expect(withCheckoutReservation(input({ checkoutAttemptId: ATTEMPT_B, verifiedOpenResume: true }), create))
+      .resolves.toEqual(original);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not replay an open authorization across a new nonce without verified resume evidence or with a mismatched binding", async () => {
+    const create = vi.fn(async () => ({ processToken: "provider-process-1", authCode: "opaque-auth" }));
+    await withCheckoutReservation(input(), create);
+
+    expect((await conflict(withCheckoutReservation(input({ checkoutAttemptId: ATTEMPT_B }), create))).state).toBe("open");
+    expect((await conflict(withCheckoutReservation(input({
+      checkoutAttemptId: ATTEMPT_B,
+      verifiedOpenResume: true,
+      fingerprint: createCheckoutReservationFingerprint({ email: "buyer@example.test", product: "guide", identity: "other-buyer" }),
+    }), create))).state).toBe("open");
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("never lets verified resume evidence bypass an uncertain reservation or paid evidence", async () => {
+    await expect(withCheckoutReservation(input(), async () => {
+      throw new Error("outcome unknown after provider delivery");
+    })).rejects.toMatchObject({ code: "CHECKOUT_RESERVATION_CONFLICT", state: "uncertain" });
+    expect((await conflict(withCheckoutReservation(input({ checkoutAttemptId: ATTEMPT_B, verifiedOpenResume: true }), async () => ({ processToken: "never" })))).state)
+      .toBe("uncertain");
+
+    const paidStore = new FakeStore();
+    setCheckoutReservationStoreForTests(paidStore);
+    await withCheckoutReservation(input(), async () => ({ processToken: "provider-process-2" }));
+    paidStore.evidence = { ...noPaid, paidForProductFamily: true };
+    expect((await conflict(withCheckoutReservation(input({ checkoutAttemptId: ATTEMPT_B, verifiedOpenResume: true }), async () => ({ processToken: "never" })))).state)
+      .toBe("completed");
+  });
+
   it("fails closed after an unclassified error but releases only a proven pre-provider error", async () => {
     await expect(withCheckoutReservation(input(), async () => { throw new Error("timeout after unknown provider delivery"); }))
       .rejects.toMatchObject({ code: "CHECKOUT_RESERVATION_CONFLICT", state: "uncertain" });

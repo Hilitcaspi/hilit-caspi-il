@@ -6,9 +6,17 @@ import { purchaseFromThankYouPath, selectSmartUpsell, type PurchaseFlags } from 
 
 const PURCHASE_KEYS: Array<keyof PurchaseFlags> = ["database", "guide", "course", "session", "coaching"];
 
+function readPreference(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function savePreference(key: string, value: string): void {
+  try { localStorage.setItem(key, value); } catch { /* Optional marketing preferences must never break registration. */ }
+}
+
 function readPurchases(): PurchaseFlags {
   return PURCHASE_KEYS.reduce<PurchaseFlags>((result, product) => {
-    result[product] = localStorage.getItem(`hilit_purchase_${product}`) === "1";
+    result[product] = readPreference(`hilit_purchase_${product}`) === "1";
     return result;
   }, {});
 }
@@ -26,7 +34,7 @@ export default function ContextualUpsell() {
   useEffect(() => {
     const purchased = purchaseFromThankYouPath(location);
     if (purchased) {
-      localStorage.setItem(`hilit_purchase_${purchased}`, "1");
+      savePreference(`hilit_purchase_${purchased}`, "1");
       setPurchases(readPurchases());
     }
   }, [location]);
@@ -36,7 +44,7 @@ export default function ContextualUpsell() {
   useEffect(() => {
     setVisible(false);
     if (!offer) return;
-    const dismissedAt = Number(localStorage.getItem(`hilit_upsell_dismissed_${offer.id}`) || 0);
+    const dismissedAt = Number(readPreference(`hilit_upsell_dismissed_${offer.id}`) || 0);
     if (dismissedAt && Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000) return;
     const timer = window.setTimeout(() => {
       setVisible(true);
@@ -48,7 +56,7 @@ export default function ContextualUpsell() {
   if (!offer || !visible) return null;
 
   const close = () => {
-    localStorage.setItem(`hilit_upsell_dismissed_${offer.id}`, String(Date.now()));
+    savePreference(`hilit_upsell_dismissed_${offer.id}`, String(Date.now()));
     setVisible(false);
     track({ eventType: "button_click", page: location, metadata: { component: "contextual_upsell", action: "dismiss", offerId: offer.id } });
   };
