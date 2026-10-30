@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1793368947948,
+      "tag": "0000_live_open_registrations",
+      "breakpoints": true
+    }
+  ]
+}

@@ -4,11 +4,13 @@ import { z } from "zod";
 import { publicProcedure, router, teamProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { liveOctoberQuestions, liveOctoberTickets, singles } from "../drizzle/schema";
-import { ticketJoinUrl } from "./liveZoomDelivery";
+import { isOpenLiveRegistrationDeliveryEnabled, ticketJoinUrl } from "./liveZoomDelivery";
 import { liveQuestionTicket } from "./liveQuestionAccess";
 import { confirmLiveAttendance, readLiveQuestionAccess } from "./liveAttendance";
 import { loadLiveFirstMatchQueue } from "./liveFirstMatchQueue";
 import { isZoomLiveDeliveryEnabled } from "./liveZoomApi";
+import { liveOpenRegistrations } from "../drizzle/liveOpenRegistrationSchema";
+import { openLiveRegistrationInput, openLiveRegistrationStatus, registerOpenLive } from "./liveOpenRegistration";
 import {
   LIVE_OCTOBER_SLUG, ensurePlusLiveTicket, existingLiveTicket,
   getVerifiedLiveMember, isLiveCheckoutOpen, liveTicketByReceipt, submitLiveQuestion,
@@ -18,6 +20,9 @@ const memberInput = z.object({ email: z.string().email().max(320), token: z.stri
 const receiptInput = z.object({ trackingToken: z.string().regex(/^[a-f0-9]{64}$/) });
 
 export const liveOctoberRouter = router({
+  openRegistrationStatus: publicProcedure.query(() => openLiveRegistrationStatus()),
+  registerOpenLive: publicProcedure.input(openLiveRegistrationInput).mutation(({ input, ctx }) =>
+    registerOpenLive(input, { ip: ctx.req.ip || "unknown" })),
   salesStatus: publicProcedure.query(() => ({
     open: isLiveCheckoutOpen("live_october", undefined),
     databaseGiftOpen: isLiveCheckoutOpen("database", "LIVE"),
@@ -95,6 +100,7 @@ export const liveOctoberRouter = router({
       confirmedPlus: sql<number>`sum(case when ${liveOctoberTickets.source} = 'plus' and ${liveOctoberTickets.attendanceConfirmedAt} is not null then 1 else 0 end)`,
       friends: sql<number>`sum(case when ${liveOctoberTickets.source} = 'friends' then 1 else 0 end)`,
       standalone: sql<number>`sum(case when ${liveOctoberTickets.source} = 'standalone' then 1 else 0 end)`,
+      openRegistration: sql<number>`sum(case when ${liveOctoberTickets.source} = 'open_registration' then 1 else 0 end)`,
     }).from(liveOctoberTickets).where(and(
       eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG),
       sql`${liveOctoberTickets.revokedAt} is null`,
@@ -117,11 +123,16 @@ export const liveOctoberRouter = router({
       zoomAttemptCount: liveOctoberTickets.zoomAttemptCount, zoomLastError: liveOctoberTickets.zoomLastError,
       zoomEmailSentAt: liveOctoberTickets.zoomEmailSentAt,
       attendanceConfirmedAt: liveOctoberTickets.attendanceConfirmedAt,
+      registrationPhone: liveOpenRegistrations.phone,
+      declaredDatabaseMember: liveOpenRegistrations.isDatabaseMember,
+      registrationMarketingConsent: liveOpenRegistrations.marketingConsent,
     }).from(liveOctoberTickets).where(and(
       eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG),
       sql`${liveOctoberTickets.revokedAt} is null`,
       sql`${liveOctoberTickets.voucherCode} not like 'TEST-%'`,
-    )).leftJoin(singles, eq(liveOctoberTickets.singleId, singles.id)).orderBy(desc(liveOctoberTickets.issuedAt)).limit(300);
+    )).leftJoin(singles, eq(liveOctoberTickets.singleId, singles.id))
+      .leftJoin(liveOpenRegistrations, eq(liveOpenRegistrations.ticketId, liveOctoberTickets.id))
+      .orderBy(desc(liveOctoberTickets.issuedAt)).limit(300);
     const questions = await db.select({
       id: liveOctoberQuestions.id, name: liveOctoberTickets.name,
       email: liveOctoberTickets.email, body: liveOctoberQuestions.body,
@@ -139,9 +150,10 @@ export const liveOctoberRouter = router({
         total: Number(totals?.total || 0), database: Number(totals?.database || 0),
         plus: Number(totals?.plus || 0), confirmedPlus: Number(totals?.confirmedPlus || 0), friends: Number(totals?.friends || 0),
         standalone: Number(totals?.standalone || 0), questions: Number(questionTotal?.total || 0),
+        openRegistration: Number(totals?.openRegistration || 0),
         test: Number(testCount?.total || 0),
       },
-      zoomDelivery: { enabled: isZoomLiveDeliveryEnabled() },
+      zoomDelivery: { enabled: isZoomLiveDeliveryEnabled(), openRegistrationEnabled: isOpenLiveRegistrationDeliveryEnabled() },
       tickets, questions,
     };
   }),

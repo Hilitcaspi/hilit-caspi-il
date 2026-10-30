@@ -66,6 +66,7 @@ const ProfileComplete = lazy(() => import("@/pages/ProfileComplete"));
 const UserDashboard = lazy(() => import("@/pages/UserDashboard"));
 const LeadCall = lazy(() => import("@/pages/LeadCall"));
 const LiveEvent = lazy(() => import("@/pages/LiveEvent"));
+const LiveOpenRegistration = lazy(() => import("@/pages/LiveOpenRegistration"));
 const LiveEventThankYou = lazy(() => import("@/pages/LiveEventThankYou"));
 const LiveDatabaseOffer = lazy(() => import("@/pages/LiveDatabase"));
 const LiveSmsRedirect = lazy(() => import("@/pages/LiveSmsRedirect"));
@@ -355,6 +356,7 @@ function HeRouter() {
           {import.meta.env.DEV && <Route path={"/__preview/match-tracking"} component={MatchTrackingPreview} />}
           <Route path={"/match/return-to-pool"} component={lazy(() => import("./pages/MatchReturnToPool"))} />
           <Route path={"/match/owner-approve"} component={MatchOwnerApprove} />
+          <Route path={"/live/register"} component={LiveOpenRegistration} />
           <Route path={"/live/thank-you"} component={LiveEventThankYou} />
           <Route path={"/live/question"} component={lazy(() => import("./pages/LiveQuestion"))} />
           <Route path={"/terms/live-october"} component={TermsLiveOctober} />

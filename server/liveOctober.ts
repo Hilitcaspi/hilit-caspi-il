@@ -28,7 +28,7 @@ export function isLiveCheckoutOpen(
   return product === LIVE_PRODUCT && ticketSalesOpen;
 }
 
-export type LiveTicketSource = "database_live" | "plus" | "friends" | "standalone";
+export type LiveTicketSource = "database_live" | "plus" | "friends" | "standalone" | "open_registration";
 export function normalizeLiveEmail(email: string) { return email.trim().toLowerCase(); }
 
 /** Grow callback must be authenticated by the signed notify URL before this check. */
@@ -90,7 +90,8 @@ export async function existingLiveTicket(email: string) {
   return ticket && !ticket.revokedAt ? ticket : null;
 }
 
-/** Only call for confirmed Grow payments or for a verified active Plus member. */
+/** Confirmed Grow/Plus tickets, or the explicit owner-approved free live registration route.
+ * A free ticket never establishes database membership or first-match entitlement. */
 export async function ensureLiveTicket(input: {
   email: string; name: string; source: LiveTicketSource;
   singleId?: number | null; amountAgorot?: number; transactionId?: string; testCheckout?: boolean;

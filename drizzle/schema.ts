@@ -762,7 +762,7 @@ export const liveOctoberTickets = mysqlTable("live_october_tickets", {
   email: varchar("email", { length: 320 }).notNull(),
   name: varchar("name", { length: 200 }).notNull(),
   singleId: int("single_id"),
-  source: mysqlEnum("source", ["database_live", "plus", "friends", "standalone"]).notNull(),
+  source: mysqlEnum("source", ["database_live", "plus", "friends", "standalone", "open_registration"]).notNull(),
   voucherCode: varchar("voucher_code", { length: 30 }).notNull(),
   amountAgorot: int("amount_agorot").notNull().default(0),
   providerTransactionId: varchar("provider_transaction_id", { length: 200 }),
@@ -1696,3 +1696,5 @@ export { smsMarketingOptouts } from './smsMarketingSchema';
 
 // Durable duplicate-checkout coordination; no product or customer fulfillment changes.
 export { checkoutReservations } from './checkoutReservationSchema';
+
+export * from "./liveOpenRegistrationSchema";
