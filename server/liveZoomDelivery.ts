@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { and, asc, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { liveOctoberTickets, plusPilotMembers } from "../drizzle/schema";
 import { liveOpenRegistrations } from "../drizzle/liveOpenRegistrationSchema";
 import { sendEmailBatch, isPermanentlyBlockedEmail } from "./brevo";
@@ -76,8 +76,25 @@ export async function processOpenLiveRegistrationTicket(ticketId: number) {
   return processLiveZoomTickets(1, ticketId, true);
 }
 
+function validatedSnapshotTicketIds(ticketIds: readonly number[]): number[] {
+  if (!Array.isArray(ticketIds) || ticketIds.length === 0 || ticketIds.length > 5000
+      || ticketIds.some(id => !Number.isSafeInteger(id) || id < 1)) {
+    throw new Error("invalid_live_ticket_snapshot");
+  }
+  return Array.from(new Set<number>(ticketIds));
+}
+
+/** Internal operator-only invocation, not exposed by any HTTP route. The rollout
+ * flag is still required; a one-shot operator process must not change site settings.
+ * Each invocation attempts at most five tickets from this exact frozen snapshot. */
+export async function processApprovedLiveZoomSnapshot(ticketIds: readonly number[], limit = 5) {
+  return processLiveZoomTickets(limit, undefined, false, validatedSnapshotTicketIds(ticketIds));
+}
+
 /** Side effects are never run unless both the explicit rollout switch and all Zoom secrets are set. */
-export async function processLiveZoomTickets(limit = 2, targetTicketId?: number, allowRegisteredOpenSignup = false) {
+export async function processLiveZoomTickets(limit = 2, targetTicketId?: number, allowRegisteredOpenSignup = false, approvedSnapshotTicketIds?: readonly number[]) {
+  const snapshotIds = approvedSnapshotTicketIds === undefined ? undefined : validatedSnapshotTicketIds(approvedSnapshotTicketIds);
+  if (snapshotIds && targetTicketId !== undefined) throw new Error("conflicting_live_ticket_scope");
   const targetedOpenRegistration = targetTicketId !== undefined && allowRegisteredOpenSignup;
   // A target ID alone is never permission to bypass the global rollout.
   if (targetTicketId !== undefined && !targetedOpenRegistration) {
@@ -94,6 +111,7 @@ export async function processLiveZoomTickets(limit = 2, targetTicketId?: number,
   const now = Date.now();
   const tickets = await db.select({ id: liveOctoberTickets.id }).from(liveOctoberTickets).where(and(
     ...(targetedOpenRegistration ? [eq(liveOctoberTickets.id, targetTicketId!)] : []),
+    ...(snapshotIds ? [inArray(liveOctoberTickets.id, snapshotIds)] : []),
     eq(liveOctoberTickets.eventSlug, LIVE_OCTOBER_SLUG),
     isNull(liveOctoberTickets.revokedAt),
     ne(liveOctoberTickets.zoomDeliveryState, "sent"),
