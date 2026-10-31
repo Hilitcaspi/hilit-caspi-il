@@ -335,22 +335,25 @@ export default function LiveOpenRegistration() {
           >
             <div className="inline-flex items-center gap-2 rounded-full border border-[#ffe27c]/45 bg-white/10 px-4 py-2 text-xs font-black text-[#ffe27c] backdrop-blur-sm">
               <Sparkles className="h-4 w-4" />
-              מפגש לייב פתוח בזום עם הילית כספי
+              הזמנה אישית ממני לחברי הקהילה שלי
             </div>
             <p className="mt-7 text-sm font-bold tracking-wide text-white/70">
               {EVENT_DATE} · {EVENT_TIME} · אונליין בזום
             </p>
             <h1 className="mt-4 max-w-3xl text-5xl font-black leading-[1.04] tracking-[-.055em] sm:text-6xl lg:text-7xl">
-              סודות ההתאמה
-              <span className="block text-[#ffe27c]">המושלמת.</span>
+              הערב נפגשים בלייב.
+              <span className="block text-[#ffe27c]">ולכם זה בחינם.</span>
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-white/82 sm:text-xl">
-              ערב פתוח לשיחה על היכרות, פרופיל והדרך שבה נראית התאמה מאחורי
-              הקלעים.
+              כחברי הקהילה שלי, החלטתי לפתוח לכולכם את ערב הלייב איתי בחינם.
+              אני רוצה שתבינו באמת איך עובדות ההתאמות, תראו מה אני בודקת
+              מאחורי הקלעים, ובעיקר שאוכל לפגוש אתכם, לראות אתכם ולשמוע
+              את השאלות שלכם.
             </p>
-            <p className="mt-5 text-base font-black text-[#ffe27c]">
-              הרשמה ללא עלות ללייב
-            </p>
+            <div className="mt-6 inline-flex flex-wrap items-center gap-4 rounded-2xl border border-[#ffe27c]/35 bg-white/10 px-5 py-4">
+              <span className="text-sm text-white/65">עלות רגילה <s className="mr-1 text-xl font-bold">149 ₪</s></span>
+              <span className="text-xl font-black text-[#ffe27c]">ולחברי הקהילה שלי: בחינם</span>
+            </div>
             <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-2">
               <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/[.08] p-4 backdrop-blur-sm">
                 <CalendarDays className="h-5 w-5 shrink-0 text-[#ffe27c]" />
@@ -427,10 +430,12 @@ export default function LiveOpenRegistration() {
               <UsersRound className="h-5 w-5" />
             </div>
             <h2 className="mt-5 text-2xl font-black leading-tight text-[#191265]">
-              פשוט להירשם, פשוט להצטרף.
+              הפעם, אני רוצה לפגוש אתכם.
             </h2>
             <p className="mt-3 text-sm leading-7 text-[#625d78]">
-              ממלאים פרטים קצרים, ומקבלים קישור כניסה אישי למפגש החי בזום.
+              הערב אפתח לכם את מאחורי הקלעים של ההתאמות שלי, ואשאיר מקום
+              לשאלות ולשיחה. לא צריך להיות במאגר כדי להצטרף. ההזמנה הזו
+              היא לכל הקהילה שלי, והכניסה עליי.
             </p>
             <div className="mt-7 space-y-4 border-t border-[#191265]/10 pt-6">
               <div className="flex items-start gap-3">
@@ -489,7 +494,7 @@ export default function LiveOpenRegistration() {
                       id="open-live-registration-title"
                       className="mt-2 text-3xl font-black leading-tight tracking-[-.035em] text-[#191265]"
                     >
-                      להרשמה ללא עלות ללייב
+                      שומרים מקום לערב שלנו
                     </h2>
                   </div>
                   <span className="inline-flex items-center gap-2 rounded-full bg-[#fff0bf] px-3 py-2 text-xs font-black text-[#191265]">
