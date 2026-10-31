@@ -8,7 +8,7 @@ import { getDb } from "./db";
 import { LIVE_OCTOBER_SLUG } from "./liveOctober";
 import { liveQuestionToken } from "./liveQuestionAccess";
 import { buildLiveZoomTicketEmail } from "./liveZoomTicketEmail";
-import { decryptZoomJoinUrl, encryptZoomJoinUrl, isZoomLiveDeliveryEnabled, registerApprovedLiveAttendee, zoomLiveConfig } from "./liveZoomApi";
+import { decryptZoomJoinUrl, encryptZoomJoinUrl, getRegistrationDisabledMeetingJoin, isZoomLiveDeliveryEnabled, registerApprovedLiveAttendee, zoomLiveConfig } from "./liveZoomApi";
 
 function affectedRows(result: unknown): number {
   const item = (result as any)?.[0] ?? result as any;
@@ -120,6 +120,10 @@ export async function processLiveZoomTickets(limit = 2, targetTicketId?: number,
     sql`(${liveOctoberTickets.zoomLastError} is null or ${liveOctoberTickets.zoomLastError} not in ('recipient_blocked','inactive_plus','email_inflight','delivery_uncertain'))`,
   )).orderBy(asc(liveOctoberTickets.issuedAt)).limit(Math.max(1, Math.min(limit, 5)));
   let processed = 0, sent = 0;
+  // The host may disable registration after a personal link was prepared.
+  // Resolve the safe current participant link once per bounded batch, and
+  // refresh only unsent tickets. Already-sent tickets are never resent here.
+  const simpleMeetingJoin = tickets.length ? await getRegistrationDisabledMeetingJoin() : null;
   for (const { id } of tickets) {
     const claimTime = Date.now();
     const claim = await db.update(liveOctoberTickets).set({
@@ -152,9 +156,11 @@ export async function processLiveZoomTickets(limit = 2, targetTicketId?: number,
       const config = zoomLiveConfig();
       if (!config) throw new Error("configuration_missing");
       let encrypted = ticket.zoomJoinUrlEncrypted;
-      if (!encrypted) {
+      let joinMode: "personal" | "meeting" = simpleMeetingJoin ? "meeting" : "personal";
+      if (!encrypted || simpleMeetingJoin) {
         phase = "zoom_registration";
-        const registered = await registerApprovedLiveAttendee({ email: ticket.email, name: ticket.name });
+        const registered = simpleMeetingJoin || await registerApprovedLiveAttendee({ email: ticket.email, name: ticket.name });
+        if (registered.mode === "meeting") joinMode = "meeting";
         phase = "join_encryption";
         encrypted = encryptZoomJoinUrl(registered.joinUrl, config.encryptionKey);
         phase = "registration_persist";
@@ -168,7 +174,7 @@ export async function processLiveZoomTickets(limit = 2, targetTicketId?: number,
       phase = "email_build";
       const joinUrl = decryptZoomJoinUrl(encrypted, config.encryptionKey);
       const email = buildLiveZoomTicketEmail({
-        name: ticket.name, joinUrl, source: ticket.source, questionToken: liveQuestionToken(ticket), registrationEmail: ticket.email,
+        name: ticket.name, joinUrl, source: ticket.source, questionToken: liveQuestionToken(ticket), registrationEmail: ticket.email, joinMode,
       });
       // Persist a review-only state before the external call. Brevo's idempotency lasts only 30 minutes;
       // if a worker dies or the result is ambiguous, automatic retry could send a duplicate later.

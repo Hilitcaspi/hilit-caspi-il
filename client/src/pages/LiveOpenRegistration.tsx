@@ -159,10 +159,10 @@ function RegistrationResult({
       </h2>
       <p className="mt-4 text-sm leading-7 text-[#625d78]">
         {unavailable
-          ? "הפרטים התקבלו, אך כרגע לא הצלחנו לשלוח את קישור הכניסה האישי למייל. אין צורך למלא את הטופס מחדש."
+          ? "הפרטים התקבלו, אך כרגע לא הצלחנו לשלוח את קישור הכניסה למייל. אין צורך למלא את הטופס מחדש."
           : queued
-            ? "קישור הכניסה האישי נמצא בתור למשלוח למייל."
-            : "קישור הכניסה האישי נשלח למייל."}
+            ? "קישור הכניסה נמצא בתור למשלוח למייל."
+            : "קישור הכניסה נשלח למייל."}
       </p>
 
       {unavailable ? (
@@ -205,7 +205,7 @@ function RegistrationResult({
       ) : (
         <div className="mt-6 flex items-start gap-2 rounded-2xl bg-[#f4eedf] p-4 text-xs leading-6 text-[#625d78]">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#4e3eb4]" />
-          <p>שמרו את המייל כדי למצוא את קישור הכניסה האישי לקראת המפגש.</p>
+          <p>שמרו את המייל כדי למצוא את קישור הכניסה לקראת המפגש.</p>
         </div>
       )}
     </div>
@@ -369,7 +369,7 @@ export default function LiveOpenRegistration() {
                 <div>
                   <p className="text-xs font-bold text-white/62">אחרי ההרשמה</p>
                   <p className="mt-1 text-sm font-black text-white">
-                    קישור כניסה אישי יישלח למייל
+                    קישור כניסה יישלח למייל
                   </p>
                 </div>
               </div>
@@ -451,7 +451,7 @@ export default function LiveOpenRegistration() {
                   2
                 </span>
                 <p className="pt-0.5 text-sm font-bold leading-6 text-[#4f4969]">
-                  קישור הכניסה האישי יישלח למייל.
+                  קישור הכניסה יישלח למייל, בלי הרשמה נוספת בזום.
                 </p>
               </div>
               <div className="flex items-start gap-3">
@@ -504,7 +504,7 @@ export default function LiveOpenRegistration() {
                 </div>
 
                 <p className="mt-5 max-w-2xl text-sm leading-7 text-[#625d78]">
-                  אחרי ההרשמה יישלח למייל קישור כניסה אישי ללייב. כדי להירשם
+                  אחרי ההרשמה יישלח למייל קישור כניסה ללייב. כדי להירשם
                   ולקבל גם עדכונים והטבות, יש לאשר קבלת מיילים בתיבה למטה.
                 </p>
 

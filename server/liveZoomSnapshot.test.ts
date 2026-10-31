@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   isZoomLiveDeliveryEnabled: vi.fn(() => false),
   zoomLiveConfig: vi.fn(() => ({ encryptionKey: "ab".repeat(32) })),
   registerApprovedLiveAttendee: vi.fn(),
+  getRegistrationDisabledMeetingJoin: vi.fn(async () => null),
   sendEmailBatch: vi.fn(),
   isPermanentlyBlockedEmail: vi.fn(() => false),
 }));
@@ -19,6 +20,7 @@ vi.mock("./liveZoomApi", () => ({
   isZoomLiveDeliveryEnabled: mocks.isZoomLiveDeliveryEnabled,
   zoomLiveConfig: mocks.zoomLiveConfig,
   registerApprovedLiveAttendee: mocks.registerApprovedLiveAttendee,
+  getRegistrationDisabledMeetingJoin: mocks.getRegistrationDisabledMeetingJoin,
   encryptZoomJoinUrl: vi.fn((url: string) => url),
   decryptZoomJoinUrl: vi.fn((url: string) => url),
 }));
@@ -91,6 +93,8 @@ beforeEach(() => {
   mocks.zoomLiveConfig.mockReset();
   mocks.zoomLiveConfig.mockReturnValue({ encryptionKey: "ab".repeat(32) });
   mocks.registerApprovedLiveAttendee.mockReset();
+  mocks.getRegistrationDisabledMeetingJoin.mockReset();
+  mocks.getRegistrationDisabledMeetingJoin.mockResolvedValue(null);
   mocks.sendEmailBatch.mockReset();
   mocks.isPermanentlyBlockedEmail.mockReset();
   mocks.isPermanentlyBlockedEmail.mockReturnValue(false);

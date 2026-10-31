@@ -77,20 +77,106 @@ async function zoomRequest<T>(config: NonNullable<ReturnType<typeof zoomLiveConf
 
 type Registrant = { id?: string; registrant_id?: string; email?: string; join_url?: string; status?: string };
 type CreatedMeetingRegistrant = { id?: number; registrant_id?: string; join_url?: string };
+type LiveMeeting = {
+  start_time?: string;
+  join_url?: string;
+  password?: string;
+  encrypted_password?: string;
+  settings?: { approval_type?: number; waiting_room?: boolean };
+};
+
+const LIVE_MEETING_START = "2026-10-31T18:30:00Z";
+
+function isZoomEncryptedPasscode(value: unknown): value is string {
+  // Zoom's encrypted passcode is a non-empty token. A numeric value is the raw
+  // meeting passcode and must never be treated as a safe `pwd` URL parameter.
+  return typeof value === "string" && value.trim() === value && value.length > 0 && !/^\d+$/.test(value);
+}
+
+function meetingJoinUrl(config: NonNullable<ReturnType<typeof zoomLiveConfig>>, meeting: LiveMeeting): string {
+  if (!meeting.join_url) throw new Error("Zoom meeting join URL unavailable");
+  assertZoomJoinUrl(meeting.join_url);
+  const url = new URL(meeting.join_url);
+  const joinMatch = /^\/j\/(\d{9,15})$/.exec(url.pathname);
+  const joinMeetingId = joinMatch?.[1];
+  const isConfiguredMeeting = joinMeetingId === config.meetingId;
+  // Zoom can return a participant URL through a numeric PMI occurrence alias.
+  // Trust that alias only when Zoom binds it to this configured meeting via `omn`.
+  const isConfiguredOccurrenceAlias = Boolean(joinMeetingId && url.searchParams.get("omn") === config.meetingId);
+  if (!isConfiguredMeeting && !isConfiguredOccurrenceAlias) {
+    throw new Error("Zoom meeting join URL is not for configured meeting");
+  }
+
+  const embeddedPasscode = url.searchParams.get("pwd");
+  if (embeddedPasscode !== null) {
+    if (!isZoomEncryptedPasscode(embeddedPasscode)) throw new Error("Zoom meeting join URL has invalid encrypted passcode");
+    return meeting.join_url;
+  }
+  if (!meeting.password) return meeting.join_url;
+  if (!isZoomEncryptedPasscode(meeting.encrypted_password)) {
+    throw new Error("Zoom meeting join URL lacks encrypted passcode");
+  }
+  // `encrypted_password` is Zoom's documented encrypted token; never append
+  // the raw `password`, which could expose a numeric meeting passcode.
+  url.searchParams.set("pwd", meeting.encrypted_password);
+  return url.toString();
+}
+
+type RegistrationDisabledMeetingJoin = { registrantId: null; joinUrl: string; mode: "meeting" };
+
+async function readLiveMeetingForRegistration(config: NonNullable<ReturnType<typeof zoomLiveConfig>>): Promise<{
+  meeting: LiveMeeting;
+  registrationDisabledJoin: RegistrationDisabledMeetingJoin | null;
+}> {
+  const meeting = await zoomRequest<LiveMeeting>(config, `/meetings/${config.meetingId}`);
+  if (meeting.settings?.approval_type === 1) return { meeting, registrationDisabledJoin: null };
+  if (meeting.settings?.approval_type !== 2) throw new Error("Zoom meeting must require manual approval");
+  if (!meeting.start_time || Date.parse(meeting.start_time) !== Date.parse(LIVE_MEETING_START)) {
+    throw new Error("Zoom meeting is not at the expected time");
+  }
+  if (meeting.settings.waiting_room !== true) throw new Error("Zoom meeting must use a waiting room");
+  return {
+    meeting,
+    registrationDisabledJoin: { registrantId: null, joinUrl: meetingJoinUrl(config, meeting), mode: "meeting" },
+  };
+}
+
+/**
+ * Returns the current generic participant link only when Zoom registration is
+ * explicitly disabled and the meeting passes the live-delivery safeguards.
+ */
+export async function getRegistrationDisabledMeetingJoin(): Promise<RegistrationDisabledMeetingJoin | null> {
+  const config = zoomLiveConfig();
+  if (!config) throw new Error("Zoom live configuration missing");
+  return (await readLiveMeetingForRegistration(config)).registrationDisabledJoin;
+}
 
 export async function verifyZoomLiveMeeting() {
   const config = zoomLiveConfig();
-  if (!config) return { configured: false, manualApproval: false, correctTime: false, canReadRegistrants: false };
-  const meeting = await zoomRequest<{ start_time?: string; settings?: { approval_type?: number } }>(
-    config, `/meetings/${config.meetingId}`,
-  );
+  if (!config) {
+    return {
+      configured: false, manualApproval: false, correctTime: false, canReadRegistrants: false,
+      registrationNotRequired: false, meetingJoinReady: false, joinReady: false,
+    };
+  }
+  const meeting = await zoomRequest<LiveMeeting>(config, `/meetings/${config.meetingId}`);
+  const registrationNotRequired = meeting.settings?.approval_type === 2;
+  const correctTime = meeting.start_time ? Date.parse(meeting.start_time) === Date.parse(LIVE_MEETING_START) : false;
+  const meetingJoinReady = registrationNotRequired && correctTime && meeting.settings?.waiting_room === true
+    ? (() => { try { meetingJoinUrl(config, meeting); return true; } catch { return false; } })()
+    : false;
   // Only inspect status 200. Never return or log names, emails, IDs or personal join links.
-  await zoomRequest(config, `/meetings/${config.meetingId}/registrants?status=approved&page_size=1`);
+  if (!registrationNotRequired) {
+    await zoomRequest(config, `/meetings/${config.meetingId}/registrants?status=approved&page_size=1`);
+  }
   return {
     configured: true,
     manualApproval: meeting.settings?.approval_type === 1,
-    correctTime: meeting.start_time ? Date.parse(meeting.start_time) === Date.parse("2026-10-31T18:30:00Z") : false,
-    canReadRegistrants: true,
+    correctTime,
+    canReadRegistrants: !registrationNotRequired,
+    registrationNotRequired,
+    meetingJoinReady,
+    joinReady: meetingJoinReady,
   };
 }
 
@@ -110,13 +196,17 @@ async function findRegistrant(config: NonNullable<ReturnType<typeof zoomLiveConf
   return null;
 }
 
-export async function registerApprovedLiveAttendee(input: { email: string; name: string }) {
+export async function registerApprovedLiveAttendee(input: { email: string; name: string }): Promise<{
+  registrantId: string | null;
+  joinUrl: string;
+  mode?: "meeting";
+}> {
   const config = zoomLiveConfig();
   if (!config) throw new Error("Zoom live configuration missing");
   const email = input.email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Invalid ticket email");
-  const meeting = await zoomRequest<{ settings?: { approval_type?: number } }>(config, `/meetings/${config.meetingId}`);
-  if (meeting.settings?.approval_type !== 1) throw new Error("Zoom meeting must require manual approval");
+  const { meeting, registrationDisabledJoin } = await readLiveMeetingForRegistration(config);
+  if (registrationDisabledJoin) return registrationDisabledJoin;
 
   let approved = await findRegistrant(config, email, "approved");
   let approvedReferenceId = approved?.id || approved?.registrant_id;

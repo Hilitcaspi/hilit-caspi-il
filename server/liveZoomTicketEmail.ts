@@ -6,12 +6,15 @@ function escapeHtml(text: string) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-export function buildLiveZoomTicketEmail(input: { name: string; joinUrl: string; source: string; questionToken: string; registrationEmail?: string }) {
+export function buildLiveZoomTicketEmail(input: { name: string; joinUrl: string; source: string; questionToken: string; registrationEmail?: string; joinMode?: "personal" | "meeting" }) {
   const name = escapeHtml(input.name.trim().split(/\s+/)[0] || "");
   const joinUrl = escapeHtml(input.joinUrl);
   const questionUrl = `${SITE}/live/question#q=${encodeURIComponent(input.questionToken)}`;
-  const personalPolicy = "הכרטיס אישי ומיועד לשימושך בלבד. קישור הכניסה נוצר עבור הכרטיס שלך. אין להעביר את הכרטיס או את קישורי הכניסה והשאלות לאדם אחר.";
-  const registrationEmail = input.registrationEmail?.trim().toLowerCase();
+  const simpleJoin = input.joinMode === "meeting";
+  const personalPolicy = simpleJoin
+    ? "זו ההזמנה שלך לערב הלייב. הכניסה בלחיצה, בלי הרשמה נוספת ל־Zoom ובלי צורך להקליד סיסמה. קישור השאלות אישי, ואין להעביר אותו לאדם אחר."
+    : "הכרטיס אישי ומיועד לשימושך בלבד. קישור הכניסה נוצר עבור הכרטיס שלך. אין להעביר את הכרטיס או את קישורי הכניסה והשאלות לאדם אחר.";
+  const registrationEmail = simpleJoin ? undefined : input.registrationEmail?.trim().toLowerCase();
   const gift = input.source === "database_live" || input.source === "plus";
   const headline = gift ? "כרטיס המתנה שלך ללייב מוכן" : "הכרטיס שלך ללייב מוכן";
   const subject = `${headline} | סודות ההתאמה המושלמת`;
@@ -29,12 +32,12 @@ export function buildLiveZoomTicketEmail(input: { name: string; joinUrl: string;
 <h1 style="font-size:28px;line-height:1.3;margin:0 0 12px;color:#191265;">${headline}</h1>
 <p style="font-size:16px;line-height:1.75;margin:0 0 24px;color:#49446a;">אני ממש שמחה שניפגש. הכנתי לנו ערב שבו אפתח את מאחורי הקלעים של ההתאמות, נדבר על פרופילים שבאמת עובדים ונפנה מקום גם לשאלות שלכם.</p>
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #d8c278;border-radius:18px;background:#fff6dd;"><tr><td style="padding:24px;text-align:center;">
-<p style="font-size:12px;letter-spacing:2px;font-weight:700;color:#706045;margin:0 0 11px;">הכרטיס שלך · כניסה אחת</p>
+<p style="font-size:12px;letter-spacing:2px;font-weight:700;color:#706045;margin:0 0 11px;">${simpleJoin ? "ההזמנה שלך לערב הלייב" : "הכרטיס שלך · כניסה אחת"}</p>
 <p style="font-size:23px;line-height:1.35;font-weight:800;margin:0 0 14px;color:#191265;">סודות ההתאמה המושלמת</p>
 <p style="font-size:15px;line-height:1.7;margin:0;color:#49446a;">שבת, 31.10.2026&nbsp; · &nbsp;20:30 שעון ישראל<br>בשידור חי ב־Zoom</p>
 ${registrationEmail ? `<p style="font-size:12px;line-height:1.7;color:#625b74;margin:16px 0 0;">הכרטיס הונפק לכתובת ההרשמה:<br><span dir="ltr" style="display:inline-block;font-weight:700;">${escapeHtml(registrationEmail)}</span></p>` : ""}
 </td></tr></table>
-<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr><td align="center" style="padding:26px 0 12px;"><a href="${joinUrl}" style="display:inline-block;background:#191265;border-radius:999px;padding:16px 34px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;">לכניסה אישית ללייב</a></td></tr></table>
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr><td align="center" style="padding:26px 0 12px;"><a href="${joinUrl}" style="display:inline-block;background:#191265;border-radius:999px;padding:16px 34px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;">${simpleJoin ? "לכניסה ללייב" : "לכניסה אישית ללייב"}</a></td></tr></table>
 <p style="font-size:14px;line-height:1.75;color:#68617c;margin:0 0 18px;text-align:center;">כדאי לשמור את המייל. אין צורך להירשם שוב ב־Zoom.<br>אם תגיעו לפני שהתחלנו, תוכלו להמתין עד שאפתח את המפגש.</p>
 <p style="font-size:13px;line-height:1.75;color:#625b74;margin:0 0 22px;padding:14px;background:#f5eedc;border-radius:12px;">${personalPolicy}</p>
 <p style="font-size:16px;line-height:1.75;color:#191265;margin:0 0 4px;font-weight:700;text-align:center;">יש שאלה שמסקרנת אותך לקראת הלייב?</p>

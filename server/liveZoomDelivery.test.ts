@@ -110,4 +110,17 @@ describe("October Zoom ticket delivery", () => {
     expect(standalone.htmlContent).toContain(`/live/question#q=${questionToken}`);
     expect(standalone.subject).not.toContain("מתנה");
   });
+  it("uses a simple meeting CTA without claiming a unique registrant link", () => {
+    const mail = buildLiveZoomTicketEmail({
+      name: "דוגמה", joinUrl: "https://example.zoom.us/j/987654321?omn=123456789",
+      source: "open_registration", questionToken: `17.${"a".repeat(43)}`,
+      registrationEmail: "attendee@example.com", joinMode: "meeting",
+    });
+    expect(mail.htmlContent).toContain("לכניסה ללייב");
+    expect(mail.htmlContent).not.toContain("לכניסה אישית ללייב");
+    expect(mail.textContent).toContain("בלי הרשמה נוספת");
+    expect(mail.textContent).toContain("בלי צורך להקליד סיסמה");
+    expect(mail.textContent).not.toContain("קישור הכניסה נוצר עבור הכרטיס שלך");
+    expect(mail.htmlContent).not.toContain("attendee@example.com");
+  });
 });
