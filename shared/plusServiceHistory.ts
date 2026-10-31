@@ -1,6 +1,7 @@
 import { wasMatchProposalSent, type MatchDeliveryEvidence } from "./matchDelivery";
 import { getPlusServiceAnchor, PLUS_SERVICE_CYCLE_MS, type PlusServiceMember } from "./plusServiceCycle";
 import { getPlusWednesdayCycleTarget } from "./plusWednesdayOffer";
+import { getLivePostPlusCycleTarget } from "./livePostOffer";
 
 /** Bound admin payloads while still showing up to two years of the member's own service history. */
 export const MAX_PLUS_SERVICE_HISTORY_PERIODS = 24;
@@ -65,7 +66,11 @@ function getIsraelCalendarMonthLabel(timestamp: number) {
 }
 
 function getPeriodTarget(member: PlusServiceHistoryMember, cycleIndex: number) {
-  return getPlusWednesdayCycleTarget(member.pilotCohort, cycleIndex, member.monthlyMatchTarget);
+  return getLivePostPlusCycleTarget(
+    member.pilotCohort,
+    cycleIndex,
+    getPlusWednesdayCycleTarget(member.pilotCohort, cycleIndex, member.monthlyMatchTarget),
+  );
 }
 
 function isCountableManualProposal(member: PlusServiceHistoryMember, proposal: PlusHistoricalProposal) {

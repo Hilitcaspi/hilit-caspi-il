@@ -6,6 +6,7 @@ import {
   plusPaymentEvents,
   plusPilotMembers,
   singles,
+  liveOctoberTickets,
 } from "../drizzle/schema";
 import type { Single } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
@@ -27,6 +28,12 @@ import {
   PLUS_WEDNESDAY_FIRST_CYCLE_TARGET,
   qualifiesForPlusWednesdayOffer,
 } from "../shared/plusWednesdayOffer";
+import {
+  isLivePostOfferAccountTicket,
+  LIVE_POST_PLUS_COHORT,
+  LIVE_POST_PLUS_FIRST_CYCLE_TARGET,
+  qualifiesForLivePostPlusOffer,
+} from "../shared/livePostOffer";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -127,6 +134,19 @@ export async function activatePlusForSingle(input: PlusActivationInput) {
       .where(sql`LOWER(TRIM(${plusCheckoutIntents.email})) = ${input.email.trim().toLowerCase()}`)
       .limit(1),
   ]);
+  const eventTickets = await db.select({
+    eventSlug: liveOctoberTickets.eventSlug,
+    email: liveOctoberTickets.email,
+    revokedAt: liveOctoberTickets.revokedAt,
+    voucherCode: liveOctoberTickets.voucherCode,
+    singleId: liveOctoberTickets.singleId,
+  }).from(liveOctoberTickets).where(and(
+    eq(liveOctoberTickets.eventSlug, "matching-secrets-2026-10-31"),
+    sql`LOWER(TRIM(${liveOctoberTickets.email})) = ${input.email.trim().toLowerCase()}`,
+  ));
+  const verifiedLivePostTicket = eventTickets.some(ticket =>
+    isLivePostOfferAccountTicket(ticket, input.email, input.single.id),
+  );
   // paidAt is written by the verified Grow webhook. Profile completion may happen later.
   const wednesdayOfferFirstCycle = qualifiesForPlusWednesdayOffer({
     utmTerm: checkoutIntent?.utmTerm,
@@ -141,16 +161,31 @@ export async function activatePlusForSingle(input: PlusActivationInput) {
     && Boolean(input.transactionId)
     && existing.lastPaymentTransactionId === input.transactionId;
   const firstCycleWednesdayOffer = wednesdayOfferFirstCycle || preservedWednesdayOffer;
+  const livePostOfferFirstCycle = qualifiesForLivePostPlusOffer({
+    utmTerm: checkoutIntent?.utmTerm,
+    paidAt: input.paidAt || checkoutIntent?.paidAt,
+    amountAgorot: input.amountAgorot || checkoutIntent?.amountAgorot,
+    existingMember: existing,
+    verifiedTicket: verifiedLivePostTicket,
+  });
+  // A duplicate callback must retain its original verified first-cycle benefit;
+  // a later renewal never recreates the third-proposal cohort.
+  const preservedLivePostOffer = existing?.pilotCohort === LIVE_POST_PLUS_COHORT
+    && existing.monthlyMatchTarget === LIVE_POST_PLUS_FIRST_CYCLE_TARGET
+    && Boolean(input.transactionId)
+    && existing.lastPaymentTransactionId === input.transactionId;
+  const firstCycleLivePostOffer = livePostOfferFirstCycle || preservedLivePostOffer;
   const legacyFirstCycle = (!existing?.activatedAt && qualifiesForPlusHolidayLaunch(checkoutIntent?.utmCampaign, cycleStart))
     || (existing?.pilotCohort === PLUS_HOLIDAY_LAUNCH_COHORT && existing.monthlyMatchTarget === PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET && Boolean(input.transactionId) && existing.lastPaymentTransactionId === input.transactionId);
   const cycleMatchTarget = firstCycleWednesdayOffer ? PLUS_WEDNESDAY_FIRST_CYCLE_TARGET
+    : firstCycleLivePostOffer ? LIVE_POST_PLUS_FIRST_CYCLE_TARGET
     : legacyFirstCycle ? PLUS_HOLIDAY_LAUNCH_FIRST_CYCLE_TARGET : PLUS_STANDARD_CYCLE_TARGET;
 
   const memberValues = {
     status: "active" as const,
     billingStatus: "active" as const,
     pilotPriceAgorot: input.amountAgorot || 9900,
-    pilotCohort: firstCycleWednesdayOffer ? PLUS_WEDNESDAY_COHORT : legacyFirstCycle ? PLUS_HOLIDAY_LAUNCH_COHORT : existing?.pilotCohort || null,
+    pilotCohort: firstCycleWednesdayOffer ? PLUS_WEDNESDAY_COHORT : firstCycleLivePostOffer ? LIVE_POST_PLUS_COHORT : legacyFirstCycle ? PLUS_HOLIDAY_LAUNCH_COHORT : existing?.pilotCohort || null,
     monthlyMatchTarget: cycleMatchTarget,
     billingCycleStartedAt: cycleStart,
     billingCycleEndsAt: cycleEnd,

@@ -54,7 +54,9 @@ export default function DatabasePlusSales() {
   const activeWednesdayOffer = wednesdayMemberOffer || (wednesdayOffer?.available ? wednesdayOffer : null);
   const requestedCoupon = params.get("coupon")?.trim().toUpperCase() === "PLUSGIFT"
     ? "PLUSGIFT"
-    : isPlusBonusCouponCode(params.get("coupon")) ? "PLUS" : undefined;
+    : params.get("coupon")?.trim().toUpperCase() === "LIVEPLUS"
+      ? "LIVEPLUS"
+      : isPlusBonusCouponCode(params.get("coupon")) ? "PLUS" : undefined;
   const guideLaunchOffer = launchOffer?.type === "guide" ? launchOffer : null;
   const personalLinkMissingDatabaseMembership = Boolean(
     isPersonalLink && statusQuery.isSuccess && plusData?.databaseMembershipActive !== true,

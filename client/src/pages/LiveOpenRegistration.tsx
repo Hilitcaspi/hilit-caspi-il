@@ -726,7 +726,7 @@ export default function LiveOpenRegistration() {
                     {register.isPending ? "שולחים הרשמה" : "להרשמה ללא עלות"}
                   </button>
                   <p className="text-center text-xs leading-6 text-[#77718a]">
-                    אין תשלום בעמוד הזה. קישור הכניסה האישי יישלח למייל.
+                    אין תשלום בעמוד הזה. קישור הכניסה יישלח למייל.
                   </p>
                 </form>
               </>

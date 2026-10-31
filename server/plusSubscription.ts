@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { wasMatchProposalSent, type MatchDeliveryEvidence } from "../shared/matchDelivery";
 import { resolvePlusServiceCycle, type PlusServiceMember } from "../shared/plusServiceCycle";
 import { getPlusWednesdayCycleTarget } from "../shared/plusWednesdayOffer";
+import { getLivePostPlusCycleTarget } from "../shared/livePostOffer";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -94,8 +95,9 @@ export function calculatePlusCycleProgress(
 
 export function calculatePlusServiceProgress(member: PlusCycleMember & PlusServiceMember & { pilotCohort?: string | null }, memberMatches: PlusCycleMatch[], now = Date.now()) {
   const window = resolvePlusServiceCycle(member, now);
-  // The Wednesday bonus grants a third *manual* proposal only in its first service cycle.
-  const target = getPlusWednesdayCycleTarget(member.pilotCohort, window.cycleIndex, member.monthlyMatchTarget);
+  // Each dated cohort preserves its own first-cycle-only third manual proposal.
+  const wednesdayTarget = getPlusWednesdayCycleTarget(member.pilotCohort, window.cycleIndex, member.monthlyMatchTarget);
+  const target = getLivePostPlusCycleTarget(member.pilotCohort, window.cycleIndex, wednesdayTarget);
   const progress = calculatePlusCycleProgress({ ...member, monthlyMatchTarget: target, billingCycleStartedAt: window.cycleStart, billingCycleEndsAt: window.cycleEnd }, memberMatches, now);
   const continuingCancellation = member.billingStatus === "cancelled" && Boolean(member.cancelledAt) && now < window.cycleEnd;
   const needsMatches = member.status === "active" && (member.billingStatus === "active" || continuingCancellation)

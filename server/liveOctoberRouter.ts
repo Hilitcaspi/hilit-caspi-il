@@ -8,7 +8,9 @@ import { isOpenLiveRegistrationDeliveryEnabled, ticketJoinUrl } from "./liveZoom
 import { liveQuestionTicket } from "./liveQuestionAccess";
 import { confirmLiveAttendance, readLiveQuestionAccess } from "./liveAttendance";
 import { loadLiveFirstMatchQueue } from "./liveFirstMatchQueue";
+import { loadLivePostFirstMatchQueue } from "./livePostFirstMatchQueue";
 import { isZoomLiveDeliveryEnabled } from "./liveZoomApi";
+import { LIVE_POST_DATABASE_CODE, LIVE_POST_PLUS_CODE, LIVE_POST_OFFER_START, LIVE_POST_OFFER_END } from "../shared/livePostOffer";
 import { liveOpenRegistrations } from "../drizzle/liveOpenRegistrationSchema";
 import { openLiveRegistrationInput, openLiveRegistrationStatus, registerOpenLive } from "./liveOpenRegistration";
 import {
@@ -23,6 +25,11 @@ export const liveOctoberRouter = router({
   openRegistrationStatus: publicProcedure.query(() => openLiveRegistrationStatus()),
   registerOpenLive: publicProcedure.input(openLiveRegistrationInput).mutation(({ input, ctx }) =>
     registerOpenLive(input, { ip: ctx.req.ip || "unknown" })),
+  postLiveOfferStatus: publicProcedure.query(() => ({
+    implementationVersion: 1, serviceOffersOnly: true,
+    startsAt: LIVE_POST_OFFER_START, endsAt: LIVE_POST_OFFER_END,
+    codes: { database: LIVE_POST_DATABASE_CODE, plus: LIVE_POST_PLUS_CODE },
+  })),
   salesStatus: publicProcedure.query(() => ({
     open: isLiveCheckoutOpen("live_october", undefined),
     databaseGiftOpen: isLiveCheckoutOpen("database", "LIVE"),
@@ -162,5 +169,12 @@ export const liveOctoberRouter = router({
     if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
     if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     return loadLiveFirstMatchQueue();
+  }),
+
+  /** Read-only staff view for verified LIVE48 purchases; never sends or queues a proposal. */
+  adminPostEventFirstMatchQueue: teamProcedure.query(async ({ ctx }) => {
+    if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+    if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    return loadLivePostFirstMatchQueue();
   }),
 });

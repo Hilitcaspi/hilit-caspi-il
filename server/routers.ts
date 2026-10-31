@@ -7840,6 +7840,19 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           const { validatePlusWednesdayCoupon } = await import("./plusWednesdayCoupon");
           return validatePlusWednesdayCoupon(input);
         }
+        if (requested === "LIVE48" || requested === "LIVEPLUS") {
+          if (!input.email) return { valid: false as const, error: "יש להזין כתובת מייל כדי לאמת את הטבת הלייב" };
+          const { validateLivePostOfferCheckout } = await import("./livePostOfferEligibility");
+          const eligibility = await validateLivePostOfferCheckout({
+            code: requested,
+            product: input.product,
+            email: input.email,
+            personalToken: input.personalToken,
+          });
+          return eligibility.valid
+            ? { valid: true as const, code: eligibility.code, discountPercent: undefined, discountAmount: undefined, fixedPrice: undefined }
+            : { valid: false as const, error: eligibility.error };
+        }
         if (requested === "TEST1") {
           const { isLiveTestCheckout } = await import("./liveTestCoupon");
           if (!isLiveTestCheckout(input.product || "", requested, input.email))
@@ -7899,7 +7912,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             fixedPrice: 49,
           };
         }
-        if (requested === "LIVE" || requested === "FRIENDS")
+        if (requested === "LIVE" || requested === "LIVE48" || requested === "LIVEPLUS" || requested === "FRIENDS")
           return { valid: false as const, error: "הקוד אינו תקף למוצר זה" };
         const db = await getDb();
         if (!db) return { valid: false as const, error: "שגיאת שרת" };
@@ -8106,6 +8119,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const normalizedCheckoutEmail = input.email.trim().toLowerCase();
         const reservedCode = input.couponCode?.trim().toUpperCase();
         const diagnosticTest = reservedCode === "TEST1";
+        let verifiedLivePostOfferCode: "LIVE48" | "LIVEPLUS" | null = null;
         let choose50FixedPrice: number | undefined;
         if (reservedCode === CHOOSE50_CODE) {
           const offer = validateChoose50Coupon({ code: reservedCode, product: input.product });
@@ -8149,6 +8163,21 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           }
           validatedRecoveryCode = recoveryValidation.code;
           recoveryFixedPrice = recoveryValidation.fixedPrice;
+        }
+        if (reservedCode === "LIVE48" || reservedCode === "LIVEPLUS") {
+          const { validateLivePostOfferCheckout } = await import("./livePostOfferEligibility");
+          const eligibility = await validateLivePostOfferCheckout({
+            code: reservedCode,
+            product: input.product,
+            email: normalizedCheckoutEmail,
+            personalToken: input.personalToken,
+            now: Date.now(),
+            db,
+          });
+          if (!eligibility.valid) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: eligibility.error });
+          }
+          verifiedLivePostOfferCode = eligibility.code;
         }
         const {
           withCheckoutReservation, createCheckoutReservationFingerprint,
@@ -8261,10 +8290,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             }
 
             const { appendPlusWednesdayOfferMarker, canApplyPlusWednesdayOfferCoupon, stripPlusWednesdayOfferMarker, isPlusBonusCouponCode } = await import("../shared/plusWednesdayOffer");
+            const { appendLivePostPlusOfferMarker, stripLivePostPlusOfferMarker } = await import("../shared/livePostOffer");
             const requestedCoupon = input.couponCode?.trim().toUpperCase();
-            const cleanUtmTerm = stripPlusWednesdayOfferMarker(input.utmTerm);
-            if (requestedCoupon && requestedCoupon !== "TEST1" && requestedCoupon !== validatedRecoveryCode && !isPlusBonusCouponCode(requestedCoupon)) {
-              throw new TRPCError({ code: "BAD_REQUEST", message: "במסלול Plus קוד ההטבה PLUS תקף, והוא אינו משנה את המחיר של 99 ₪" });
+            const cleanUtmTerm = stripLivePostPlusOfferMarker(stripPlusWednesdayOfferMarker(input.utmTerm));
+            if (requestedCoupon && requestedCoupon !== "TEST1" && requestedCoupon !== validatedRecoveryCode
+              && !isPlusBonusCouponCode(requestedCoupon) && requestedCoupon !== "LIVEPLUS") {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "במסלול Plus קוד הטבה מאומת אינו משנה את המחיר של 99 ₪" });
             }
             if (isPlusBonusCouponCode(requestedCoupon) && !canApplyPlusWednesdayOfferCoupon({
               couponCode: requestedCoupon,
@@ -8273,9 +8304,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             })) {
               throw new TRPCError({ code: "PRECONDITION_FAILED", message: "הטבת PLUS מיועדת להצטרפות ראשונה בלבד ובחלון ההטבה הפעיל. ההטבה הנוכחית בתוקף עד סוף שבת 17.10 לפי שעון ישראל. המחיר נשאר 99 ₪" });
             }
-            input.utmTerm = isPlusBonusCouponCode(requestedCoupon)
-              ? appendPlusWednesdayOfferMarker(cleanUtmTerm)
-              : cleanUtmTerm || undefined;
+            input.utmTerm = verifiedLivePostOfferCode === "LIVEPLUS"
+              ? appendLivePostPlusOfferMarker(cleanUtmTerm)
+              : isPlusBonusCouponCode(requestedCoupon)
+                ? appendPlusWednesdayOfferMarker(cleanUtmTerm)
+                : cleanUtmTerm || undefined;
           }
           if (!diagnosticTest) await db.insert(plusCheckoutIntents).values({
             email: normalizedEmail,
@@ -8323,6 +8356,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
 
         // Reserved live campaign/test codes are verified here, never priced by the browser.
         if ((reservedCode === "LIVE" && input.product !== "database") ||
+            (reservedCode === "LIVE48" && input.product !== "database") ||
+            (reservedCode === "LIVEPLUS" && input.product !== "plus") ||
             (reservedCode === "FRIENDS" && input.product !== "live_october")) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "קוד ההטבה אינו תקף למוצר הזה" });
         }
@@ -8380,7 +8415,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         // derive 269.10 through generic whole-shekel coupon rounding.
         if (validatedRecoveryCode) finalSum = recoveryFixedPrice;
         if (choose50FixedPrice !== undefined) finalSum = choose50FixedPrice;
-        if (input.couponCode && db && choose50FixedPrice === undefined && !validatedRecoveryCode && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "FRIENDS" && reservedCode !== "TEST1") {
+        if (input.couponCode && db && choose50FixedPrice === undefined && !validatedRecoveryCode && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "LIVE48" && reservedCode !== "LIVEPLUS" && reservedCode !== "FRIENDS" && reservedCode !== "TEST1") {
           const { discountCodes } = await import("../drizzle/schema");
           const [code] = await db.select().from(discountCodes)
             .where(eq(discountCodes.code, input.couponCode.toUpperCase()))

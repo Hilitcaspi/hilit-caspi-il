@@ -1,4 +1,5 @@
 import { isPlusBonusCouponCode } from "@shared/plusWednesdayOffer";
+import { LIVE_POST_DATABASE_CODE, LIVE_POST_PLUS_CODE } from "@shared/livePostOffer";
 import { boostEntryChannelFromSearch } from "../../../shared/boostEntryChannel";
 /*
  * GrowWallet — Payment component using Grow Wallet SDK
@@ -564,7 +565,7 @@ export default function GrowWallet({
     // just because the automatic LIVE coupon validation is still pending.
     if (
       product === "database" &&
-      ["LIVE", "TEST1"].includes(prefillCoupon?.trim().toUpperCase() || "") &&
+      ["LIVE", LIVE_POST_DATABASE_CODE, "TEST1"].includes(prefillCoupon?.trim().toUpperCase() || "") &&
       couponApplied?.code !== prefillCoupon?.trim().toUpperCase()
     ) {
       toast.error(
@@ -772,7 +773,7 @@ export default function GrowWallet({
       // Do not mint a second intended purchase or server nonce for this identity.
       if (!attempt.authCode) {
         const baseCheckoutPrice = PRODUCT_CONFIGS[product]?.sum ?? 0;
-        const trackedCheckoutPrice = isPlusBonusCouponCode(attempt.couponCode)
+        const trackedCheckoutPrice = (isPlusBonusCouponCode(attempt.couponCode) || attempt.couponCode === LIVE_POST_PLUS_CODE)
           ? baseCheckoutPrice
           : (couponApplied?.fixedPrice ??
             (couponApplied?.discountAmount
@@ -809,7 +810,7 @@ export default function GrowWallet({
         // final price remains server-validated; this is retained for pricing flow parity.
         const basePrice = PRODUCT_CONFIGS[product]?.sum ?? 0;
         let finalPrice: number | undefined = undefined;
-        if (couponApplied && !isPlusBonusCouponCode(couponApplied.code)) {
+        if (couponApplied && !isPlusBonusCouponCode(couponApplied.code) && couponApplied.code !== LIVE_POST_PLUS_CODE && couponApplied.code !== LIVE_POST_DATABASE_CODE) {
           if (couponApplied.fixedPrice) finalPrice = couponApplied.fixedPrice;
           else if (couponApplied.discountAmount)
             finalPrice = Math.max(1, basePrice - couponApplied.discountAmount);
@@ -1151,6 +1152,12 @@ export default function GrowWallet({
                   : ""}
                 {isPlusBonusCouponCode(couponApplied.code)
                   ? " — 3 הצעות ידניות במחזור הראשון, במחיר 99 ₪"
+                  : ""}
+                {couponApplied.code === LIVE_POST_PLUS_CODE
+                  ? " — 3 הצעות ידניות במחזור הראשון, במחיר 99 ₪"
+                  : ""}
+                {couponApplied.code === LIVE_POST_DATABASE_CODE
+                  ? " — הצעת התאמה ראשונה בתוך 48 שעות מאישור התשלום והשלמת הפרופיל"
                   : ""}
                 {couponApplied.discountPercent
                   ? ` — ${couponApplied.discountPercent}% הנחה`

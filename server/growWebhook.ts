@@ -573,6 +573,16 @@ export async function handlePlus(email: string, name: string, transactionId: str
     .where(sql`LOWER(TRIM(${singles.email})) = ${normalizedEmail}`)
     .limit(1);
   const now = Date.now();
+  const [verifiedPayment] = transactionId
+    ? await db.select({ paidAt: completedPayments.paidAt }).from(completedPayments).where(and(
+      eq(completedPayments.transactionId, transactionId),
+      eq(completedPayments.product, "plus"),
+    )).limit(1)
+    : [];
+  // The accounting ledger is created only from the verified provider path.
+  // Keep its time as the entitlement proof; legacy/no-ledger callbacks retain
+  // their existing handling rather than inventing a historical timestamp.
+  const paidAt = Number(verifiedPayment?.paidAt || now);
   const providerSubscriptionId = String(
     data.subscriptionId || data.recurringPaymentId || data.paymentLinkProcessToken || "",
   ).slice(0, 200) || null;
@@ -583,7 +593,7 @@ export async function handlePlus(email: string, name: string, transactionId: str
     providerSubscriptionId,
     amountAgorot: Math.round(sum * 100) || 9900,
     singleId: single?.id || null,
-    paidAt: now,
+    paidAt,
     updatedAt: now,
   }).where(sql`LOWER(TRIM(${plusCheckoutIntents.email})) = ${normalizedEmail}`);
 
@@ -595,7 +605,7 @@ export async function handlePlus(email: string, name: string, transactionId: str
       transactionId,
       amountAgorot: Math.round(sum * 100) || 9900,
       providerSubscriptionId,
-      paidAt: now,
+      paidAt,
     });
     return;
   }
