@@ -4172,6 +4172,8 @@ TEST1 תוקן ממצב שפג תוקפו ושאפשר רק שני מוצרים,
 **Status:** partially resolved, implementation and one-shot scheduling complete; production publication and scheduled delivery pending.
 **Cost:** נתון הקרדיטים הכולל המדויק אינו זמין; עלות ספק מייל עתידית טרם אומתה. אין להמציא סכום או לציין שהדיוור כבר יצא.
 **Notes:** העבודה התארכה עקב תיעדוף עמוד הקהילה וההזמנות, שינוי הגדרות Zoom בידי המארחת, תקלות רשת ובדיקת סינון הסכמה/חברות. שמירה וסנכרון GitHub נדרשים לפני המסירה. ריצת 21:30 צריכה לעדכן באותה רשומה counts מצרפיים של sent/suppressed/review בלבד. אם לא פורסם עד אז, המנוע ייעצר ולא ישלח הטבה שקוד הרכישה שלה אינו חי. ניטור, קמפיינים ישנים, SMS, WhatsApp בפועל והאתר האמריקאי נשארו ללא שינוי.
+**After publication update (2026-10-31 19:32 Asia/Jerusalem):** גרסת ba4ea642 נשמרה וסונכרנה מיד ל-GitHub; פרסום דווח כהצלחה. בקריאת metadata ציבורית בלבד באתר החי אומת implementationVersion=1, שני הקודים LIVE48/LIVEPLUS ומועד סיום ההטבות המתוכנן. חסם הפרסום הוסר. תצוגת הפיתוח המקומית הישנה הוחלפה בתהליך מעודכן עם SCHEDULERS_ENABLED=false, ואותו מסלול מוכנות אומת גם בה; האתר החי ועבודות הרקע שלו לא שונו לצורך הבדיקה. תזמון Manus החד-פעמי נשאר פעיל ב-21:30. עדיין לא נשלחו מיילי ההטבות ולא בוצעו רכישות או התאמות. השינוי שאחרי הגרסה הוא תיעוד בלבד.
+**Status after publication:** partially resolved; published and ready for owner-approved scheduled delivery at 21:30.
 ---
 
 ## Task: התאמת הזמנות הלייב לכניסה פשוטה לאחר ביטול רישום Zoom
