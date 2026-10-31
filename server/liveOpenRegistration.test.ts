@@ -103,6 +103,24 @@ afterEach(() => {
 });
 
 describe("open live registration service", () => {
+  it("rejects unapproved email consent before any database, ticket or provider access", async () => {
+    const getDb = vi.fn();
+    const ensureTicket = vi.fn();
+    const processTicket = vi.fn();
+    const service = createOpenLiveRegistrationService({
+      getDb,
+      ensureLiveTicket: ensureTicket,
+      processOpenLiveRegistrationTicket: processTicket,
+      deliveryEnabled: () => true,
+      now: () => NOW,
+      rateLimit: () => true,
+    });
+    await expect(service.registerOpenLive({ ...input, marketingConsent: false })).rejects.toThrow("לאשר קבלת מיילים");
+    expect(getDb).not.toHaveBeenCalled();
+    expect(ensureTicket).not.toHaveBeenCalled();
+    expect(processTicket).not.toHaveBeenCalled();
+  });
+
   it("captures an immutable dedicated lead, issues an open-registration ticket, and sends only its target when ready", async () => {
     const { db, state } = makeRegistrationDb();
     const ensureTicket = vi.fn(async () => ({ id: 73, email: "noa@example.com", source: "open_registration" }));
@@ -125,6 +143,7 @@ describe("open live registration service", () => {
       isDatabaseMember: false,
       marketingConsent: true,
       consentedAt: NOW,
+      consentVersion: "live-open-v2-required-email",
       utmSource: "instagram",
     })]);
     expect(ensureTicket).toHaveBeenCalledWith({ email: "noa@example.com", name: "נועה כהן", source: "open_registration" });
@@ -148,7 +167,7 @@ describe("open live registration service", () => {
       rateLimit: () => true,
     });
 
-    await expect(service.registerOpenLive({ ...input, marketingConsent: false, phone: "050-0000000" })).resolves.toEqual({ success: true, delivery: "queued" });
+    await expect(service.registerOpenLive({ ...input, marketingConsent: true, phone: "050-0000000" })).resolves.toEqual({ success: true, delivery: "queued" });
     expect(state.inserts).toHaveLength(0);
     expect(state.updates).toHaveLength(0);
     expect(ensureTicket).not.toHaveBeenCalled();
@@ -186,7 +205,7 @@ describe("open live registration service", () => {
     });
 
     await expect(service.registerOpenLive(input)).resolves.toEqual({ success: true, delivery: "unavailable" });
-    await expect(service.registerOpenLive({ ...input, firstName: "לא", lastName: "להחליף", marketingConsent: false })).resolves.toEqual({ success: true, delivery: "sent" });
+    await expect(service.registerOpenLive({ ...input, firstName: "לא", lastName: "להחליף", marketingConsent: true })).resolves.toEqual({ success: true, delivery: "sent" });
     expect(state.inserts).toHaveLength(0);
     expect(state.updates).toEqual([{ ticketId: 903 }]);
     expect(ensureTicket).toHaveBeenLastCalledWith({ email: "noa@example.com", name: "שם מקורי", source: "open_registration" });

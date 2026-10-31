@@ -6,7 +6,7 @@ import { getDb } from "./db";
 import { LIVE_OCTOBER_SLUG, LIVE_START_ISO, ensureLiveTicket, normalizeLiveEmail } from "./liveOctober";
 import { isOpenLiveRegistrationDeliveryEnabled, processOpenLiveRegistrationTicket } from "./liveZoomDelivery";
 
-export const LIVE_OPEN_REGISTRATION_CONSENT_VERSION = "live-open-v1";
+export const LIVE_OPEN_REGISTRATION_CONSENT_VERSION = "live-open-v2-required-email";
 const OPEN_REGISTRATION_FLAG = "LIVE_OPEN_REGISTRATION_ENABLED";
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 8;
@@ -24,7 +24,9 @@ export const openLiveRegistrationInput = z.object({
   email: z.string().trim().email().max(320),
   phone: z.string().trim().min(5).max(30),
   isDatabaseMember: z.boolean(),
-  marketingConsent: z.boolean(),
+  marketingConsent: z.boolean().refine(value => value === true, {
+    message: "כדי להשלים את ההרשמה, יש לאשר קבלת מיילים ועדכונים.",
+  }),
   // Honeypot: any non-empty value receives a generic success response with no side effects.
   website: z.string().max(200).optional(),
   utmSource: trimmedOptional(100),

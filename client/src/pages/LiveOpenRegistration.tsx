@@ -262,6 +262,11 @@ export default function LiveOpenRegistration() {
       return;
     }
 
+    if (!form.marketingConsent) {
+      setFormError("כדי להשלים את ההרשמה, יש לאשר קבלת מיילים ועדכונים.");
+      return;
+    }
+
     const payload: RegistrationPayload = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
@@ -494,8 +499,8 @@ export default function LiveOpenRegistration() {
                 </div>
 
                 <p className="mt-5 max-w-2xl text-sm leading-7 text-[#625d78]">
-                  קישור כניסה אישי יישלח למייל. הודעת השירות הזאת נשלחת כחלק
-                  מההרשמה, גם ללא הסכמה לקבלת עדכונים שיווקיים.
+                  אחרי ההרשמה יישלח למייל קישור כניסה אישי ללייב. כדי להירשם
+                  ולקבל גם עדכונים והטבות, יש לאשר קבלת מיילים בתיבה למטה.
                 </p>
 
                 <div className="mt-6">
@@ -672,18 +677,27 @@ export default function LiveOpenRegistration() {
                       <input
                         type="checkbox"
                         name="marketingConsent"
+                        required
+                        aria-describedby="live-open-consent-help"
                         checked={form.marketingConsent}
                         onChange={event =>
                           updateField("marketingConsent", event.target.checked)
                         }
                         className="mt-0.5 h-4 w-4 shrink-0 accent-[#191265]"
                       />
-                      <span className="text-xs leading-6 text-[#625d78]">
-                        אשמח לקבל במייל עדכונים, תוכן והצעות מהילית כספי. אפשר
-                        לבטל את ההסכמה בכל עת.
+                      <span id="live-open-consent-help" className="text-xs leading-6 text-[#625d78]">
+                        אני רוצה לקבל מהילית כספי מיילים עם עדכונים, תוכן
+                        והטבות, כולל ההטבות לאחר הלייב. אפשר להסיר את ההרשמה
+                        לדיוור בכל עת באמצעות קישור ההסרה במייל.
                       </span>
                     </label>
                   </fieldset>
+
+                  {!form.marketingConsent ? (
+                    <p className="text-xs leading-6 text-[#625d78]">
+                      כדי להפעיל את כפתור ההרשמה, יש לסמן אישור קבלת מיילים.
+                    </p>
+                  ) : null}
 
                   {formError ? (
                     <p
@@ -696,7 +710,7 @@ export default function LiveOpenRegistration() {
 
                   <button
                     type="submit"
-                    disabled={!formAvailable || register.isPending}
+                    disabled={!formAvailable || register.isPending || !form.marketingConsent}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#191265] px-6 py-4 text-base font-black text-white shadow-[0_14px_30px_rgba(25,18,101,.22)] transition duration-150 hover:-translate-y-0.5 hover:bg-[#30247e] active:scale-[.98] disabled:cursor-not-allowed disabled:transform-none disabled:opacity-60"
                   >
                     {register.isPending ? (
