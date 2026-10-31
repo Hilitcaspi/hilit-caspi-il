@@ -76,13 +76,15 @@ describe("October Zoom ticket delivery", () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ settings: { approval_type: 1 } }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ registrants: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ registrants: [] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "pending-reg" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 123456789, registrant_id: "pending-reg" }) })
       .mockResolvedValueOnce({ ok: true, status: 204 })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ registrants: [{ id: "pending-reg", email: "person@example.com", join_url: fakeUrl }] }) });
     vi.stubGlobal("fetch", fetchMock);
     expect(await registerApprovedLiveAttendee({ email: "person@example.com", name: "שם שני" })).toEqual({ registrantId: "pending-reg", joinUrl: fakeUrl });
     expect(fetchMock.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(call => call[1]?.method === "PUT")).toHaveLength(1);
+    const approval = fetchMock.mock.calls.find(call => call[1]?.method === "PUT");
+    expect(JSON.parse(approval?.[1]?.body as string).registrants[0].id).toBe("pending-reg");
   });
 
   it("produces a Hebrew branded ticket, escaping names and using no common meeting passcode", () => {

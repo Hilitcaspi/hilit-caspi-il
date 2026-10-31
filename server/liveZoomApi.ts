@@ -75,7 +75,8 @@ async function zoomRequest<T>(config: NonNullable<ReturnType<typeof zoomLiveConf
   return res.status === 204 ? ({} as T) : await res.json() as T;
 }
 
-type Registrant = { id?: string; registrant_id?: string; email?: string; join_url?: string };
+type Registrant = { id?: string; registrant_id?: string; email?: string; join_url?: string; status?: string };
+type CreatedMeetingRegistrant = { id?: number; registrant_id?: string; join_url?: string };
 
 export async function verifyZoomLiveMeeting() {
   const config = zoomLiveConfig();
@@ -118,14 +119,18 @@ export async function registerApprovedLiveAttendee(input: { email: string; name:
   if (meeting.settings?.approval_type !== 1) throw new Error("Zoom meeting must require manual approval");
 
   let approved = await findRegistrant(config, email, "approved");
+  let approvedReferenceId = approved?.id || approved?.registrant_id;
   if (!approved) {
     let pending = await findRegistrant(config, email, "pending");
     if (!pending) {
       const [firstName, ...remainder] = input.name.trim().split(/\s+/);
       try {
-        pending = await zoomRequest<Registrant>(config, `/meetings/${config.meetingId}/registrants`, "POST", {
+        const created = await zoomRequest<CreatedMeetingRegistrant>(config, `/meetings/${config.meetingId}/registrants`, "POST", {
           email, first_name: firstName || "משתתף", ...(remainder.length ? { last_name: remainder.join(" ") } : {}),
         });
+        // The creation response's `id` is the MEETING ID, unlike list/detail
+        // responses where `id` identifies the registrant. Never use it for approval.
+        pending = created.registrant_id ? { registrant_id: created.registrant_id, email } : await findRegistrant(config, email, "pending");
       } catch (error) {
         // The POST may have succeeded before a timeout; recover only by looking up this same email.
         pending = await findRegistrant(config, email, "pending");
@@ -134,12 +139,35 @@ export async function registerApprovedLiveAttendee(input: { email: string; name:
       }
     }
     if (!approved) {
-      const id = pending?.id || pending?.registrant_id;
+      const id = pending?.registrant_id || pending?.id;
       if (!id) throw new Error("Zoom registrant ID unavailable");
       await zoomRequest(config, `/meetings/${config.meetingId}/registrants/status`, "PUT", {
         action: "approve", registrants: [{ id, email }],
       });
+      approvedReferenceId = id;
       approved = await findRegistrant(config, email, "approved");
+    }
+  }
+  // The list endpoint may lag behind an approval or omit its personal join URL.
+  // Read this exact approved registrant; never repeat POST/PUT while waiting.
+  const referenceId = approved?.id || approved?.registrant_id || approvedReferenceId;
+  if (!approved?.join_url && referenceId) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt > 0) await new Promise(resolve => setTimeout(resolve, 300 * 2 ** (attempt - 1)));
+      let details: Registrant | null = null;
+      try {
+        details = await zoomRequest<Registrant>(config,
+          `/meetings/${config.meetingId}/registrants/${encodeURIComponent(referenceId)}`);
+      } catch {
+        // Keep installations with list-only read scope usable without changing scopes.
+        const listed = await findRegistrant(config, email, "approved");
+        if (listed?.join_url) { approved = listed; break; }
+      }
+      if (details?.status === "approved" && (details.id || details.registrant_id) === referenceId
+          && details.email?.trim().toLowerCase() === email && details.join_url) {
+        approved = details;
+        break;
+      }
     }
   }
   const id = approved?.id || approved?.registrant_id;

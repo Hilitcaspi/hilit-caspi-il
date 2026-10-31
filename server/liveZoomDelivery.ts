@@ -133,6 +133,7 @@ export async function processLiveZoomTickets(limit = 2, targetTicketId?: number,
     if (affectedRows(claim) !== 1) continue;
     processed++;
     let emailAttempted = false;
+    let phase = "ticket_load";
     try {
       const [ticket] = await db.select().from(liveOctoberTickets).where(eq(liveOctoberTickets.id, id)).limit(1);
       if (!ticket || ticket.revokedAt || ticket.voucherCode.startsWith("TEST-")) continue;
@@ -141,6 +142,7 @@ export async function processLiveZoomTickets(limit = 2, targetTicketId?: number,
       // not modify a reused Plus ticket, but allows this one scoped delivery
       // even if its former Plus entitlement has ended.
       if (ticket.source === "plus" && !targetedOpenRegistration) {
+        phase = "plus_entitlement";
         const [plus] = ticket.singleId ? await db.select({
           status: plusPilotMembers.status, billingStatus: plusPilotMembers.billingStatus,
           billingCycleEndsAt: plusPilotMembers.billingCycleEndsAt,
@@ -151,8 +153,11 @@ export async function processLiveZoomTickets(limit = 2, targetTicketId?: number,
       if (!config) throw new Error("configuration_missing");
       let encrypted = ticket.zoomJoinUrlEncrypted;
       if (!encrypted) {
+        phase = "zoom_registration";
         const registered = await registerApprovedLiveAttendee({ email: ticket.email, name: ticket.name });
+        phase = "join_encryption";
         encrypted = encryptZoomJoinUrl(registered.joinUrl, config.encryptionKey);
+        phase = "registration_persist";
         await db.update(liveOctoberTickets).set({
           zoomRegistrantId: registered.registrantId,
           zoomJoinUrlEncrypted: encrypted,
@@ -160,14 +165,17 @@ export async function processLiveZoomTickets(limit = 2, targetTicketId?: number,
           zoomLastError: null,
         }).where(and(eq(liveOctoberTickets.id, id), isNull(liveOctoberTickets.revokedAt)));
       }
+      phase = "email_build";
       const joinUrl = decryptZoomJoinUrl(encrypted, config.encryptionKey);
       const email = buildLiveZoomTicketEmail({
         name: ticket.name, joinUrl, source: ticket.source, questionToken: liveQuestionToken(ticket), registrationEmail: ticket.email,
       });
       // Persist a review-only state before the external call. Brevo's idempotency lasts only 30 minutes;
       // if a worker dies or the result is ambiguous, automatic retry could send a duplicate later.
+      phase = "email_claim";
       await db.update(liveOctoberTickets).set({ zoomLastError: "email_inflight" }).where(eq(liveOctoberTickets.id, id));
       emailAttempted = true;
+      phase = "email_send";
       const delivered = await sendEmailBatch({
         subject: email.subject,
         textContent: email.textContent,
@@ -187,7 +195,12 @@ export async function processLiveZoomTickets(limit = 2, targetTicketId?: number,
         : error instanceof Error && error.message === "inactive_plus" ? "inactive_plus"
         : emailAttempted ? "delivery_uncertain" : "delivery_retryable";
       await db.update(liveOctoberTickets).set({ zoomLastError: category }).where(eq(liveOctoberTickets.id, id));
-      console.warn(`[LiveZoom] ticket ${id}: ${category}`);
+      const message = error instanceof Error ? error.message : "";
+      const safeStatus = /^Zoom (GET|POST|PUT|OAuth) failed \(\d{3}\)$/.test(message) ? message : "";
+      const safeReason = message === "Approved Zoom join URL unavailable" ? "approved_join_not_visible"
+        : message === "Zoom registrant ID unavailable" ? "registrant_id_not_visible"
+        : error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError") ? "upstream_timeout" : "";
+      console.warn(`[LiveZoom] ticket ${id}: ${category}; phase=${phase}${safeStatus ? `; ${safeStatus}` : ""}${safeReason ? `; reason=${safeReason}` : ""}`);
     } finally {
       await db.update(liveOctoberTickets).set({ zoomClaimedUntil: null }).where(eq(liveOctoberTickets.id, id));
     }
