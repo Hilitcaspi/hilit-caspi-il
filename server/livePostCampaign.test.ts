@@ -2,11 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   LIVE_POST_CAMPAIGN_KEY,
   LIVE_POST_SEND_NOT_BEFORE,
+  LIVE_POST_SEND_EXPIRES_AT,
+  isLivePostSendWindow,
   planLivePostAudience,
   readLivePostCampaignPreview,
   runLivePostCampaign,
   type LivePostRawAudience,
 } from "./livePostCampaign";
+import { LIVE_POST_OFFER_START } from "../shared/livePostOffer";
 
 const NOW = LIVE_POST_SEND_NOT_BEFORE + 1_000;
 const raw = (overrides: Partial<LivePostRawAudience> = {}): LivePostRawAudience => ({
@@ -221,6 +224,15 @@ describe("live post campaign audience", () => {
 });
 
 describe("live post campaign delivery guards", () => {
+  it("shares the owner-approved offer start and preserves the expiry boundary", () => {
+    expect(LIVE_POST_SEND_NOT_BEFORE).toBe(LIVE_POST_OFFER_START);
+    expect(LIVE_POST_SEND_NOT_BEFORE).toBe(Date.parse("2026-10-31T21:20:29+02:00"));
+    expect(isLivePostSendWindow(LIVE_POST_SEND_NOT_BEFORE - 1)).toBe(false);
+    expect(isLivePostSendWindow(LIVE_POST_SEND_NOT_BEFORE)).toBe(true);
+    expect(isLivePostSendWindow(LIVE_POST_SEND_EXPIRES_AT)).toBe(true);
+    expect(isLivePostSendWindow(LIVE_POST_SEND_EXPIRES_AT + 1)).toBe(false);
+  });
+
   it("fails closed without reading or writing outside the Jerusalem send window", async () => {
     const readRawAudience = vi.fn(async () => raw());
     const getDb = vi.fn();

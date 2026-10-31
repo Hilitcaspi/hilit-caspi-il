@@ -37,7 +37,7 @@ const completeProfile = {
 
 describe("live post-event offer policy", () => {
   it("uses the exact Israel-time inclusive start and exclusive midnight cutoff", () => {
-    expect(new Date(LIVE_POST_OFFER_START).toISOString()).toBe("2026-10-31T19:30:00.000Z");
+    expect(new Date(LIVE_POST_OFFER_START).toISOString()).toBe("2026-10-31T19:20:29.000Z");
     expect(new Date(LIVE_POST_OFFER_END).toISOString()).toBe("2026-11-01T22:00:00.000Z");
     expect(isLivePostOfferPaymentTime(LIVE_POST_OFFER_START - 1)).toBe(false);
     expect(isLivePostOfferPaymentTime(LIVE_POST_OFFER_START)).toBe(true);

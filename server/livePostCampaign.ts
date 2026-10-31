@@ -10,6 +10,7 @@ import { buildLivePostEmail, type LivePostEmailVariant } from "./livePostEmail";
 import { hasActivePlusCouponEntitlement } from "./couponPolicy";
 import { injectRecoveryTracking } from "./purchaseRecoveryCampaign";
 import { hasPaidDatabaseMembership } from "../shared/plusDatabaseEligibility";
+import { LIVE_POST_OFFER_START } from "../shared/livePostOffer";
 
 /**
  * One scoped after-live marketing email only. This file deliberately does not
@@ -19,7 +20,7 @@ import { hasPaidDatabaseMembership } from "../shared/plusDatabaseEligibility";
  */
 export const LIVE_POST_CAMPAIGN_KEY = "live_2026_10_31_after";
 export const LIVE_POST_EVENT_SLUG = LIVE_OCTOBER_SLUG;
-export const LIVE_POST_SEND_NOT_BEFORE = Date.parse("2026-10-31T21:30:00+02:00");
+export const LIVE_POST_SEND_NOT_BEFORE = LIVE_POST_OFFER_START;
 export const LIVE_POST_SEND_EXPIRES_AT = Date.parse("2026-11-01T23:59:59+02:00");
 const DATABASE_JOURNEY = `${LIVE_POST_CAMPAIGN_KEY}:database`;
 const PLUS_JOURNEY = `${LIVE_POST_CAMPAIGN_KEY}:plus`;
@@ -478,7 +479,7 @@ export function isLivePostSendWindow(now: number): boolean {
 
 function assertLivePostWindow(now: number): void {
   if (!isLivePostSendWindow(now)) {
-    throw new Error("Live post campaign is allowed only from 2026-10-31 21:30 through 2026-11-01 23:59:59 Asia/Jerusalem");
+    throw new Error("Live post campaign is allowed only from the owner-approved offer start through 2026-11-01 23:59:59 Asia/Jerusalem");
   }
 }
 

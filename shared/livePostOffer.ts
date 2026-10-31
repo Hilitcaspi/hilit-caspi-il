@@ -5,7 +5,8 @@ import { hasPreviouslyActivatedPlus } from "./plusWednesdayOffer";
  * entitlements only: neither code changes a product price or activates a
  * global discount-coupon row.
  */
-export const LIVE_POST_OFFER_START = Date.parse("2026-10-31T21:30:00+02:00");
+// The owner ended the live and explicitly advanced the send at 21:20:29 Israel time.
+export const LIVE_POST_OFFER_START = Date.parse("2026-10-31T21:20:29+02:00");
 export const LIVE_POST_OFFER_END = Date.parse("2026-11-02T00:00:00+02:00");
 export const LIVE_POST_DATABASE_CODE = "LIVE48" as const;
 export const LIVE_POST_PLUS_CODE = "LIVEPLUS" as const;
