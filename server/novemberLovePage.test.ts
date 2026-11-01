@@ -37,6 +37,13 @@ describe("November Love Bundle campaign pages", () => {
     expect(landing).toContain("showCoupon={false}");
   });
 
+  it("omits the extra checkout explanation while retaining the standard payment form", () => {
+    expect(landing).not.toContain("הקופה המאובטחת תבקש את הפרטים הדרושים להצטרפות");
+    expect(landing).toContain("<GrowWallet");
+    expect(landing).toContain("product={NOVEMBER_BUNDLE_PRODUCT}");
+    expect(landing).toContain('termsPath="/terms/november-love"');
+  });
+
   it("has an expiry-based disabled checkout state and no manufactured countdown", () => {
     expect(landing).toContain("offerActive ?");
     expect(landing).toContain("הטבת נובמבר הסתיימה");

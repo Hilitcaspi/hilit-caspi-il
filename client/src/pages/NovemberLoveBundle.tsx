@@ -403,9 +403,6 @@ export default function NovemberLoveBundle() {
               <>
                 <p className="text-sm font-black text-[#5e4b5a]">פרטי ההצטרפות</p>
                 <h3 className="mt-2 text-2xl font-black text-[#171519]">מאגר וקורס ב־{NOVEMBER_BUNDLE_PRICE} ₪</h3>
-                <div className="mt-5 rounded-2xl bg-[#f1e9ed] p-4 text-sm leading-7 text-[#594b57]">
-                  הקופה המאובטחת תבקש את הפרטים הדרושים להצטרפות. בתשלום אחד, ללא מנוי וללא הפעלת Plus.
-                </div>
                 <div className="november-love-wallet mt-6">
                   <GrowWallet
                     product={NOVEMBER_BUNDLE_PRODUCT}
