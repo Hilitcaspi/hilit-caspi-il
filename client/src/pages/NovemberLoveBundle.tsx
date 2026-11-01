@@ -24,7 +24,7 @@ import {
   isNovemberBundleOfferActive,
 } from "@shared/novemberBundleOffer";
 
-const HERO_IMAGE = "/manus-storage/hilit-bundle-standing_b180bb60.jpeg";
+const HERO_IMAGE = "/manus-storage/hilit-smiling-portrait_cddd0dfc.jpg";
 const ABOUT_IMAGE = "/manus-storage/hilit-bundle-close-portrait_85abe6c9.jpeg";
 const PROFILE_FALLBACK =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
@@ -76,7 +76,7 @@ const faqs = [
   {
     question: "מתי מתקבלת הצעת ההתאמה הראשונה?",
     answer:
-      "התהליך מתחיל לאחר אישור התשלום והשלמת הפרופיל, התמונה, השאלונים וההעדפות.",
+      "בתוך 3 ימים מאישור התשלום והשלמת הפרופיל, התמונה, השאלונים וההעדפות. ההטבה היא להצעת התאמה, לא הבטחה לדייט או לזוגיות.",
   },
   {
     question: "איך נראית התאמה במאגר?",
@@ -137,7 +137,7 @@ function Portrait({
       }}
       className={
         hero
-          ? "h-full min-h-[620px] w-full object-cover object-top"
+          ? "absolute inset-0 h-full w-full object-cover object-[50%_24%]"
           : "h-full min-h-[420px] w-full object-cover object-top"
       }
     />
@@ -347,66 +347,71 @@ export default function NovemberLoveBundle() {
         </div>
       </nav>
 
-      <header className="relative isolate min-h-[100svh] overflow-hidden bg-[#d2c3cd] pt-24 md:pt-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(255,253,249,.83),transparent_31%),radial-gradient(circle_at_82%_88%,rgba(111,89,105,.20),transparent_35%)]" />
-        <div className="relative mx-auto grid min-h-[100svh] max-w-[1440px] items-stretch lg:grid-cols-[1.02fr_.98fr]">
-          <div className="order-1 flex items-center px-5 py-10 md:px-10 md:py-16 lg:px-16 xl:px-24">
+      <header className="relative isolate overflow-hidden bg-[#eee5ee] px-5 pb-10 pt-24 md:px-9 md:pb-12 md:pt-28" data-testid="november-hero">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,253,249,.78),transparent_60%),radial-gradient(circle_at_85%_90%,rgba(160,132,158,.22),transparent_55%)]" />
+        <div className="relative mx-auto grid max-w-[1320px] items-center gap-8 lg:grid-cols-[.98fr_1.02fr] lg:gap-12 xl:gap-16">
+          <div className="order-1 py-2 lg:py-4">
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22 }}
-              className="november-love-motion max-w-2xl"
+              className="november-love-motion mx-auto max-w-[610px] lg:mx-0"
             >
-              <p className="inline-flex items-center gap-2 rounded-full border border-[#171519]/12 bg-[#fffdf9]/64 px-4 py-2 text-xs font-black text-[#4e404d] backdrop-blur-sm">
-                <Sparkles className="h-3.5 w-3.5" /> הטבה חד־פעמית. מצטרפים עכשיו.
+              <p className="inline-flex items-center gap-2 text-sm font-bold text-[#76516d]">
+                <Sparkles className="h-4 w-4" /> הטבת נובמבר. חד־פעמית.
               </p>
-              <h1 className="mt-7 text-[2.65rem] font-black leading-[1.04] tracking-[-0.05em] text-[#171519] sm:text-6xl md:text-7xl lg:text-[4.65rem]">
-                לא עוד גלילה.
-                <span className="mt-3 block text-[#614a5d]">
-                  היכרות שנבדקת לעומק.
-                </span>
+              <h1 className="mt-5 text-[2.55rem] font-black leading-[1.08] tracking-[-0.045em] text-[#171519] sm:text-[3.2rem] lg:text-[clamp(2.5rem,3.9vw,3.65rem)]">
+                בנובמבר אני נותנת
+                <span className="mt-1 block text-[#68465e]">גז על ההתאמות.</span>
               </h1>
-              <p className="mt-7 max-w-xl text-lg font-bold leading-8 text-[#3f3440] md:text-xl md:leading-9">
-                מאגר ב־349 ₪ וקורס מלא במתנה. היכרות לאנשים שרוצים זוגיות,
-                עם התאמות שנבחנות אישית.
+              <p className="mt-5 max-w-xl text-[1.05rem] leading-7 text-[#4b3d49] md:text-lg md:leading-8">
+                זו ההזדמנות להצטרף למאגר הרווקים והרווקות שלי: אנשים
+                שמחפשים זוגיות רצינית, עם התאמות שאני בודקת אישית.
               </p>
-              <div className="november-live-glow relative mt-6 rounded-[1.5rem] border border-[#171519]/13 bg-[#171519] p-4 text-[#fffdf9] shadow-[0_18px_44px_rgba(23,21,25,.18)]">
-                <div className="relative z-10 flex items-start gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#d2c3cd] text-[#171519]">
-                    <Clock3 className="h-5 w-5" />
-                  </span>
+              <div className="mt-6 rounded-[1.4rem] border border-white/80 bg-[#fffdf9]/85 p-5 shadow-[0_12px_40px_rgba(77,46,69,.06)]" data-testid="november-hero-offer">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
                   <div>
-                    <p className="text-lg font-black leading-6">
-                      הצעת התאמה ראשונה בתוך 3 ימים!
-                    </p>
-                    <p className="mt-1 text-xs font-bold leading-5 text-white/76">
-                      מאישור התשלום והשלמת הפרופיל והשאלונים.
-                    </p>
+                    <p className="text-sm font-bold text-[#65515f]">מצטרפים למאגר</p>
+                    <div className="mt-1 flex items-baseline gap-3">
+                      <span className="text-[2.65rem] font-black leading-none tracking-[-.04em] text-[#171519]">{NOVEMBER_BUNDLE_PRICE} ₪</span>
+                      <span className="text-base text-[#877983] line-through">499 ₪</span>
+                    </div>
+                  </div>
+                  <div className="border-r-2 border-[#c7b0c1] pr-5">
+                    <p className="text-sm font-bold text-[#785469]">ובמתנה עם ההצטרפות</p>
+                    <p className="mt-1 text-lg font-black leading-7">הקורס המלא ״המסע לזוגיות״</p>
                   </div>
                 </div>
+                <p className="mt-3 border-t border-[#c7b0c1]/35 pt-3 text-xs text-[#785469] lg:hidden">שווי ההטבה: 647 ₪, לפי הערך המקורי</p>
               </div>
-              <div className="mt-6 max-w-xl">
-                <OfferPrice />
+              <div className="mt-5 flex items-start gap-3 text-[#68465e]">
+                <span className="november-live-glow relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#68465e] text-white shadow-[0_0_22px_rgba(138,85,128,.28)]">
+                  <Clock3 className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-base font-black leading-6 md:text-lg">הצעת התאמה ראשונה בתוך 3 ימים!</p>
+                  <p className="mt-0.5 text-xs leading-5 text-[#6b5a67]">מאישור התשלום והשלמת הפרופיל והשאלונים.</p>
+                </div>
               </div>
-              <div className="mt-7 flex flex-col items-stretch gap-3 sm:items-start">
+              <div className="mt-5 flex flex-col items-stretch gap-3 sm:items-start">
                 <button
                   type="button"
                   onClick={() => openCheckout("hero")}
-                  className="inline-flex min-h-15 w-full items-center justify-center gap-3 rounded-full bg-[#171519] px-7 py-4 text-base font-black text-[#fffdf9] shadow-[0_18px_40px_rgba(23,21,25,.2)] transition hover:-translate-y-0.5 hover:bg-[#332d31] active:scale-[.98] sm:w-auto sm:text-lg"
+                  className="inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-full bg-[#171519] px-7 py-4 text-base font-black text-[#fffdf9] shadow-[0_12px_30px_rgba(23,21,25,.15)] transition hover:-translate-y-0.5 hover:bg-[#332d31] active:scale-[.98] sm:text-lg"
                 >
-                  להצטרפות עכשיו ב־349 ₪ <ArrowDown className="h-5 w-5" />
+                  להצטרפות למאגר ב־349 ₪ <ArrowDown className="h-5 w-5" />
                 </button>
                 <a
                   href={dnaOfferHref}
                   onClick={() => trackDnaClick("hero_secondary")}
-                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#614a5d]/35 bg-[#fffdf9] px-5 py-3 text-sm font-black text-[#4d3848] shadow-[0_8px_20px_rgba(97,74,93,.12)] transition hover:border-[#614a5d]/65 hover:bg-white active:scale-[.98]"
+                  className="inline-flex min-h-10 items-center justify-center px-2 text-sm font-bold text-[#624558] underline decoration-[#624558]/40 underline-offset-4 transition hover:text-[#171519] sm:self-center"
                 >
-                  לא בטוחים? מתחילים בשאלון DNA חינמי
+                  מעדיפים להתחיל בשאלון DNA חינמי? מתחילים כאן
                 </a>
               </div>
-              <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-[#594c57]">
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[#6a5864]">
                 <span className="inline-flex items-center gap-1.5">
-                  <LockKeyhole className="h-3.5 w-3.5" /> תשלום חד־פעמי מאובטח
+                  <LockKeyhole className="h-3.5 w-3.5" /> תשלום חד־פעמי, ללא מנוי
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5" /> {PLUS_EXCLUSION}
@@ -414,22 +419,23 @@ export default function NovemberLoveBundle() {
               </div>
             </motion.div>
           </div>
-
           <motion.div
             initial={{ opacity: 0, scale: 1.015 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.22, delay: 0.04 }}
-            className="november-love-motion relative order-2 min-h-[540px] overflow-hidden lg:min-h-[100svh]"
+            className="november-love-motion relative order-2 mx-auto aspect-square w-full max-w-[610px] overflow-hidden rounded-[1.8rem] bg-[#c8b9c2] shadow-[0_24px_65px_rgba(74,46,66,.14)] lg:aspect-[4/5] lg:max-h-[740px] lg:rounded-[2rem]"
+            data-testid="november-hero-photo"
           >
             <Portrait src={HERO_IMAGE} alt="הילית כספי" hero />
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(23,21,25,.04)_30%,rgba(23,21,25,.42)_100%)]" />
-            <div className="absolute inset-x-5 bottom-6 rounded-[1.4rem] border border-white/25 bg-[#171519]/68 px-5 py-4 text-[#fffdf9] shadow-2xl backdrop-blur-md md:inset-x-8 md:bottom-9">
-              <p className="text-xs font-bold text-[#e9dfe5]">
-                מאגר עם מבט אנושי
-              </p>
-              <p className="mt-1 text-lg font-black leading-7">
-                פרופיל, שאלונים, שיקול דעת, והסכמה של שני הצדדים.
-              </p>
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,rgba(23,21,25,.35)_100%)]" />
+            <div className="absolute left-6 top-6 hidden rounded-[1.25rem] border border-white/75 bg-[#fffdf9]/92 px-5 py-4 text-center shadow-[0_8px_28px_rgba(23,21,25,.10)] backdrop-blur-md lg:block">
+              <p className="text-xs font-bold text-[#785469]">שווי ההטבה</p>
+              <p className="mt-1 text-3xl font-black tracking-[-.04em]">647 ₪</p>
+              <p className="mt-1 text-[10px] text-[#73616d]">לפי הערך המקורי</p>
+            </div>
+            <div className="absolute inset-x-5 bottom-5 text-white md:inset-x-7 md:bottom-7">
+              <p className="text-xl font-black">הילית כספי</p>
+              <p className="mt-1 text-sm text-white/90">מאמנת לזוגיות ושדכנית. אני כאן, מאחורי כל התאמה.</p>
             </div>
           </motion.div>
         </div>
@@ -451,10 +457,12 @@ export default function NovemberLoveBundle() {
               id="offer-title"
               className="mt-3 text-3xl font-black leading-tight tracking-[-.045em] text-[#171519] md:text-5xl"
             >
-              היכרות רצינית. בחירה מודעת.
+              המאגר פותח את ההיכרות.
+              <br />
+              הקורס מחדד את הבחירה.
             </h2>
             <p className="mt-5 text-base leading-8 text-[#625563] md:text-lg">
-              פרופיל מלא, שאלונים ובדיקה אישית לפני שמתקדמים.
+              אנשים חדשים להכיר, וכלים להבין עם מי באמת נכון לך להתקדם.
             </p>
           </motion.div>
           <div className="mt-12 grid gap-5 md:grid-cols-[1.07fr_.93fr]">
@@ -474,14 +482,15 @@ export default function NovemberLoveBundle() {
                   </span>
                 </h3>
                 <p className="mt-5 max-w-xl text-base leading-8 text-white/76">
-                  המאגר מיועד לאנשים שמחפשים זוגיות ברצינות. כל מצטרף או מצטרפת
-                  מתחילים בפרופיל ובתמונה, שאלון DNA זוגי, שאלון מדעי והעדפות
-                  שחשוב לכבד בתוך הקשר.
+                  יותר מ־5,000 רווקים ורווקות כבר הצטרפו למאגר שלי. אנשים
+                  שמחפשים זוגיות רצינית, לא עוד שיחה שנעלמת. אני עוברת על כל
+                  פרופיל, והמערכת בוחנת התאמה לפי ה־DNA הזוגי, השאלון המדעי,
+                  ההעדפות ואורח החיים.
                 </p>
                 <ul className="mt-7 grid gap-3 text-sm font-bold leading-6 text-white/88">
                   {[
-                    "המערכת מציעה אפשרויות על בסיס התמונה המלאה",
-                    "הילית קוראת את הפרופילים ובוחנת אישית כל הצעה",
+                    "לא צריך לגלול בין פרופילים. הצעות ההתאמה מגיעות במייל",
+                    "אני בודקת כל פרופיל וכל הצעה לפני השליחה",
                     "פרטי קשר נחשפים רק אחרי אישור במייל של שני הצדדים",
                   ].map(item => (
                     <li key={item} className="flex gap-3">
@@ -507,16 +516,16 @@ export default function NovemberLoveBundle() {
                   ״המסע לזוגיות״
                 </h3>
                 <p className="mt-5 max-w-xl text-base leading-8 text-[#443842]">
-                  טקסטים, שאלות ותרגילים שמלווים את העבודה האישית; חוברת עבודה
-                  ומפה זוגית אישית שמרכזת את מה שמתגלה בדרך. לא תחליף לליווי
-                  פרטי, אלא חומר מסודר שאפשר לעבוד איתו בקצב שלך.
+                  למה אותו סוג קשר חוזר שוב? איך מבדילים בין משיכה להתאמה?
+                  חמישה מודולים עם טקסטים ותרגילים, חוברת עבודה ומפה זוגית
+                  אישית שיעזרו לזהות דפוסים, להבין מה חשוב לך ולבחור אחרת.
                 </p>
                 <div className="mt-7 rounded-2xl border border-[#171519]/10 bg-[#fffdf9]/55 p-4">
                   <p className="text-xs font-black text-[#655260]">
                     הקורס המלא במתנה
                   </p>
                   <p className="mt-1 text-xs leading-5 text-[#665965]">
-                    שני כלים להצטרפות אחת.
+                    כל התוכן פתוח אחרי אישור התשלום, בקצב שלך.
                   </p>
                 </div>
               </div>
@@ -650,7 +659,9 @@ export default function NovemberLoveBundle() {
                 id="method-title"
                 className="mt-3 text-4xl font-black leading-[1.05] tracking-[-.05em] text-[#171519] md:text-6xl"
               >
-                המערכת מוצאת אפשרויות. אדם בודק אם הן ראויות להיכרות.
+                המערכת מציעה.
+                <br />
+                אני בודקת אישית.
               </h2>
             </div>
             <p className="max-w-2xl text-lg leading-9 text-[#554854]">
@@ -665,7 +676,7 @@ export default function NovemberLoveBundle() {
               {
                 icon: ScanSearch,
                 number: "01",
-                title: "ממלאים תמונה מלאה",
+                title: "בונים פרופיל מלא",
                 copy: "פרופיל, תמונה, שאלון DNA, שאלון מדעי והעדפות. רק כשהכול הושלם אפשר להתחיל לבחון התאמה.",
               },
               {
@@ -722,18 +733,22 @@ export default function NovemberLoveBundle() {
                 id="three-days-title"
                 className="mt-3 text-4xl font-black leading-tight tracking-[-.05em] md:text-5xl"
               >
-                מתחילים בתהליך.
+                מצטרפים עכשיו.
+                <br />
+                ההצעה הראשונה בתוך 3 ימים.
               </h2>
             </div>
             <div className="relative z-10 p-8 md:p-11">
               <p className="max-w-2xl text-lg font-bold leading-8 text-white/85">
-                אחרי אישור התשלום והשלמת הפרופיל, התמונה, השאלונים וההעדפות.
+                לכבוד נובמבר אני נותנת גז על ההתאמות. מתחילים אחרי אישור
+                התשלום והשלמת הפרופיל, התמונה, השאלונים וההעדפות, והצעת ההתאמה
+                הראשונה מגיעה בתוך 3 ימים.
               </p>
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
                 {[
                   "אישור תשלום",
                   "פרופיל, תמונה, שאלונים והעדפות",
-                  "מתחילים בתהליך",
+                  "הצעת התאמה ראשונה במייל",
                 ].map((item, index) => (
                   <div
                     key={item}
