@@ -842,23 +842,6 @@ export default function CRMMatchmaking() {
     [singles],
   );
 
-  if (loading) {
-    return <div className="min-h-screen bg-[#f0eadc] flex items-center justify-center" dir="rtl"><div className="text-[#191265]">טוענת...</div></div>;
-  }
-
-  if (!user || user.role !== "admin") {
-    return (
-      <div className="min-h-screen bg-[#191265] flex items-center justify-center" dir="rtl">
-        <div className="text-center bg-white rounded-3xl p-10 shadow-2xl max-w-sm mx-4">
-          <div className="text-5xl mb-4">🔐</div>
-          <h1 className="text-2xl font-black text-[#191265] mb-2">ניהול מאגר</h1>
-          <a href="/team/login" className="block bg-[#191265] text-white font-bold text-lg px-8 py-4 rounded-2xl text-center mt-4">כניסת צוות</a>
-          <a href={getLoginUrl()} className="block text-[#727272] text-sm mt-3 underline">כניסה עם Manus</a>
-        </div>
-      </div>
-    );
-  }
-
   const typedSingles = (singles as unknown) as Array<{
     id: number; firstName: string; lastName?: string | null; gender: string; age: number;
     city?: string | null; dnaType?: string | null; occupation?: string | null;
@@ -1132,6 +1115,7 @@ export default function CRMMatchmaking() {
     // A November queue link may nominate only person A. The existing
     // compatibility workflow still requires staff to choose person B and press
     // its explicit check/send controls; this never runs a comparison or a send.
+    if (loading || !user || user.role !== "admin") return;
     if (activeTab !== "compatibility" || selectedSingle === null || compatPersonA === selectedSingle) return;
     if (!allSinglesForCompat.some(single => single.id === selectedSingle)) return;
     manualPreviewGeneration.current += 1;
@@ -1141,7 +1125,27 @@ export default function CRMMatchmaking() {
     setCompatDropdownA(false);
     setCompatResult(null);
     setCompatNarrativeLoading(false);
-  }, [activeTab, allSinglesForCompat, compatPersonA, selectedSingle]);
+  }, [loading, user?.role, activeTab, allSinglesForCompat, compatPersonA, selectedSingle]);
+
+  // All hooks must run before either auth branch returns, including the
+  // November deep-link effect. Otherwise loading -> admin adds a hook (React310).
+  if (loading) {
+    return <div className="min-h-screen bg-[#f0eadc] flex items-center justify-center" dir="rtl"><div className="text-[#191265]">טוענת...</div></div>;
+  }
+
+  if (!user || user.role !== "admin") {
+    return (
+      <div className="min-h-screen bg-[#191265] flex items-center justify-center" dir="rtl">
+        <div className="text-center bg-white rounded-3xl p-10 shadow-2xl max-w-sm mx-4">
+          <div className="text-5xl mb-4">🔐</div>
+          <h1 className="text-2xl font-black text-[#191265] mb-2">ניהול מאגר</h1>
+          <a href="/team/login" className="block bg-[#191265] text-white font-bold text-lg px-8 py-4 rounded-2xl text-center mt-4">כניסת צוות</a>
+          <a href={getLoginUrl()} className="block text-[#727272] text-sm mt-3 underline">כניסה עם Manus</a>
+        </div>
+      </div>
+    );
+  }
+
   const isCurrentManualPreview = (result: any) => {
     const identity = result?.__previewIdentity;
     return Boolean(
