@@ -24,7 +24,7 @@ import {
   isNovemberBundleOfferActive,
 } from "@shared/novemberBundleOffer";
 
-const HERO_IMAGE = "/manus-storage/hilit-smiling-portrait_cddd0dfc.jpg";
+const HERO_IMAGE = "/manus-storage/hilit-standing-close-restored_ffd66094.webp";
 const ABOUT_IMAGE = "/manus-storage/hilit-bundle-close-portrait_85abe6c9.jpeg";
 const PROFILE_FALLBACK =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";

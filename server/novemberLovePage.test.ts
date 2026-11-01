@@ -88,7 +88,8 @@ describe("November Love Bundle campaign pages", () => {
   });
 
   it("keeps the campaign portrait use to a hero and one lazy below-fold about portrait", () => {
-    expect(landing).toContain("hilit-smiling-portrait_cddd0dfc.jpg");
+    expect(landing).toContain("hilit-standing-close-restored_ffd66094.webp");
+    expect(landing).not.toContain("hilit-smiling-portrait_cddd0dfc.jpg");
     expect(landing).not.toContain("hilit-bundle-standing_b180bb60.jpeg");
     expect(landing).toContain('data-testid="november-hero-photo"');
     expect(landing).toContain('lg:aspect-[4/5]');
