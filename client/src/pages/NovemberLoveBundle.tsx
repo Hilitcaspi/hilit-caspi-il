@@ -19,7 +19,6 @@ import { track } from "@/lib/track";
 import { trpc } from "@/lib/trpc";
 import { NOVEMBER_APPROVED_TESTIMONIALS } from "@shared/novemberApprovedTestimonials";
 import {
-  NOVEMBER_BUNDLE_EXPIRES_AT,
   NOVEMBER_BUNDLE_PRICE,
   NOVEMBER_BUNDLE_PRODUCT,
   isNovemberBundleOfferActive,
@@ -29,8 +28,6 @@ const HERO_IMAGE = "/manus-storage/hilit-bundle-standing_b180bb60.jpeg";
 const ABOUT_IMAGE = "/manus-storage/hilit-bundle-close-portrait_85abe6c9.jpeg";
 const PROFILE_FALLBACK =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
-const FIRST_MATCH_LIMITATION =
-  "אין התחייבות לדייט, לקבלת ההצעה, להסכמה הדדית, לזוגיות או לקצב קבוע אחר כך";
 const PLUS_EXCLUSION = "Plus לא כלול ולא מופעל אוטומטית";
 
 const fadeUp = {
@@ -74,27 +71,27 @@ const faqs = [
   {
     question: "מה כלול בהטבת נובמבר?",
     answer:
-      "לראשונה: המאגר ב־349 ₪ במקום 499 ₪, עם הקורס המלא ״המסע לזוגיות״ במתנה. Plus אינו כלול ואינו מופעל אוטומטית.",
+      "המאגר ב־349 ₪ במקום 499 ₪, עם הקורס המלא ״המסע לזוגיות״ במתנה. Plus לא כלול.",
   },
   {
     question: "מתי מתקבלת הצעת ההתאמה הראשונה?",
     answer:
-      "עד 3 ימים קלנדריים אחרי שהתשלום אושר וגם הושלמו הפרופיל, התמונה, השאלונים וההעדפות. זו הצעת התאמה ראשונה, לא התחייבות לדייט, לקשר או להסכמה של אדם אחר.",
+      "התהליך מתחיל לאחר אישור התשלום והשלמת הפרופיל, התמונה, השאלונים וההעדפות.",
   },
   {
     question: "איך נראית התאמה במאגר?",
     answer:
-      "המערכת מציעה אפשרויות על בסיס הפרופיל, התמונה, שאלון ה־DNA, השאלון המדעי וההעדפות. הילית בוחנת אישית את הפרופילים ואת ההצעות, ופרטי קשר נחשפים רק אחרי אישור במייל של שני האנשים.",
+      "המערכת מציעה על בסיס הפרופיל, התמונה, שאלון ה־DNA, השאלון המדעי וההעדפות. הילית בוחנת אישית, ופרטים נחשפים רק לאחר אישור של שני הצדדים.",
   },
   {
     question: "האם יש מספר קבוע של התאמות?",
     answer:
-      "לא. אין תדירות קבועה או מכסה קבועה. ההצעות נשלחות כשיש בסיס אמיתי לשני הצדדים, ולא כדי לייצר כמות.",
+      "לא. הצעות נשלחות כשיש בסיס אמיתי לשני הצדדים, לא כדי לייצר כמות.",
   },
   {
     question: "מהו הקורס שמתקבל במתנה?",
     answer:
-      "זהו הקורס הדיגיטלי המלא ״המסע לזוגיות״: טקסטים, שאלות ותרגילים, חוברת עבודה ומפה זוגית אישית. ערכו המקורי הוא 497 ₪; בעמוד הקורס הוא מוצע כיום במחיר נפרד של 249 ₪.",
+      "זהו הקורס הדיגיטלי המלא ״המסע לזוגיות״: טקסטים, שאלות ותרגילים, חוברת עבודה ומפה זוגית אישית.",
   },
 ];
 
@@ -147,7 +144,13 @@ function Portrait({
   );
 }
 
-function OfferPrice({ compact = false }: { compact?: boolean }) {
+function OfferPrice({
+  compact = false,
+  showValueDetails = compact,
+}: {
+  compact?: boolean;
+  showValueDetails?: boolean;
+}) {
   return (
     <div
       className={`rounded-[1.6rem] border border-[#171519]/10 bg-[#fffdf9]/88 shadow-[0_18px_55px_rgba(50,39,48,.11)] backdrop-blur-sm ${compact ? "p-5" : "p-6 md:p-7"}`}
@@ -155,10 +158,10 @@ function OfferPrice({ compact = false }: { compact?: boolean }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-black tracking-[0.08em] text-[#6e5868]">
-            הצעת נובמבר
+            הטבה חד־פעמית
           </p>
           <p className="mt-2 text-sm font-bold leading-6 text-[#423842]">
-            לראשונה: המאגר ב־349 ₪ עם הקורס המלא במתנה
+            המאגר ב־349 ₪ והקורס המלא במתנה
           </p>
         </div>
         <span className="rounded-full bg-[#171519] px-3 py-1.5 text-xs font-black text-[#fffdf9]">
@@ -177,18 +180,17 @@ function OfferPrice({ compact = false }: { compact?: boolean }) {
         <p className="text-lg font-black tracking-[-.02em] text-[#171519]">
           שווי ההטבה: 647 ₪
         </p>
-        <p className="mt-1 text-xs leading-5 text-[#5e4d5b]">
-          מבוסס על המחירים המקוריים: 150 ₪ הנחה על המאגר + קורס בערך מקורי של
-          497 ₪.
-        </p>
-      </div>
-      <div className="mt-4 border-t border-[#171519]/10 pt-4">
-        <p className="text-sm font-black text-[#3e313b]">
-          הקורס הדיגיטלי המלא ״המסע לזוגיות״ במתנה
-        </p>
-        <p className="mt-1 text-xs leading-6 text-[#655866]">
-          ערך מקורי 497 ₪. בעמוד הקורס הוא מוצע כיום ב־249 ₪ כמחיר נפרד.
-        </p>
+        {showValueDetails ? (
+          <details className="mt-2 text-xs leading-5 text-[#5e4d5b]">
+            <summary className="cursor-pointer font-black underline decoration-[#765d70]/45 underline-offset-2">
+              פירוט השווי
+            </summary>
+            <p className="mt-2">
+              150 ₪ הנחה על המאגר + קורס בערך מקורי של 497 ₪. הקורס מוצע כיום
+              בנפרד ב־249 ₪.
+            </p>
+          </details>
+        ) : null}
       </div>
     </div>
   );
@@ -207,6 +209,7 @@ function getDnaOfferHref() {
 
 export default function NovemberLoveBundle() {
   const checkoutRef = useRef<HTMLElement>(null);
+  const checkoutFormRef = useRef<HTMLDivElement>(null);
   const [offerActive] = useState(() => isNovemberBundleOfferActive());
   const { data: approvedTestimonials = [] } =
     trpc.publicProof.approvedTestimonials.useQuery(undefined, {
@@ -220,8 +223,7 @@ export default function NovemberLoveBundle() {
 
   useEffect(() => {
     document.title = "הטבת נובמבר לזוגיות | הילית כספי";
-    const description =
-      "לראשונה: מאגר הרווקים והרווקות ב־349 ₪ במקום 499 ₪, עם הקורס המלא המסע לזוגיות במתנה. בתוקף בישראל עד 30.11.2026.";
+    const description = "הטבה חד־פעמית: מאגר הרווקים והרווקות ב־349 ₪ במקום 499 ₪, עם הקורס המלא במתנה. מצטרפים עכשיו ומתחילים להכיר אחרת.";
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
       meta = document.createElement("meta");
@@ -257,10 +259,12 @@ export default function NovemberLoveBundle() {
         placement,
       },
     });
-    checkoutRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
+    const target = checkoutFormRef.current ?? checkoutRef.current;
+    target?.scrollIntoView({
+      behavior: "instant",
+      block: "start",
     });
+    checkoutFormRef.current?.focus({ preventScroll: true });
   };
 
   const trackDnaClick = (placement: string) => {
@@ -274,16 +278,6 @@ export default function NovemberLoveBundle() {
       },
     });
   };
-
-  const deadline = new Date(NOVEMBER_BUNDLE_EXPIRES_AT - 1).toLocaleDateString(
-    "he-IL",
-    {
-      timeZone: "Asia/Jerusalem",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }
-  );
 
   return (
     <main
@@ -334,13 +328,22 @@ export default function NovemberLoveBundle() {
           >
             הילית כספי
           </a>
-          <button
-            type="button"
-            onClick={() => openCheckout("navigation")}
-            className="rounded-full border border-[#171519]/15 bg-[#fffdf9]/75 px-4 py-2.5 text-xs font-black text-[#171519] backdrop-blur transition hover:bg-white md:px-5 md:text-sm"
-          >
-            להצטרפות בנובמבר
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={dnaOfferHref}
+              onClick={() => trackDnaClick("navigation_secondary")}
+              className="rounded-full px-2 py-2.5 text-xs font-black text-[#4d3848] underline underline-offset-4 transition hover:text-[#171519] md:text-sm"
+            >
+              DNA חינמי
+            </a>
+            <button
+              type="button"
+              onClick={() => openCheckout("navigation")}
+              className="rounded-full border border-[#171519]/15 bg-[#fffdf9]/75 px-4 py-2.5 text-xs font-black text-[#171519] backdrop-blur transition hover:bg-white md:px-5 md:text-sm"
+            >
+              להצטרפות עכשיו
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -355,8 +358,7 @@ export default function NovemberLoveBundle() {
               className="november-love-motion max-w-2xl"
             >
               <p className="inline-flex items-center gap-2 rounded-full border border-[#171519]/12 bg-[#fffdf9]/64 px-4 py-2 text-xs font-black text-[#4e404d] backdrop-blur-sm">
-                <Sparkles className="h-3.5 w-3.5" /> בתוקף בישראל, 1.11.2026 עד
-                30.11.2026
+                <Sparkles className="h-3.5 w-3.5" /> הטבה חד־פעמית. מצטרפים עכשיו.
               </p>
               <h1 className="mt-7 text-[2.65rem] font-black leading-[1.04] tracking-[-0.05em] text-[#171519] sm:text-6xl md:text-7xl lg:text-[4.65rem]">
                 לא עוד גלילה.
@@ -365,9 +367,8 @@ export default function NovemberLoveBundle() {
                 </span>
               </h1>
               <p className="mt-7 max-w-xl text-lg font-bold leading-8 text-[#3f3440] md:text-xl md:leading-9">
-                לראשונה: המאגר ב־349 ₪ עם הקורס המלא במתנה. אנשים שבאמת רוצים
-                זוגיות, התאמות שאני בוחנת אישית וכלים שיעזרו לך לבחור נכון.
-                לא עוד להישאר עם אותו חיפוש ואותן תוצאות.
+                מאגר ב־349 ₪ וקורס מלא במתנה. היכרות לאנשים שרוצים זוגיות,
+                עם התאמות שנבחנות אישית.
               </p>
               <div className="november-live-glow relative mt-6 rounded-[1.5rem] border border-[#171519]/13 bg-[#171519] p-4 text-[#fffdf9] shadow-[0_18px_44px_rgba(23,21,25,.18)]">
                 <div className="relative z-10 flex items-start gap-3">
@@ -379,8 +380,7 @@ export default function NovemberLoveBundle() {
                       הצעת התאמה ראשונה בתוך 3 ימים!
                     </p>
                     <p className="mt-1 text-xs font-bold leading-5 text-white/76">
-                      לאחר אישור התשלום והשלמת הפרופיל, התמונה והשאלונים
-                      וההעדפות.
+                      מאישור התשלום והשלמת הפרופיל והשאלונים.
                     </p>
                   </div>
                 </div>
@@ -394,14 +394,14 @@ export default function NovemberLoveBundle() {
                   onClick={() => openCheckout("hero")}
                   className="inline-flex min-h-15 w-full items-center justify-center gap-3 rounded-full bg-[#171519] px-7 py-4 text-base font-black text-[#fffdf9] shadow-[0_18px_40px_rgba(23,21,25,.2)] transition hover:-translate-y-0.5 hover:bg-[#332d31] active:scale-[.98] sm:w-auto sm:text-lg"
                 >
-                  להצטרפות ב־349 ₪ <ArrowDown className="h-5 w-5" />
+                  להצטרפות עכשיו ב־349 ₪ <ArrowDown className="h-5 w-5" />
                 </button>
                 <a
                   href={dnaOfferHref}
                   onClick={() => trackDnaClick("hero_secondary")}
-                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#171519]/18 bg-[#fffdf9]/66 px-5 py-3 text-sm font-black text-[#3f3440] transition hover:bg-white active:scale-[.98]"
+                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#614a5d]/35 bg-[#fffdf9] px-5 py-3 text-sm font-black text-[#4d3848] shadow-[0_8px_20px_rgba(97,74,93,.12)] transition hover:border-[#614a5d]/65 hover:bg-white active:scale-[.98]"
                 >
-                  קודם להבין מה מדויק לי? שאלון DNA חינמי
+                  לא בטוחים? מתחילים בשאלון DNA חינמי
                 </a>
               </div>
               <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-[#594c57]">
@@ -451,12 +451,10 @@ export default function NovemberLoveBundle() {
               id="offer-title"
               className="mt-3 text-3xl font-black leading-tight tracking-[-.045em] text-[#171519] md:text-5xl"
             >
-              מאגר שנבנה להיכרות רצינית, לצד דרך שמחזירה את הבחירה לידיים שלך.
+              היכרות רצינית. בחירה מודעת.
             </h2>
             <p className="mt-5 text-base leading-8 text-[#625563] md:text-lg">
-              מעל 5,000 רווקים ורווקות כבר הצטרפו לאורך הדרך. אנשים איכותיים,
-              עם חיים מלאים ורצון אמיתי להכיר. לא עוד רשימת תמונות שצריך
-              לנחש מה עומד מאחוריהן, אלא פרופיל מלא ובדיקה אישית של ההתאמה.
+              פרופיל מלא, שאלונים ובדיקה אישית לפני שמתקדמים.
             </p>
           </motion.div>
           <div className="mt-12 grid gap-5 md:grid-cols-[1.07fr_.93fr]">
@@ -514,12 +512,11 @@ export default function NovemberLoveBundle() {
                   פרטי, אלא חומר מסודר שאפשר לעבוד איתו בקצב שלך.
                 </p>
                 <div className="mt-7 rounded-2xl border border-[#171519]/10 bg-[#fffdf9]/55 p-4">
-                  <p className="text-xs font-black text-[#655260]">ערך הקורס</p>
-                  <p className="mt-1 text-xl font-black text-[#171519]">
-                    497 ₪
+                  <p className="text-xs font-black text-[#655260]">
+                    הקורס המלא במתנה
                   </p>
                   <p className="mt-1 text-xs leading-5 text-[#665965]">
-                    בעמוד הקורס הוא מוצע כיום ב־249 ₪ כמחיר נפרד.
+                    שני כלים להצטרפות אחת.
                   </p>
                 </div>
               </div>
@@ -719,25 +716,24 @@ export default function NovemberLoveBundle() {
             <div className="relative z-10 bg-[#c6b5c0] p-8 text-[#171519] md:p-11">
               <Clock3 className="h-9 w-9" />
               <p className="mt-8 text-sm font-black text-[#564452]">
-                התחייבות נובמבר
+                אחרי שהפרופיל מוכן
               </p>
               <h2
                 id="three-days-title"
                 className="mt-3 text-4xl font-black leading-tight tracking-[-.05em] md:text-5xl"
               >
-                הצעת התאמה ראשונה בתוך 3 ימים קלנדריים.
+                מתחילים בתהליך.
               </h2>
             </div>
             <div className="relative z-10 p-8 md:p-11">
               <p className="max-w-2xl text-lg font-bold leading-8 text-white/85">
-                הספירה מתחילה רק כשהפרופיל מוכן: לאחר אישור התשלום והשלמת
-                הפרופיל, התמונה, השאלונים וההעדפות.
+                אחרי אישור התשלום והשלמת הפרופיל, התמונה, השאלונים וההעדפות.
               </p>
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
                 {[
                   "אישור תשלום",
                   "פרופיל, תמונה, שאלונים והעדפות",
-                  "עד 3 ימים קלנדריים להצעה ראשונה",
+                  "מתחילים בתהליך",
                 ].map((item, index) => (
                   <div
                     key={item}
@@ -750,9 +746,6 @@ export default function NovemberLoveBundle() {
                   </div>
                 ))}
               </div>
-              <p className="mt-7 text-sm leading-7 text-white/60">
-                ההתחייבות היא להצעת התאמה ראשונה. {FIRST_MATCH_LIMITATION}.
-              </p>
             </div>
           </motion.div>
         </Reveal>
@@ -819,7 +812,7 @@ export default function NovemberLoveBundle() {
               הגישה לקורס והשלב הבא להשלמת ההצטרפות למאגר.
             </p>
             <div className="mt-7 max-w-md">
-              <OfferPrice compact />
+              <OfferPrice compact showValueDetails />
             </div>
             <a
               href={dnaOfferHref}
@@ -829,9 +822,11 @@ export default function NovemberLoveBundle() {
               רוצים קודם את שאלון ה־DNA החינמי? אפשר להתחיל כאן
             </a>
           </motion.div>
-          <motion.div
-            variants={fadeUp}
-            className="rounded-[2rem] border border-[#171519]/12 bg-[#fffdf9]/78 p-5 shadow-[0_26px_72px_rgba(71,49,65,.16)] backdrop-blur-sm md:p-8"
+          <div
+            ref={checkoutFormRef}
+            tabIndex={-1}
+            data-testid="november-checkout-form"
+            className="scroll-mt-6 rounded-[2rem] border border-[#171519]/12 bg-[#fffdf9]/78 p-5 shadow-[0_26px_72px_rgba(71,49,65,.16)] backdrop-blur-sm outline-none md:p-8"
           >
             {offerActive ? (
               <>
@@ -848,6 +843,7 @@ export default function NovemberLoveBundle() {
                     buttonClassName="!bg-[#171519] !py-4 !text-base !font-black !text-[#fffdf9] hover:!bg-[#342d32]"
                     termsPath="/terms/november-love"
                     showCoupon={false}
+                    keepDetailsVisible
                     onSuccess={() => {
                       window.location.assign("/thank-you/november-love");
                     }}
@@ -861,8 +857,7 @@ export default function NovemberLoveBundle() {
                   הטבת נובמבר הסתיימה
                 </h3>
                 <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-[#5f5160]">
-                  הקופה של ההטבה הייתה זמינה בישראל עד {deadline}. אי אפשר
-                  להצטרף במחיר הקמפיין אחרי מועד זה.
+                  הקופה של ההטבה אינה זמינה עוד.
                 </p>
                 <button
                   type="button"
@@ -873,7 +868,7 @@ export default function NovemberLoveBundle() {
                 </button>
               </div>
             )}
-          </motion.div>
+          </div>
         </Reveal>
       </section>
 
@@ -917,6 +912,17 @@ export default function NovemberLoveBundle() {
       </section>
 
       <footer className="border-t border-[#171519]/10 bg-[#fffdf9] px-5 py-8 text-center">
+        <details className="mx-auto mb-6 max-w-2xl rounded-2xl border border-[#171519]/10 bg-[#f4eef1] px-5 py-4 text-right">
+          <summary className="cursor-pointer text-sm font-black text-[#171519]">
+            תנאי ההטבה
+          </summary>
+          <p className="mt-3 text-xs leading-6 text-[#5f5160]">
+            בתוקף בישראל מ־1.11.2026 עד 30.11.2026. מחיר ההטבה 349 ₪ במקום 499
+            ₪. הצעת התאמה ראשונה עד 3 ימים קלנדריים לאחר אישור התשלום והשלמת
+            הפרופיל, התמונה, השאלונים וההעדפות. אין התחייבות לדייט, להסכמה
+            הדדית או לזוגיות. Plus לא כלול ולא מופעל אוטומטית.
+          </p>
+        </details>
         <nav
           aria-label="קישורים"
           className="flex flex-wrap justify-center gap-x-5 gap-y-3 text-sm font-bold text-[#625563]"
@@ -928,7 +934,7 @@ export default function NovemberLoveBundle() {
             href="/terms/november-love"
             className="transition hover:text-[#171519]"
           >
-            תנאי ההטבה
+            תקנון ההטבה
           </a>
           <a href="/terms/database" className="transition hover:text-[#171519]">
             תקנון המאגר

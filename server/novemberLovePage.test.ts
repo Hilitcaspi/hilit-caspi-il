@@ -13,16 +13,17 @@ describe("November Love Bundle campaign pages", () => {
   it("states the approved November bundle, course scope, and campaign dates accurately", () => {
     expect(landing).toContain("NOVEMBER_BUNDLE_PRODUCT");
     expect(landing).toContain("NOVEMBER_BUNDLE_PRICE");
-    expect(landing).toContain("NOVEMBER_BUNDLE_EXPIRES_AT");
+    expect(read("shared/novemberBundleOffer.ts")).toContain("NOVEMBER_BUNDLE_EXPIRES_AT");
     expect(landing).toContain("isNovemberBundleOfferActive");
     expect(landing).toContain("349 ₪");
     expect(landing).toContain("499 ₪");
     expect(landing).toMatch(/1\.11\.2026\s+עד\s+30\.11\.2026/);
     expect(landing).toContain("הקורס המלא ״המסע לזוגיות״");
-    expect(landing).toContain("ערך מקורי 497 ₪");
-    expect(landing).toContain("ב־249 ₪ כמחיר נפרד");
+    expect(landing).toMatch(/ערך מקורי של\s+497 ₪/);
+    expect(landing).toContain("בנפרד ב־249 ₪");
     expect(landing).toContain("שווי ההטבה: 647 ₪");
-    expect(landing).toContain("מבוסס על המחירים המקוריים");
+    expect(landing).toContain("150 ₪ הנחה על המאגר");
+    expect(landing).toContain("compact showValueDetails");
     expect(landing).not.toContain("המדריך ״לבחור נכון״");
     expect(landing).not.toContain("חיסכון של");
   });
@@ -64,13 +65,9 @@ describe("November Love Bundle campaign pages", () => {
 
   it("keeps the first-match promise conditional and rejects outcome or cadence promises", () => {
     expect(landing).toContain("עד 3 ימים קלנדריים");
-    expect(landing).toContain(
-      "התשלום אושר וגם הושלמו הפרופיל, התמונה, השאלונים וההעדפות"
-    );
-    expect(landing).toContain("ההתחייבות היא להצעת התאמה ראשונה");
-    expect(landing).toContain(
-      "אין התחייבות לדייט, לקבלת ההצעה, להסכמה הדדית, לזוגיות או לקצב קבוע אחר כך"
-    );
+    expect(landing).toMatch(/עד 3 ימים קלנדריים לאחר אישור התשלום והשלמת\s+הפרופיל, התמונה, השאלונים וההעדפות/);
+    expect(landing).toContain("הצעת התאמה ראשונה בתוך 3 ימים!");
+    expect(landing).toMatch(/אין התחייבות לדייט, להסכמה\s+הדדית או לזוגיות/);
     expect(landing).toContain("Plus לא כלול ולא מופעל אוטומטית");
     expect(landing).toContain("ציון התאמה מעל 80%");
     expect(landing).not.toContain("יותר מ־80 התאמות רגילות");

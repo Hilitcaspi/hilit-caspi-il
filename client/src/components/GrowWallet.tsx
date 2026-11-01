@@ -340,6 +340,8 @@ interface GrowWalletProps {
   registrationResumeToken?: string;
   boostMatchId?: number;
   showCoupon?: boolean;
+  /** Campaign checkout can keep the entered identity visible instead of collapsing the form. */
+  keepDetailsVisible?: boolean;
   onFreeAccessCode?: (
     code: string,
     email: string
@@ -384,6 +386,7 @@ export default function GrowWallet({
   registrationResumeToken,
   boostMatchId,
   showCoupon = true,
+  keepDetailsVisible = false,
   onFreeAccessCode,
   plusConsents,
 }: GrowWalletProps) {
@@ -1054,7 +1057,7 @@ export default function GrowWallet({
       dir="rtl"
       style={{ color: "#191265" }}
     >
-      {!hasAllDetails && (
+      {(keepDetailsVisible || !hasAllDetails) && (
         <div className="flex flex-col gap-3 mb-4">
           <div>
             <Label
