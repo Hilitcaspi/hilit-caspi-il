@@ -17,10 +17,12 @@ describe("November Love Bundle campaign pages", () => {
     expect(landing).toContain("isNovemberBundleOfferActive");
     expect(landing).toContain("349 ₪");
     expect(landing).toContain("499 ₪");
-    expect(landing).toContain("1.11.2026 עד 30.11.2026");
+    expect(landing).toMatch(/1\.11\.2026\s+עד\s+30\.11\.2026/);
     expect(landing).toContain("הקורס המלא ״המסע לזוגיות״");
     expect(landing).toContain("ערך מקורי 497 ₪");
     expect(landing).toContain("ב־249 ₪ כמחיר נפרד");
+    expect(landing).toContain("שווי ההטבה: 647 ₪");
+    expect(landing).toContain("מבוסס על המחירים המקוריים");
     expect(landing).not.toContain("המדריך ״לבחור נכון״");
     expect(landing).not.toContain("חיסכון של");
   });
@@ -28,17 +30,23 @@ describe("November Love Bundle campaign pages", () => {
   it("uses the agreed single checkout payment anchor and Grow contract", () => {
     expect(landing).toContain('id="payment"');
     expect(landing).not.toContain('id="checkout"');
-    expect(landing).toContain('product={NOVEMBER_BUNDLE_PRODUCT}');
+    expect(landing).toContain("product={NOVEMBER_BUNDLE_PRODUCT}");
     expect(landing).toContain('termsPath="/terms/november-love"');
-    expect(landing).toContain('window.location.assign("/thank-you/november-love")');
+    expect(landing).toContain(
+      'window.location.assign("/thank-you/november-love")'
+    );
     expect(landing).toContain('gaViewItem("bundle_november"');
-    expect(landing).toContain('trackViewContent({ content_name: "bundle_november"');
+    expect(landing).toMatch(
+      /trackViewContent\(\{\s*content_name: "bundle_november"/
+    );
     expect(landing).toContain('page: "/november-love"');
     expect(landing).toContain("showCoupon={false}");
   });
 
   it("omits the extra checkout explanation while retaining the standard payment form", () => {
-    expect(landing).not.toContain("הקופה המאובטחת תבקש את הפרטים הדרושים להצטרפות");
+    expect(landing).not.toContain(
+      "הקופה המאובטחת תבקש את הפרטים הדרושים להצטרפות"
+    );
     expect(landing).toContain("<GrowWallet");
     expect(landing).toContain("product={NOVEMBER_BUNDLE_PRODUCT}");
     expect(landing).toContain('termsPath="/terms/november-love"');
@@ -56,9 +64,13 @@ describe("November Love Bundle campaign pages", () => {
 
   it("keeps the first-match promise conditional and rejects outcome or cadence promises", () => {
     expect(landing).toContain("עד 3 ימים קלנדריים");
-    expect(landing).toContain("התשלום אושר וגם הושלמו הפרופיל, התמונה, השאלונים וההעדפות");
+    expect(landing).toContain(
+      "התשלום אושר וגם הושלמו הפרופיל, התמונה, השאלונים וההעדפות"
+    );
     expect(landing).toContain("ההתחייבות היא להצעת התאמה ראשונה");
-    expect(landing).toContain("אין התחייבות לדייט, לקבלת ההצעה, להסכמה הדדית, לזוגיות או לקצב קבוע אחר כך");
+    expect(landing).toContain(
+      "אין התחייבות לדייט, לקבלת ההצעה, להסכמה הדדית, לזוגיות או לקצב קבוע אחר כך"
+    );
     expect(landing).toContain("Plus לא כלול ולא מופעל אוטומטית");
     expect(landing).toContain("ציון התאמה מעל 80%");
     expect(landing).not.toContain("יותר מ־80 התאמות רגילות");
@@ -67,13 +79,15 @@ describe("November Love Bundle campaign pages", () => {
     expect(landing).not.toContain("ספירה לאחור");
   });
 
-  it("uses the approved matching language and only renders approved proof data when it exists", () => {
+  it("uses the approved matching language and renders only approved API or owner-supplied proof", () => {
     expect(landing).toContain("הילית בוחנת אישית את הפרופילים");
     expect(landing).toContain("שאלונים שמבוססים על מחקר");
     expect(landing).toContain("אישור נפרד של שני הצדדים לפני חשיפת פרטים");
     expect(landing).toContain("trpc.publicProof.approvedTestimonials.useQuery");
-    expect(landing).toContain("approvedTestimonials.length > 0");
-    expect(landing).not.toContain("testimonials = [");
+    expect(landing).toContain("...NOVEMBER_APPROVED_TESTIMONIALS");
+    expect(landing).toContain("Array.isArray(approvedTestimonials)");
+    expect(landing).toContain("testimonials.length > 0");
+    expect(landing).toContain("testimonial.displayName.trim().split(/\\s+/)[0]");
   });
 
   it("keeps the campaign portrait use to a hero and one lazy below-fold about portrait", () => {
@@ -105,10 +119,16 @@ describe("November Love Bundle campaign pages", () => {
 
   it("does not treat a redirect as payment proof and keeps thank-you fulfillment pending until server verification", () => {
     expect(thankYou).toContain("readPurchaseTrackingToken");
-    expect(thankYou).toContain("trpc.payment.confirmPurchaseTracking.useMutation");
+    expect(thankYou).toContain(
+      "trpc.payment.confirmPurchaseTracking.useMutation"
+    );
     expect(thankYou).toContain("expectedProduct: NOVEMBER_BUNDLE_PRODUCT");
-    expect(read("server/routers.ts")).toContain('input.expectedProduct && row.product !== input.expectedProduct');
-    expect(thankYou).toContain('result.status === "confirmed" || result.status === "already_tracked"');
+    expect(read("server/routers.ts")).toContain(
+      "input.expectedProduct && row.product !== input.expectedProduct"
+    );
+    expect(thankYou).toContain(
+      'result.status === "confirmed" || result.status === "already_tracked"'
+    );
     expect(thankYou).toContain("המעבר לעמוד הזה אינו אישור תשלום");
     expect(thankYou).toContain("אין צורך לשלם שוב");
     expect(thankYou).not.toContain("new URLSearchParams");

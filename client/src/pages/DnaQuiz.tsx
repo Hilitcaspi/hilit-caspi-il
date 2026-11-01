@@ -13,6 +13,14 @@ import { trpc } from "@/lib/trpc";
 import { trackLead } from "@/lib/metaPixel";
 import { gaGenerateLead, gaQuizComplete } from "@/lib/ga";
 import { getFirstTouchAcquisition, getLastUtmAcquisition } from "@/lib/acquisitionTracking";
+import {
+  buildNovemberDnaResultHref,
+  clearNovemberDnaContext,
+  readNovemberDnaContext,
+  resolveNovemberDnaContext,
+  writeNovemberDnaContext,
+  type NovemberDnaContext,
+} from "@shared/novemberDnaContext";
 type DnaType = "leader" | "romantic" | "free_spirit" | "anchor";
 type Gender = "female" | "male";
 
@@ -197,7 +205,46 @@ export default function DnaQuiz() {
   const returnFreeToken = urlParams.get("free_token"); // pass-through if present
   const lastUtm = getLastUtmAcquisition();
   const { utmSource, utmMedium, utmCampaign, utmContent, utmTerm, metaCampaignId, metaAdSetId, metaAdId } = lastUtm || {};
+  const [novemberContext, setNovemberContext] = useState<NovemberDnaContext | null>(() => {
+    if (typeof window === "undefined") return null;
+    let persisted: NovemberDnaContext | null = null;
+    try {
+      persisted = readNovemberDnaContext(window.sessionStorage);
+    } catch {
+      // Storage may be disabled; campaign context is optional and the free quiz still works.
+    }
+    return resolveNovemberDnaContext({
+      search: searchString,
+      persisted,
+      fallbackAttribution: lastUtm,
+    }).context;
+  });
   const [phase, setPhase] = useState<"gender" | "quiz" | "tiebreaker" | "capture" | "result">("gender");
+
+  // A November result route is available only after one explicit allowlisted
+  // campaign entry. Context contains no answers or contact details, survives a
+  // reload during the quiz, and is cleared as soon as a new non-campaign start
+  // or the offer expiry is observed.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const persisted = readNovemberDnaContext(window.sessionStorage);
+      const resolution = resolveNovemberDnaContext({
+        search: searchString,
+        persisted,
+        fallbackAttribution: lastUtm,
+      });
+      if (resolution.context) {
+        writeNovemberDnaContext(window.sessionStorage, resolution.context);
+      } else if (resolution.shouldClear) {
+        clearNovemberDnaContext(window.sessionStorage);
+      }
+      setNovemberContext(resolution.context);
+    } catch {
+      // The result safely falls back to the generic funnel if browser storage is unavailable.
+      setNovemberContext(null);
+    }
+  }, [searchString, utmSource, utmMedium, utmCampaign, utmContent]);
 
   // Scroll to top on every phase change
   useEffect(() => {
@@ -288,6 +335,23 @@ export default function DnaQuiz() {
   const info = dnaType ? DNA_INFO[dnaType] : null;
   const label = info ? (gender === "female" ? info.label_f : info.label_m) : "";
   const matchText = info ? (gender === "female" ? info.match_f : info.match_m) : "";
+  const novemberResultHref = buildNovemberDnaResultHref(novemberContext);
+  const continueToGenericJoin = () => {
+    // Keep contact details off the address bar. Register already reads this
+    // short-lived continuity payload when the same DNA session continues.
+    try {
+      window.sessionStorage.setItem("registration_recovery_prefill", JSON.stringify({
+        sessionId: sessionId.current,
+        name: captureForm.name,
+        email: captureForm.email,
+        phone: captureForm.phone,
+        savedAt: Date.now(),
+      }));
+    } catch {
+      // Prefill is a convenience only; a blocked store must not block registration.
+    }
+    navigate(`/join?dna=${dnaType}&gender=${gender}&session=${sessionId.current}`);
+  };
 
   // ── Gender selection ────────────────────────────────────────────────────────
   if (phase === "gender") {
@@ -346,12 +410,14 @@ export default function DnaQuiz() {
             <div className="flex gap-3 justify-center max-w-xs mx-auto">
               <button
                 onClick={() => { setGender("female"); setPhase("quiz"); trackMutation.mutate({ eventType: "dna_quiz_start", page: "/dna-quiz" }); }}
+                data-testid="dna-gender-female"
                 className="flex-1 bg-[#ffe27c] text-[#191265] font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-transform"
               >
                 אישה
               </button>
               <button
                 onClick={() => { setGender("male"); setPhase("quiz"); trackMutation.mutate({ eventType: "dna_quiz_start", page: "/dna-quiz" }); }}
+                data-testid="dna-gender-male"
                 className="flex-1 bg-white text-[#191265] font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-transform"
               >
                 גבר
@@ -446,6 +512,7 @@ export default function DnaQuiz() {
                   <button
                     key={val}
                     onClick={() => handleRate(val)}
+                    data-testid={`dna-scale-${val}`}
                     className="flex flex-col items-center gap-2 group"
                   >
                     <div className={`w-14 h-14 rounded-2xl font-black text-xl transition-all duration-200 flex items-center justify-center
@@ -515,12 +582,14 @@ export default function DnaQuiz() {
           <div className="flex flex-col gap-4">
             <button
               onClick={() => handleTiebreaker(typeA)}
+              data-testid="dna-tiebreaker-a"
               className="w-full bg-[#191265] text-white font-bold py-4 px-6 rounded-2xl text-base hover:bg-[#1800ad] transition-colors text-right"
             >
               {answerA}
             </button>
             <button
               onClick={() => handleTiebreaker(typeB)}
+              data-testid="dna-tiebreaker-b"
               className="w-full border-2 border-[#191265] text-[#191265] font-bold py-4 px-6 rounded-2xl text-base hover:bg-[#f0eadc] transition-colors text-right"
             >
               {answerB}
@@ -528,6 +597,7 @@ export default function DnaQuiz() {
           </div>
           <button
             onClick={() => setPhase("capture")}
+            data-testid="dna-tiebreaker-skip"
             className="mt-6 text-[#727272] text-sm hover:text-[#191265] transition-colors"
           >
             לא בטוחה? המשיכי בלי הכרעה
@@ -621,6 +691,7 @@ export default function DnaQuiz() {
                 value={captureForm.name}
                 onChange={e => setCaptureForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="השם שלך"
+                data-testid="dna-capture-name"
                 className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] placeholder-[#727272] focus:outline-none focus:border-[#191265] text-right transition-all"
                 required
               />
@@ -632,6 +703,7 @@ export default function DnaQuiz() {
                 value={captureForm.email}
                 onChange={e => setCaptureForm(f => ({ ...f, email: e.target.value }))}
                 placeholder="your@email.com"
+                data-testid="dna-capture-email"
                 className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] placeholder-[#727272] focus:outline-none focus:border-[#191265] text-right transition-all"
                 required
               />
@@ -643,6 +715,7 @@ export default function DnaQuiz() {
                 value={captureForm.phone}
                 onChange={e => setCaptureForm(f => ({ ...f, phone: e.target.value }))}
                 placeholder="050-0000000"
+                data-testid="dna-capture-phone"
                 className="w-full px-4 py-3 rounded-xl border-2 border-[#e9e8e8] text-[#191265] placeholder-[#727272] focus:outline-none focus:border-[#191265] text-right transition-all"
                 required
               />
@@ -655,6 +728,7 @@ export default function DnaQuiz() {
             <button
               type="submit"
               disabled={submitMutation.isPending || createLeadMutation.isPending}
+              data-testid="dna-capture-submit"
               className="w-full bg-[#191265] text-white font-black text-lg py-4 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {submitMutation.isPending ? "מחשב/ת את ה-DNA שלך..." : "הצגת התוצאה שלי"}
@@ -665,6 +739,7 @@ export default function DnaQuiz() {
                 type="checkbox"
                 checked={captureConsent}
                 onChange={e => setCaptureConsent(e.target.checked)}
+                data-testid="dna-capture-consent"
                 className="mt-0.5 w-4 h-4 accent-[#191265] flex-shrink-0"
               />
               <span className="text-xs text-[#727272] leading-relaxed text-right">
@@ -791,7 +866,25 @@ export default function DnaQuiz() {
             className="bg-gradient-to-br from-[#191265] to-[#1800ad] rounded-3xl p-8 text-center text-white"
           >
             <div className="text-4xl mb-4">💛</div>
-            {returnTo === "join" ? (
+            {novemberResultHref ? (
+              // The campaign helper owns the allowlist, campaign window and fixed
+              // first-party destination. This CTA never grants a price or access.
+              <>
+                <h3 className="font-black text-xl mb-3">
+                  הצעד הבא שלך לזוגיות מתחיל כאן
+                </h3>
+                <p className="text-white/75 text-sm leading-relaxed mb-6">
+                  המשיכו להטבת נובמבר כדי לראות את פרטי ההצטרפות והקופה המאובטחת.
+                </p>
+                <a
+                  href={novemberResultHref}
+                  data-testid="dna-november-result-cta"
+                  className="block w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-[1.02] shadow-xl"
+                >
+                  לפרטי הטבת נובמבר
+                </a>
+              </>
+            ) : returnTo === "join" ? (
               // Embedded mode: user came from /join form, return with DNA result
               <>
                 <h3 className="font-black text-xl mb-3">
@@ -859,7 +952,8 @@ export default function DnaQuiz() {
                 <div className="text-[#ffe27c] font-black text-lg mb-1">דמי רצינות ורישום: ₪299 (חד-פעמי)</div>
                 <p className="text-white/50 text-xs mb-6">כל שאלון עובר בעיניי אישית לפני שמוזן למאגר</p>
                 <button
-                  onClick={() => navigate(`/join?dna=${dnaType}&gender=${gender}&session=${sessionId.current}&name=${encodeURIComponent(captureForm.name)}&email=${encodeURIComponent(captureForm.email)}&phone=${encodeURIComponent(captureForm.phone)}`)}
+                  onClick={continueToGenericJoin}
+                  data-testid="dna-generic-result-cta"
                   className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-[1.02] shadow-xl"
                 >
                   כן! הילית, אני רוצה שתמצאי לי התאמה

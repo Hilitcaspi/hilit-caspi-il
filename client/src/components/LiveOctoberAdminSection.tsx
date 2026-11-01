@@ -49,10 +49,6 @@ export default function LiveOctoberAdminSection() {
     enabled: view === "matches",
     refetchInterval: view === "matches" ? 60_000 : false,
   });
-  const novemberQueue = trpc.liveOctober.adminNovemberBundleFirstMatchQueue.useQuery(undefined, {
-    enabled: view === "matches",
-    refetchInterval: view === "matches" ? 60_000 : false,
-  });
   const { data, isLoading, isError, refetch } = overview;
   if (isLoading) return <div className="rounded-2xl bg-white p-6 text-[#191265]">טוענים את הרשמות הלייב…</div>;
   if (isError || !data) return <div className="rounded-2xl bg-white p-6 text-[#191265]">לא ניתן לטעון כרגע את נתוני הלייב. <button type="button" onClick={() => void refetch()} className="font-bold underline">לנסות שוב</button></div>;
@@ -102,26 +98,6 @@ export default function LiveOctoberAdminSection() {
           <QueueDetails row={{ ...row, originalPromiseDeadline: row.dueAt }} time={time} />
         </article>)}
         {!postQueue.data.rows.length && <p className="text-sm text-[#625d78]">עדיין אין רכישות מאומתות דרך LIVE48. המצטרפים יופיעו כאן אוטומטית לאחר הרכישה.</p>}
-      </>}
-    </div>}
-    {view === "matches" && <div className="space-y-3 rounded-2xl border border-[#171519]/15 bg-[#ede4e9] p-5">
-      <h3 className="text-lg font-black text-[#171519]">מצטרפי נובמבר: מאגר והקורס במתנה</h3>
-      <p className="text-sm leading-6 text-[#625d78]">רכישות חבילה מאומתות ב־349 ₪. יעד ההצעה הראשונה מתחיל רק לאחר התשלום והשלמת הפרופיל, התמונה והשאלונים. התור אינו שולח התאמות אוטומטית.</p>
-      {novemberQueue.isLoading && <p className="text-sm text-[#625d78]">טוענים את מצטרפי נובמבר…</p>}
-      {novemberQueue.isError && <p className="text-sm text-rose-800">לא ניתן לטעון את תור נובמבר. <button type="button" onClick={() => void novemberQueue.refetch()} className="font-bold underline">לנסות שוב</button></p>}
-      {novemberQueue.data && <>
-        <div className="flex flex-wrap gap-2 text-xs font-bold text-[#514451]">
-          <span>סה״כ {novemberQueue.data.summary.total}</span><span>מוכנים {novemberQueue.data.summary.ready}</span><span>חסרים פרטים {novemberQueue.data.summary.awaitingProfile}</span><span>נשלחו {novemberQueue.data.summary.fulfilled}</span><span>באיחור {novemberQueue.data.summary.overdue}</span><span>טעונים טיפול {novemberQueue.data.summary.needsReview}</span>
-        </div>
-        {novemberQueue.data.rows.map(row => <article key={row.paymentId} className="rounded-xl border border-[#171519]/10 bg-white p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-black text-[#171519]">{row.name} <span className={`mr-2 rounded-full px-2 py-1 text-xs ${queueState[row.state].className}`}>{queueState[row.state].label}</span></p>
-            {row.singleId && <a href={`/crm/matchmaking?tab=singles&singleId=${row.singleId}`} className="text-sm font-bold text-[#514451] underline">פתיחת הפרופיל</a>}
-          </div>
-          <p className="mt-2 text-xs leading-6 text-[#625d78]">רכישה: {time(row.paidAt)}{row.dueAt ? ` · יעד ההצעה: ${time(row.dueAt)}` : " · יעד ההצעה טרם התחיל"}</p>
-          <QueueDetails row={{ ...row, originalPromiseDeadline: row.dueAt }} time={time} />
-        </article>)}
-        {!novemberQueue.data.rows.length && <p className="text-sm text-[#625d78]">אין עדיין רכישות מאומתות של חבילת נובמבר. הן יופיעו כאן לאחר אישור התשלום.</p>}
       </>}
     </div>}
   </section>;

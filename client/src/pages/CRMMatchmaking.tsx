@@ -15,6 +15,7 @@ import { waitingProfileMissingFields } from "@shared/waitingProfileCompleteness"
 import MatchmakingDashboard from "./MatchmakingDashboard";
 import PlusPilotAdminSection from "@/components/PlusPilotAdminSection";
 import LiveOctoberAdminSection from "@/components/LiveOctoberAdminSection";
+import NovemberMembersAdminSection from "@/components/NovemberMembersAdminSection";
 import BoostMembersAdminSection from "@/components/BoostMembersAdminSection";
 import TestimonialManagementSection from "@/components/TestimonialManagementSection";
 import DailyReportManagementSection from "@/components/DailyReportManagementSection";
@@ -336,11 +337,11 @@ function EditSingleModal({ single, onClose, onSave, isPending }: {
 export default function CRMMatchmaking() {
   const { user, loading } = useAuth();
   const trpcUtils = trpc.useUtils();
-  const [activeTab, setActiveTab] = useState<"self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "live_october" | "testimonials" | "daily_report">(() => {
+  const [activeTab, setActiveTab] = useState<"self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "live_october" | "november_members" | "testimonials" | "daily_report">(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    const allowedTabs = new Set(["self_service", "singles", "matches", "unmatched", "now", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "live_october", "testimonials", "daily_report"]);
+    const allowedTabs = new Set(["self_service", "singles", "matches", "unmatched", "now", "tokens", "inactive_leads", "missing_data", "update_requests", "compatibility", "inactive", "filter_search", "dashboard", "boost", "plus", "live_october", "november_members", "testimonials", "daily_report"]);
     return allowedTabs.has(requestedTab || "")
-      ? requestedTab as "self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "live_october" | "testimonials" | "daily_report"
+      ? requestedTab as "self_service" | "singles" | "matches" | "unmatched" | "now" | "tokens" | "inactive_leads" | "missing_data" | "update_requests" | "compatibility" | "inactive" | "filter_search" | "dashboard" | "boost" | "plus" | "live_october" | "november_members" | "testimonials" | "daily_report"
       : "singles";
   });
   // Filter-search tab state
@@ -1127,6 +1128,20 @@ export default function CRMMatchmaking() {
     setCompatResult(null);
     setCompatNarrativeLoading(false);
   };
+  useEffect(() => {
+    // A November queue link may nominate only person A. The existing
+    // compatibility workflow still requires staff to choose person B and press
+    // its explicit check/send controls; this never runs a comparison or a send.
+    if (activeTab !== "compatibility" || selectedSingle === null || compatPersonA === selectedSingle) return;
+    if (!allSinglesForCompat.some(single => single.id === selectedSingle)) return;
+    manualPreviewGeneration.current += 1;
+    manualPairRef.current = { ...manualPairRef.current, idA: selectedSingle };
+    setCompatPersonA(selectedSingle);
+    setCompatSearchA("");
+    setCompatDropdownA(false);
+    setCompatResult(null);
+    setCompatNarrativeLoading(false);
+  }, [activeTab, allSinglesForCompat, compatPersonA, selectedSingle]);
   const isCurrentManualPreview = (result: any) => {
     const identity = result?.__previewIdentity;
     return Boolean(
@@ -1749,6 +1764,7 @@ export default function CRMMatchmaking() {
             { id: "boost" as const, label: "מאושרי Boost", icon: <Sparkles size={14} /> },
             { id: "plus" as const, label: "חברי PLUS", icon: <span className="font-black text-[#8b7420]">＋</span> },
             { id: "live_october" as const, label: "הלייב עם הילית", icon: <Gift size={14} /> },
+            { id: "november_members" as const, label: "מצטרפי נובמבר", icon: <Users size={14} /> },
             { id: "testimonials" as const, label: "משובים והמלצות", icon: <span>✍️</span> },
             { id: "daily_report" as const, label: "דוח חצות", icon: <MessageSquareText size={14} /> },
             { id: "dashboard" as const, label: "דשבורד התאמות 📊", icon: <BarChart3 size={14} /> },
@@ -3661,6 +3677,9 @@ export default function CRMMatchmaking() {
         )}
         {activeTab === "live_october" && (
           <LiveOctoberAdminSection />
+        )}
+        {activeTab === "november_members" && (
+          <NovemberMembersAdminSection />
         )}
         {activeTab === "testimonials" && (
           <TestimonialManagementSection />
