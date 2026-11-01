@@ -10,6 +10,30 @@ const terms = read("client/src/pages/TermsNovemberBundle.tsx");
 const thankYou = read("client/src/pages/ThankYouNovemberBundle.tsx");
 
 describe("November Love Bundle campaign pages", () => {
+  it("uses the approved November Sale slogan while explaining the personally reviewed singles database", () => {
+    expect(landing).toMatch(/<p dir="ltr"[^>]*>\s*<Sparkles[^>]*\/> NOVEMBER SALE\s*<\/p>/);
+    expect(landing).toContain("הטבת נובמבר חד־פעמית");
+    expect(landing).toMatch(/זה לא מה קונים\.\s*<span[^>]*>זה את מי מכירים\.<\/span>/);
+    expect(landing).toContain("מאגר לרווקים ורווקות שמחפשים זוגיות רצינית");
+    expect(landing).toMatch(/הצעות התאמה שאני\s+בודקת אישית/);
+    expect(landing).toMatch(/בנובמבר אני נותנת גז על\s+ההתאמות/);
+    expect(landing).toContain("NOVEMBER SALE | מאגר זוגיות וקורס ב־349 ₪");
+    expect(landing).toContain("NOVEMBER SALE: מאגר רווקים ורווקות");
+  });
+
+  it("retains the approved hero portrait, 349 offer, and checkout contract", () => {
+    expect(landing).toContain("hilit-standing-close-restored_ffd66094.webp");
+    expect(landing).toContain('object-[50%_24%]');
+    expect(landing).toContain('data-testid="november-hero-offer"');
+    expect(landing).toContain("{NOVEMBER_BUNDLE_PRICE} ₪");
+    expect(landing).toContain("499 ₪");
+    expect(landing).toContain("הקורס המלא ״המסע לזוגיות״");
+    expect(landing).toContain('id="payment"');
+    expect(landing).toContain("product={NOVEMBER_BUNDLE_PRODUCT}");
+    expect(landing).toContain('termsPath="/terms/november-love"');
+    expect(landing).toContain('window.location.assign("/thank-you/november-love")');
+  });
+
   it("states the approved November bundle, course scope, and campaign dates accurately", () => {
     expect(landing).toContain("NOVEMBER_BUNDLE_PRODUCT");
     expect(landing).toContain("NOVEMBER_BUNDLE_PRICE");

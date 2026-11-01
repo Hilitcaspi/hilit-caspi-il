@@ -222,8 +222,8 @@ export default function NovemberLoveBundle() {
   const dnaOfferHref = getDnaOfferHref();
 
   useEffect(() => {
-    document.title = "הטבת נובמבר לזוגיות | הילית כספי";
-    const description = "הטבה חד־פעמית: מאגר הרווקים והרווקות ב־349 ₪ במקום 499 ₪, עם הקורס המלא במתנה. מצטרפים עכשיו ומתחילים להכיר אחרת.";
+    document.title = "NOVEMBER SALE | מאגר זוגיות וקורס ב־349 ₪ | הילית כספי";
+    const description = "NOVEMBER SALE: מאגר רווקים ורווקות עם התאמות שנבדקות אישית ב־349 ₪ במקום 499 ₪, עם הקורס המלא במתנה.";
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
       meta = document.createElement("meta");
@@ -357,16 +357,21 @@ export default function NovemberLoveBundle() {
               transition={{ duration: 0.22 }}
               className="november-love-motion mx-auto max-w-[610px] lg:mx-0"
             >
-              <p className="inline-flex items-center gap-2 text-sm font-bold text-[#76516d]">
-                <Sparkles className="h-4 w-4" /> הטבת נובמבר. חד־פעמית.
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-sm font-bold text-[#76516d]">
+                <p dir="ltr" className="inline-flex items-center gap-2 tracking-[0.08em]">
+                  <Sparkles className="h-4 w-4" /> NOVEMBER SALE
+                </p>
+                <span className="rounded-full border border-[#76516d]/20 bg-[#fffdf9]/65 px-2.5 py-1 text-[10px] font-black tracking-normal">
+                  הטבת נובמבר חד־פעמית
+                </span>
+              </div>
               <h1 className="mt-5 text-[2.55rem] font-black leading-[1.08] tracking-[-0.045em] text-[#171519] sm:text-[3.2rem] lg:text-[clamp(2.5rem,3.9vw,3.65rem)]">
-                בנובמבר אני נותנת
-                <span className="mt-1 block text-[#68465e]">גז על ההתאמות.</span>
+                זה לא מה קונים.
+                <span className="mt-1 block text-[#68465e]">זה את מי מכירים.</span>
               </h1>
               <p className="mt-5 max-w-xl text-[1.05rem] leading-7 text-[#4b3d49] md:text-lg md:leading-8">
-                זו ההזדמנות להצטרף למאגר הרווקים והרווקות שלי: אנשים
-                שמחפשים זוגיות רצינית, עם התאמות שאני בודקת אישית.
+                מאגר לרווקים ורווקות שמחפשים זוגיות רצינית, עם הצעות התאמה שאני
+                בודקת אישית. בנובמבר אני נותנת גז על ההתאמות.
               </p>
               <div className="mt-6 rounded-[1.4rem] border border-white/80 bg-[#fffdf9]/85 p-5 shadow-[0_12px_40px_rgba(77,46,69,.06)]" data-testid="november-hero-offer">
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
