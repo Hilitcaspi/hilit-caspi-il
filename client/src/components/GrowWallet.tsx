@@ -1008,10 +1008,15 @@ export default function GrowWallet({
         toast.error("מספר הטלפון אינו תקין. יש לבדוק את הספרות ולנסות שוב.");
         return;
       }
+      const alreadyOwnsDatabase =
+        product === "bundle_november" &&
+        technicalMessage.includes("התשלום עבור מוצר זה כבר זוהה");
       toast.error(
-        isConnectivityFailure
-          ? "לא ניתן להתחבר כרגע למערכת התשלום. אפשר לנסות שוב בעוד כמה רגעים."
-          : technicalMessage
+        alreadyOwnsDatabase
+          ? "כבר קיימת רכישת מאגר לכתובת המייל הזו. כדי למנוע חיוב כפול, לא נפתח תשלום נוסף."
+          : isConnectivityFailure
+            ? "לא ניתן להתחבר כרגע למערכת התשלום. אפשר לנסות שוב בעוד כמה רגעים."
+            : technicalMessage
       );
       if (!expectedRejection) {
         reportFailureMutation.mutate({

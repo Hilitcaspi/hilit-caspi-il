@@ -35,4 +35,10 @@ describe('November checkout visibility and unchanged payment safety', () => {
     expect(wallet).toContain('checkoutAttemptId: attempt.attemptId');
     expect(wallet).toContain('paymentStatusAmbiguous');
   });
+
+  it('clarifies historic database ownership only for the November bundle', () => {
+    expect(wallet).toMatch(/product === "bundle_november" &&\s+technicalMessage.includes\("התשלום עבור מוצר זה כבר זוהה"\)/);
+    expect(wallet).toContain('כבר קיימת רכישת מאגר לכתובת המייל הזו. כדי למנוע חיוב כפול, לא נפתח תשלום נוסף.');
+    expect(wallet).toContain('if (!expectedRejection)');
+  });
 });
