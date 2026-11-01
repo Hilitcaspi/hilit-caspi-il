@@ -1,0 +1,110 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const read = (relativePath: string) =>
+  readFileSync(resolve(process.cwd(), relativePath), "utf8");
+
+const landing = read("client/src/pages/NovemberLoveBundle.tsx");
+const terms = read("client/src/pages/TermsNovemberBundle.tsx");
+const thankYou = read("client/src/pages/ThankYouNovemberBundle.tsx");
+
+describe("November Love Bundle campaign pages", () => {
+  it("states the approved November bundle, course scope, and campaign dates accurately", () => {
+    expect(landing).toContain("NOVEMBER_BUNDLE_PRODUCT");
+    expect(landing).toContain("NOVEMBER_BUNDLE_PRICE");
+    expect(landing).toContain("NOVEMBER_BUNDLE_EXPIRES_AT");
+    expect(landing).toContain("isNovemberBundleOfferActive");
+    expect(landing).toContain("349 ₪");
+    expect(landing).toContain("499 ₪");
+    expect(landing).toContain("1.11.2026 עד 30.11.2026");
+    expect(landing).toContain("הקורס המלא ״המסע לזוגיות״");
+    expect(landing).toContain("ערך מקורי 497 ₪");
+    expect(landing).toContain("ב־249 ₪ כמחיר נפרד");
+    expect(landing).not.toContain("המדריך ״לבחור נכון״");
+    expect(landing).not.toContain("חיסכון של");
+  });
+
+  it("uses the agreed single checkout payment anchor and Grow contract", () => {
+    expect(landing).toContain('id="payment"');
+    expect(landing).not.toContain('id="checkout"');
+    expect(landing).toContain('product={NOVEMBER_BUNDLE_PRODUCT}');
+    expect(landing).toContain('termsPath="/terms/november-love"');
+    expect(landing).toContain('window.location.assign("/thank-you/november-love")');
+    expect(landing).toContain('gaViewItem("bundle_november"');
+    expect(landing).toContain('trackViewContent({ content_name: "bundle_november"');
+    expect(landing).toContain('page: "/november-love"');
+    expect(landing).toContain("showCoupon={false}");
+  });
+
+  it("has an expiry-based disabled checkout state and no manufactured countdown", () => {
+    expect(landing).toContain("offerActive ?");
+    expect(landing).toContain("הטבת נובמבר הסתיימה");
+    expect(landing).toContain("ההצטרפות בהטבה אינה זמינה");
+    expect(landing).toContain("ההטבה הסתיימה");
+    expect(landing).not.toContain("setInterval");
+    expect(landing).not.toContain("Countdown");
+    expect(landing).not.toContain("נותרו");
+  });
+
+  it("keeps the first-match promise conditional and rejects outcome or cadence promises", () => {
+    expect(landing).toContain("עד 3 ימים קלנדריים");
+    expect(landing).toContain("התשלום אושר וגם הושלמו הפרופיל, התמונה, השאלונים וההעדפות");
+    expect(landing).toContain("ההתחייבות היא להצעת התאמה ראשונה");
+    expect(landing).toContain("אין התחייבות לדייט, לקבלת ההצעה, להסכמה הדדית, לזוגיות או לקצב קבוע אחר כך");
+    expect(landing).toContain("Plus לא כלול ולא מופעל אוטומטית");
+    expect(landing).toContain("ציון התאמה מעל 80%");
+    expect(landing).not.toContain("יותר מ־80 התאמות רגילות");
+    expect(landing).not.toContain("אחוזי הצלחה");
+    expect(landing).not.toContain("מובטחת זוגיות");
+    expect(landing).not.toContain("ספירה לאחור");
+  });
+
+  it("uses the approved matching language and only renders approved proof data when it exists", () => {
+    expect(landing).toContain("הילית בוחנת אישית את הפרופילים");
+    expect(landing).toContain("שאלונים שמבוססים על מחקר");
+    expect(landing).toContain("אישור נפרד של שני הצדדים לפני חשיפת פרטים");
+    expect(landing).toContain("trpc.publicProof.approvedTestimonials.useQuery");
+    expect(landing).toContain("approvedTestimonials.length > 0");
+    expect(landing).not.toContain("testimonials = [");
+  });
+
+  it("keeps the campaign portrait use to a hero and one lazy below-fold about portrait", () => {
+    expect(landing).toContain("hilit-bundle-standing_b180bb60.jpeg");
+    expect(landing).toContain("hilit-bundle-close-portrait_85abe6c9.jpeg");
+    expect(landing).toContain('fetchPriority: "high"');
+    expect(landing).toContain('loading: "lazy"');
+    expect(landing).not.toContain("hilit-bundle-sofa");
+  });
+
+  it("supplies brief, reduced-motion-safe campaign transitions", () => {
+    expect(landing).toContain("useReducedMotion");
+    expect(landing).toContain("prefers-reduced-motion: reduce");
+    expect(landing).toContain("duration: 0.22");
+    expect(landing).not.toContain("duration: 0.62");
+  });
+
+  it("keeps terms narrow, accurate, and linked to the existing database, course, and privacy terms", () => {
+    expect(terms).toContain("349 ₪ במקום 499 ₪");
+    expect(terms).toContain("ערכו המקורי של הקורס הוא 497 ₪");
+    expect(terms).toContain("עד 3 ימים קלנדריים");
+    expect(terms).toContain('href="/terms/database"');
+    expect(terms).toContain('href="/terms/course"');
+    expect(terms).toContain('href="/privacy"');
+    expect(terms).toContain('href="/november-love#payment"');
+    expect(terms).not.toContain("טיוטת תנאים מסחריים");
+    expect(terms).not.toContain("ייעוץ משפטי");
+  });
+
+  it("does not treat a redirect as payment proof and keeps thank-you fulfillment pending until server verification", () => {
+    expect(thankYou).toContain("readPurchaseTrackingToken");
+    expect(thankYou).toContain("trpc.payment.confirmPurchaseTracking.useMutation");
+    expect(thankYou).toContain("expectedProduct: NOVEMBER_BUNDLE_PRODUCT");
+    expect(read("server/routers.ts")).toContain('input.expectedProduct && row.product !== input.expectedProduct');
+    expect(thankYou).toContain('result.status === "confirmed" || result.status === "already_tracked"');
+    expect(thankYou).toContain("המעבר לעמוד הזה אינו אישור תשלום");
+    expect(thankYou).toContain("אין צורך לשלם שוב");
+    expect(thankYou).not.toContain("new URLSearchParams");
+    expect(thankYou).not.toContain("התשלום עבר בהצלחה");
+  });
+});

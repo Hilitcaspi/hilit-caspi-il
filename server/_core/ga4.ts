@@ -86,6 +86,7 @@ export const GA4_PRODUCTS: Record<string, { id: string; name: string; price: num
   match_boost: { id: "match_boost", name: "Boost - שליחת הצעת התאמה", price: 19.9 },
   coaching_mas: { id: "coaching_mas", name: "ליווי אישי 12 פגישות", price: 4200 },
   bundle_tubav: { id: "bundle_tubav", name: "חבילת טו באב - מאגר + מדריך", price: 349 },
+  bundle_november: { id: "bundle_november", name: "חבילת נובמבר - מאגר + הקורס המלא", price: 349 },
   plus: { id: "plus", name: "Database Plus", price: 99 },
   live_event: { id: "live_event", name: "אירוע לייב", price: 99 },
   live_october: { id: "live_october", name: "סודות ההתאמה המושלמת - לייב אוקטובר", price: 149 },

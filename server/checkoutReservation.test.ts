@@ -130,6 +130,26 @@ describe("withCheckoutReservation", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the explicit November bundle in the one-time database purchase family", async () => {
+    const november = input({
+      product: "bundle_november",
+      fingerprint: createCheckoutReservationFingerprint({
+        email: "buyer@example.test", product: "bundle_november", identity: "user-42",
+      }),
+    });
+    await withCheckoutReservation(november, async () => ({ processToken: "november-provider-process" }));
+
+    const database = input({
+      product: "database",
+      checkoutAttemptId: ATTEMPT_B,
+      fingerprint: createCheckoutReservationFingerprint({
+        email: "buyer@example.test", product: "database", identity: "user-42",
+      }),
+    });
+    expect((await conflict(withCheckoutReservation(database, async () => ({ processToken: "must-not-create" })))).state)
+      .toBe("open");
+  });
+
   it("replays the same open authorization after a new browser nonce only with server-verified matching resume evidence", async () => {
     const create = vi.fn(async () => ({ processToken: "provider-process-1", authCode: "opaque-auth" }));
     const original = await withCheckoutReservation(input(), create);

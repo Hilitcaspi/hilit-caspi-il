@@ -8058,7 +8058,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     }),
     createProcess: publicProcedure
       .input(z.object({
-        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "bundle_new_year", "match_boost", "plus", "live_october"]),
+        product: z.enum(["database", "guide", "course", "coaching", "coaching_mas", "session", "bundle_tubav", "bundle_new_year", "bundle_november", "match_boost", "plus", "live_october"]),
         fullName: z.string().min(2),
         email: z.string().email(),
         phone: z.string().optional().transform((value, ctx) => {
@@ -8105,8 +8105,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }))
       .mutation(async ({ input, ctx }) => {
         const { isClosedSeasonalProduct, TU_BAV_CLOSED_MESSAGE } = await import("../shared/closedSeasonalOffers");
+        const { isNovemberBundleOfferActive, NOVEMBER_BUNDLE_PRODUCT } = await import("../shared/novemberBundleOffer");
         if (isClosedSeasonalProduct(input.product)) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: TU_BAV_CLOSED_MESSAGE });
+        }
+        // This gate protects only a new provider process. A payment process
+        // created within the campaign window can still complete later and is
+        // intentionally fulfilled by the webhook after the public window ends.
+        if (input.product === NOVEMBER_BUNDLE_PRODUCT && !isNovemberBundleOfferActive()) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "הטבת נובמבר הסתיימה ואינה פתוחה לרכישות חדשות" });
         }
         const { createPaymentProcess, getPlusCheckoutConfig, PRODUCT_CONFIGS } = await import("./growPayment");
         const db = await getDb();
@@ -8119,6 +8126,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const normalizedCheckoutEmail = input.email.trim().toLowerCase();
         const reservedCode = input.couponCode?.trim().toUpperCase();
         const diagnosticTest = reservedCode === "TEST1";
+        if (input.product === NOVEMBER_BUNDLE_PRODUCT && reservedCode && reservedCode !== "TEST1") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "קודי קופון אינם תקפים לחבילת נובמבר" });
+        }
         let verifiedLivePostOfferCode: "LIVE48" | "LIVEPLUS" | null = null;
         let choose50FixedPrice: number | undefined;
         if (reservedCode === CHOOSE50_CODE) {
@@ -8465,7 +8475,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
                 .where(eq(crmLeadsTable.email, input.email));
             } else {
               // Map product to valid crm product enum (session not in crm enum, use null)
-              const crmProduct = input.product === "bundle_new_year"
+              const crmProduct = input.product === "bundle_new_year" || input.product === "bundle_november"
                 ? "database"
                 : (["database", "guide", "course", "coaching", "coaching_mas"] as const)
                     .includes(input.product as any)
@@ -8714,7 +8724,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }),
 
     confirmPurchaseTracking: publicProcedure
-      .input(z.object({ trackingToken: z.string().regex(/^[a-f0-9]{64}$/) }))
+      .input(z.object({ trackingToken: z.string().regex(/^[a-f0-9]{64}$/), expectedProduct: z.string().max(64).optional() }))
       .mutation(async ({ input }) => {
         if (process.env.NODE_ENV !== "production") return { status: "invalid" as const };
         const db = await getDb();
@@ -8737,6 +8747,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!row || !row.attributionExpiresAt || row.attributionExpiresAt < Date.now()) {
           return { status: "invalid" as const };
         }
+        if (input.expectedProduct && row.product !== input.expectedProduct) return { status: "invalid" as const };
         if (row.couponCode?.toUpperCase() === "TEST1") return { status: "invalid" as const };
         if (!row.confirmedAt || !row.confirmedTransactionId || !row.confirmedAmountAgorot || !row.purchaseEventId) {
           return { status: "pending" as const };

@@ -90,7 +90,7 @@ describe("New Year holiday bundle", () => {
       expect(wallet).toContain(field);
       expect(router).toContain(field);
     }
-    expect(wallet).toContain("const attributionTerm = [utmTerm, metaPlacement, metaSiteSource]");
+    expect(wallet.replace(/\s+/g, " ")).toContain("const attributionTerm = [utmTerm, metaPlacement, siteSourceName]");
   });
 
   it("states the service limits and does not promise a relationship or match cadence", () => {

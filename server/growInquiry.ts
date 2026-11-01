@@ -24,6 +24,7 @@ export type GrowInquiryProduct =
   | "session"
   | "bundle_tubav"
   | "bundle_new_year"
+  | "bundle_november"
   | "match_boost"
   | "live_october"
   | "plus";
@@ -90,9 +91,13 @@ const PRODUCT_CREDENTIAL_ENV: Record<
     pageCode: "GROW_PAGE_CODE_COACHING_MAS",
   },
   session: { userId: "GROW_USER_ID", pageCode: "GROW_PAGE_CODE_SESSION" },
-  // These two checkout products use the application's database payment page.
+  // These bundle checkout products use the application's database payment page.
   bundle_tubav: { userId: "GROW_USER_ID", pageCode: "GROW_PAGE_CODE_DATABASE" },
   bundle_new_year: {
+    userId: "GROW_USER_ID",
+    pageCode: "GROW_PAGE_CODE_DATABASE",
+  },
+  bundle_november: {
     userId: "GROW_USER_ID",
     pageCode: "GROW_PAGE_CODE_DATABASE",
   },

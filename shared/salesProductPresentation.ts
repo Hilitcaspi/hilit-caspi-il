@@ -11,7 +11,7 @@ type ProductSale = { product: string; productLabel: string; status: "included" |
 const key = (value: string) => value.trim().toLowerCase();
 export function salesProductGroup(product: string): "database" | "boost" | "plus" | "other" {
   const value = key(product);
-  if (value === "database") return "database";
+  if (value === "database" || value === "bundle_november") return "database";
   if (value === "match_boost" || value === "boost") return "boost";
   if (value === "plus" || value === "database_plus") return "plus";
   return "other";

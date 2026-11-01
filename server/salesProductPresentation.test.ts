@@ -10,6 +10,14 @@ describe("product-scoped purchase sources", () => {
     expect(filterSalesByProduct(sales).map(sale => sale.product)).toEqual(["database", "database"]);
     expect(filterSalesByProduct([{ ...row("database", 29900), coupon: "LIVE" }])).toHaveLength(1);
   });
+  it("includes the November database bundle in database revenue without counting the gifted course twice", () => {
+    const bundle = row("bundle_november", 34900);
+    const paidCourse = row("course", 24900);
+    expect(salesProductGroup(" BUNDLE_NOVEMBER ")).toBe("database");
+    expect(filterSalesByProduct([bundle, paidCourse])).toEqual([bundle]);
+    expect(filterSalesByProduct([bundle, paidCourse], "other")).toEqual([paidCourse]);
+    expect(summarizeProductSales(filterSalesByProduct([bundle, paidCourse])).includedRevenueAgorot).toBe(34900);
+  });
   it("separates Boost, Plus, other products and optional all-products view", () => {
     expect(filterSalesByProduct(sales,"boost").map(sale=>sale.product)).toEqual(["match_boost"]);
     expect(filterSalesByProduct(sales,"plus").map(sale=>sale.product)).toEqual(["plus"]);

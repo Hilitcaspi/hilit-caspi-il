@@ -14,6 +14,7 @@ export const CAPI_PRODUCTS: Record<string, { name: string; currency: string }> =
   live_october: { name: "סודות ההתאמה המושלמת - לייב אוקטובר", currency: "ILS" },
   bundle_tubav: { name: "חבילת טו באב - מאגר + מדריך", currency: "ILS" },
   bundle_new_year: { name: "חבילת שנה חדשה - מאגר + מדריך + קורס", currency: "ILS" },
+  bundle_november: { name: "חבילת נובמבר - מאגר + הקורס המלא", currency: "ILS" },
   match_boost: { name: "Boost - שליחת הצעת התאמה", currency: "ILS" },
   plus: { name: "Database Plus", currency: "ILS" },
 };

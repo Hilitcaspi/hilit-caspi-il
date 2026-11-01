@@ -17,6 +17,7 @@ export const LIVE_TEST_PRODUCTS = [
   "session",
   "bundle_tubav",
   "bundle_new_year",
+  "bundle_november",
   "match_boost",
   "plus",
   "live_october",

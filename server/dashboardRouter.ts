@@ -25,6 +25,7 @@ const PRODUCT_PRICES: Record<string, number> = {
   coaching_mas: 4200,
   bundle_tubav: 349,
   bundle_new_year: 399,
+  bundle_november: 349,
 };
 
 /**
@@ -1045,7 +1046,7 @@ export const dashboardRouter = router({
       const revenuePrev = previousPayments.revenue;
       const productSales = currentPayments.productSales;
       const trackedTargetPurchases = (productSales.database || 0)
-        + (productSales.bundle_new_year || 0)
+        + (productSales.bundle_new_year || 0) + (productSales.bundle_november || 0)
         + (productSales.match_boost || 0);
       
       // Lead journey attribution: leads from campaigns that converted
@@ -1334,6 +1335,7 @@ export const dashboardRouter = router({
         coaching_mas: "תוכנית ליווי",
         bundle_tubav: "חבילת טו באב",
         bundle_new_year: "חבילת שנה חדשה",
+        bundle_november: "חבילת נובמבר",
       };
 
       return (rows as any[]).map((r: any) => ({

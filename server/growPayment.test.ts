@@ -29,7 +29,7 @@ describe("growPayment module", () => {
   });
 
   it("has product configs for all supported products", () => {
-    const expected = ["database", "guide", "course", "coaching", "session", "bundle_new_year", "match_boost", "plus"];
+    const expected = ["database", "guide", "course", "coaching", "session", "bundle_new_year", "bundle_november", "match_boost", "plus"];
     for (const p of expected) {
       expect(PRODUCT_CONFIGS[p]).toBeDefined();
       expect(PRODUCT_CONFIGS[p].sum).toBeGreaterThan(0);
@@ -53,6 +53,13 @@ describe("growPayment module", () => {
     expect(PRODUCT_CONFIGS.bundle_new_year.description).toContain("מאגר");
     expect(PRODUCT_CONFIGS.bundle_new_year.description).toContain("מדריך");
     expect(PRODUCT_CONFIGS.bundle_new_year.description).toContain("קורס");
+  });
+
+  it("configures the dedicated November bundle as an exact single 349 ILS charge", () => {
+    expect(PRODUCT_CONFIGS.bundle_november).toMatchObject({ sum: 349, paymentNum: 1 });
+    expect(PRODUCT_CONFIGS.bundle_november.description).toContain("נובמבר");
+    expect(PRODUCT_CONFIGS.bundle_november.description).toContain("מאגר");
+    expect(PRODUCT_CONFIGS.bundle_november.description).toContain("הקורס המלא");
   });
 
   it("keeps the retired Tu B'Av bundle closed even for an internal TEST1 diagnostic", async () => {

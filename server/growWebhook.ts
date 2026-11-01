@@ -44,6 +44,7 @@ import { resolveEmailRecipientGender } from "./emailRecipientGender";
 import { ga4Purchase, clientIdFromEmail } from "./_core/ga4";
 import { capiPurchase } from "./_core/metaCapi";
 import { buildNewYearBundleAccessEmail } from "./newYearBundleEmail";
+import { buildNovemberBundleAccessEmail } from "./novemberBundleAccessEmail";
 import { activatePendingPlusAfterRegistration, activatePlusForSingle } from "./plusFulfillment";
 import { verifyPlusCheckoutReference } from "./plusCheckoutReference";
 import { ensureDatabaseNowMatchTask } from "./databaseNowFulfillment";
@@ -51,6 +52,7 @@ import { ensureLiveTicket, ensurePlusLiveTicket, LIVE_PRODUCT } from "./liveOcto
 import { verifyLiveCheckoutReference } from "./liveCheckoutReference";
 import { isProductionPurchaseMeasurement, isPaidGrowMeasurementNotification, metaNotificationPaidAt, matchesMetaCheckout } from "../shared/metaPurchasePolicy";
 import { verifyPurchaseRecoveryCheckoutReference, redeemPurchaseRecoveryOffer } from "./purchaseRecoveryOffers";
+import { NOVEMBER_BUNDLE_PRICE, NOVEMBER_BUNDLE_PRODUCT } from "../shared/novemberBundleOffer";
 
 const SITE_BASE = "https://hilitcaspi.com";
 
@@ -98,6 +100,27 @@ export function shouldApplyTemporalWebhookDedupe(product: string | null, hasVeri
   return !(product === "match_boost" && hasVerifiedBoostReference);
 }
 
+/**
+ * November's dedicated discriminator is the product description plus the
+ * server-created payment intent. A 349 ILS amount alone remains historical
+ * Tu B'Av and can never earn this entitlement.
+ */
+export function isValidNovemberBundleWebhookBinding(input: {
+  sum: number;
+  webhookProcessToken?: string | null;
+  checkoutProcessToken?: string | null;
+  couponCode?: string | null;
+}): boolean {
+  const matchingProcess = Boolean(
+    input.webhookProcessToken
+    && input.checkoutProcessToken
+    && input.webhookProcessToken === input.checkoutProcessToken,
+  );
+  if (!matchingProcess) return false;
+  return input.sum === NOVEMBER_BUNDLE_PRICE
+    || (input.sum === 1 && input.couponCode?.trim().toUpperCase() === "TEST1");
+}
+
 export function completedPaymentDedupeKey(input: {
   email: string;
   product: string;
@@ -116,6 +139,9 @@ export function detectProductByDesc(desc: string): string | null {
   if (d.includes("סודות ההתאמה המושלמת 31.10.2026")) return LIVE_PRODUCT;
   if (d.includes("match boost") || d.includes("match_boost") || d.includes("בוסט התאמה") || d.includes("boost - הצעת התאמה")) return "match_boost";
   if (d.includes("database plus") || d.includes("מאגר פלוס") || d.includes("database+")) return "plus";
+  // November deliberately has a dedicated descriptor. 349 ILS has historical
+  // Tu B'Av meaning, so this product is never inferred from amount alone.
+  if (d.includes("חבילת נובמבר") || d.includes("bundle_november")) return NOVEMBER_BUNDLE_PRODUCT;
   if (d.includes("חבילת שנה חדשה") || d.includes("bundle_new_year") || (d.includes("מאגר") && d.includes("מדריך") && d.includes("קורס"))) return "bundle_new_year";
   // IMPORTANT: bundle_tubav MUST be checked before guide/database because its description contains both "מדריך" and "מאגר"
   if (d.includes("חבילת טו באב") || d.includes("bundle_tubav") || (d.includes("מאגר") && d.includes("מדריך"))) return "bundle_tubav";
@@ -194,7 +220,7 @@ async function handleGuide(email: string, name: string, opts?: { skipJourney?: b
 async function handleCourse(
   email: string,
   name: string,
-  opts: { skipJourney?: boolean; emailMode?: "standalone" | "new_year_bundle" } = {},
+  opts: { skipJourney?: boolean; emailMode?: "standalone" | "new_year_bundle" | "november_bundle" } = {},
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -204,9 +230,14 @@ async function handleCourse(
     .orderBy(orderDesc(productAccessTokens.createdAt))
     .limit(1);
   const isNewYearBundle = opts.emailMode === "new_year_bundle";
+  const isNovemberBundle = opts.emailMode === "november_bundle";
   if (existing.length > 0 && !isNewYearBundle) {
-    console.log(`[GrowWebhook] Course token already exists for ${email}, skipping`);
-    return;
+    // November deliberately falls through so it can inspect both durable
+    // access tokens and make its own repeat-safe combined-email decision.
+    if (!isNovemberBundle) {
+      console.log(`[GrowWebhook] Course token already exists for ${email}, skipping`);
+      return;
+    }
   }
 
   const now = Date.now();
@@ -216,8 +247,15 @@ async function handleCourse(
     .limit(1);
   const courseToken = existing[0]?.token || crypto.randomBytes(32).toString("hex");
   const guideToken = existingGuide[0]?.token || crypto.randomBytes(32).toString("hex");
+  // A duplicate November callback must not resend the combined access message
+  // or create any replacement access. Existing full-course behavior remains
+  // unchanged for standalone and historical New Year fulfillment.
+  if (isNovemberBundle && existing.length > 0 && existingGuide.length > 0) {
+    console.log(`[GrowWebhook] November bundle course access already exists for ${email}, skipping`);
+    return;
+  }
   if (existing.length === 0) {
-    await db.insert(leads).values({ name, email, phone: "", source: "paid_course" }).catch(() => {});
+    await db.insert(leads).values({ name, email, phone: "", source: isNovemberBundle ? "november_course_gift" : "paid_course" }).catch(() => {});
     await db.insert(productAccessTokens).values({
       token: courseToken, email, name, product: "course_249",
       expiresAt: now + 365 * 24 * 60 * 60 * 1000, accessCount: 0, createdAt: now,
@@ -232,9 +270,24 @@ async function handleCourse(
   const COURSE_URL = `${SITE_BASE}/course/view?token=${courseToken}`;
   const GUIDE_URL = `${SITE_BASE}/guide/view?token=${guideToken}`;
   const firstName = name.trim().split(" ")[0];
-  await notifyOwner({ title: "רכישת קורס חדשה! 🎓", content: `${name} (${email}) רכש את הקורס ב-249 ₪` });
+  if (isNovemberBundle) {
+    await notifyOwner({ title: "גישה לקורס במתנה בחבילת נובמבר", content: `${name} (${email}) קיבל גישה לקורס המלא במסגרת חבילת נובמבר. אין חיוב נוסף עבור הקורס.` });
+  } else {
+    await notifyOwner({ title: "רכישת קורס חדשה! 🎓", content: `${name} (${email}) רכש את הקורס ב-249 ₪` });
+  }
   if (isNewYearBundle) {
     const bundleEmail = buildNewYearBundleAccessEmail({
+      firstName,
+      email,
+      courseUrl: COURSE_URL,
+      guideUrl: GUIDE_URL,
+    });
+    await sendEmail({
+      to: { email, name },
+      ...bundleEmail,
+    });
+  } else if (isNovemberBundle) {
+    const bundleEmail = buildNovemberBundleAccessEmail({
       firstName,
       email,
       courseUrl: COURSE_URL,
@@ -350,6 +403,7 @@ export async function handleDatabase(
   phone: string,
   transactionId: string = "",
   couponCode?: string | null,
+  opts: { skipEmailIfAlreadyPaid?: boolean } = {},
 ) {
   const db = await getDb();
   if (!db) return;
@@ -386,6 +440,7 @@ export async function handleDatabase(
     id: singles.id,
     questionnaireToken: singles.questionnaireToken,
     questionnaireCompletedAt: singles.questionnaireCompletedAt,
+    isPaid: singles.isPaid,
   })
     .from(singles)
     .where(
@@ -396,6 +451,14 @@ export async function handleDatabase(
     )
     .limit(1)
     .then(r => r[0] ?? null);
+
+  // Only the November bundle uses this narrowly-scoped repeat guard. The
+  // payment ledger and webhook row are the primary idempotency boundary; this
+  // also prevents a late duplicate callback from issuing another join email.
+  if (singleRecord?.isPaid && opts.skipEmailIfAlreadyPaid) {
+    console.log(`[GrowWebhook] November database access already exists for ${email}, skipping duplicate onboarding email`);
+    return;
+  }
 
   if (singleRecord) {
     // Existing record found (created by registerBasicProfile with isPaid=false), mark as paid + active now
@@ -434,7 +497,7 @@ export async function handleDatabase(
       updatedAt: now,
     });
     const singleId = (inserted as any)[0].insertId as number;
-    singleRecord = { id: singleId, questionnaireToken: token, questionnaireCompletedAt: null };
+    singleRecord = { id: singleId, questionnaireToken: token, questionnaireCompletedAt: null, isPaid: true };
 
   }
 
@@ -477,7 +540,11 @@ export async function handleDatabase(
 
   const joinUrl = `${SITE_BASE}/join/questionnaire?token=${singleRecord.questionnaireToken}`;
 
-  await notifyOwner({ title: "תשלום מאגר חדש! 💛", content: `${name} (${email}) שילם דמי רישום למאגר ב-299 ₪. Transaction: ${transactionId || 'N/A'}` });
+  if (opts.skipEmailIfAlreadyPaid) {
+    await notifyOwner({ title: "תשלום מאגר בחבילת נובמבר", content: `${name} (${email}) הצטרף למאגר במסגרת חבילת נובמבר הכוללת את הקורס במתנה. אין רכישת קורס נפרדת. Transaction: ${transactionId || 'N/A'}` });
+  } else {
+    await notifyOwner({ title: "תשלום מאגר חדש! 💛", content: `${name} (${email}) שילם דמי רישום למאגר ב-299 ₪. Transaction: ${transactionId || 'N/A'}` });
+  }
 
   // Send personal join link email
   sendEmail({
@@ -562,6 +629,16 @@ async function handleBundleNewYear(email: string, name: string, phone: string, t
     content: `${name} (${email}) רכש/ה את חבילת השנה החדשה (מאגר + מדריך + קורס) ב־${amount} ₪. Transaction: ${transactionId || "N/A"}`,
   });
   console.log(`[GrowWebhook] New Year bundle completed for ${email} (database + guide + course)`);
+}
+
+// ─── November Bundle handler ──────────────────────────────────────────────────
+async function handleBundleNovember(email: string, name: string, phone: string, transactionId: string = "") {
+  // Database enrollment sends the personal questionnaire link. The course path
+  // creates/reuses the normal full-course + included guide tokens, but sends one
+  // November combined access email and deliberately skips the course nurture.
+  await handleDatabase(email, name, phone, transactionId, undefined, { skipEmailIfAlreadyPaid: true });
+  await handleCourse(email, name, { skipJourney: true, emailMode: "november_bundle" });
+  console.log(`[GrowWebhook] November bundle completed for ${email} (database + full course)`);
 }
 
 export async function handlePlus(email: string, name: string, transactionId: string, sum: number, data: any) {
@@ -789,7 +866,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   const descProduct = detectProductByDesc(desc);
   if (descProduct) {
     // Description is more specific than processToken for bundles (bundle_tubav uses same pageCode as database)
-    if (descProduct === "bundle_tubav" || descProduct === "bundle_new_year" || descProduct === "match_boost" || descProduct === "plus" || descProduct === LIVE_PRODUCT || !product) {
+    if (descProduct === "bundle_tubav" || descProduct === "bundle_new_year" || descProduct === NOVEMBER_BUNDLE_PRODUCT || descProduct === "match_boost" || descProduct === "plus" || descProduct === LIVE_PRODUCT || !product) {
       product = descProduct;
     }
   }
@@ -821,7 +898,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     console.log(`[GrowWebhook] Overriding product from ${product} to bundle_tubav based on sum=349`);
     product = "bundle_tubav";
   }
-  if (product !== "bundle_new_year" && (sum === 399 || sum === 449)) {
+  if (product !== "bundle_new_year" && product !== NOVEMBER_BUNDLE_PRODUCT && (sum === 399 || sum === 449)) {
     console.log(`[GrowWebhook] Overriding product from ${product || "unknown"} to bundle_new_year based on sum=${sum}`);
     product = "bundle_new_year";
   }
@@ -853,7 +930,12 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     try {
       const db = await getDb();
       if (db) {
-        const trackingWhere = verifiedLiveTier
+        // November cannot use the legacy email/product fallback: its 349 ILS
+        // price historically identifies Tu B'Av. The callback must resolve to
+        // this exact server-created process before the later binding check.
+        const trackingWhere = product === NOVEMBER_BUNDLE_PRODUCT
+          ? and(eq(paymentLeads.providerProcessToken, liveProcessToken), eq(paymentLeads.email, email), eq(paymentLeads.product, product))
+          : verifiedLiveTier
           ? and(eq(paymentLeads.providerProcessToken, liveProcessToken), eq(paymentLeads.email, email), eq(paymentLeads.product, product))
           : processToken
           ? or(
@@ -887,6 +969,21 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       }
     } catch (error) {
       console.warn("[PurchaseTracking] Checkout attribution lookup failed", error);
+    }
+  }
+
+  // The new 349 ILS November bundle is intentionally not a price discriminator.
+  // It must carry the dedicated canonical description and bind to the exact
+  // server-created payment intent/process token. This retains historical 349
+  // Tu B'Av callback behavior while rejecting fabricated or mismatched claims.
+  if (product === NOVEMBER_BUNDLE_PRODUCT) {
+    if (!isValidNovemberBundleWebhookBinding({
+      sum,
+      webhookProcessToken: liveProcessToken,
+      checkoutProcessToken: purchaseTracking?.providerProcessToken,
+      couponCode: purchaseTracking?.couponCode,
+    })) {
+      throw new Error("November bundle payment is not bound to the exact server checkout or price");
     }
   }
 
@@ -1124,6 +1221,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       }
       case "bundle_tubav": await handleBundleTuBav(email, name, phone, transactionId); break;
       case "bundle_new_year": await handleBundleNewYear(email, name, phone, transactionId, sum); break;
+      case NOVEMBER_BUNDLE_PRODUCT: await handleBundleNovember(email, name, phone, transactionId); break;
       case "live_event": await handleLiveEvent(email, name, phone); break;
       case "live_october": {
         if (!verifiedLiveTier || verifiedLiveTier.startsWith("database_live")) throw new Error("Live ticket tier missing");
@@ -1208,7 +1306,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     }
 
     // Fire GA4 purchase event server-side via Measurement Protocol
-    const GA4_KEYS = ["guide", "course", "coaching", "coaching_mas", "session", "database", "bundle_tubav", "bundle_new_year", "match_boost", "plus", "live_event", "live_october"] as const;
+    const GA4_KEYS = ["guide", "course", "coaching", "coaching_mas", "session", "database", "bundle_tubav", "bundle_new_year", NOVEMBER_BUNDLE_PRODUCT, "match_boost", "plus", "live_event", "live_october"] as const;
     type GA4Key = typeof GA4_KEYS[number];
     if (GA4_KEYS.includes(product as GA4Key) && !businessActionAlreadyProcessed && measureProductionPurchase && paidMeasurementNotification) {
       // Prefer the real browser client_id (from _ga cookie) for accurate DebugView stitching

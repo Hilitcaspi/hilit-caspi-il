@@ -19,6 +19,11 @@ import { normalizeIsraeliPhone } from "../shared/profileValidation";
 import { PLUS_HOLIDAY_LAUNCH_COHORT } from "./plusLaunchOffer";
 import { requirePlusDatabaseCheckout } from "./plusDatabaseCheckout";
 import { isClosedSeasonalProduct, TU_BAV_CLOSED_MESSAGE } from "../shared/closedSeasonalOffers";
+import {
+  isNovemberBundleOfferActive,
+  NOVEMBER_BUNDLE_PRICE,
+  NOVEMBER_BUNDLE_PRODUCT,
+} from "../shared/novemberBundleOffer";
 
 export const PAYMENT_PHONE_INVALID = "PAYMENT_PHONE_INVALID";
 
@@ -93,6 +98,7 @@ const PAGE_CODES: Record<string, string> = {
   session:      process.env.GROW_PAGE_CODE_SESSION      || PROD_PAGE_CODE,
   bundle_tubav: process.env.GROW_PAGE_CODE_DATABASE   || PROD_PAGE_CODE,
   bundle_new_year: process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
+  [NOVEMBER_BUNDLE_PRODUCT]: process.env.GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   // Boost is a one-time micro-payment and may safely use the existing one-time
   // wallet page. Product identity is preserved by its unique description and
   // by the pending Boost request created before Grow is opened.
@@ -164,6 +170,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   session:      { description: "פגישת היכרות עם הילית כספי",                          sum: 500,  paymentNum: 1 },
   bundle_tubav: { description: "חבילת טו באב - מאגר + מדריך לבחור נכון",            sum: 349,  paymentNum: 1 },
   bundle_new_year: { description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע", sum: 399, paymentNum: 1 },
+  [NOVEMBER_BUNDLE_PRODUCT]: { description: "חבילת נובמבר - מאגר + הקורס המלא המסע לזוגיות", sum: NOVEMBER_BUNDLE_PRICE, paymentNum: 1 },
   match_boost:  { description: "Boost - הצעת התאמה אלגוריתמית",                       sum: 19.90, paymentNum: 1 },
   live_october: { description: "כרטיס ללייב סודות ההתאמה המושלמת 31.10.2026", sum: 149, paymentNum: 1 },
   plus:         { description: "Database Plus - מנוי חודשי",                         sum: 99 },
@@ -225,6 +232,12 @@ export interface CreatePaymentResult {
 }
 
 export async function createPaymentProcess(input: CreatePaymentInput): Promise<CreatePaymentResult> {
+  // This is intentionally a new-checkout gate only. A verified Grow callback
+  // from a process created while the campaign was open is fulfilled elsewhere
+  // even after the public offer has expired.
+  if (input.product === NOVEMBER_BUNDLE_PRODUCT && !isNovemberBundleOfferActive()) {
+    throw new GrowCreateProcessError("הטבת נובמבר הסתיימה ואינה פתוחה לרכישות חדשות", "safe_rejected");
+  }
   if (isClosedSeasonalProduct(input.product)) {
     throw new GrowCreateProcessError(TU_BAV_CLOSED_MESSAGE, "safe_rejected");
   }
@@ -348,6 +361,12 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     throw new GrowCreateProcessError("The selected Grow payment product is not configured yet", "safe_rejected");
   }
   const sum = input.sum ?? config.sum;
+  if (input.product === NOVEMBER_BUNDLE_PRODUCT) {
+    const permittedSum = input.diagnosticTest ? 1 : NOVEMBER_BUNDLE_PRICE;
+    if (sum !== permittedSum) {
+      throw new GrowCreateProcessError("מחיר חבילת נובמבר אינו תקין", "safe_rejected");
+    }
+  }
 
   const params = new URLSearchParams();
   params.append("pageCode", pageCode);
@@ -363,6 +382,7 @@ export async function createPaymentProcess(input: CreatePaymentInput): Promise<C
     session:      "/thank-you/session",
     bundle_tubav: "/thank-you/bundle",
     bundle_new_year: "/thank-you/new-year-love",
+    [NOVEMBER_BUNDLE_PRODUCT]: "/thank-you/november-love",
     match_boost:  "/thank-you/match-boost",
     live_october: "/live/thank-you",
     plus:         "/thank-you/plus",

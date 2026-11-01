@@ -74,6 +74,8 @@ const PAGE_CODES: Record<string, string> = {
   bundle_tubav: import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   bundle_new_year:
     import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
+  bundle_november:
+    import.meta.env.VITE_GROW_PAGE_CODE_DATABASE || PROD_PAGE_CODE,
   match_boost:
     import.meta.env.VITE_GROW_PAGE_CODE_MATCH_BOOST ||
     import.meta.env.VITE_GROW_PAGE_CODE_DATABASE ||
@@ -128,6 +130,11 @@ const PRODUCT_CONFIGS: Record<
   bundle_new_year: {
     description: "חבילת שנה חדשה - מאגר + מדריך לבחור נכון + קורס המסע",
     sum: 399,
+    paymentNum: 1,
+  },
+  bundle_november: {
+    description: "חבילת נובמבר - מאגר + הקורס המלא המסע לזוגיות",
+    sum: 349,
     paymentNum: 1,
   },
   match_boost: {
@@ -314,6 +321,7 @@ interface GrowWalletProps {
     | "session"
     | "bundle_tubav"
     | "bundle_new_year"
+    | "bundle_november"
     | "match_boost"
     | "plus"
     | "live_october";
@@ -886,6 +894,7 @@ export default function GrowWallet({
             | "session"
             | "bundle_tubav"
             | "bundle_new_year"
+            | "bundle_november"
             | "match_boost"
             | "plus"
             | "live_october",

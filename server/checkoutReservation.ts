@@ -206,7 +206,7 @@ interface CheckoutScope {
 function checkoutScope(product: string, boostMatchId: string | number | undefined, diagnosticTest: boolean): CheckoutScope {
   let scope: CheckoutScope;
   if (product === "database" || product.startsWith("bundle")) {
-    scope = { scopeKind: "database_bundle", aliases: ["database", "bundle_tubav", "bundle_new_year", "bundle"], repeatable: false, oneTime: true };
+    scope = { scopeKind: "database_bundle", aliases: ["database", "bundle_tubav", "bundle_new_year", "bundle_november", "bundle"], repeatable: false, oneTime: true };
   } else if (product === "guide" || product.startsWith("guide_")) {
     scope = { scopeKind: "guide", aliases: ["guide", "guide_149", "guide_live_bonus"], repeatable: false, oneTime: true };
   } else if (product === "course" || product.startsWith("course_")) {

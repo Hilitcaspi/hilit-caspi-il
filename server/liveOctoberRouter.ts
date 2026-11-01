@@ -9,6 +9,7 @@ import { liveQuestionTicket } from "./liveQuestionAccess";
 import { confirmLiveAttendance, readLiveQuestionAccess } from "./liveAttendance";
 import { loadLiveFirstMatchQueue } from "./liveFirstMatchQueue";
 import { loadLivePostFirstMatchQueue } from "./livePostFirstMatchQueue";
+import { loadNovemberBundleFirstMatchQueue } from "./novemberBundleFirstMatchQueue";
 import { isZoomLiveDeliveryEnabled } from "./liveZoomApi";
 import { LIVE_POST_DATABASE_CODE, LIVE_POST_PLUS_CODE, LIVE_POST_OFFER_START, LIVE_POST_OFFER_END } from "../shared/livePostOffer";
 import { liveOpenRegistrations } from "../drizzle/liveOpenRegistrationSchema";
@@ -176,5 +177,12 @@ export const liveOctoberRouter = router({
     if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
     if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     return loadLivePostFirstMatchQueue();
+  }),
+
+  /** Read-only November 2026 bundle queue; it never scores, queues, or sends a match. */
+  adminNovemberBundleFirstMatchQueue: teamProcedure.query(async ({ ctx }) => {
+    if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
+    if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    return loadNovemberBundleFirstMatchQueue();
   }),
 });

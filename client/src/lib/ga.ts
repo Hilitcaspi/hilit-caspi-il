@@ -125,6 +125,13 @@ export const GA_PRODUCTS = {
     price: 399,
     currency: "ILS",
   },
+  bundle_november: {
+    item_id: "bundle_november_349",
+    item_name: "חבילת נובמבר - מאגר + הקורס המלא",
+    item_category: "bundle",
+    price: 349,
+    currency: "ILS",
+  },
   match_boost: {
     item_id: "match_boost_1990",
     item_name: "Boost - שליחת הצעת התאמה",

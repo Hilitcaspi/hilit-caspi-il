@@ -19,7 +19,7 @@ describe("TEST1 diagnostic coupon policy", () => {
     expect(LIVE_TEST_PRICE).toBe(1);
     expect(LIVE_TEST_PRODUCTS).toEqual([
       "database", "guide", "course", "coaching", "coaching_mas", "session",
-      "bundle_tubav", "bundle_new_year", "match_boost", "plus", "live_october",
+      "bundle_tubav", "bundle_new_year", "bundle_november", "match_boost", "plus", "live_october",
     ]);
     for (const product of LIVE_TEST_PRODUCTS) {
       expect(isLiveTestCheckout(product, "test1", "test-owner@gmail.com", now)).toBe(true);
