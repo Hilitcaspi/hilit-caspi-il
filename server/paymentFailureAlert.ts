@@ -88,14 +88,16 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
     : info.stage === "doPayment" ? "סליקת כרטיס"
     : "כשל ב-SDK";
   const isPreliminarySdkReport = info.stage === "sdk_failure";
+  const isProfileSaveFailure = info.stage === "profile_save";
   const emailHeading = isPreliminarySdkReport
     ? "⚠️ דיווח ראשוני ממסך התשלום"
-    : "🚨 התראת תשלום נכשל";
+    : isProfileSaveFailure ? "שמירת ההרשמה נעצרה לפני התשלום" : "🚨 התראת תשלום נכשל";
   const emailSubject = isPreliminarySdkReport
     ? `⚠️ דיווח ראשוני ממסך התשלום - ${info.customerName} (${productLabel})`
-    : `🚨 תשלום נכשל - ${info.customerName} (${productLabel})`;
+    : isProfileSaveFailure ? `שמירת הרשמה נעצרה - ${info.customerName} (${productLabel})` : `🚨 תשלום נכשל - ${info.customerName} (${productLabel})`;
   const guidance = isPreliminarySdkReport
     ? "זהו דיווח מהמסך בלבד ולא קביעה סופית. Grow הוא מקור האמת, ולעיתים Bit מאשר את העסקה זמן קצר לאחר הדיווח. יש לבדוק שוב ב-Grow לפני פנייה ללקוח."
+    : isProfileSaveFailure ? "שמירת הפרופיל נעצרה לפני פתיחת התשלום. זו אינה הודעה על כרטיס שנדחה. יש לבדוק את שמירת ההרשמה ואת מסלול ההמשך, ולהצליב אם התשלום הושלם בניסיון אחר."
     : "ייתכן שמדובר בכרטיס שנדחה או בעיה זמנית ב-Meshulam. אם זה חוזר על עצמו, כדאי לבדוק בלוח הבקרה של Grow.";
 
   const now = new Date().toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" });
@@ -128,7 +130,7 @@ export async function notifyPaymentFailure(info: PaymentFailureInfo): Promise<vo
 
   if (shouldSendCriticalPaymentSms(info.stage)) {
     alertTasks.push(sendSMS(HILIT_PHONE, [
-      `🚨 תקלה זמנית ביצירת תשלום: ${productLabel}`,
+      isProfileSaveFailure ? `שמירת הרשמה נעצרה לפני התשלום: ${productLabel}` : `🚨 תקלה זמנית ביצירת תשלום: ${productLabel}`,
       `שלב: ${stageLabel}`,
       "בניסיון הזה לא בוצע חיוב.",
       "ייתכן שהלקוח ינסה שוב ויצליח; מייל עם הפרטים נשלח לבדיקה.",

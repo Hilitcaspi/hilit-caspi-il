@@ -47,6 +47,10 @@ describe("DNA payment recovery", () => {
     expect(recovery).toContain('status: "already_paid"');
     expect(recovery).toContain('status: "recover_local"');
     expect(recovery).toContain('status: "resume"');
+    expect(recovery).toContain("singleId: dnaQuizResults.singleId");
+    expect(recovery).toContain("resolveRegistrationDraftOwnership({");
+    expect(recovery).toContain("verifiedDnaSession: quiz");
+    expect(recovery.indexOf("if (!ownership.authorized) return")).toBeLessThan(recovery.indexOf('status: "resume"'));
     const client = readFileSync(new URL("../client/src/pages/RegistrationPaymentRecovery.tsx", import.meta.url), "utf8");
     expect(client).toContain("readRecoverablePaymentDraft(saved, recovery.lead)");
     expect(client).toContain("deferUntilPayment: true");

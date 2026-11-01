@@ -88,4 +88,12 @@ describe("payment failure operational alerts", () => {
     expect(sendEmailMock).not.toHaveBeenCalled();
     expect(sendSmsMock).not.toHaveBeenCalled();
   });
+  it("does not alert on a cached client's expected resume guard", async () => {
+    await notifyPaymentFailure({
+      customerName: "בדיקה", customerEmail: "resume@example.test", product: "database",
+      stage: "profile_save", errorMessage: "resume-required",
+    });
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(sendSmsMock).not.toHaveBeenCalled();
+  });
 });

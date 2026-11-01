@@ -99,6 +99,7 @@ import {
 } from "../shared/unmatchedQueuePresentation";
 import { hashActor, recordSelfServiceEventSafely } from "./usageMetrics";
 import { isInvalidMatchPlaceholder } from "./invalidMatchPlaceholder";
+import { requestRegistrationResumeLink } from "./registrationResumeLink";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -2622,7 +2623,7 @@ export const appRouter = router({
           .limit(1);
         if (!lead || !lead.email || !lead.phone || !lead.gender || !lead.dnaType
           || lead.createdAt < Date.now() - 30 * 24 * 60 * 60 * 1000) return null;
-        const [quiz] = await db.select({ dnaType: dnaQuizResults.dnaType })
+        const [quiz] = await db.select({ dnaType: dnaQuizResults.dnaType, sessionId: dnaQuizResults.sessionId, singleId: dnaQuizResults.singleId })
           .from(dnaQuizResults).where(eq(dnaQuizResults.sessionId, input.sessionId)).limit(1);
         if (!quiz || quiz.dnaType !== lead.dnaType) return null;
 
@@ -2637,6 +2638,7 @@ export const appRouter = router({
             eq(paymentLeads.product, "database"), isNotNull(paymentLeads.confirmedAt)))
           .limit(1);
         const [profile] = await db.select({
+          id: singles.id, email: singles.email,
           isPaid: singles.isPaid, questionnaireToken: singles.questionnaireToken,
           age: singles.age, city: singles.city,
         }).from(singles).where(sql`LOWER(TRIM(${singles.email})) = ${email}`).limit(1);
@@ -2644,6 +2646,11 @@ export const appRouter = router({
           return { status: "already_paid" as const };
         }
         if (profile) {
+          const ownership = resolveRegistrationDraftOwnership({
+            existingProfile: profile, normalizedEmail: email,
+            hasVerifiedFreeToken: false, dnaSessionId: input.sessionId, verifiedDnaSession: quiz,
+          });
+          if (!ownership.authorized) return { status: "needs_support" as const };
           // A skeleton or a profile without a resume token must not be charged.
           if (!profile.age || !profile.city || !/^[a-f0-9]{64}$/i.test(profile.questionnaireToken || "")) {
             return { status: "needs_support" as const };
@@ -3148,6 +3155,11 @@ export const appRouter = router({
         }
         return { success: true as const };
       }),
+
+    /** Request a stored-draft continuation link without returning account data. */
+    sendRegistrationResumeLink: publicProcedure
+      .input(z.object({ email: z.string().trim().email().max(320) }))
+      .mutation(({ input }) => requestRegistrationResumeLink(input)),
 
     /**
      * Send a magic link to the user's email for dashboard access.

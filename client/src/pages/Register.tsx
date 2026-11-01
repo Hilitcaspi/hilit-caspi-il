@@ -16,6 +16,7 @@ import EmbeddedDnaQuiz from "@/components/EmbeddedDnaQuiz";
 import GrowWallet from "@/components/GrowWallet";
 import LiveVoucherCard from "@/components/LiveVoucherCard";
 import { normalizeIsraeliPhone } from "@shared/profileValidation";
+import { isRegistrationResumeRequired, registrationSaveErrorForDisplay, shouldRetryRegistrationSave } from "@shared/registrationSaveErrors";
 import { getFirstTouchAcquisition, getLastUtmAcquisition } from "@/lib/acquisitionTracking";
 import {
   createRegistrationDraftScope,
@@ -438,7 +439,7 @@ export default function Register() {
       } catch (err) {
         console.error("[PrePayment] Failed to save profile draft:", err);
         reportProfileSaveFailure(err);
-        setRegisterError("לא הצלחנו לשמור את הפרופיל לפני התשלום. לא בוצע חיוב. אנא נסו שוב.");
+        setRegisterError(registrationSaveErrorForDisplay(err));
         setStep("uploading_error");
       } finally {
         setPaymentLoading(false);
@@ -531,6 +532,8 @@ export default function Register() {
     // customer may now change. handleProfileSubmit always saves fresh state.
     setDraftSavedBeforePayment(false);
     setGrowOpened(false);
+    setRegisterError("");
+    registrationResumeLinkMutation.reset();
     setStep("profile");
   };
 
@@ -660,6 +663,7 @@ export default function Register() {
   });
   const profileDraftMutation = trpc.singles.registerBasicProfile.useMutation();
   const registrationFailureMutation = trpc.payment.reportFailure.useMutation();
+  const registrationResumeLinkMutation = trpc.singles.sendRegistrationResumeLink.useMutation();
   type ProfileDraftResult = Awaited<ReturnType<typeof profileDraftMutation.mutateAsync>>;
   const [draftSavedBeforePayment, setDraftSavedBeforePayment] = useState(false);
   const draftSaveInFlightRef = useRef<Promise<ProfileDraftResult> | null>(null);
@@ -836,7 +840,7 @@ export default function Register() {
 
   const reportProfileSaveFailure = (error: unknown) => {
     const message = error instanceof Error ? error.message : "unknown_profile_save_error";
-    if (message === "PROFILE_ALREADY_REGISTERED") return;
+    if (message === "PROFILE_ALREADY_REGISTERED" || isRegistrationResumeRequired(error)) return;
     registrationFailureMutation.mutate({
       customerName: `${firstName} ${lastName}`.trim() || "לא ידוע",
       customerEmail: email.trim(),
@@ -997,6 +1001,7 @@ export default function Register() {
           return data;
         } catch (error) {
           lastError = error;
+          if (!shouldRetryRegistrationSave(error)) throw error;
           if (retry < 3) await new Promise(resolve => setTimeout(resolve, retry * 1200));
         }
       }
@@ -1806,7 +1811,7 @@ export default function Register() {
                   } catch (err) {
                     console.error("[PrePayment] Failed to save profile draft after DNA:", err);
                     reportProfileSaveFailure(err);
-                    setRegisterError("לא הצלחנו לשמור את הפרופיל לפני התשלום. לא בוצע חיוב. אנא נסו שוב.");
+                    setRegisterError(registrationSaveErrorForDisplay(err));
                     setStep("uploading_error");
                   } finally {
                     setPaymentLoading(false);
@@ -2022,14 +2027,26 @@ export default function Register() {
           {/* ── UPLOADING ERROR ── */}
           {step === "uploading_error" && (
             <motion.div key="uploading_error" {...slideIn} className="text-center py-20">
-              <div className="text-6xl mb-6">⚠️</div>
-              <h2 className="text-2xl font-black text-red-600 mb-4">
-                אירעה שגיאה
+              <h2 className="text-2xl font-black text-[#191265] mb-4">
+                {isRegistrationResumeRequired(registerError) ? "ממשיכים מההרשמה הקיימת" : "לא הצלחנו לשמור כרגע"}
               </h2>
-              <p className="text-[#727272] mb-6 max-w-sm mx-auto">
-                {registerError || (isFemale ? "לא הצלחנו לשמור את הפרופיל. אנא נסי שוב." : "לא הצלחנו לשמור את הפרופיל. אנא נסה שוב.")}
+              <p className="text-[#727272] mb-6 max-w-sm mx-auto" role="status">
+                {isRegistrationResumeRequired(registerError)
+                  ? "כדי להמשיך בבטחה, נשלח קישור אישי למייל שהוזן בטופס. הפרטים שמילאת כאן לא נמחקו, ולא נפתח תשלום נוסף."
+                  : registerError || "הפרטים נשארו בטופס. אפשר לנסות שוב או לחזור לפרטים בלי להתחיל מחדש."}
               </p>
               <div className="flex flex-col gap-3 max-w-xs mx-auto">
+                {isRegistrationResumeRequired(registerError) ? <>
+                  <button type="button"
+                    disabled={registrationResumeLinkMutation.isPending || registrationResumeLinkMutation.isSuccess}
+                    onClick={() => registrationResumeLinkMutation.mutate({ email: email.trim() })}
+                    className="bg-[#191265] text-white font-bold py-3 rounded-2xl hover:bg-[#1800ad] transition-all disabled:opacity-60"
+                  >
+                    {registrationResumeLinkMutation.isPending ? "מבקשים את הקישור..." : registrationResumeLinkMutation.isSuccess ? "בקשת הקישור נקלטה" : "שלחו לי קישור להמשך ההרשמה"}
+                  </button>
+                  {registrationResumeLinkMutation.isSuccess && <p className="text-sm leading-6 text-[#727272]" role="status">אם קיימת הרשמה בכתובת הזו, הקישור נשלח למייל. כדאי לבדוק גם בספאם. הקישור יפתח את הפרטים השמורים כדי להמשיך משם.</p>}
+                  {registrationResumeLinkMutation.isError && <p className="text-sm text-red-600" role="alert">לא הצלחנו לבקש את הקישור כרגע. הפרטים נשארו כאן, ואפשר לנסות שוב.</p>}
+                </> : <>
                 <button
                   disabled={paymentLoading}
                   onClick={async () => {
@@ -2049,7 +2066,7 @@ export default function Register() {
                         setStep("payment");
                       }
                     } catch (error) {
-                      setRegisterError(error instanceof Error ? error.message : "לא הצלחנו לשמור את הפרטים. הפרטים נשארו בטופס ולא נפתח חיוב.");
+                      setRegisterError(registrationSaveErrorForDisplay(error));
                     } finally {
                       setPaymentLoading(false);
                     }
@@ -2057,6 +2074,11 @@ export default function Register() {
                   className="bg-[#191265] text-white font-bold py-3 rounded-2xl hover:bg-[#1800ad] transition-all"
                 >
                   {isFemale ? "נסי שוב" : "נסה שוב"}
+                </button>
+                </>}
+                <button type="button" onClick={returnToProfileForEditing}
+                  className="border-2 border-[#191265] text-[#191265] font-bold py-3 rounded-2xl text-center hover:bg-[#191265] hover:text-white transition-all">
+                  חזרה לפרטים
                 </button>
                 <a href="https://wa.me/972552442334" target="_blank" rel="noopener noreferrer"
                   className="border-2 border-[#191265] text-[#191265] font-bold py-3 rounded-2xl text-center hover:bg-[#191265] hover:text-white transition-all">

@@ -1,3 +1,5 @@
+import { isRegistrationResumeRequired } from "./registrationSaveErrors";
+
 const EXPECTED_CHECKOUT_REJECTION_MESSAGES = [
   "Database Plus זמין רק לחברי המאגר הפעילים",
   "התשלום עבור Plus כבר נקלט",
@@ -18,5 +20,6 @@ const EXPECTED_CHECKOUT_REJECTION_MESSAGES = [
  */
 export function isExpectedCheckoutRejection(message?: string | null): boolean {
   const normalized = String(message || "");
+  if (isRegistrationResumeRequired(normalized)) return true;
   return EXPECTED_CHECKOUT_REJECTION_MESSAGES.some(expected => normalized.includes(expected));
 }

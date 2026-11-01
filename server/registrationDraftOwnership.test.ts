@@ -58,6 +58,13 @@ describe("registration draft ownership", () => {
     })).toEqual({ authorized: false, proof: null });
   });
 
+  it("refuses a missing profile link even if the session and email match", () => {
+    expect(resolveRegistrationDraftOwnership({
+      existingProfile: profile, normalizedEmail: "draft@example.test", hasVerifiedFreeToken: false,
+      dnaSessionId: DNA_SESSION_ID, verifiedDnaSession: { sessionId: DNA_SESSION_ID, singleId: null },
+    })).toEqual({ authorized: false, proof: null });
+  });
+
   it("never treats email alone as ownership", () => {
     expect(resolveRegistrationDraftOwnership({
       existingProfile: profile,
