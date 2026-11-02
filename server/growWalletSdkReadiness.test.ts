@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { isGrowPaymentRendererReady, isGrowWalletVisible } from "../client/src/lib/growSdkReadiness";
@@ -18,10 +18,33 @@ describe("Grow wallet SDK readiness", () => {
     })).toBe(false);
   });
 
-  it("accepts the SDK only after the public payment renderer is callable", () => {
+  it("rejects a callable wrapper while native services are still loading", () => {
+    const __growServicesLoaded = vi.fn(() => false);
     expect(isGrowPaymentRendererReady({
       growRuntime: {},
       growPayment: { renderPaymentOptions: () => undefined },
+      __growServicesLoaded,
+    })).toBe(false);
+    expect(__growServicesLoaded).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed when the window-level native readiness flag is absent or throws", () => {
+    const host = {
+      growRuntime: { __growServicesLoaded: () => true },
+      growPayment: { renderPaymentOptions: () => undefined },
+    };
+    expect(isGrowPaymentRendererReady(host)).toBe(false);
+    expect(isGrowPaymentRendererReady({
+      ...host,
+      __growServicesLoaded: () => { throw new Error("partial boot"); },
+    })).toBe(false);
+  });
+
+  it("accepts the SDK only after the callable renderer and all native services are ready", () => {
+    expect(isGrowPaymentRendererReady({
+      growRuntime: {},
+      growPayment: { renderPaymentOptions: () => undefined },
+      __growServicesLoaded: () => true,
     })).toBe(true);
   });
 
@@ -37,7 +60,7 @@ describe("Grow wallet SDK readiness", () => {
   it("rechecks renderer readiness after createProcess and before opening Grow", () => {
     const source = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
     const createProcessIndex = source.indexOf("const result = await createProcessMutation.mutateAsync");
-    const guardedRenderIndex = source.indexOf("await renderGrowPaymentOptionsWithRetry(result.authCode, logStep)", createProcessIndex);
+    const guardedRenderIndex = source.indexOf("await renderGrowPaymentOptionsWithRetry(result.authCode, logStep, isCurrentAttempt)", createProcessIndex);
 
     expect(createProcessIndex).toBeGreaterThan(-1);
     expect(guardedRenderIndex).toBeGreaterThan(createProcessIndex);
@@ -46,6 +69,17 @@ describe("Grow wallet SDK readiness", () => {
     expect(source).toContain("await waitForGrowRuntime(GROW_RUNTIME_TIMEOUT_MS)");
     expect(source).toContain("await waitForGrowWalletOpen(9000)");
     expect(source).toContain("setWalletLoading(false)");
+  });
+
+  it("starts native initialization before waiting for services and creating a process", () => {
+    const source = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
+    const initIndex = source.indexOf("await window.growPayment.init({");
+    const waitIndex = source.indexOf("await waitForGrowRuntime(GROW_RUNTIME_TIMEOUT_MS)", initIndex);
+    const createIndex = source.indexOf("const result = await createProcessMutation.mutateAsync", waitIndex);
+    expect(initIndex).toBeGreaterThan(-1);
+    expect(waitIndex).toBeGreaterThan(initIndex);
+    expect(createIndex).toBeGreaterThan(waitIndex);
+    expect(source).toContain("Date.now() - servicesReadyAt >= 200");
   });
 
   it("classifies slow SDK readiness separately from createProcess failures", () => {

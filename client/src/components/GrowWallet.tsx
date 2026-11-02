@@ -25,6 +25,7 @@ import { gaBeginCheckout } from "@/lib/ga";
 import { trackInitiateCheckout } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import {
+  isGrowPaymentOutcomeUnknown,
   isGrowPaymentRendererReady,
   isGrowWalletVisible,
 } from "@/lib/growSdkReadiness";
@@ -219,8 +220,8 @@ function preloadGrowSDKScript(): Promise<void> {
   return scriptLoadPromise;
 }
 
-// Wait for the exact public renderer used by checkout. Grow can expose
-// growRuntime before renderPaymentOptions is attached to growPayment.
+// init() starts loading services before this wait. The loader wrapper and
+// growRuntime alone do not mean its native all-assets readiness gate has passed.
 const GROW_RUNTIME_TIMEOUT_MS = 35_000;
 
 function waitForGrowRuntime(
@@ -228,12 +229,19 @@ function waitForGrowRuntime(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
+    let servicesReadyAt: number | undefined;
     const poll = setInterval(() => {
       if (isGrowPaymentRendererReady(window)) {
-        clearInterval(poll);
-        console.log("[GrowWallet] Payment renderer ready ✓");
-        resolve();
-        return;
+        servicesReadyAt ??= Date.now();
+        // 1.3.5 marks HTML loaded before its deferred 200ms DOM/listener setup.
+        if (Date.now() - servicesReadyAt >= 200) {
+          clearInterval(poll);
+          console.log("[GrowWallet] Payment renderer ready ✓");
+          resolve();
+          return;
+        }
+      } else {
+        servicesReadyAt = undefined;
       }
       if (Date.now() > deadline) {
         clearInterval(poll);
@@ -265,10 +273,13 @@ function waitForGrowWalletOpen(timeoutMs = 2500): Promise<void> {
 
 async function renderGrowPaymentOptionsWithRetry(
   authCode: string,
-  logStep: (step: string, detail?: string) => void
+  logStep: (step: string, detail?: string) => void,
+  isCurrentAttempt: () => boolean
 ): Promise<void> {
   for (let attempt = 1; attempt <= 2; attempt++) {
+    if (!isCurrentAttempt()) return;
     await waitForGrowRuntime(GROW_RUNTIME_TIMEOUT_MS);
+    if (!isCurrentAttempt()) return;
     const growPaymentSdk = window.growPayment;
     if (
       !growPaymentSdk ||
@@ -288,6 +299,9 @@ async function renderGrowPaymentOptionsWithRetry(
       await waitForGrowWalletOpen(9000);
       return;
     } catch {
+      // Timeout/error callbacks invalidate ownership. Never redraw an expired
+      // authorization (or another unknown outcome) from this in-flight loop.
+      if (!isCurrentAttempt()) return;
       if (attempt < 2) {
         await new Promise(resolve => setTimeout(resolve, attempt * 350));
       }
@@ -366,6 +380,7 @@ interface LocalCheckoutAttempt {
   lease?: CheckoutOwnerLease;
   authCode?: string;
   processToken?: string | null;
+  outcomeUnknown?: boolean;
   terminal: boolean;
 }
 
@@ -542,7 +557,7 @@ export default function GrowWallet({
   const handlePay = useCallback(async () => {
     // This ref is intentionally set before the first await. React state alone
     // cannot prevent two click handlers from entering in the same event turn.
-    if (checkoutLockRef.current || paymentCompleted || paymentStatusAmbiguous) return;
+    if (checkoutLockRef.current || checkoutAttemptRef.current?.outcomeUnknown || paymentCompleted || paymentStatusAmbiguous) return;
 
     const fullName = normalizeCheckoutFullName(name);
     const userEmail = email.trim();
@@ -649,6 +664,9 @@ export default function GrowWallet({
       isCheckoutOwner(lease);
     const releaseRecoverableAttempt = (ambiguous = false) => {
       if (!isCurrentAttempt()) return;
+      // React may not have committed the disabled button yet. Keep the unknown
+      // outcome sticky in the attempt ref as well as the visible UI state.
+      if (ambiguous) attempt.outcomeUnknown = true;
       releaseCheckoutOwner(lease);
       attempt.lease = undefined;
       checkoutLockRef.current = false;
@@ -733,11 +751,23 @@ export default function GrowWallet({
             },
             onFailure: (r: any) => {
               if (!isCurrentAttempt()) return;
-              const ambiguousFailure = /outcome_unknown|timeout|network|fetch failed|Failed to fetch|מצב התשלום/i.test(JSON.stringify(r) || "");
+              const ambiguousFailure = isGrowPaymentOutcomeUnknown(r);
               releaseRecoverableAttempt(ambiguousFailure);
               toast.error(ambiguousFailure
                 ? "מצב התשלום אינו ברור. אין לשלם שוב לפני בדיקה; אפשר לפנות אלינו לבירור."
                 : "התשלום נכשל. אפשר לפתוח שוב את אותו תהליך תשלום.");
+              reportSdkFailure(r);
+              attempt.callbacks.onFailure?.(r);
+            },
+            onTimeout: (r: any) => {
+              if (!isCurrentAttempt()) return;
+              // Expiry is not terminal unpaid proof. Keep authCode/processToken
+              // and the dedupe UUID; only reconciliation can authorize recovery.
+              logStep("sdk_timeout", "outcome_unknown");
+              releaseRecoverableAttempt(true);
+              toast.error(
+                "מצב התשלום אינו ברור. אין לשלם שוב לפני בדיקה; אפשר לפנות אלינו לבירור."
+              );
               reportSdkFailure(r);
               attempt.callbacks.onFailure?.(r);
             },
@@ -761,8 +791,8 @@ export default function GrowWallet({
             },
             onError: (e: any) => {
               if (!isCurrentAttempt()) return;
-              // This may arrive after a provider action, so it is distinct from
-              // a confirmed SDK failure. The customer can reopen the same process.
+              // This may arrive after a provider action. Preserve the process
+              // and block another payment until its outcome has been verified.
               releaseRecoverableAttempt(true);
               toast.error(
                 "מצב התשלום עדיין אינו ברור. אין לשלם שוב לפני בדיקה; אפשר לפנות אלינו לבירור."
@@ -780,8 +810,8 @@ export default function GrowWallet({
         logStep("3_wait_runtime_done");
       }
 
-      // A close/error after createProcess must redraw the same provider process.
-      // Do not mint a second intended purchase or server nonce for this identity.
+      // A recoverable close may reopen the same provider process. Unknown
+      // outcomes/expiry are blocked; never mint another purchase or nonce here.
       if (!attempt.authCode) {
         const baseCheckoutPrice = PRODUCT_CONFIGS[product]?.sum ?? 0;
         const trackedCheckoutPrice = (isPlusBonusCouponCode(attempt.couponCode) || attempt.couponCode === LIVE_POST_PLUS_CODE)
@@ -971,9 +1001,8 @@ export default function GrowWallet({
         );
         failureStage = "sdk_failure";
         logStep("5_renderPaymentOptions_start");
-        // The first open uses the just-created process. A later close/error
-        // reaches the cached-attempt branch below and redraws this same authCode.
-        await renderGrowPaymentOptionsWithRetry(result.authCode, logStep);
+        // Only a recoverable close reaches the cached-attempt redraw branch.
+        await renderGrowPaymentOptionsWithRetry(result.authCode, logStep, isCurrentAttempt);
         if (!isCurrentAttempt()) return;
         setWalletLoading(false);
         setWalletOpen(true);
@@ -986,7 +1015,7 @@ export default function GrowWallet({
       logStep("5_renderPaymentOptions_start");
       // Re-check after the network round-trip as the SDK mutates its global
       // object asynchronously during initialization on some first loads.
-      await renderGrowPaymentOptionsWithRetry(attempt.authCode!, logStep);
+      await renderGrowPaymentOptionsWithRetry(attempt.authCode!, logStep, isCurrentAttempt);
       if (!isCurrentAttempt()) return;
       setWalletLoading(false);
       setWalletOpen(true);
