@@ -42,6 +42,7 @@ import { sendEmail, blacklistBrevoContactEmail, isPermanentlyBlockedEmail, resum
 import { createPlusCheckoutReference } from "./plusCheckoutReference";
 import { activatePendingPlusAfterRegistration } from "./plusFulfillment";
 import { hasPlusPilotCapacity } from "./plusPilotCapacity";
+import { loadPlusPilotCapacityRows } from "./plusPilotCapacityLoader";
 import { normalizeFreeAccessToken, validateFreeAccessTokenState } from "./freeAccessTokenPolicy";
 import { DNA_SESSION_UUID_RE, REGISTRATION_DRAFT_TOKEN_RE, resolveRegistrationDraftOwnership } from "./registrationDraftOwnership";
 import { verifyBoostNewsletterUnsubscribeToken } from "./boostNewsletterCampaign";
@@ -8304,10 +8305,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             if (priorPlusMember?.status === "active" && priorPlusMember.billingStatus === "active") {
               throw new TRPCError({ code: "CONFLICT", message: "מנוי Plus כבר פעיל עבור כתובת המייל הזו" });
             }
-            const capacityRows = await db.select({ status: plusPilotMembers.status, gender: singles.gender })
-              .from(plusPilotMembers)
-              .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id));
-            if (!hasPlusPilotCapacity(capacityRows, existingSingle.gender)) {
+            const capacityRows = await loadPlusPilotCapacityRows(db);
+            if (!hasPlusPilotCapacity(capacityRows, existingSingle.gender, now)) {
               throw new TRPCError({ code: "PRECONDITION_FAILED", message: "מכסת ההשקה מלאה כרגע. אפשר להשאיר פרטים ונעדכן כשייפתח מקום נוסף" });
             }
 

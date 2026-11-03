@@ -77,7 +77,7 @@ describe("Database Plus holiday launch", () => {
 
   it("guards paid members against exceeding the operational Plus capacity", () => {
     const source = readFileSync(resolve(process.cwd(), "server/routers.ts"), "utf8");
-    expect(source).toContain("hasPlusPilotCapacity(capacityRows, existingSingle.gender)");
+    expect(source).toContain("hasPlusPilotCapacity(capacityRows, existingSingle.gender, now)");
     expect(source).toContain("מכסת ההשקה מלאה כרגע");
   });
 

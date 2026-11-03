@@ -14,7 +14,8 @@ import { getPlusServiceDeparture } from "../shared/plusServiceDeparture";
 import { hasPaidDatabaseMembership } from "../shared/plusDatabaseEligibility";
 import { buildPlusServiceHistory } from "../shared/plusServiceHistory";
 import { endPlusLocally } from "./plusLocalEnd";
-import { calculatePlusPilotCapacity, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
+import { calculatePlusPilotCapacity, calculatePlusPilotCapacityBreakdown, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
+import { loadPlusPilotCapacityRows } from "./plusPilotCapacityLoader";
 import { recordPlusCancellation } from "./plusCancellation";
 import { notifyPlusCancellation } from "./plusCancellationNotifications";
 import { isPlusCancellationPending, loadPlusCancellationQueue } from "./plusCancellationQueue";
@@ -572,20 +573,9 @@ export const plusPilotRouter = router({
       atRisk: enrichedRows.filter(row => row.pilot.status === "active" && !row.archived && row.cycleProgress.state === "red").length,
       inProgress: enrichedRows.filter(row => row.pilot.status === "active" && !row.archived && row.cycleProgress.delivered < row.cycleProgress.target && row.cycleProgress.state !== "red").length,
     };
-    const capacity = calculatePlusPilotCapacity(rows.map(row => ({
-      status: row.pilot.status,
-      gender: row.single.gender,
-    })));
-    const capacityBreakdown = {
-      female: {
-        active: rows.filter(row => row.single.gender === "female" && row.pilot.status === "active").length,
-        invited: rows.filter(row => row.single.gender === "female" && row.pilot.status === "invited").length,
-      },
-      male: {
-        active: rows.filter(row => row.single.gender === "male" && row.pilot.status === "active").length,
-        invited: rows.filter(row => row.single.gender === "male" && row.pilot.status === "invited").length,
-      },
-    };
+    const capacityRows = await loadPlusPilotCapacityRows(db, { rows, requests: cancellationEvidence.requests });
+    const capacity = calculatePlusPilotCapacity(capacityRows, overviewNow);
+    const capacityBreakdown = calculatePlusPilotCapacityBreakdown(capacityRows, overviewNow);
     const relaunchMembers = rows.filter(row => row.pilot.pilotCohort === PLUS_RELAUNCH_COHORT);
     const relaunchSmsRecipients = new Set(relaunchLogs
       .filter(row => row.journeyKey === PLUS_RELAUNCH_SMS_JOURNEY)
@@ -673,13 +663,15 @@ export const plusPilotRouter = router({
       }
 
       const reservingSlot = input.status === "invited" || input.status === "active";
-      if (reservingSlot && !isPlusPilotSlotReserved(member.pilot.status)) {
-        const capacityRows = await db.select({
-          status: plusPilotMembers.status,
-          gender: singles.gender,
-        }).from(plusPilotMembers)
-          .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id));
-        if (!hasPlusPilotCapacity(capacityRows, member.single.gender)) {
+      if (reservingSlot) {
+        const capacityRows = await loadPlusPilotCapacityRows(db);
+        const capacityMember = capacityRows.find(row => row.id === member.pilot.id);
+        // Preserve invitation policy, but activation must not bypass a previously
+        // released slot merely because the persisted status still says active.
+        const alreadyReservesSlot = input.status === "invited"
+          ? isPlusPilotSlotReserved(member.pilot.status)
+          : Boolean(capacityMember && isPlusPilotSlotReserved(capacityMember, now));
+        if (!alreadyReservesSlot && !hasPlusPilotCapacity(capacityRows, member.single.gender, now)) {
           const genderLabel = member.single.gender === "female" ? "נשים" : member.single.gender === "male" ? "גברים" : "המגדר הזה";
           throw new TRPCError({
             code: "BAD_REQUEST",
