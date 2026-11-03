@@ -1,6 +1,5 @@
 import { resolvePlusServiceCycle, type PlusServiceMember } from "../shared/plusServiceCycle";
-
-export const PLUS_PILOT_LIMIT_PER_GENDER = 30;
+import { PLUS_ENROLLMENT_POLICY } from "../shared/plusEnrollmentPolicy";
 
 export type PlusPilotGender = "female" | "male";
 
@@ -77,15 +76,16 @@ export function calculatePlusPilotCapacity(rows: readonly PlusPilotCapacityRow[]
   const femaleReserved = rows.filter(row => row.gender === "female" && isPlusPilotSlotReserved(row, now)).length;
   const maleReserved = rows.filter(row => row.gender === "male" && isPlusPilotSlotReserved(row, now)).length;
   return {
+    enrollmentLimited: PLUS_ENROLLMENT_POLICY.enrollmentLimited,
     female: {
       reserved: femaleReserved,
-      remaining: Math.max(0, PLUS_PILOT_LIMIT_PER_GENDER - femaleReserved),
-      limit: PLUS_PILOT_LIMIT_PER_GENDER,
+      remaining: null,
+      limit: PLUS_ENROLLMENT_POLICY.limitPerGender,
     },
     male: {
       reserved: maleReserved,
-      remaining: Math.max(0, PLUS_PILOT_LIMIT_PER_GENDER - maleReserved),
-      limit: PLUS_PILOT_LIMIT_PER_GENDER,
+      remaining: null,
+      limit: PLUS_ENROLLMENT_POLICY.limitPerGender,
     },
   };
 }
@@ -98,7 +98,7 @@ export function calculatePlusPilotCapacityBreakdown(rows: readonly PlusPilotCapa
   };
 }
 
-export function hasPlusPilotCapacity(rows: readonly PlusPilotCapacityRow[], gender: string | null | undefined, now = Date.now()): boolean {
-  if (gender !== "female" && gender !== "male") return false;
-  return calculatePlusPilotCapacity(rows, now)[gender].remaining > 0;
+/** Compatibility signature: enrollment has no count limit; profile gender validity remains separate. */
+export function hasPlusPilotCapacity(_rows: readonly PlusPilotCapacityRow[], gender: string | null | undefined, _now = Date.now()): boolean {
+  return gender === "female" || gender === "male";
 }

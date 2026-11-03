@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PLUS_SERVICE_CYCLE_MS as span } from "../shared/plusServiceCycle";
 import {
-  PLUS_PILOT_LIMIT_PER_GENDER,
   calculatePlusPilotCapacity,
   calculatePlusPilotCapacityBreakdown,
   hasPlusPilotCapacity,
@@ -24,7 +23,7 @@ const confirmed: PlusPilotCapacityRow = {
 
 function reserved(row: PlusPilotCapacityRow, at = now) { return isPlusPilotSlotReserved(row, at); }
 
-describe("Plus active-service 30/30 capacity", () => {
+describe("Plus unlimited enrollment and read-only active-service counts", () => {
   it("keeps legacy status-only behavior and invitation policy unchanged", () => {
     expect(isPlusPilotSlotReserved("active")).toBe(true);
     for (const status of ["invited", "eligible", "declined", "churned", "waitlist", "", null, undefined]) {
@@ -112,21 +111,22 @@ describe("Plus active-service 30/30 capacity", () => {
     expect(calculatePlusPilotCapacityBreakdown([confirmed], anchor + span).male.active).toBe(0);
   });
 
-  it("enforces separate limits for 30 women and 30 men and clamps over-capacity", () => {
+  it.each([30, 31, 101, 150])("reports %s same-gender members without closing enrollment", count => {
     const rows = [
       ...Array.from({ length: 30 }, () => ({ status: "invited", gender: "female" })),
-      ...Array.from({ length: 30 }, () => ({ status: "active", gender: "female" })),
-      ...Array.from({ length: 7 }, () => ({ status: "active", gender: "male" })),
+      ...Array.from({ length: count }, () => ({ status: "active", gender: "female" })),
+      ...Array.from({ length: count }, () => ({ status: "active", gender: "male" })),
       { status: "waitlist", gender: "female" },
     ];
     const capacity = calculatePlusPilotCapacity(rows, now);
-    expect(capacity.female).toEqual({ reserved: 30, remaining: 0, limit: PLUS_PILOT_LIMIT_PER_GENDER });
-    expect(capacity.male).toEqual({ reserved: 7, remaining: 23, limit: PLUS_PILOT_LIMIT_PER_GENDER });
-    expect(hasPlusPilotCapacity(rows, "female", now)).toBe(false);
+    expect(capacity.enrollmentLimited).toBe(false);
+    expect(capacity.female).toEqual({ reserved: count, remaining: null, limit: null });
+    expect(capacity.male).toEqual({ reserved: count, remaining: null, limit: null });
+    expect(hasPlusPilotCapacity(rows, "female", now)).toBe(true);
     expect(hasPlusPilotCapacity(rows, "male", now)).toBe(true);
     expect(hasPlusPilotCapacity(rows, null, now)).toBe(false);
     expect(hasPlusPilotCapacity(rows, "unknown", now)).toBe(false);
-    expect(calculatePlusPilotCapacity([...rows, { status: "active", gender: "female" }], now).female.remaining).toBe(0);
+    expect(calculatePlusPilotCapacity([...rows, { status: "active", gender: "female" }], now).female.reserved).toBe(count + 1);
   });
 
   it("is deterministic and never writes or mutates even frozen input rows", () => {

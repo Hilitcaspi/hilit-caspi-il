@@ -30,7 +30,9 @@ describe("Database Plus holiday launch", () => {
     expect(content.textContent).toContain("קדימות באיתור");
     expect(content.textContent).toContain("הטבות והזדמנויות מיוחדות שייפתחו רק לחברי Plus");
     expect(content.textContent).toContain("בחודש הראשון 3 התאמות במקום 2");
-    expect(content.textContent).toContain("מספר המקומות ב-Plus מוגבל");
+    expect(content.textContent).toContain("ללא הגבלת מספר המצטרפים");
+    expect(content.htmlContent).toContain("ללא הגבלת מספר המצטרפים");
+    expect(content.textContent + content.htmlContent).not.toContain("מספר המקומות");
     expect(content.textContent).toContain("99 ₪ לחודש");
     expect(content.textContent.indexOf("מה מקבלים בכל חודש פעיל?")).toBeLessThan(content.textContent.indexOf("רק עכשיו לכבוד ההשקה"));
     expect(content.checkoutUrl).toContain("utm_source=email");
@@ -60,6 +62,8 @@ describe("Database Plus holiday launch", () => {
     expect(content.message).toContain("בוסט במתנה");
     expect(content.message).toContain("בחודש הראשון 3 התאמות במקום 2");
     expect(content.message).toContain("99 ₪ לחודש");
+    expect(content.message).toContain("ללא הגבלת מספר המצטרפים");
+    expect(content.message).not.toContain("מספר המקומות מוגבל");
     expect(content.message).toContain("להסרה:");
     expect(content.checkoutUrl).toContain("utm_source=sms");
     expect(content.checkoutUrl).toContain("utm_campaign=plus_launch_sep26");
@@ -75,10 +79,13 @@ describe("Database Plus holiday launch", () => {
     expect(source).toContain("monthlyMatchTarget: cycleMatchTarget");
   });
 
-  it("guards paid members against exceeding the operational Plus capacity", () => {
+  it("opens enrollment without cohort queries while retaining paid database and duplicate payment guards", () => {
     const source = readFileSync(resolve(process.cwd(), "server/routers.ts"), "utf8");
-    expect(source).toContain("hasPlusPilotCapacity(capacityRows, existingSingle.gender, now)");
-    expect(source).toContain("מכסת ההשקה מלאה כרגע");
+    expect(source).not.toContain("hasPlusPilotCapacity");
+    expect(source).not.toContain("loadPlusPilotCapacityRows");
+    expect(source).not.toContain("מכסת ההשקה מלאה כרגע");
+    expect(source).toContain("requirePlusDatabaseCheckout(normalizedEmail, input.personalToken)");
+    expect(source).toContain('priorPlusMember?.status === "active" && priorPlusMember.billingStatus === "active"');
   });
 
   it("targets database members broadly but excludes everyone who already paid for Plus", () => {

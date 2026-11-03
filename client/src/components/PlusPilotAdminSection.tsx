@@ -6,7 +6,7 @@ import PlusCancellationQueue, { type PlusCancellationSummary, type PlusCancellat
 import ProfileStaffMarkers, { profileStaffSurface } from "@/components/ProfileStaffMarkers";
 
 const STATUS_LABELS: Record<string, string> = {
-  waitlist: "רשימת המתנה",
+  waitlist: "עניין ב־Plus נרשם",
   eligible: "זכאי/ת",
   invited: "הוזמן/ה",
   active: "פעיל/ה",
@@ -233,17 +233,18 @@ export default function PlusPilotAdminSection() {
       </div>}
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
-        <div className={`rounded-xl border p-3 ${capacity.female.remaining === 0 ? "border-red-200 bg-red-50 text-red-800" : "border-pink-200 bg-pink-50 text-pink-800"}`}>
-          <strong className="text-lg">{capacity.female.reserved}/{capacity.female.limit}</strong>
+        <div className="rounded-xl border border-pink-200 bg-pink-50 p-3 text-pink-800">
+          <strong className="text-lg">{capacity.female.reserved}</strong>
           <span className="mr-1">מנויות Plus פעילות</span>
-          <div className="text-[10px]">{capacityBreakdown.female.active} פעילות · {capacityBreakdown.female.invited} הזמנות פתוחות · נותרו {capacity.female.remaining}</div>
+          <div className="text-[10px]">{capacityBreakdown.female.active} פעילות · {capacityBreakdown.female.invited} הזמנות פתוחות</div>
         </div>
-        <div className={`rounded-xl border p-3 ${capacity.male.remaining === 0 ? "border-red-200 bg-red-50 text-red-800" : "border-blue-200 bg-blue-50 text-blue-800"}`}>
-          <strong className="text-lg">{capacity.male.reserved}/{capacity.male.limit}</strong>
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-blue-800">
+          <strong className="text-lg">{capacity.male.reserved}</strong>
           <span className="mr-1">מנויי Plus פעילים</span>
-          <div className="text-[10px]">{capacityBreakdown.male.active} פעילים · {capacityBreakdown.male.invited} הזמנות פתוחות · נותרו {capacity.male.remaining}</div>
+          <div className="text-[10px]">{capacityBreakdown.male.active} פעילים · {capacityBreakdown.male.invited} הזמנות פתוחות</div>
         </div>
       </div>
+      <p className="mt-2 text-center text-[10px] text-[#777]">ההרשמה ל־Plus פתוחה לחברי מאגר פעילים בתשלום, ללא הגבלת מספר המצטרפים. המונים משמשים לדיווח שירות בלבד.</p>
 
       {relaunchStats.cohort > 0 && <div className="mt-3 rounded-xl border border-pink-200 bg-pink-50 p-3">
         <div className="flex items-center justify-between gap-2"><strong className="text-xs text-pink-950">גל ההשקה עם מתנת המדריך</strong><span className="text-[10px] text-pink-800">חלון אישי של 72 שעות</span></div>
@@ -278,7 +279,7 @@ export default function PlusPilotAdminSection() {
       </div>}
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">
-        <div className="rounded-lg bg-[#f7f6fb] p-2">המתנה ← הזמנה <strong>{waitlistToInviteRate}%</strong></div>
+        <div className="rounded-lg bg-[#f7f6fb] p-2">רישום עניין ← הזמנה <strong>{waitlistToInviteRate}%</strong></div>
         <div className="rounded-lg bg-[#f7f6fb] p-2">הזמנה ← הפעלה <strong>{inviteToActiveRate}%</strong></div>
         <div className="rounded-lg bg-[#f7f6fb] p-2">פעילים שנשמרו <strong>{retentionRate}%</strong></div>
       </div>
@@ -389,13 +390,7 @@ export default function PlusPilotAdminSection() {
                       || row.pilot.status === status
                       || (
                         (status === "invited" || status === "active")
-                        && row.pilot.status !== "invited"
-                        && row.pilot.status !== "active"
-                        && (
-                          (row.single.gender === "female" && capacity.female.remaining === 0)
-                          || (row.single.gender === "male" && capacity.male.remaining === 0)
-                          || !["female", "male"].includes(row.single.gender)
-                        )
+                        && !["female", "male"].includes(row.single.gender)
                       )
                     }
                     className="rounded-lg border border-[#dcd8ef] px-2.5 py-1.5 text-[9px] font-bold text-[#191265] hover:bg-[#f3f1fb] disabled:opacity-40">

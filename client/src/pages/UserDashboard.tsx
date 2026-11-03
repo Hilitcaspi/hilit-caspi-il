@@ -45,7 +45,7 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
     && (pilot?.billingStatus === "active" || pilot?.billingStatus === "past_due")
     && !cancellationPending;
   const statusLabel: Record<string, string> = {
-    waitlist: "ברשימת ההמתנה",
+    waitlist: "עניין ב־Plus נרשם",
     eligible: "מתאים/ה לפיילוט",
     invited: "הוזמנת לפיילוט",
     active: "Plus פעיל",
@@ -116,10 +116,10 @@ function PlusPilotCard({ email, token }: { email: string; token: string }) {
           </div>
         )}
 
-        {(status === "eligible" || status === "invited" || !registered) && (
+        {status !== "active" && (
           <div className="mt-4 border-t border-[#eadf9e] pt-4 text-xs leading-6 text-[#6b6250]">
             {databaseMembershipActive === true ? <>
-              <p>Plus הוא שירות המשך לחברי המאגר, בתשלום נוסף של 99 ₪ לחודש.</p>
+              <p>ההרשמה ל־Plus פתוחה לחברי מאגר פעילים בתשלום, ללא הגבלת מספר המצטרפים. שירות המשך בתשלום נוסף של 99 ₪ לחודש.</p>
               <a href={`/database-plus?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`} referrerPolicy="no-referrer" className="mt-3 inline-block rounded-xl bg-[#191265] px-5 py-3 font-bold text-white">לפרטים ולהצטרפות ל־Plus</a>
             </> : <p>ההצטרפות ל־Plus מתאפשרת רק לאחר השלמת ההרשמה והתשלום למאגר והפעלת החברות.</p>}
           </div>

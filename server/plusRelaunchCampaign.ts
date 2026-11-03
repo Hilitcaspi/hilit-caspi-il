@@ -59,7 +59,7 @@ export function buildPlusRelaunchEmail(input: { firstName: string; email: string
 לכל הפרטים ולהצטרפות:
 ${checkoutUrl}
 
-מספר המקומות ב-Plus מוגבל, כדי שאוכל להעניק לחברי השירות את היחס האישי, הקדימות וכל ההטבות שמגיעות להם. לכן אני ממליצה להצטרף בהקדם.
+ההרשמה ל-Plus פתוחה לחברי המאגר הפעילים בתשלום, ללא הגבלת מספר המצטרפים. היחס האישי, הקדימות וכל ההטבות נשארים חלק מהשירות.
 
 ההתחייבות היא להצעות שנבדקו ונשלחו. אישור הדדי, פגישה או זוגיות אינם מובטחים.
 
@@ -173,14 +173,14 @@ ${unsubscribeUrl}`;
             <div style="margin-top:18px;color:#f4d58e;font-size:26px;font-weight:900">99 ₪ לחודש</div>
             <div style="margin-top:4px;color:#e5d7df;font-size:13px">חיוב חודשי מתחדש עד לביטול</div>
             <div style="margin-top:24px"><a href="${checkoutUrl}" style="display:inline-block;background:#f39ab2;color:#31102e;text-decoration:none;font-size:17px;font-weight:900;padding:17px 34px;border-radius:999px;box-shadow:0 10px 26px rgba(8,3,11,.3)">להצטרפות ל־Database Plus</a></div>
-            <div style="margin-top:14px;color:#ead6e2;font-size:12px">מספר המקומות מוגבל כדי לשמור על רמת שירות אישית.</div>
+            <div style="margin-top:14px;color:#ead6e2;font-size:12px">הרשמה פתוחה לחברי מאגר פעילים בתשלום, ללא הגבלת מספר המצטרפים.</div>
           </div>
         </td></tr>
         <tr><td class="body-pad" style="padding:28px 42px 38px;background:#fffaf5">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid #eadbd1;padding-top:22px">
             <tr>
               <td width="88" valign="middle"><img src="https://hilitcaspi.com/manus-storage/plus-email-hilit-full_0acd266d.jpg" width="74" height="74" alt="הילית כספי" style="display:block;width:74px;height:74px;object-fit:cover;object-position:50% 18%;border-radius:50%;border:3px solid #e4c27f" /></td>
-              <td valign="middle" style="padding-right:12px;color:#514650;font-size:15px;line-height:1.7"><strong style="color:#3d1738">מספר המקומות ב־Plus מוגבל</strong>, כדי שאוכל להעניק לחברי השירות את היחס האישי, הקדימות וכל ההטבות שמגיעות להם. לכן אני ממליצה להצטרף בהקדם.<br /><span style="color:#8e285f;font-weight:800">באהבה, הילית</span></td>
+              <td valign="middle" style="padding-right:12px;color:#514650;font-size:15px;line-height:1.7"><strong style="color:#3d1738">ההרשמה ל־Plus פתוחה ללא הגבלת מספר המצטרפים</strong>, לחברי מאגר פעילים בתשלום. היחס האישי, הקדימות וכל ההטבות נשארים חלק מהשירות.<br /><span style="color:#8e285f;font-weight:800">באהבה, הילית</span></td>
             </tr>
           </table>
           <p style="margin:22px 0 0;color:#7b7078;font-size:12px;line-height:1.65">ההתחייבות היא להצעות שנבדקו ונשלחו. אישור הדדי, פגישה או זוגיות אינם מובטחים.</p>
@@ -203,7 +203,7 @@ export function buildPlusRelaunchSms(input: { email: string; token: string }) {
 
 אני משיקה את Database Plus, מנוי חודשי עם התחייבות ללפחות 2 הצעות התאמה שאני בודקת ושולחת, בוסט במתנה, קדימות לפרופיל והטבות בלעדיות לחברי Plus.
 
-רק עכשיו לכבוד ההשקה, מצטרפים ומקבלים בחודש הראשון 3 התאמות במקום 2. המחיר 99 ₪ לחודש, מתחדש עד ביטול. מספר המקומות מוגבל.
+רק עכשיו לכבוד ההשקה, מצטרפים ומקבלים בחודש הראשון 3 התאמות במקום 2. המחיר 99 ₪ לחודש, מתחדש עד ביטול. הרשמה פתוחה לחברי מאגר פעילים בתשלום, ללא הגבלת מספר המצטרפים.
 
 לכל הפרטים ולהצטרפות:
 ${checkoutUrl}

@@ -14,7 +14,8 @@ import { getPlusServiceDeparture } from "../shared/plusServiceDeparture";
 import { hasPaidDatabaseMembership } from "../shared/plusDatabaseEligibility";
 import { buildPlusServiceHistory } from "../shared/plusServiceHistory";
 import { endPlusLocally } from "./plusLocalEnd";
-import { calculatePlusPilotCapacity, calculatePlusPilotCapacityBreakdown, hasPlusPilotCapacity, isPlusPilotSlotReserved, PLUS_PILOT_LIMIT_PER_GENDER } from "./plusPilotCapacity";
+import { PLUS_ENROLLMENT_POLICY } from "../shared/plusEnrollmentPolicy";
+import { calculatePlusPilotCapacity, calculatePlusPilotCapacityBreakdown } from "./plusPilotCapacity";
 import { loadPlusPilotCapacityRows } from "./plusPilotCapacityLoader";
 import { recordPlusCancellation } from "./plusCancellation";
 import { notifyPlusCancellation } from "./plusCancellationNotifications";
@@ -195,6 +196,7 @@ export const plusPilotRouter = router({
       const eligibility = assessPlusEligibility(single, memberMatches);
       const cancellationPending = await isPlusCancellationPending(db, pilot[0]);
       return {
+        ...PLUS_ENROLLMENT_POLICY,
         cancellationPending,
         status: pilot[0]?.status || "none",
         pilot: pilot[0] || null,
@@ -662,24 +664,10 @@ export const plusPilotRouter = router({
         }
       }
 
-      const reservingSlot = input.status === "invited" || input.status === "active";
-      if (reservingSlot) {
-        const capacityRows = await loadPlusPilotCapacityRows(db);
-        const capacityMember = capacityRows.find(row => row.id === member.pilot.id);
-        // Preserve invitation policy, but activation must not bypass a previously
-        // released slot merely because the persisted status still says active.
-        const alreadyReservesSlot = input.status === "invited"
-          ? isPlusPilotSlotReserved(member.pilot.status)
-          : Boolean(capacityMember && isPlusPilotSlotReserved(capacityMember, now));
-        if (!alreadyReservesSlot && !hasPlusPilotCapacity(capacityRows, member.single.gender, now)) {
-          const genderLabel = member.single.gender === "female" ? "נשים" : member.single.gender === "male" ? "גברים" : "המגדר הזה";
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: member.single.gender === "female" || member.single.gender === "male"
-              ? `מכסת ${PLUS_PILOT_LIMIT_PER_GENDER} ${genderLabel} בפיילוט Plus מלאה`
-              : "יש לעדכן מגדר בפרופיל לפני הזמנה לפיילוט Plus",
-          });
-        }
+      // Gender is a profile guard, not an enrollment quota. No cohort query is needed.
+      if ((input.status === "invited" || input.status === "active")
+        && member.single.gender !== "female" && member.single.gender !== "male") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "יש לעדכן מגדר בפרופיל לפני הזמנה או הפעלה של Plus" });
       }
 
       await db.update(plusPilotMembers).set({

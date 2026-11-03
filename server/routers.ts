@@ -41,8 +41,7 @@ import { EMAIL_SEQUENCES, renderTemplate, JourneyKey, buildMatchProposalEmail as
 import { sendEmail, blacklistBrevoContactEmail, isPermanentlyBlockedEmail, resumeTransactionalEmail } from "./brevo";
 import { createPlusCheckoutReference } from "./plusCheckoutReference";
 import { activatePendingPlusAfterRegistration } from "./plusFulfillment";
-import { hasPlusPilotCapacity } from "./plusPilotCapacity";
-import { loadPlusPilotCapacityRows } from "./plusPilotCapacityLoader";
+import { PLUS_ENROLLMENT_POLICY } from "../shared/plusEnrollmentPolicy";
 import { normalizeFreeAccessToken, validateFreeAccessTokenState } from "./freeAccessTokenPolicy";
 import { DNA_SESSION_UUID_RE, REGISTRATION_DRAFT_TOKEN_RE, resolveRegistrationDraftOwnership } from "./registrationDraftOwnership";
 import { verifyBoostNewsletterUnsubscribeToken } from "./boostNewsletterCampaign";
@@ -8065,6 +8064,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       const { getPlusWednesdayOfferPublicStatus } = await import("../shared/plusWednesdayOffer");
       return {
         ...getPlusCheckoutConfig(),
+        ...PLUS_ENROLLMENT_POLICY,
         attributionVersion: "plus_checkout_utm_v1" as const,
         wednesdayOffer: getPlusWednesdayOfferPublicStatus(),
       };
@@ -8305,9 +8305,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             if (priorPlusMember?.status === "active" && priorPlusMember.billingStatus === "active") {
               throw new TRPCError({ code: "CONFLICT", message: "מנוי Plus כבר פעיל עבור כתובת המייל הזו" });
             }
-            const capacityRows = await loadPlusPilotCapacityRows(db);
-            if (!hasPlusPilotCapacity(capacityRows, existingSingle.gender, now)) {
-              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "מכסת ההשקה מלאה כרגע. אפשר להשאיר פרטים ונעדכן כשייפתח מקום נוסף" });
+            // Enrollment is open regardless of service counts; retain profile validity.
+            if (existingSingle.gender !== "female" && existingSingle.gender !== "male") {
+              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "יש לעדכן מגדר בפרופיל לפני הצטרפות ל־Plus" });
             }
 
             const { appendPlusWednesdayOfferMarker, canApplyPlusWednesdayOfferCoupon, stripPlusWednesdayOfferMarker, isPlusBonusCouponCode } = await import("../shared/plusWednesdayOffer");

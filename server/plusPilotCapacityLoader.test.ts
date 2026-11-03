@@ -106,11 +106,9 @@ describe("shared read-only Plus capacity loader", () => {
     ];
     const requests = Array.from({ length: 10 }, (_, index) => ({ ...stop, id: index + 1, plusMemberId: index + 21, providerStoppedAt: index === 9 ? null : stop.providerStoppedAt }));
     const { db } = fakeSelectDb(rows, requests);
-    const checkoutRows = await loadPlusPilotCapacityRows(db);
-    const activationRows = await loadPlusPilotCapacityRows(db);
+    const directRows = await loadPlusPilotCapacityRows(db);
     const overviewRows = await loadPlusPilotCapacityRows(db, { rows: rows.map(row => ({ pilot: row, single: { gender: row.gender } })), requests });
-    const capacity = calculatePlusPilotCapacity(checkoutRows, now);
-    expect(calculatePlusPilotCapacity(activationRows, now)).toEqual(capacity);
+    const capacity = calculatePlusPilotCapacity(directRows, now);
     expect(calculatePlusPilotCapacity(overviewRows, now)).toEqual(capacity);
     const breakdown = calculatePlusPilotCapacityBreakdown(overviewRows, now);
     expect({ capacity, breakdown }).toMatchInlineSnapshot(`
@@ -126,14 +124,15 @@ describe("shared read-only Plus capacity loader", () => {
           },
         },
         "capacity": {
+          "enrollmentLimited": false,
           "female": {
-            "limit": 30,
-            "remaining": 0,
+            "limit": null,
+            "remaining": null,
             "reserved": 30,
           },
           "male": {
-            "limit": 30,
-            "remaining": 9,
+            "limit": null,
+            "remaining": null,
             "reserved": 21,
           },
         },
@@ -148,24 +147,21 @@ describe("Plus capacity caller source contracts", () => {
   const loader = readFileSync(resolve(process.cwd(), "server/plusPilotCapacityLoader.ts"), "utf8");
   const capacity = readFileSync(resolve(process.cwd(), "server/plusPilotCapacity.ts"), "utf8");
 
-  it("all three operations share the loader and pass the same captured operation clock", () => {
-    expect(checkout).toContain("const capacityRows = await loadPlusPilotCapacityRows(db);");
-    expect(checkout).toContain("hasPlusPilotCapacity(capacityRows, existingSingle.gender, now)");
+  it("only overview reporting loads cohort evidence using its captured operation clock", () => {
+    expect(checkout).not.toContain("loadPlusPilotCapacityRows");
+    expect(checkout).not.toContain("hasPlusPilotCapacity");
     expect(admin).toContain("loadPlusPilotCapacityRows(db, { rows, requests: cancellationEvidence.requests })");
     expect(admin).toContain("calculatePlusPilotCapacity(capacityRows, overviewNow)");
     expect(admin).toContain("calculatePlusPilotCapacityBreakdown(capacityRows, overviewNow)");
-    expect(admin).toContain("const capacityRows = await loadPlusPilotCapacityRows(db);");
-    expect(admin).toContain("isPlusPilotSlotReserved(capacityMember, now)");
-    expect(admin).toContain("hasPlusPilotCapacity(capacityRows, member.single.gender, now)");
-    expect(checkout).not.toContain("db.select({ status: plusPilotMembers.status, gender: singles.gender })");
+    const activation = admin.split("adminUpdateStatus:")[1].split("adminEndMembership:")[0];
+    expect(activation).not.toContain("loadPlusPilotCapacityRows");
+    expect(activation).not.toContain("hasPlusPilotCapacity");
   });
 
-  it("admin activation tests the exact loaded row while retaining invitation and verified payment policy", () => {
-    expect(admin).toContain("capacityRows.find(row => row.id === member.pilot.id)");
-    expect(admin).toContain('input.status === "invited"\n          ? isPlusPilotSlotReserved(member.pilot.status)');
-    expect(admin).toContain("if (!alreadyReservesSlot && !hasPlusPilotCapacity");
-    expect(admin).not.toContain("reservingSlot && !isPlusPilotSlotReserved(member.pilot.status)");
+  it("retains profile gender, confirmed payment, database eligibility and duplicate checkout guards", () => {
     expect(admin).toContain('member.pilot.billingStatus !== "active" || !hasConfirmedProductionPlusPayment(paymentEvents)');
+    expect(admin).toContain('member.single.gender !== "female" && member.single.gender !== "male"');
+    expect(checkout).toContain('existingSingle.gender !== "female" && existingSingle.gender !== "male"');
     expect(checkout).toContain('priorPlusMember?.status === "active" && priorPlusMember.billingStatus === "active"');
     expect(checkout).toContain('existingIntent?.status === "paid_pending_profile" || existingIntent?.status === "active"');
     expect(checkout).toContain("return await withCheckoutReservation({");

@@ -219,8 +219,8 @@ describe("purchase recovery checkout plumbing", () => {
   });
 
   it("keeps PLUSGIFT at the normal recurring Plus amount while binding its recovery callback", async () => {
-    // select order: existing Plus intent, prior Plus membership, capacity rows.
-    const harness: CheckoutDbHarness = createCheckoutDb([[], [], []]);
+    // select order: existing Plus intent and prior membership; no capacity query.
+    const harness: CheckoutDbHarness = createCheckoutDb([[], []]);
     mocks.getDb.mockResolvedValue(harness.db);
     setRecoveryMocks("plus", "PLUSGIFT", undefined);
     mocks.createPaymentProcess.mockResolvedValue({
@@ -259,7 +259,7 @@ describe("purchase recovery checkout plumbing", () => {
   });
 
   it("does not mark a recovery Plus intent failed after Grow accepted a process but binding is ambiguous", async () => {
-    const harness: CheckoutDbHarness = createCheckoutDb([[], [], []]);
+    const harness: CheckoutDbHarness = createCheckoutDb([[], []]);
     mocks.getDb.mockResolvedValue(harness.db);
     setRecoveryMocks("plus", "PLUSGIFT", undefined);
     mocks.createPaymentProcess.mockResolvedValue({
