@@ -145,6 +145,31 @@ function Portrait({
   );
 }
 
+function BenefitValueStamp({ compact = false }: { compact?: boolean }) {
+  return (
+    <div
+      className={`november-value-stamp ${compact ? "november-value-stamp--compact" : ""}`}
+      data-testid="november-value-stamp"
+      role="note"
+      aria-label="שווי ההטבה: 647 ₪ לפי הערך המקורי. לא המחיר לתשלום."
+    >
+      <p className="november-value-stamp-label">שווי ההטבה</p>
+      <p className="november-value-stamp-amount">647 ₪</p>
+      <p className="november-value-stamp-caption">לפי הערך המקורי</p>
+      <p className="november-value-stamp-disclaimer">לא המחיר לתשלום</p>
+    </div>
+  );
+}
+
+function CourseOriginalValue() {
+  return (
+    <p className="mt-2 text-xs leading-5 text-[#6b5a67]" data-testid="november-course-original-value">
+      ערך מקורי: <span className="line-through decoration-[#6b5a67]/60">497 ₪</span>
+      <span className="block text-[11px]">הקורס מוצע כיום בנפרד ב־249 ₪</span>
+    </p>
+  );
+}
+
 function OfferPrice({
   compact = false,
   showValueDetails = compact,
@@ -286,6 +311,20 @@ export default function NovemberLoveBundle() {
       className="min-h-screen overflow-x-hidden bg-[#fffdf9] font-['Rubik',sans-serif] text-[#171519]"
     >
       <style>{`
+        .november-value-stamp { position: relative; isolation: isolate; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; width: clamp(144px, 14vw, 176px); aspect-ratio: 1; color: #291d28; text-align: center; filter: drop-shadow(0 5px 12px rgba(55,30,50,.12)); }
+        .november-value-stamp::before { content: ""; position: absolute; inset: 0; z-index: -2; pointer-events: none; background: #c6a8c5; border-radius: 50%; }
+        @supports (clip-path: polygon(0 0, 100% 0, 50% 100%)) {
+          .november-value-stamp::before { border-radius: 0; clip-path: polygon(50.00% 0.00%, 55.74% 6.38%, 62.94% 1.70%, 66.84% 9.35%, 75.00% 6.70%, 76.79% 15.09%, 85.36% 14.64%, 84.91% 23.21%, 93.30% 25.00%, 90.65% 33.16%, 98.30% 37.06%, 93.62% 44.26%, 100.00% 50.00%, 93.62% 55.74%, 98.30% 62.94%, 90.65% 66.84%, 93.30% 75.00%, 84.91% 76.79%, 85.36% 85.36%, 76.79% 84.91%, 75.00% 93.30%, 66.84% 90.65%, 62.94% 98.30%, 55.74% 93.62%, 50.00% 100.00%, 44.26% 93.62%, 37.06% 98.30%, 33.16% 90.65%, 25.00% 93.30%, 23.21% 84.91%, 14.64% 85.36%, 15.09% 76.79%, 6.70% 75.00%, 9.35% 66.84%, 1.70% 62.94%, 6.38% 55.74%, 0.00% 50.00%, 6.38% 44.26%, 1.70% 37.06%, 9.35% 33.16%, 6.70% 25.00%, 15.09% 23.21%, 14.64% 14.64%, 23.21% 15.09%, 25.00% 6.70%, 33.16% 9.35%, 37.06% 1.70%, 44.26% 6.38%); }
+        }
+        .november-value-stamp::after { content: ""; position: absolute; inset: 13%; z-index: -1; pointer-events: none; border: 1px dashed rgba(68,40,63,.25); border-radius: 50%; }
+        .november-value-stamp-label { font-size: 15px; line-height: 1.35; font-weight: 900; }
+        .november-value-stamp-amount { margin-top: 3px; font-size: 39px; line-height: 1.1; font-weight: 900; letter-spacing: -.04em; white-space: nowrap; }
+        .november-value-stamp-caption { margin-top: 5px; font-size: 10px; line-height: 1.4; }
+        .november-value-stamp-disclaimer { margin-top: 3px; font-size: 10px; line-height: 1.4; font-weight: 700; }
+        .november-value-stamp--compact { width: 132px; }
+        .november-value-stamp--compact .november-value-stamp-label { font-size: 13px; }
+        .november-value-stamp--compact .november-value-stamp-amount { font-size: 33px; }
+        .november-value-stamp--compact .november-value-stamp-caption, .november-value-stamp--compact .november-value-stamp-disclaimer { font-size: 9px; }
         @media (prefers-reduced-motion: reduce) {
           .november-love-motion { opacity: 1 !important; transform: none !important; }
           .november-live-glow::before, .november-live-glow::after { animation: none !important; transform: none !important; opacity: .32 !important; }
@@ -377,19 +416,27 @@ export default function NovemberLoveBundle() {
               </p>
               <div className="mt-6 rounded-[1.4rem] border border-white/80 bg-[#fffdf9]/85 p-5 shadow-[0_12px_40px_rgba(77,46,69,.06)]" data-testid="november-hero-offer">
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-                  <div>
-                    <p className="text-sm font-bold text-[#65515f]">מצטרפים למאגר</p>
-                    <div className="mt-1 flex items-baseline gap-3">
-                      <span className="text-[2.65rem] font-black leading-none tracking-[-.04em] text-[#171519]">{NOVEMBER_BUNDLE_PRICE} ₪</span>
-                      <span className="text-base text-[#877983] line-through">499 ₪</span>
+                  <div className="flex w-full items-center justify-between gap-2 lg:w-auto">
+                    <div>
+                      <p className="text-sm font-bold text-[#65515f]">מצטרפים למאגר</p>
+                      <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span className="text-[clamp(2rem,9.5vw,2.65rem)] font-black leading-none tracking-[-.04em] text-[#171519] lg:text-[2.65rem]">{NOVEMBER_BUNDLE_PRICE} ₪</span>
+                        <span className="text-base text-[#877983] line-through">499 ₪</span>
+                      </div>
+                    </div>
+                    <div className="lg:hidden">
+                      <BenefitValueStamp compact />
                     </div>
                   </div>
                   <div className="border-r-2 border-[#c7b0c1] pr-5">
                     <p className="text-sm font-bold text-[#785469]">ובמתנה עם ההצטרפות</p>
                     <p className="mt-1 text-lg font-black leading-7">{NOVEMBER_CAMPAIGN_COPY.course}<span className="block">{NOVEMBER_CAMPAIGN_COPY.courseName}</span></p>
+                    <CourseOriginalValue />
                   </div>
                 </div>
-                <p className="mt-3 border-t border-[#c7b0c1]/35 pt-3 text-xs text-[#785469] lg:hidden">שווי ההטבה: 647 ₪, לפי הערך המקורי</p>
+                <p className="mt-3 border-t border-[#c7b0c1]/35 pt-3 text-xs leading-5 text-[#785469] lg:hidden">
+                  ההנחה על המאגר + הקורס במתנה. המחיר לתשלום נשאר 349 ₪.
+                </p>
               </div>
               <div className="mt-5 flex items-start gap-3 text-[#68465e]">
                 <span className="november-live-glow relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#68465e] text-white shadow-[0_0_22px_rgba(138,85,128,.28)]">
@@ -435,10 +482,8 @@ export default function NovemberLoveBundle() {
           >
             <Portrait src={HERO_IMAGE} alt="הילית כספי" hero />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,rgba(23,21,25,.35)_100%)]" />
-            <div className="absolute left-6 top-6 hidden rounded-[1.25rem] border border-white/75 bg-[#fffdf9]/92 px-5 py-4 text-center shadow-[0_8px_28px_rgba(23,21,25,.10)] backdrop-blur-md lg:block">
-              <p className="text-xs font-bold text-[#785469]">שווי ההטבה</p>
-              <p className="mt-1 text-3xl font-black tracking-[-.04em]">647 ₪</p>
-              <p className="mt-1 text-[10px] text-[#73616d]">לפי הערך המקורי</p>
+            <div className="absolute left-5 top-5 hidden lg:block">
+              <BenefitValueStamp />
             </div>
             <div className="absolute inset-x-5 bottom-5 text-white md:inset-x-7 md:bottom-7">
               <p className="text-xl font-black">הילית כספי</p>
@@ -531,6 +576,7 @@ export default function NovemberLoveBundle() {
                   <p className="text-xs font-black text-[#655260]">
                     {NOVEMBER_CAMPAIGN_COPY.course} במתנה
                   </p>
+                  <CourseOriginalValue />
                   <p className="mt-1 text-xs leading-5 text-[#665965]">
                     כל התוכן פתוח אחרי אישור התשלום, בקצב שלך.
                   </p>

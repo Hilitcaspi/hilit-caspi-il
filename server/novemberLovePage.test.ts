@@ -62,6 +62,32 @@ describe("November Love Bundle campaign pages", () => {
     expect(landing).not.toContain("חיסכון של");
   });
 
+  it("distinguishes the sunburst benefit value from the unchanged payable price in desktop and mobile layouts", () => {
+    expect(landing).toContain('data-testid="november-value-stamp"');
+    expect(landing).toContain('aria-label="שווי ההטבה: 647 ₪ לפי הערך המקורי. לא המחיר לתשלום."');
+    expect(landing).toContain("clip-path: polygon(");
+    expect(landing).toContain(".november-value-stamp::before");
+    expect(landing).toContain(".november-value-stamp--compact");
+    expect(landing).toContain("שווי ההטבה</p>");
+    expect(landing).toContain("לפי הערך המקורי</p>");
+    expect(landing).toContain("לא המחיר לתשלום</p>");
+    expect(landing).toContain("<BenefitValueStamp compact />");
+    expect(landing).toContain("<BenefitValueStamp />");
+    expect(landing).toContain("המחיר לתשלום נשאר 349 ₪.");
+    expect(landing).not.toContain('className="absolute left-6 top-6 hidden rounded-[1.25rem]');
+    expect(landing).toMatch(/<span[^>]*line-through[^>]*>499 ₪<\/span>/);
+    expect(landing).toContain("product={NOVEMBER_BUNDLE_PRODUCT}");
+  });
+
+  it("shows the original course value in small print next to the gift without hiding its current standalone price", () => {
+    expect(landing).toContain('data-testid="november-course-original-value"');
+    expect(landing.match(/<CourseOriginalValue \/>/g)).toHaveLength(2);
+    expect(landing).toMatch(/ערך מקורי: <span[^>]*line-through[^>]*>497 ₪<\/span>/);
+    expect(landing).toContain("הקורס מוצע כיום בנפרד ב־249 ₪");
+    expect(landing).toContain("150 ₪ הנחה על המאגר");
+    expect(landing).toContain("compact showValueDetails");
+  });
+
   it("uses the first-person course name across hero, offer, FAQ, checkout and confirmed receipt only", () => {
     expect(landing.match(/NOVEMBER_CAMPAIGN_COPY\.course\b/g)?.length).toBeGreaterThanOrEqual(8);
     expect(landing).not.toContain("הקורס המלא במתנה");
