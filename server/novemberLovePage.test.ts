@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { NOVEMBER_CAMPAIGN_COPY } from "../shared/novemberCampaignCopy";
 
 const read = (relativePath: string) =>
   readFileSync(resolve(process.cwd(), relativePath), "utf8");
@@ -13,7 +14,14 @@ describe("November Love Bundle campaign pages", () => {
   it("uses the approved November Sale slogan while explaining the personally reviewed singles database", () => {
     expect(landing).toMatch(/<p dir="ltr"[^>]*>\s*<Sparkles[^>]*\/> NOVEMBER SALE\s*<\/p>/);
     expect(landing).toContain("הטבת נובמבר חד־פעמית");
-    expect(landing).toMatch(/זה לא מה קונים\.\s*<span[^>]*>זה את מי מכירים\.<\/span>/);
+    expect(NOVEMBER_CAMPAIGN_COPY.slogan).toBe("בנובמבר הזה זה לא רק מה קונים. זה את מי מכירים.");
+    expect(NOVEMBER_CAMPAIGN_COPY.slogan).toBe([
+      NOVEMBER_CAMPAIGN_COPY.sloganIntro,
+      NOVEMBER_CAMPAIGN_COPY.sloganLead,
+      NOVEMBER_CAMPAIGN_COPY.sloganEmphasis,
+    ].join(" "));
+    expect(landing).toMatch(/<h1[^>]*>[\s\S]*?NOVEMBER_CAMPAIGN_COPY.sloganIntro[\s\S]*?NOVEMBER_CAMPAIGN_COPY.sloganLead[\s\S]*?NOVEMBER_CAMPAIGN_COPY.sloganEmphasis[\s\S]*?<\/h1>/);
+    expect(landing).not.toContain("זה לא מה קונים.");
     expect(landing).toContain("מאגר לרווקים ורווקות שמחפשים זוגיות רצינית");
     expect(landing).toMatch(/הצעות התאמה שאני\s+בודקת אישית/);
     expect(landing).toMatch(/בנובמבר אני נותנת גז על\s+ההתאמות/);
@@ -27,7 +35,7 @@ describe("November Love Bundle campaign pages", () => {
     expect(landing).toContain('data-testid="november-hero-offer"');
     expect(landing).toContain("{NOVEMBER_BUNDLE_PRICE} ₪");
     expect(landing).toContain("499 ₪");
-    expect(landing).toContain("הקורס המלא ״המסע לזוגיות״");
+    expect(landing).toContain("NOVEMBER_CAMPAIGN_COPY.course");
     expect(landing).toContain('id="payment"');
     expect(landing).toContain("product={NOVEMBER_BUNDLE_PRODUCT}");
     expect(landing).toContain('termsPath="/terms/november-love"');
@@ -42,7 +50,9 @@ describe("November Love Bundle campaign pages", () => {
     expect(landing).toContain("349 ₪");
     expect(landing).toContain("499 ₪");
     expect(landing).toMatch(/1\.11\.2026\s+עד\s+30\.11\.2026/);
-    expect(landing).toContain("הקורס המלא ״המסע לזוגיות״");
+    expect(NOVEMBER_CAMPAIGN_COPY.course).toBe("הקורס המלא שלי למציאת זוגיות");
+    expect(NOVEMBER_CAMPAIGN_COPY.courseName).toBe("״המסע לזוגיות״");
+    expect(landing).toContain("NOVEMBER_CAMPAIGN_COPY.courseName");
     expect(landing).toMatch(/ערך מקורי של\s+497 ₪/);
     expect(landing).toContain("בנפרד ב־249 ₪");
     expect(landing).toContain("שווי ההטבה: 647 ₪");
@@ -50,6 +60,15 @@ describe("November Love Bundle campaign pages", () => {
     expect(landing).toContain("compact showValueDetails");
     expect(landing).not.toContain("המדריך ״לבחור נכון״");
     expect(landing).not.toContain("חיסכון של");
+  });
+
+  it("uses the first-person course name across hero, offer, FAQ, checkout and confirmed receipt only", () => {
+    expect(landing.match(/NOVEMBER_CAMPAIGN_COPY\.course\b/g)?.length).toBeGreaterThanOrEqual(8);
+    expect(landing).not.toContain("הקורס המלא במתנה");
+    expect(landing).not.toContain("הקורס הדיגיטלי המלא");
+    expect(thankYou).toContain("{NOVEMBER_CAMPAIGN_COPY.course} במתנה");
+    expect(thankYou).toMatch(/isConfirmed \? \([\s\S]*NOVEMBER_CAMPAIGN_COPY.course/);
+    expect(thankYou).not.toContain("הקורס המלא במתנה");
   });
 
   it("uses the agreed single checkout payment anchor and Grow contract", () => {

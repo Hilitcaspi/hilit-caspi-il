@@ -18,6 +18,7 @@ import { trackViewContent } from "@/lib/metaPixel";
 import { track } from "@/lib/track";
 import { trpc } from "@/lib/trpc";
 import { NOVEMBER_APPROVED_TESTIMONIALS } from "@shared/novemberApprovedTestimonials";
+import { NOVEMBER_CAMPAIGN_COPY } from "@shared/novemberCampaignCopy";
 import {
   NOVEMBER_BUNDLE_PRICE,
   NOVEMBER_BUNDLE_PRODUCT,
@@ -71,7 +72,7 @@ const faqs = [
   {
     question: "מה כלול בהטבת נובמבר?",
     answer:
-      "המאגר ב־349 ₪ במקום 499 ₪, עם הקורס המלא ״המסע לזוגיות״ במתנה. Plus לא כלול.",
+      `המאגר ב־349 ₪ במקום 499 ₪, עם ${NOVEMBER_CAMPAIGN_COPY.course}, ${NOVEMBER_CAMPAIGN_COPY.courseName}, במתנה. Plus לא כלול.`,
   },
   {
     question: "מתי מתקבלת הצעת ההתאמה הראשונה?",
@@ -91,7 +92,7 @@ const faqs = [
   {
     question: "מהו הקורס שמתקבל במתנה?",
     answer:
-      "זהו הקורס הדיגיטלי המלא ״המסע לזוגיות״: טקסטים, שאלות ותרגילים, חוברת עבודה ומפה זוגית אישית.",
+      `זהו ${NOVEMBER_CAMPAIGN_COPY.course}, ${NOVEMBER_CAMPAIGN_COPY.courseName}: טקסטים, שאלות ותרגילים, חוברת עבודה ומפה זוגית אישית.`,
   },
 ];
 
@@ -161,7 +162,7 @@ function OfferPrice({
             הטבה חד־פעמית
           </p>
           <p className="mt-2 text-sm font-bold leading-6 text-[#423842]">
-            המאגר ב־349 ₪ והקורס המלא במתנה
+            המאגר ב־349 ₪, עם {NOVEMBER_CAMPAIGN_COPY.course} במתנה
           </p>
         </div>
         <span className="rounded-full bg-[#171519] px-3 py-1.5 text-xs font-black text-[#fffdf9]">
@@ -223,7 +224,7 @@ export default function NovemberLoveBundle() {
 
   useEffect(() => {
     document.title = "NOVEMBER SALE | מאגר זוגיות וקורס ב־349 ₪ | הילית כספי";
-    const description = "NOVEMBER SALE: מאגר רווקים ורווקות עם התאמות שנבדקות אישית ב־349 ₪ במקום 499 ₪, עם הקורס המלא במתנה.";
+    const description = `NOVEMBER SALE: מאגר רווקים ורווקות עם התאמות שנבדקות אישית ב־349 ₪ במקום 499 ₪, עם ${NOVEMBER_CAMPAIGN_COPY.course} במתנה. ${NOVEMBER_CAMPAIGN_COPY.slogan}`;
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
       meta = document.createElement("meta");
@@ -366,8 +367,9 @@ export default function NovemberLoveBundle() {
                 </span>
               </div>
               <h1 className="mt-5 text-[2.55rem] font-black leading-[1.08] tracking-[-0.045em] text-[#171519] sm:text-[3.2rem] lg:text-[clamp(2.5rem,3.9vw,3.65rem)]">
-                זה לא מה קונים.
-                <span className="mt-1 block text-[#68465e]">זה את מי מכירים.</span>
+                <span className="mb-2 block text-lg font-bold leading-7 tracking-normal text-[#76516d] md:text-xl">{NOVEMBER_CAMPAIGN_COPY.sloganIntro}</span>
+                {NOVEMBER_CAMPAIGN_COPY.sloganLead}
+                <span className="mt-1 block text-[#68465e]">{NOVEMBER_CAMPAIGN_COPY.sloganEmphasis}</span>
               </h1>
               <p className="mt-5 max-w-xl text-[1.05rem] leading-7 text-[#4b3d49] md:text-lg md:leading-8">
                 מאגר לרווקים ורווקות שמחפשים זוגיות רצינית, עם הצעות התאמה שאני
@@ -384,7 +386,7 @@ export default function NovemberLoveBundle() {
                   </div>
                   <div className="border-r-2 border-[#c7b0c1] pr-5">
                     <p className="text-sm font-bold text-[#785469]">ובמתנה עם ההצטרפות</p>
-                    <p className="mt-1 text-lg font-black leading-7">הקורס המלא ״המסע לזוגיות״</p>
+                    <p className="mt-1 text-lg font-black leading-7">{NOVEMBER_CAMPAIGN_COPY.course}<span className="block">{NOVEMBER_CAMPAIGN_COPY.courseName}</span></p>
                   </div>
                 </div>
                 <p className="mt-3 border-t border-[#c7b0c1]/35 pt-3 text-xs text-[#785469] lg:hidden">שווי ההטבה: 647 ₪, לפי הערך המקורי</p>
@@ -516,9 +518,9 @@ export default function NovemberLoveBundle() {
                   במתנה עם ההצטרפות
                 </span>
                 <h3 className="mt-6 text-3xl font-black leading-[1.08] tracking-[-.04em] text-[#171519] md:text-4xl">
-                  הקורס הדיגיטלי המלא
+                  {NOVEMBER_CAMPAIGN_COPY.course}
                   <br />
-                  ״המסע לזוגיות״
+                  {NOVEMBER_CAMPAIGN_COPY.courseName}
                 </h3>
                 <p className="mt-5 max-w-xl text-base leading-8 text-[#443842]">
                   למה אותו סוג קשר חוזר שוב? איך מבדילים בין משיכה להתאמה?
@@ -527,7 +529,7 @@ export default function NovemberLoveBundle() {
                 </p>
                 <div className="mt-7 rounded-2xl border border-[#171519]/10 bg-[#fffdf9]/55 p-4">
                   <p className="text-xs font-black text-[#655260]">
-                    הקורס המלא במתנה
+                    {NOVEMBER_CAMPAIGN_COPY.course} במתנה
                   </p>
                   <p className="mt-1 text-xs leading-5 text-[#665965]">
                     כל התוכן פתוח אחרי אישור התשלום, בקצב שלך.
@@ -828,7 +830,7 @@ export default function NovemberLoveBundle() {
               מתחילים מכאן.
             </h2>
             <p className="mt-5 max-w-md text-lg leading-9 text-[#514451]">
-              מאגר ב־349 ₪, עם הקורס המלא במתנה. אחרי אישור התשלום יישלחו למייל
+              מאגר ב־349 ₪, עם {NOVEMBER_CAMPAIGN_COPY.course} במתנה. אחרי אישור התשלום יישלחו למייל
               הגישה לקורס והשלב הבא להשלמת ההצטרפות למאגר.
             </p>
             <div className="mt-7 max-w-md">

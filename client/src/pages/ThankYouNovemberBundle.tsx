@@ -4,6 +4,7 @@ import { BookOpenCheck, CheckCircle2, CircleAlert, Clock3, Mail, RefreshCw, Shie
 import { trpc } from "@/lib/trpc";
 import { readPurchaseTrackingToken } from "@/lib/purchaseTracking";
 import { NOVEMBER_BUNDLE_PRODUCT } from "@shared/novemberBundleOffer";
+import { NOVEMBER_CAMPAIGN_COPY } from "@shared/novemberCampaignCopy";
 
 const SUPPORT_URL = "https://wa.me/972552442334?text=" + encodeURIComponent("היי הילית, הגעתי מעמוד הטבת נובמבר ואשמח לעזרה");
 
@@ -95,7 +96,7 @@ export default function ThankYouNovemberBundle() {
                 </div>
 
                 <div className="mt-6 space-y-3">
-                  <div className="flex gap-4 rounded-2xl border border-[#171519]/10 p-5"><BookOpenCheck className="mt-1 h-6 w-6 shrink-0 text-[#765d70]" /><div><h2 className="font-black">הקורס המלא במתנה</h2><p className="mt-1 text-sm leading-6 text-[#5d505a]">חמישה מודולים, חוברת עבודה ומפה זוגית אישית. הקישור הוא אישי ונשלח למייל.</p></div></div>
+                  <div className="flex gap-4 rounded-2xl border border-[#171519]/10 p-5"><BookOpenCheck className="mt-1 h-6 w-6 shrink-0 text-[#765d70]" /><div><h2 className="font-black">{NOVEMBER_CAMPAIGN_COPY.course} במתנה</h2><p className="mt-1 text-sm leading-6 text-[#5d505a]">חמישה מודולים, חוברת עבודה ומפה זוגית אישית. הקישור הוא אישי ונשלח למייל.</p></div></div>
                   <div className="flex gap-4 rounded-2xl border border-[#171519]/10 p-5"><ShieldCheck className="mt-1 h-6 w-6 shrink-0 text-[#765d70]" /><div><h2 className="font-black">השלמת פרופיל המאגר</h2><p className="mt-1 text-sm leading-6 text-[#5d505a]">השלימו פרופיל, תמונה, שאלונים והעדפות. רק לאחר אישור התשלום והשלמת כל הפרטים מתחיל חלון של עד 3 ימים קלנדריים להצעת התאמה ראשונה.</p></div></div>
                 </div>
 
