@@ -13,7 +13,7 @@ export type NovemberBundleAccessEmailInput = {
   firstName: string;
   email: string;
   courseUrl: string;
-  /** The full course retains its existing included workbook/guide access. */
+  /** Legacy fulfillment input; intentionally not rendered in this email. */
   guideUrl: string;
 };
 
@@ -26,14 +26,13 @@ export function buildNovemberBundleAccessEmail({
   firstName,
   email,
   courseUrl,
-  guideUrl,
 }: NovemberBundleAccessEmailInput) {
   const safeFirstName = escapeHtml(firstName.trim());
   const greeting = safeFirstName ? `שלום ${safeFirstName},` : "שלום,";
   const unsubscribeUrl = `${SITE_BASE}/unsubscribe?email=${encodeURIComponent(email)}`;
 
   const subject = "הקורס המלא שלך מוכן | חבילת נובמבר";
-  const textContent = `${greeting}\n\nהרכישה הושלמה. הקורס הדיגיטלי המלא שלך מוכן עכשיו.\n\nהקורס כולל 5 מודולים כתובים ומעשיים, חוברת עבודה ומפת דרך אישית — לא קורס וידאו.\n\nכניסה לקורס: ${courseUrl}\n\nבתוך הקורס מחכה גם גישה אישית למדריך ״לבחור נכון״: ${guideUrl}\n\nאת הקישור האישי להשלמת ההצטרפות למאגר קיבלת במייל נפרד. לאחר שהפרופיל, התמונה, השאלון וההעדפות יושלמו, ההבטחה להצעת התאמה ראשונה מתחילה להימדד.\n\nמומלץ לשמור את המייל; הקישורים אישיים.\n\nלשאלות: https://wa.me/972552442334\n\nבאהבה,\nהילית כספי`;
+  const textContent = `${greeting}\n\nהרכישה הושלמה. הקורס הדיגיטלי המלא שלך מוכן עכשיו.\n\nהקורס כולל 5 מודולים כתובים ומעשיים, חוברת עבודה ומפת דרך אישית — לא קורס וידאו.\n\nכניסה לקורס: ${courseUrl}\n\nאת הקישור האישי להשלמת ההצטרפות למאגר קיבלת במייל נפרד. לאחר שהפרופיל, התמונה, השאלון וההעדפות יושלמו, ההבטחה להצעת התאמה ראשונה מתחילה להימדד.\n\nמומלץ לשמור את המייל; הקישורים אישיים.\n\nלשאלות: https://wa.me/972552442334\n\nבאהבה,\nהילית כספי`;
 
   const htmlContent = `<!DOCTYPE html>
 <html dir="rtl" lang="he">
@@ -55,7 +54,6 @@ export function buildNovemberBundleAccessEmail({
           <p style="font-size:15px;color:#5f514a;line-height:1.8;margin:0 0 16px;">5 מודולים כתובים ומעשיים, חוברת עבודה ומפת דרך אישית שיעזרו לך להבין דפוסים, לדייק בחירות ולבנות תנועה נכונה יותר. זהו קורס דיגיטלי טקסטואלי ומעשי — לא קורס וידאו.</p>
           <div style="text-align:center;"><a href="${courseUrl}" style="display:inline-block;background:#2b1711;color:#fff8ee;font-size:17px;font-weight:700;padding:15px 34px;border-radius:12px;text-decoration:none;">כניסה לקורס המלא</a></div>
         </div>
-        <p style="font-size:15px;color:#5f514a;line-height:1.8;margin:0 0 24px;">בתוך הקורס נשמרת גם הגישה האישית למדריך ״לבחור נכון״, כחלק מהקורס המלא: <a href="${guideUrl}" style="color:#2b1711;font-weight:700;">לפתיחת המדריך</a>.</p>
         <div style="background:#fffaf3;border:1px solid #e7d5bd;border-radius:14px;padding:18px 20px;margin:0 0 24px;">
           <p style="font-size:15px;color:#5f514a;line-height:1.8;margin:0;">את הקישור האישי להשלמת ההצטרפות למאגר קיבלת במייל נפרד. לאחר שהפרופיל, התמונה, השאלון וההעדפות הושלמו, מתחילה ספירת ההתחייבות להצעת התאמה ראשונה.</p>
         </div>

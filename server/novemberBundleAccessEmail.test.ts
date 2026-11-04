@@ -15,12 +15,17 @@ describe("November bundle access email", () => {
     expect(email.htmlContent).toContain("5 מודולים כתובים ומעשיים");
     expect(email.htmlContent).toContain("לא קורס וידאו");
     expect(email.htmlContent).toContain(`href=\"${courseUrl}\"`);
-    expect(email.htmlContent).toContain(`href=\"${guideUrl}\"`);
+    for (const content of [email.htmlContent, email.textContent]) {
+      expect(content).not.toContain(guideUrl);
+      expect(content).not.toContain("guide/view");
+      expect(content).not.toContain("לבחור נכון");
+      expect(content).not.toContain("מדריך");
+    }
     expect(email.textContent).toContain("במייל נפרד");
     expect(email.textContent).toContain(courseUrl);
   });
 
-  it("escapes the greeting and keeps the guide as included course access", () => {
+  it("escapes the greeting and preserves onboarding and unsubscribe links", () => {
     const email = buildNovemberBundleAccessEmail({
       firstName: "<script>alert(1)</script>",
       email: "buyer+november@example.com",
@@ -29,7 +34,8 @@ describe("November bundle access email", () => {
     });
     expect(email.htmlContent).not.toContain("<script>alert(1)</script>");
     expect(email.htmlContent).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
-    expect(email.htmlContent).toContain("כחלק מהקורס המלא");
+    expect(email.htmlContent).toContain("המסע לזוגיות");
+    expect(email.htmlContent).toContain("להשלמת ההצטרפות למאגר קיבלת במייל נפרד");
     expect(email.htmlContent).toContain("buyer%2Bnovember%40example.com");
   });
 });
