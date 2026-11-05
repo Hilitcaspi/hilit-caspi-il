@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({ open: true, search: "" }));
 vi.mock("../client/src/lib/trpc", () => ({
   trpc: {
     liveOctober: { salesStatus: { useQuery: () => ({ data: { databaseGiftOpen: state.open }, isLoading: false }) } },
+    publicProof: { approvedTestimonials: { useQuery: () => ({ data: [] }) } },
   },
 }));
 vi.mock("wouter", () => ({
@@ -74,5 +75,8 @@ describe("public database live gift offer", () => {
     expect(regularHtml).not.toContain('id="live-offer"');
     expect(regularHtml).not.toContain("live-db-test-email");
     expect(regularHtml).toContain("הצטרפות למאגר");
+    expect(regularHtml).toContain("אתמול בערב נפגשנו");
+    expect(regularHtml).toContain("בעילום שם");
+    expect(regularHtml.match(/data-testid="database-testimonial-card"/g)).toHaveLength(4);
   });
 });

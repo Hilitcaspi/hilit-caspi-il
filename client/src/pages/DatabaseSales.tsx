@@ -13,6 +13,7 @@ import { motion, useInView } from "framer-motion";
 import { Link, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { isLiveFirstMatchPublicOfferActive, LIVE_FIRST_MATCH_OFFER_END } from "@shared/liveFirstMatchPolicy";
+import DatabaseTestimonials from "@/components/DatabaseTestimonials";
 
 const CASUAL_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-casual_dac3228f.jpg";
 const SMILING_IMG = "/manus-storage/hilit-smiling-portrait_cddd0dfc.jpg";
@@ -383,6 +384,8 @@ export function DatabaseSalesContent({ campaign }: { campaign?: "live" } = {}) {
           </div>
         </AnimatedSection>
       </section>
+
+      {!isLiveOffer && <DatabaseTestimonials />}
 
       {/* ── VERIFIED OUTCOMES ── */}
       <section className="py-20 px-6 bg-white">
