@@ -3,6 +3,13 @@
  * Sends events to /api/track (no auth required, fire-and-forget)
  */
 
+import {
+  CHECKOUT_FUNNEL_ACTION,
+  sanitizeLandingPath,
+  type CheckoutReason,
+  type CheckoutStage,
+} from "@shared/checkoutFunnel";
+
 type TrackEventType =
   | "email_open"
   | "email_click"
@@ -76,4 +83,48 @@ export function track(payload: TrackPayload): void {
 /** Track a page view automatically */
 export function trackPageView(page?: string): void {
   track({ eventType: "page_view", page: page ?? (typeof window !== "undefined" ? window.location.pathname : undefined) });
+}
+
+const LANDING_PATH_KEY = "hc_landing_path";
+
+/** Remembers the first page this browser tab opened on. Path only, no query string. */
+export function rememberLandingPath(): void {
+  try {
+    if (typeof window === "undefined") return;
+    if (!sessionStorage.getItem(LANDING_PATH_KEY)) {
+      sessionStorage.setItem(LANDING_PATH_KEY, sanitizeLandingPath(window.location.pathname));
+    }
+  } catch {
+    // storage may be blocked; tracking must never throw
+  }
+}
+
+export function getLandingPath(): string {
+  try {
+    if (typeof window === "undefined") return "/";
+    return sessionStorage.getItem(LANDING_PATH_KEY) || sanitizeLandingPath(window.location.pathname);
+  } catch {
+    return "/";
+  }
+}
+
+/**
+ * Anonymous checkout stage event. Never sends email, name, phone, coupon or
+ * raw error text; only fixed stage/reason codes, product and landing path.
+ */
+export function trackCheckoutStage(
+  product: string,
+  stage: CheckoutStage,
+  reason: CheckoutReason | "-" = "-",
+): void {
+  track({
+    eventType: "button_click",
+    metadata: {
+      action: CHECKOUT_FUNNEL_ACTION,
+      product,
+      stage,
+      reason,
+      landing: getLandingPath(),
+    },
+  });
 }

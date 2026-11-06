@@ -3,11 +3,12 @@
  * for publication. First-name website display only, no photos or surnames.
  * These are experience quotes, not verified relationship outcomes.
  * Excerpts preserve the supplied meaning; punctuation is lightly normalized.
+ * 6 November 2026: owner corrected the first display name to "דור".
  */
 export const NOVEMBER_APPROVED_TESTIMONIALS = [
   {
     id: "november-experience-01",
-    displayName: "דיר",
+    displayName: "דור",
     topic: "על הדרך עם הילית",
     text: "בשיחה הראשונה עם הילית הרגשתי שהיא רואה ומבינה אותי ובאה עם רצון מאוד גדול לעזור לי. זה מאוד עזר לי להאמין בדרך המשותפת איתה. להילית מאוד אכפת מהאנשים שבטיפול אצלה.",
   },

@@ -5,7 +5,8 @@
  */
 import { useState, useRef, useEffect, useMemo } from "react";
 import React from "react";
-import { track } from "@/lib/track";
+import { track, trackCheckoutStage } from "@/lib/track";
+import { classifyInvalidField } from "@shared/checkoutFunnel";
 import { trackCompleteRegistration } from "@/lib/metaPixel";
 import { gaSignUp } from "@/lib/ga";
 import { motion, AnimatePresence } from "framer-motion";
@@ -403,6 +404,8 @@ export default function Register() {
     const form = e.target as HTMLFormElement;
     if (!form.checkValidity()) {
       const firstInvalid = form.querySelector(':invalid') as HTMLElement;
+      // Anonymous: field type only, never the value.
+      try { trackCheckoutStage("database", "profile_invalid", classifyInvalidField(firstInvalid as any)); } catch {}
       if (firstInvalid) {
         firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
         firstInvalid.focus();
@@ -412,6 +415,7 @@ export default function Register() {
     }
     const normalizedPhone = normalizeIsraeliPhone(phone);
     if (!normalizedPhone) {
+      try { trackCheckoutStage("database", "profile_invalid", "phone"); } catch {}
       const phoneInput = form.querySelector('input[type="tel"]') as HTMLInputElement | null;
       phoneInput?.setCustomValidity("יש להזין מספר טלפון ישראלי מלא, לדוגמה 050-0000000");
       phoneInput?.scrollIntoView({ behavior: "smooth", block: "center" });

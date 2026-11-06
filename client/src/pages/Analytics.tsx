@@ -630,6 +630,137 @@ export default function Analytics() {
         {/* ── Tab: Behavior (Hotjar-style) ── */}
         {activeTab === "behavior" && (
           <div className="space-y-4">
+            {/* Checkout funnel: where buyers stop */}
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h2 className="font-black text-[#191265] text-lg mb-1">💳 איפה נעצרים בקופה</h2>
+              <p className="text-xs text-[#727272] mb-4">
+                נתונים אנונימיים, ללא פרטים אישיים וללא בדיקות TEST1. השלבים נאספים מרגע פרסום הגרסה הזו, ולכן בימים הראשונים המספרים קטנים.
+                &quot;הצלחה&quot; היא אישור ממערכת התשלום בדפדפן; המכירה המאומתת עצמה נספרת בלשונית המכירות.
+              </p>
+              {behaviorData?.checkoutFunnel?.byProduct && behaviorData.checkoutFunnel.byProduct.length > 0 ? (() => {
+                const PRODUCT_LABELS: Record<string, string> = {
+                  database: "מאגר",
+                  bundle_november: "נובמבר",
+                  plus: "פלוס",
+                  match_boost: "בוסט",
+                  guide: "מדריך",
+                  course: "קורס",
+                };
+                const REASON_LABELS: Record<string, string> = {
+                  "validation_error:name": "שם מלא חסר",
+                  "validation_error:email": "מייל לא תקין",
+                  "validation_error:phone": "טלפון לא תקין",
+                  "validation_error:age": "לא אישרו גיל 18+",
+                  "validation_error:terms": "לא אישרו תקנון",
+                  "validation_error:coupon_pending": "קוד הטבה עוד לא אומת",
+                  "validation_error:coupon_unverified": "קוד שהוזן ולא אומת",
+                  "profile_invalid:photo": "טופס ההרשמה: חסרה תמונה",
+                  "profile_invalid:phone": "טופס ההרשמה: טלפון לא תקין",
+                  "profile_invalid:email": "טופס ההרשמה: מייל לא תקין",
+                  "profile_invalid:name": "טופס ההרשמה: שם חסר",
+                  "profile_invalid:terms": "טופס ההרשמה: לא אישרו תקנון",
+                  "profile_invalid:age": "טופס ההרשמה: לא אישרו גיל",
+                  "profile_invalid:required_field": "טופס ההרשמה: שדה חובה אחר חסר",
+                  "profile_invalid:other": "טופס ההרשמה: שדה לא תקין",
+                  "rejected:open_process": "נחסמו: תהליך תשלום קודם פתוח",
+                  "rejected:already_paid": "כבר שילמו בעבר",
+                  "rejected:pending_previous": "תשלום קודם ממתין לאישור",
+                  "rejected:uncertain_previous": "תשלום קודם לא ברור",
+                  "rejected:plus_requires_database": "פלוס בלי מאגר פעיל",
+                  "rejected:plus_already_active": "פלוס כבר פעיל",
+                  "rejected:boost_link_required": "בוסט בלי קישור אישי",
+                  "rejected:resume_required": "נדרש קישור המשך הרשמה",
+                  "error:connectivity": "תקלת חיבור למערכת התשלום",
+                  "error:outcome_unknown": "שגיאה בארנק, מצב לא ברור",
+                  "error:other": "שגיאה אחרת",
+                  "sdk_failure:other": "התשלום נדחה בכרטיס",
+                  "sdk_failure:outcome_unknown": "תשלום במצב לא ברור",
+                  "sdk_timeout:outcome_unknown": "פג זמן הארנק",
+                };
+                const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "-");
+                return (
+                  <div className="space-y-5">
+                    <table className="w-full text-sm text-right">
+                      <thead>
+                        <tr className="text-[#727272] text-xs border-b border-[#f0eadc]">
+                          <th className="pb-2 font-medium">מוצר</th>
+                          <th className="pb-2 font-medium text-center">לחצו לשלם</th>
+                          <th className="pb-2 font-medium text-center">נעצרו בטופס</th>
+                          <th className="pb-2 font-medium text-center">נחסמו</th>
+                          <th className="pb-2 font-medium text-center">הארנק נפתח</th>
+                          <th className="pb-2 font-medium text-center">סגרו את הארנק</th>
+                          <th className="pb-2 font-medium text-center">הצלחה</th>
+                          <th className="pb-2 font-medium text-center">הצלחה מתוך נפתח</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {behaviorData.checkoutFunnel.byProduct.slice(0, 8).map((row: any, i: number) => (
+                          <tr key={i} className="border-b border-[#f0eadc] last:border-0">
+                            <td className="py-2 font-medium text-[#191265] text-xs">{PRODUCT_LABELS[row.product] ?? row.product}</td>
+                            <td className="py-2 text-center">{row.starts}</td>
+                            <td className="py-2 text-center text-amber-700">{row.validation}</td>
+                            <td className="py-2 text-center text-red-600">{row.rejected + row.errors}</td>
+                            <td className="py-2 text-center">{row.walletOpened}</td>
+                            <td className="py-2 text-center text-amber-700">{row.closed}</td>
+                            <td className="py-2 text-center font-bold text-green-600">{row.success}</td>
+                            <td className="py-2 text-center">
+                              <span className="bg-[#f0eadc] px-2 py-0.5 rounded-full text-xs font-bold">{pct(row.success, row.walletOpened)}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {behaviorData.checkoutFunnel.byProduct.some((r: any) => r.topReasons?.length > 0) && (
+                      <div>
+                        <h3 className="font-bold text-[#191265] text-sm mb-2">הסיבות הנפוצות לעצירה</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {behaviorData.checkoutFunnel.byProduct.flatMap((r: any) =>
+                            (r.topReasons ?? []).map((t: any) => ({ ...t, product: r.product })),
+                          )
+                            .sort((a: any, b: any) => b.count - a.count)
+                            .slice(0, 10)
+                            .map((t: any, i: number) => (
+                              <span key={i} className="bg-[#f0eadc] text-[#191265] px-3 py-1 rounded-full text-xs">
+                                {PRODUCT_LABELS[t.product] ?? t.product}: {REASON_LABELS[t.reason] ?? t.reason} <b>{t.count}</b>
+                              </span>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                    {behaviorData.checkoutFunnel.byLanding?.length > 0 && (
+                      <div>
+                        <h3 className="font-bold text-[#191265] text-sm mb-2">לפי עמוד הנחיתה הראשון בביקור</h3>
+                        <table className="w-full text-sm text-right">
+                          <thead>
+                            <tr className="text-[#727272] text-xs border-b border-[#f0eadc]">
+                              <th className="pb-2 font-medium">עמוד נחיתה</th>
+                              <th className="pb-2 font-medium text-center">הארנק נפתח</th>
+                              <th className="pb-2 font-medium text-center">סגרו</th>
+                              <th className="pb-2 font-medium text-center">נחסמו</th>
+                              <th className="pb-2 font-medium text-center">הצלחה</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {behaviorData.checkoutFunnel.byLanding.map((row: any, i: number) => (
+                              <tr key={i} className="border-b border-[#f0eadc] last:border-0">
+                                <td className="py-2 font-medium text-[#191265] text-xs" dir="ltr">{row.landing}</td>
+                                <td className="py-2 text-center">{row.walletOpened}</td>
+                                <td className="py-2 text-center text-amber-700">{row.closed}</td>
+                                <td className="py-2 text-center text-red-600">{row.rejected}</td>
+                                <td className="py-2 text-center font-bold text-green-600">{row.success}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })() : (
+                <div className="text-center py-4 text-[#727272] text-sm">עוד אין נתוני קופה. הם יתחילו להצטבר אחרי פרסום הגרסה.</div>
+              )}
+            </div>
+
             {/* Page Views */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
               <h2 className="font-black text-[#191265] text-lg mb-4">👁 צפיות בדפים</h2>

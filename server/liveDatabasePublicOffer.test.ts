@@ -76,7 +76,10 @@ describe("public database live gift offer", () => {
     expect(regularHtml).not.toContain("live-db-test-email");
     expect(regularHtml).toContain("הצטרפות למאגר");
     expect(regularHtml).toContain("אתמול בערב נפגשנו");
-    expect(regularHtml).toContain("בעילום שם");
+    expect(regularHtml).toContain("דניאל");
+    expect(regularHtml).toContain("דור");
+    expect(regularHtml).not.toContain(">דיר<");
+    expect(regularHtml).toContain(">דור<");
     expect(regularHtml.match(/data-testid="database-testimonial-card"/g)).toHaveLength(4);
   });
 });

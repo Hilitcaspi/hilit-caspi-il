@@ -13,6 +13,7 @@ import { CHOOSE50_CODE, validateChoose50Coupon } from "./choose50Coupon";
 
 import { COOKIE_NAME } from "../shared/const";
 import { captureAcquisitionIfMissing } from "../shared/acquisitionAttribution";
+import { buildCheckoutFunnelFromEventRows } from "../shared/checkoutFunnel";
 import { acquisitionInputSchema, recordAcquisitionSafely } from "./acquisitionCapture";
 import { checkoutStatusInputSchema, getCheckoutPaymentStatus } from "./checkoutPaymentStatus";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -7605,6 +7606,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           SELECT page, metadata, COUNT(*) as clicks
           FROM analytics_events
           WHERE eventType = 'button_click'
+            AND (metadata IS NULL OR metadata NOT LIKE '%"action":"checkout_stage"%')
             AND (${since} = 0 OR createdAt > ${since})
           GROUP BY page, metadata
           ORDER BY clicks DESC
@@ -7658,6 +7660,29 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         `) as any;
         const sectionRows = Array.isArray(svResult[0]) ? svResult[0] : svResult;
 
+        // Anonymous checkout funnel (fixed stage/reason codes only, no PII).
+        const cfResult = await db.execute(sql`
+          SELECT metadata, COUNT(*) as cnt
+          FROM analytics_events
+          WHERE eventType = 'button_click'
+            AND metadata LIKE '%"action":"checkout_stage"%'
+            AND (${since} = 0 OR createdAt > ${since})
+          GROUP BY metadata
+          LIMIT 2000
+        `) as any;
+        const cfRows = Array.isArray(cfResult[0]) ? cfResult[0] : cfResult;
+        const icResult = await db.execute(sql`
+          SELECT metadata, COUNT(*) as cnt
+          FROM analytics_events
+          WHERE eventType = 'button_click'
+            AND metadata LIKE '%"action":"initiate_checkout"%'
+            AND (${since} = 0 OR createdAt > ${since})
+          GROUP BY metadata
+          LIMIT 2000
+        `) as any;
+        const icRows = Array.isArray(icResult[0]) ? icResult[0] : icResult;
+        const checkoutFunnel = buildCheckoutFunnelFromEventRows(cfRows as any[], icRows as any[]);
+
         return {
           pageViews: (pageViewRows as any[]).map((r: any) => ({ page: r.page, views: Number(r.views) })),
           buttonClicks: (buttonClickRows as any[]).map((r: any) => ({ page: r.page, metadata: r.metadata, clicks: Number(r.clicks) })),
@@ -7665,6 +7690,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           formConversion: (formRows as any[]).map((r: any) => ({ page: r.page, eventType: r.eventType, count: Number(r.cnt) })),
           ctaClicks: (ctaRows as any[]).map((r: any) => ({ page: r.page, eventType: r.eventType, count: Number(r.cnt) })),
           sectionViews: (sectionRows as any[]).map((r: any) => ({ page: r.page, metadata: r.metadata, views: Number(r.views) })),
+          checkoutFunnel,
         };
       }),
   }),

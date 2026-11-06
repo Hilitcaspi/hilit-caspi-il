@@ -7,6 +7,7 @@ import * as readiness from "../client/src/lib/growSdkReadiness";
 import * as safety from "../client/src/lib/checkoutSafety";
 import * as identity from "../shared/checkoutIdentity";
 import { normalizeIsraeliPhone } from "../shared/profileValidation";
+import * as checkoutFunnel from "../shared/checkoutFunnel";
 
 const ATTEMPT_ID = "11111111-1111-4111-8111-111111111111";
 const EXPIRY = "התשלום נכשל: נגמר הזמן לתשלום. אנא רענן את הדף ונסה שנית";
@@ -78,7 +79,8 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
     } },
     "@/lib/ga": { gaBeginCheckout: vi.fn() },
     "@/lib/metaPixel": { trackInitiateCheckout: vi.fn() },
-    "@/lib/track": { track: vi.fn() },
+    "@/lib/track": { track: vi.fn(), trackCheckoutStage: vi.fn() },
+    "@shared/checkoutFunnel": checkoutFunnel,
     "@/lib/growSdkReadiness": readiness,
     "@shared/profileValidation": { normalizeIsraeliPhone },
     "@/lib/purchaseTracking": { getMetaBrowserIdentifiers: () => ({}), rememberPurchaseTrackingToken: vi.fn() },

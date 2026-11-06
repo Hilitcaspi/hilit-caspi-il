@@ -3,8 +3,7 @@
  * Auto-tracks: button clicks, scroll depth, time on page, rage clicks, form interactions
  * All data flows to /api/track and appears in the CRM analytics dashboard
  */
-import { track } from "./track";
-
+import { rememberLandingPath, track } from "./track";
 let initialized = false;
 let scrollDepthMax = 0;
 let pageStartTime = 0;
@@ -166,6 +165,7 @@ let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
 export function initBehaviorTracker() {
   if (initialized) return;
   initialized = true;
+  rememberLandingPath();
 
   currentPage = window.location.pathname;
   pageStartTime = Date.now();

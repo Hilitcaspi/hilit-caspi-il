@@ -14,9 +14,9 @@ describe("approved experience quotes on the database sales page", () => {
     expect(new Set(DATABASE_APPROVED_TESTIMONIALS.map(row => row.id)).size).toBe(4);
   });
 
-  it("adds only the owner-supplied meeting experience without inventing an identity", () => {
+  it("adds only the owner-supplied meeting experience with the owner-supplied first name", () => {
     const additional = DATABASE_APPROVED_TESTIMONIALS[3];
-    expect(additional.displayName).toBe("");
+    expect(additional.displayName).toBe("דניאל");
     expect(additional.topic).toBe("על ההיכרות הראשונה");
     expect(additional.text).toBe("אתמול בערב נפגשנו. תודה רבה על ההיכרות. אין ספק שההיכרות בדרך הזו הרבה יותר נעימה ומוצלחת מהאפליקציות 😎🍷. סופ״ש נעים.");
     expect(additional.text).not.toMatch(/זוגיות|חודשים|חתונה/);

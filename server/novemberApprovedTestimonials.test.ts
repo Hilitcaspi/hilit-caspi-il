@@ -12,6 +12,7 @@ describe("owner-supplied November website experience quotes", () => {
       "על הדרך עם הילית", "על חוויית ההתאמות", "על התוצאה בשאלון",
     ]);
     expect(NOVEMBER_APPROVED_TESTIMONIALS[0].text).toContain("רואה ומבינה אותי");
+    expect(NOVEMBER_APPROVED_TESTIMONIALS.map(row => row.displayName)).toEqual(["דור", "תום", "הודיה"]);
     expect(NOVEMBER_APPROVED_TESTIMONIALS[1].text).toContain("כל פעם בהתאמה אחת");
     expect(NOVEMBER_APPROVED_TESTIMONIALS[2].text).toContain("כל נושא ההתאמה מסקרן ממש");
   });

@@ -23,7 +23,8 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { gaBeginCheckout } from "@/lib/ga";
 import { trackInitiateCheckout } from "@/lib/metaPixel";
-import { track } from "@/lib/track";
+import { track, trackCheckoutStage } from "@/lib/track";
+import { classifyCheckoutErrorReason, type CheckoutReason, type CheckoutStage } from "@shared/checkoutFunnel";
 import {
   isGrowPaymentOutcomeUnknown,
   isGrowPaymentRendererReady,
@@ -574,16 +575,28 @@ export default function GrowWallet({
     const fullName = normalizeCheckoutFullName(name);
     const userEmail = email.trim();
     const userPhone = normalizeIsraeliPhone(phone);
+    const isDiagnosticCheckout =
+      prefillCoupon?.trim().toUpperCase() === "TEST1" ||
+      couponApplied?.code === "TEST1" ||
+      couponCode.trim().toUpperCase() === "TEST1";
+    // Anonymous funnel diagnostics only; TEST1 owner checks are excluded.
+    const stage = (value: CheckoutStage, reason: CheckoutReason | "-" = "-") => {
+      if (isDiagnosticCheckout) return;
+      try { trackCheckoutStage(product, value, reason); } catch {}
+    };
 
     if (!isValidCheckoutFullName(fullName)) {
+      stage("validation_error", "name");
       toast.error("שם מלא נדרש — יש להזין שם פרטי ושם משפחה.");
       return;
     }
     if (!isValidCheckoutEmail(userEmail)) {
+      stage("validation_error", "email");
       toast.error("אימייל לא תקין — יש להזין כתובת אימייל תקינה.");
       return;
     }
     if (!userPhone) {
+      stage("validation_error", "phone");
       toast.error(
         "מספר הטלפון אינו תקין. יש להזין מספר ישראלי מלא, לדוגמה 050-0000000."
       );
@@ -592,10 +605,12 @@ export default function GrowWallet({
     if (name !== fullName) setName(fullName);
     if (phone !== userPhone) setPhone(userPhone);
     if (!ageConfirmed) {
+      stage("validation_error", "age");
       toast.error("יש לאשר שאתה/את בן/בת 18 ומעלה.");
       return;
     }
     if (termsPath && !termsAccepted) {
+      stage("validation_error", "terms");
       toast.error("יש לאשר את התקנון לפני התשלום.");
       return;
     }
@@ -606,6 +621,7 @@ export default function GrowWallet({
        (product === "database" && ["LIVE", LIVE_POST_DATABASE_CODE].includes(prefillCoupon?.trim().toUpperCase() || ""))) &&
       couponApplied?.code !== prefillCoupon?.trim().toUpperCase()
     ) {
+      stage("validation_error", "coupon_pending");
       toast.error(
         "ממתינים לאימות קוד ההטבה. אין לבצע תשלום בלי שהקוד מופיע בקופה."
       );
@@ -616,6 +632,7 @@ export default function GrowWallet({
       couponCode.trim() &&
       couponApplied?.code !== couponCode.trim().toUpperCase()
     ) {
+      stage("validation_error", "coupon_unverified");
       toast.error(
         "יש לאמת את הקוד שהוזן לפני פתיחת התשלום, או למחוק אותו כדי להמשיך במחיר הרגיל."
       );
@@ -804,6 +821,7 @@ export default function GrowWallet({
           events: {
             onSuccess: (r: any) => {
               if (!isCurrentAttempt()) return;
+              stage("sdk_success");
               // Terminal success wins over every later close/cancel/error
               // callback. The SDK result is not presented as server verification.
               attempt.terminal = true;
@@ -827,6 +845,7 @@ export default function GrowWallet({
             onFailure: (r: any) => {
               if (!isCurrentAttempt()) return;
               const ambiguousFailure = isGrowPaymentOutcomeUnknown(r);
+              stage("sdk_failure", ambiguousFailure ? "outcome_unknown" : "other");
               releaseRecoverableAttempt(ambiguousFailure);
               attempt.statusToastId = toast.error(ambiguousFailure
                 ? "מצב התשלום אינו ברור. אין לשלם שוב לפני בדיקה; אפשר לפנות אלינו לבירור."
@@ -840,6 +859,7 @@ export default function GrowWallet({
               // Expiry is not terminal unpaid proof. Keep authCode/processToken
               // and the dedupe UUID; only reconciliation can authorize recovery.
               logStep("sdk_timeout", "outcome_unknown");
+              stage("sdk_timeout", "outcome_unknown");
               releaseRecoverableAttempt(true);
               attempt.statusToastId = toast.error(
                 "מצב התשלום אינו ברור. אין לשלם שוב לפני בדיקה; אפשר לפנות אלינו לבירור."
@@ -850,24 +870,29 @@ export default function GrowWallet({
             },
             onCancel: () => {
               if (!isCurrentAttempt()) return;
+              stage("sdk_closed");
               releaseRecoverableAttempt(false);
             },
             onPaymentCancel: () => {
               if (!isCurrentAttempt()) return;
+              stage("sdk_closed");
               releaseRecoverableAttempt(false);
             },
             onClose: () => {
               if (!isCurrentAttempt()) return;
+              stage("sdk_closed");
               // Closing is recoverable: keep the immutable authCode/process
               // client-side and reopen it, rather than creating a new purchase.
               releaseRecoverableAttempt(false);
             },
             onWalletChange: (state: unknown) => {
               if (state !== "close" || !isCurrentAttempt()) return;
+              stage("sdk_closed");
               releaseRecoverableAttempt(false);
             },
             onError: (e: any) => {
               if (!isCurrentAttempt()) return;
+              stage("error", "outcome_unknown");
               // This may arrive after a provider action. Preserve the process
               // and block another payment until its outcome has been verified.
               releaseRecoverableAttempt(true);
@@ -1085,6 +1110,7 @@ export default function GrowWallet({
         if (!isCurrentAttempt()) return;
         setWalletLoading(false);
         setWalletOpen(true);
+        stage("wallet_opened");
         logStep("5_renderPaymentOptions_done");
         return;
       }
@@ -1098,12 +1124,14 @@ export default function GrowWallet({
       if (!isCurrentAttempt()) return;
       setWalletLoading(false);
       setWalletOpen(true);
+      stage("wallet_opened");
       logStep("5_renderPaymentOptions_done");
     } catch (err: any) {
       if (!isCurrentAttempt()) return;
       const technicalMessage = String(err?.message || "Unknown");
       const errDetail = `${technicalMessage} | stack: ${err?.stack?.slice(0, 200) || "N/A"}`;
       const expectedRejection = isExpectedCheckoutRejection(technicalMessage);
+      stage(expectedRejection ? "rejected" : "error", classifyCheckoutErrorReason(technicalMessage));
       logStep(expectedRejection ? "REJECTED" : "ERROR", errDetail);
       releaseRecoverableAttempt(
         failureStage === "sdk_failure" && Boolean(attempt.authCode)
