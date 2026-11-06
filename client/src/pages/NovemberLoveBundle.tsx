@@ -237,6 +237,10 @@ export default function NovemberLoveBundle() {
   const checkoutRef = useRef<HTMLElement>(null);
   const checkoutFormRef = useRef<HTMLDivElement>(null);
   const [offerActive] = useState(() => isNovemberBundleOfferActive());
+  // A public URL cannot authorize this price: Grow validates the configured
+  // test inbox server-side, and refuses payment until TEST1 has been applied.
+  const [diagnosticCoupon] = useState(() => typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("coupon")?.trim().toUpperCase() === "TEST1" ? "TEST1" : undefined);
   const { data: approvedTestimonials = [] } =
     trpc.publicProof.approvedTestimonials.useQuery(undefined, {
       staleTime: 10 * 60 * 1000,
@@ -911,6 +915,7 @@ export default function NovemberLoveBundle() {
                     buttonClassName="!bg-[#171519] !py-4 !text-base !font-black !text-[#fffdf9] hover:!bg-[#342d32]"
                     termsPath="/terms/november-love"
                     showCoupon={false}
+                    prefillCoupon={diagnosticCoupon}
                     keepDetailsVisible
                     onSuccess={() => {
                       window.location.assign("/thank-you/november-love");

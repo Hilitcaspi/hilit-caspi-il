@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createLiveCheckoutReference, verifyLiveCheckoutReference } from "./liveCheckoutReference";
 import { isLiveCheckoutOpen, liveCheckoutPrice, matchesPaidLiveCheckout } from "./liveOctober";
-import { LIVE_TEST_EXPIRES_AT, isLiveTestCheckout } from "./liveTestCoupon";
+import { isLiveTestCheckout } from "./liveTestCoupon";
 
 const previous = process.env.JWT_SECRET;
 const previousTestEmail = process.env.LIVE_TEST_CHECKOUT_EMAIL;
@@ -88,8 +88,8 @@ describe("October live paid callback", () => {
 });
 
 describe("TEST1 checkout protection", () => {
-  it("requires a configured owner inbox; accepts only two exact aliases before expiry", () => {
-    const now = LIVE_TEST_EXPIRES_AT - 60_000;
+  it("requires a configured owner inbox; accepts only two exact aliases without a coupon cutoff", () => {
+    const now = Date.parse("2026-11-06T10:00:00+02:00");
     delete process.env.LIVE_TEST_CHECKOUT_EMAIL;
     expect(isLiveTestCheckout("database", "TEST1", "owner@example.com", now)).toBe(false);
     process.env.LIVE_TEST_CHECKOUT_EMAIL = "owner@gmail.com";
@@ -100,6 +100,6 @@ describe("TEST1 checkout protection", () => {
       expect(isLiveTestCheckout("database", "TEST1", email, now)).toBe(false);
     }
     expect(isLiveTestCheckout("plus", "TEST1", "owner@gmail.com", now)).toBe(true);
-    expect(isLiveTestCheckout("database", "TEST1", "owner@gmail.com", LIVE_TEST_EXPIRES_AT)).toBe(false);
+    expect(isLiveTestCheckout("database", "TEST1", "owner@gmail.com", Date.parse("2099-12-31T00:00:00Z"))).toBe(true);
   });
 });

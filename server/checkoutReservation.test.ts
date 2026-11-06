@@ -45,7 +45,7 @@ class FakeStore implements CheckoutReservationStore {
   }
   async rotateOpen(record: CheckoutReservationRecord, prior: string) {
     const old = this.rows.get(record.reservationKey);
-    if (!old || old.state !== "open" || old.attemptId !== prior) return false;
+    if (!old || !["open", "completed"].includes(old.state) || old.attemptId !== prior) return false;
     this.rows.set(record.reservationKey, { ...record });
     return true;
   }
@@ -213,6 +213,57 @@ describe("withCheckoutReservation", () => {
     const diagnostic = input({ diagnosticTest: true });
     await expect(withCheckoutReservation(diagnostic, async () => ({ processToken: "diagnostic-only" })))
       .resolves.toEqual({ processToken: "diagnostic-only" });
+  });
+
+  it.each(["database", "bundle_november", "guide", "course", "match_boost", "live_october"])("rotates confirmed diagnostic %s only with a fresh explicit attempt", async product => {
+    const diagnostic = input({
+      product, diagnosticTest: true, boostMatchId: product === "match_boost" ? 101 : undefined,
+      fingerprint: createCheckoutReservationFingerprint({ email: "buyer@example.test", product, couponCode: "TEST1", identity: "owner-test" }),
+    });
+    const create = vi.fn(async () => ({ processToken: "diagnostic-process" }));
+    await withCheckoutReservation(diagnostic, create);
+    expect((await conflict(withCheckoutReservation({ ...diagnostic, checkoutAttemptId: ATTEMPT_B }, create))).state).toBe("open");
+    const row = [...store.rows.values()][0];
+    row.state = "completed"; // Only the server's provider-confirmed marker may set this in production.
+    expect((await conflict(withCheckoutReservation(diagnostic, create))).state).toBe("completed");
+    await expect(withCheckoutReservation({ ...diagnostic, checkoutAttemptId: ATTEMPT_B }, create)).resolves.toEqual({ processToken: "diagnostic-process" });
+    expect(create).toHaveBeenCalledTimes(2);
+    expect([...store.rows.values()][0].diagnosticTest).toBe(true);
+  });
+
+  it.each(["creating", "uncertain"] as const)("never releases a %s diagnostic with a new attempt ID", async state => {
+    const diagnostic = input({ diagnosticTest: true });
+    const create = vi.fn(async () => ({ processToken: "diagnostic-process" }));
+    await withCheckoutReservation(diagnostic, create);
+    [...store.rows.values()][0].state = state;
+    expect((await conflict(withCheckoutReservation({ ...diagnostic, checkoutAttemptId: ATTEMPT_B }, create))).state).toBe(state);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps database/bundle diagnostics on the original shared lock until the prior test is confirmed", async () => {
+    const database = input({ product: "database", diagnosticTest: true });
+    await withCheckoutReservation(database, async () => ({ processToken: "old-database-test" }));
+    const november = input({ product: "bundle_november", diagnosticTest: true, checkoutAttemptId: ATTEMPT_B });
+    expect((await conflict(withCheckoutReservation(november, async () => ({ processToken: "must-not-create" })))).state).toBe("open");
+    [...store.rows.values()][0].state = "completed";
+    await expect(withCheckoutReservation(november, async () => ({ processToken: "new-november-test" }))).resolves.toEqual({ processToken: "new-november-test" });
+    expect(store.rows.size).toBe(1);
+  });
+
+  it("elects just one new diagnostic owner when two requests race to rotate the same confirmed test", async () => {
+    const diagnostic = input({ diagnosticTest: true });
+    await withCheckoutReservation(diagnostic, async () => ({ processToken: "old-test" }));
+    [...store.rows.values()][0].state = "completed";
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const create = vi.fn(async () => { await gate; return { processToken: "new-test" }; });
+    const next = { ...diagnostic, checkoutAttemptId: ATTEMPT_B };
+    const first = withCheckoutReservation(next, create);
+    await expect.poll(() => create.mock.calls.length).toBe(1);
+    expect((await conflict(withCheckoutReservation(next, create))).state).toBe("creating");
+    release();
+    await expect(first).resolves.toEqual({ processToken: "new-test" });
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it("rotates a repeatable purchase only with a new attempt and exact provider confirmation", async () => {

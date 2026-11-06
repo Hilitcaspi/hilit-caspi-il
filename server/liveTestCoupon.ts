@@ -1,10 +1,11 @@
 export const LIVE_TEST_CODE = "TEST1";
 export const LIVE_TEST_PRICE = 1;
-/** TEST1 is unavailable from midnight in Israel immediately after 1 November 2026. */
-export const LIVE_TEST_EXPIRES_AT = Date.parse("2026-11-02T00:00:00+02:00");
+/** Owner-approved permanent diagnostic: no expiry or coupon-use quota. */
+export const LIVE_TEST_EXPIRES_AT = null;
+export const LIVE_TEST_MAX_USES = null;
 
 /**
- * Checkout products covered by the short-lived TEST1 diagnostic. The retired
+ * Checkout products covered by the permanent TEST1 diagnostic. The retired
  * Tu B'Av product remains listed so the test policy cannot drift from the
  * checkout enum, but its normal closed-offer gate still rejects new checkouts.
  */
@@ -28,7 +29,9 @@ export type LiveTestProduct = (typeof LIVE_TEST_PRODUCTS)[number];
 /** Only the configured owner's inbox and two fixed Gmail aliases may test the checkout. */
 export function isAuthorizedLiveTestEmail(email: string | undefined, now = Date.now()): boolean {
   const owner = process.env.LIVE_TEST_CHECKOUT_EMAIL?.trim().toLowerCase();
-  if (!owner || now >= LIVE_TEST_EXPIRES_AT || !email) return false;
+  // Keep the optional clock argument compatible with existing callers; TEST1
+  // no longer expires. Each attempt still has its normal locks and proof TTL.
+  if (!owner || !email) return false;
   const normalized = email.trim().toLowerCase();
   const at = owner.lastIndexOf("@");
   if (at < 1 || owner.slice(at) !== "@gmail.com") return normalized === owner;

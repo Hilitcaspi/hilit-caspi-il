@@ -98,6 +98,28 @@ export function getOrCreateCheckoutAttemptId(
   }
 }
 
+/** Prepare a new TEST1 label only; the server still requires confirmed prior payment. */
+export function createNextDiagnosticCheckoutAttempt(
+  identity: CheckoutAttemptIdentity,
+  couponCode: string | undefined,
+  priorAttemptId: string,
+  storage: CheckoutStorage | null = sessionStorageOrNull(),
+  createId: () => string = createCheckoutAttemptId,
+): string | null {
+  if (couponCode !== "TEST1" || currentCheckoutOwner || !storage ||
+      !isCheckoutAttemptCompleted(priorAttemptId, storage)) return null;
+  try {
+    const key = checkoutAttemptStorageKey(identity);
+    if (storage.getItem(key) !== priorAttemptId) return null;
+    const next = createId();
+    if (!UUID_V4.test(next) || next === priorAttemptId) return null;
+    storage.setItem(key, next);
+    return next;
+  } catch {
+    return null;
+  }
+}
+
 /** The terminal marker stores only a literal marker under an opaque UUID key. */
 export function isCheckoutAttemptCompleted(
   attemptId: string,

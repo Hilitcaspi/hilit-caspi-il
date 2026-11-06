@@ -219,7 +219,10 @@ function checkoutScope(product: string, boostMatchId: string | number | undefine
     // Unknown products are conservatively one-time until intentionally classified.
     scope = { scopeKind: `product:${product}`, aliases: [product], repeatable: false, oneTime: true };
   }
-  if (diagnosticTest) scope = { ...scope, scopeKind: `${scope.scopeKind}:diagnostic` };
+  // Keep the existing diagnostic keys so old open/uncertain attempts cannot be
+  // bypassed. Only an exact provider-confirmed diagnostic may rotate through
+  // the existing CAS with a new explicit attempt ID; production is unchanged.
+  if (diagnosticTest) scope = { ...scope, scopeKind: `${scope.scopeKind}:diagnostic`, repeatable: true };
   return scope;
 }
 

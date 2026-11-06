@@ -49,6 +49,7 @@ import {
   acquireCheckoutOwner,
   checkoutAttemptStorageKey,
   completeCheckoutOwner,
+  createNextDiagnosticCheckoutAttempt,
   getOrCreateCheckoutAttemptId,
   isCheckoutAttemptCompleted,
   isCheckoutOwner,
@@ -601,8 +602,8 @@ export default function GrowWallet({
     // A database gift-page visitor must never pay for a plain database order
     // just because the automatic LIVE coupon validation is still pending.
     if (
-      product === "database" &&
-      ["LIVE", LIVE_POST_DATABASE_CODE, "TEST1"].includes(prefillCoupon?.trim().toUpperCase() || "") &&
+      (prefillCoupon?.trim().toUpperCase() === "TEST1" ||
+       (product === "database" && ["LIVE", LIVE_POST_DATABASE_CODE].includes(prefillCoupon?.trim().toUpperCase() || ""))) &&
       couponApplied?.code !== prefillCoupon?.trim().toUpperCase()
     ) {
       toast.error(
@@ -1430,7 +1431,9 @@ export default function GrowWallet({
           <span>{checkingPayment ? "מאמתים את אישור התשלום..." : "מצב התשלום דורש בדיקה"}</span>
         ) : (
           <span>
-            {product === "guide" &&
+            {couponApplied?.code === "TEST1"
+              ? "תשלום בדיקה — 1 ₪"
+              : product === "guide" &&
             couponApplied?.code === "CHOOSE50" &&
             couponApplied.fixedPrice !== undefined
               ? `לרכישה המאובטחת ₪${couponApplied.fixedPrice.toFixed(2)} ←`
@@ -1438,6 +1441,28 @@ export default function GrowWallet({
           </span>
         )}
       </button>
+
+      {paymentCompleted && couponApplied?.code === "TEST1" && (
+        <button
+          type="button"
+          className="mt-3 w-full rounded-xl border border-[#191265]/20 py-3 text-sm font-bold text-[#191265]"
+          onClick={() => {
+            const prior = checkoutAttemptRef.current;
+            if (!prior?.terminal || prior.couponCode !== "TEST1" || !createNextDiagnosticCheckoutAttempt(
+              { product, email: prior.email, boostMatchId }, prior.couponCode, prior.attemptId,
+            )) {
+              toast.message("לא ניתן להכין בדיקה חדשה כרגע. אין לשלם שוב לפני אימות הבדיקה הקודמת.");
+              return;
+            }
+            checkoutAttemptRef.current = null;
+            checkoutLockRef.current = false;
+            setPaymentCompleted(false);
+            toast.message("בדיקה חדשה הוכנה. פתיחת תשלום נוסף תתאפשר רק לאחר אישור הבדיקה הקודמת בשרת.");
+          }}
+        >
+          הכנת בדיקה חדשה — חיוב נוסף של 1 ₪
+        </button>
+      )}
 
       {paymentStatusAmbiguous && !walletLoading && !walletOpen && !paymentCompleted && (
         <div className="mt-3 rounded-xl bg-amber-50 p-4 text-center text-sm leading-6 text-amber-900" role="status" aria-live="polite">

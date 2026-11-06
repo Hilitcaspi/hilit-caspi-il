@@ -972,6 +972,33 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
     }
   }
 
+  // payment_leads is mutable per email/product: a later production checkout can
+  // overwrite the TEST1 binding before its first callback or a verified retry.
+  // Hold every unbound/unauthorized 1 ILS notification BEFORE receipt dedupe or
+  // any approval, fulfillment, measurement or messaging. Amount alone does not
+  // prove TEST1. Preserve a genuine non-TEST1 coupon only when this same provider
+  // process is bound to its server-created lead; never the legacy email fallback.
+  let boundTestCheckout = Boolean(
+    purchaseTracking?.couponCode?.trim().toUpperCase() === "TEST1"
+    && purchaseTracking.providerProcessToken
+    && purchaseTracking.providerProcessToken === liveProcessToken
+    && sum === 1
+  );
+  if (boundTestCheckout) {
+    const { isLiveTestCheckout } = await import("./liveTestCoupon");
+    boundTestCheckout = isLiveTestCheckout(product || "", purchaseTracking?.couponCode, email);
+  }
+  const boundRegularCouponCheckout = Boolean(
+    purchaseTracking?.couponCode?.trim()
+    && purchaseTracking.couponCode.trim().toUpperCase() !== "TEST1"
+    && liveProcessToken
+    && purchaseTracking.providerProcessToken === liveProcessToken
+  );
+  if (sum === 1 && !boundTestCheckout && !boundRegularCouponCheckout) {
+    console.warn("[CheckoutSafety] One-shekel notification held: exact authorized binding required; manual review, no funding or activation");
+    return;
+  }
+
   // The new 349 ILS November bundle is intentionally not a price discriminator.
   // It must carry the dedicated canonical description and bind to the exact
   // server-created payment intent/process token. This retains historical 349
@@ -1021,19 +1048,6 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
 
   // Forward-only accounting is independent of fulfillment and legacy SDK callbacks.
   // Uncertain/mismatched notifications are retained for review, never guessed into revenue.
-  const boundTestCheckout = Boolean(
-    purchaseTracking?.couponCode?.trim().toUpperCase() === "TEST1"
-    && purchaseTracking.providerProcessToken
-    && purchaseTracking.providerProcessToken === liveProcessToken
-    && sum === 1
-  );
-  if (boundTestCheckout) {
-    const { isLiveTestCheckout } = await import("./liveTestCoupon");
-    if (!isLiveTestCheckout(product, purchaseTracking?.couponCode, email)) {
-      throw new Error("TEST1 checkout no longer authorized");
-    }
-  }
-
   const accountingInput = {
     transactionId, transactionToken: String(data.transactionToken || ""),
     processId: String(data.processId || ""), processToken: liveProcessToken,

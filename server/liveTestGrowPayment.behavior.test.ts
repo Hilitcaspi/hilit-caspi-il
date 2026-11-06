@@ -29,6 +29,7 @@ describe("TEST1 one-time Grow process", () => {
       status: 200,
       headers: { get: () => "application/json" },
       clone: () => ({ text: async () => '{"status":1}' }),
+      text: async () => JSON.stringify({ status: 1, data: { authCode: "diagnostic-auth", processToken: "diagnostic-process" } }),
       json: async () => ({ status: 1, data: { authCode: "diagnostic-auth", processToken: "diagnostic-process" } }),
     });
     vi.stubGlobal("fetch", fetch);
