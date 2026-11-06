@@ -14,6 +14,7 @@ import { CHOOSE50_CODE, validateChoose50Coupon } from "./choose50Coupon";
 import { COOKIE_NAME } from "../shared/const";
 import { captureAcquisitionIfMissing } from "../shared/acquisitionAttribution";
 import { acquisitionInputSchema, recordAcquisitionSafely } from "./acquisitionCapture";
+import { checkoutStatusInputSchema, getCheckoutPaymentStatus } from "./checkoutPaymentStatus";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, teamProcedure, router } from "./_core/trpc";
@@ -8733,6 +8734,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const { metaPurchaseDeliverySummary } = await import("./metaPurchaseDelivery");
         return metaPurchaseDeliverySummary(input.startDate, input.endDate);
       }),
+
+    // Read-only exact-process proof; independent of the browser analytics claim below.
+    checkoutStatus: publicProcedure
+      .input(checkoutStatusInputSchema)
+      .query(({ input }) => getCheckoutPaymentStatus(input)),
 
     confirmPurchaseTracking: publicProcedure
       .input(z.object({ trackingToken: z.string().regex(/^[a-f0-9]{64}$/), expectedProduct: z.string().max(64).optional() }))

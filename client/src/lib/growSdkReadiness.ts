@@ -28,7 +28,7 @@ export function isGrowPaymentRendererReady(host: GrowSdkHost): boolean {
 /** Expiry/transport errors are not authoritative proof that no charge occurred. */
 export function isGrowPaymentOutcomeUnknown(response: unknown): boolean {
   try {
-    return /outcome_unknown|timeout|network|fetch failed|Failed to fetch|מצב התשלום|נגמר\s+הזמן\s+לתשלום|פג\s+תוקף\s+התשלום/i.test(
+    return /outcome_unknown|timeout|network|fetch failed|Failed to fetch|מצב התשלום|נגמר\s+הזמן\s+לתשלום|פג\s+תוקף\s+התשלום|העסקה\s+כבר\s+בוצעה|התשלום\s+כבר\s+בוצע|already\s+(?:paid|charged|performed|processed)|payment[\s_-]*not[\s_-]*completed/i.test(
       JSON.stringify(response) || "",
     );
   } catch {

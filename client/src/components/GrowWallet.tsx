@@ -381,6 +381,10 @@ interface LocalCheckoutAttempt {
   authCode?: string;
   processToken?: string | null;
   outcomeUnknown?: boolean;
+  purchaseTrackingToken?: string;
+  reconciling?: boolean;
+  checkStatus?: () => Promise<void>;
+  statusToastId?: string | number;
   terminal: boolean;
 }
 
@@ -413,6 +417,7 @@ export default function GrowWallet({
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [paymentStatusAmbiguous, setPaymentStatusAmbiguous] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
@@ -431,6 +436,8 @@ export default function GrowWallet({
   const saveLeadMutation = trpc.coupons.saveLead.useMutation();
   const createProcessMutation = trpc.payment.createProcess.useMutation();
   const reportFailureMutation = trpc.payment.reportFailure.useMutation();
+  const utils = trpc.useUtils();
+  const mountedRef = useRef(true);
   const autoCouponKeyRef = useRef("");
   const activeCheckoutCouponRef = useRef<string | undefined>(undefined);
   const checkoutLockRef = useRef(false);
@@ -549,9 +556,13 @@ export default function GrowWallet({
     });
   }, [product]);
 
-  useEffect(() => () => {
-    const attempt = checkoutAttemptRef.current;
-    if (attempt?.lease) releaseCheckoutOwner(attempt.lease);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const attempt = checkoutAttemptRef.current;
+      if (attempt?.lease) releaseCheckoutOwner(attempt.lease);
+    };
   }, []);
 
   const handlePay = useCallback(async () => {
@@ -704,6 +715,69 @@ export default function GrowWallet({
       });
     };
 
+    // This is a bounded, SELECT-only reconciliation, never a payment retry.
+    // The proof stays on this immutable attempt, not the shared analytics token.
+    const reconcilePayment = async () => {
+      if (attempt.reconciling || attempt.terminal || !attempt.outcomeUnknown ||
+          !attempt.purchaseTrackingToken || !attempt.processToken ||
+          attempt.couponCode === "TEST1") return;
+      const stillThisAttempt = () => mountedRef.current &&
+        checkoutAttemptRef.current === attempt && !attempt.terminal;
+      if (!stillThisAttempt()) return;
+      attempt.reconciling = true;
+      setCheckingPayment(true);
+      try {
+        for (let check = 0; check < 30 && stillThisAttempt(); check++) {
+          try {
+            const result = await utils.client.payment.checkoutStatus.query({
+              trackingToken: attempt.purchaseTrackingToken,
+              processToken: attempt.processToken,
+              expectedProduct: product,
+            });
+            if (!stillThisAttempt()) return;
+            if (result.status === "confirmed" && result.product === product &&
+                result.currency === "ILS" && Number.isSafeInteger(result.amountAgorot) &&
+                result.amountAgorot > 0 && Number.isSafeInteger(result.confirmedAt) &&
+                result.confirmedAt > 0 && result.confirmedAt <= Date.now()) {
+              // Never steal the global SDK or close another widget's overlay.
+              const confirmationLease = isCheckoutOwner(attempt.lease)
+                ? attempt.lease
+                : acquireCheckoutOwner(attempt.attemptId, instanceId);
+              if (!confirmationLease) return;
+              attempt.terminal = true;
+              attempt.outcomeUnknown = false;
+              const root = document.getElementById("Gr0W8-wallet-root");
+              if (root?.style) root.style.display = "none";
+              completeCheckoutOwner(confirmationLease);
+              attempt.lease = undefined;
+              checkoutLockRef.current = true;
+              setWalletLoading(false);
+              setWalletOpen(false);
+              setPaymentStatusAmbiguous(false);
+              setCheckingPayment(false);
+              setPaymentCompleted(true);
+              if (attempt.statusToastId !== undefined) toast.dismiss(attempt.statusToastId);
+              toast.success("התשלום אושר! הרכישה הושלמה בהצלחה.");
+              attempt.callbacks.onSuccess?.({ status: 1, serverVerified: true,
+                product: result.product, amountAgorot: result.amountAgorot }, attempt.couponCode);
+              return;
+            }
+            // Invalid/review/unavailable are not proof of an unpaid purchase.
+            if (result.status !== "pending") return;
+          } catch {
+            // A connection failure never clears the unknown outcome or auth.
+          }
+          if (check < 29 && stillThisAttempt()) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+      } finally {
+        attempt.reconciling = false;
+        if (stillThisAttempt()) setCheckingPayment(false);
+      }
+    };
+    attempt.checkStatus = reconcilePayment;
+
     // Only failures from the server-side process creation step are critical
     // createProcess incidents. SDK boot/render failures are recoverable client
     // failures and must not trigger the operational createProcess SMS alert.
@@ -753,9 +827,10 @@ export default function GrowWallet({
               if (!isCurrentAttempt()) return;
               const ambiguousFailure = isGrowPaymentOutcomeUnknown(r);
               releaseRecoverableAttempt(ambiguousFailure);
-              toast.error(ambiguousFailure
+              attempt.statusToastId = toast.error(ambiguousFailure
                 ? "מצב התשלום אינו ברור. אין לשלם שוב לפני בדיקה; אפשר לפנות אלינו לבירור."
                 : "התשלום נכשל. אפשר לפתוח שוב את אותו תהליך תשלום.");
+              if (ambiguousFailure) void reconcilePayment();
               reportSdkFailure(r);
               attempt.callbacks.onFailure?.(r);
             },
@@ -765,9 +840,10 @@ export default function GrowWallet({
               // and the dedupe UUID; only reconciliation can authorize recovery.
               logStep("sdk_timeout", "outcome_unknown");
               releaseRecoverableAttempt(true);
-              toast.error(
+              attempt.statusToastId = toast.error(
                 "מצב התשלום אינו ברור. אין לשלם שוב לפני בדיקה; אפשר לפנות אלינו לבירור."
               );
+              void reconcilePayment();
               reportSdkFailure(r);
               attempt.callbacks.onFailure?.(r);
             },
@@ -794,9 +870,10 @@ export default function GrowWallet({
               // This may arrive after a provider action. Preserve the process
               // and block another payment until its outcome has been verified.
               releaseRecoverableAttempt(true);
-              toast.error(
+              attempt.statusToastId = toast.error(
                 "מצב התשלום עדיין אינו ברור. אין לשלם שוב לפני בדיקה; אפשר לפנות אלינו לבירור."
               );
+              void reconcilePayment();
               reportSdkFailure(e);
             },
           },
@@ -981,6 +1058,7 @@ export default function GrowWallet({
         rememberPurchaseTrackingToken(result.purchaseTrackingToken);
         activeCheckoutCouponRef.current = attempt.couponCode;
         attempt.processToken = result.processToken || null;
+        attempt.purchaseTrackingToken = result.purchaseTrackingToken || undefined;
         lastProcessTokenRef.current = attempt.processToken;
 
         if (result.url) {
@@ -1029,6 +1107,7 @@ export default function GrowWallet({
       releaseRecoverableAttempt(
         failureStage === "sdk_failure" && Boolean(attempt.authCode)
       );
+      if (attempt.outcomeUnknown) void reconcilePayment();
       const isConnectivityFailure =
         /Grow API error|fetch failed|Failed to fetch|HTTP\s*\d+/i.test(
           technicalMessage
@@ -1040,7 +1119,7 @@ export default function GrowWallet({
       const alreadyOwnsDatabase =
         product === "bundle_november" &&
         technicalMessage.includes("התשלום עבור מוצר זה כבר זוהה");
-      toast.error(
+      attempt.statusToastId = toast.error(
         alreadyOwnsDatabase
           ? "כבר קיימת רכישת מאגר לכתובת המייל הזו. כדי למנוע חיוב כפול, לא נפתח תשלום נוסף."
           : isConnectivityFailure
@@ -1348,7 +1427,7 @@ export default function GrowWallet({
         ) : walletOpen ? (
           <span>התשלום פתוח</span>
         ) : paymentStatusAmbiguous ? (
-          <span>מצב התשלום דורש בדיקה</span>
+          <span>{checkingPayment ? "מאמתים את אישור התשלום..." : "מצב התשלום דורש בדיקה"}</span>
         ) : (
           <span>
             {product === "guide" &&
@@ -1361,9 +1440,20 @@ export default function GrowWallet({
       </button>
 
       {paymentStatusAmbiguous && !walletLoading && !walletOpen && !paymentCompleted && (
-        <p className="mt-3 text-center text-xs leading-5 text-amber-800">
-          לא הצלחנו לוודא אם התשלום נקלט. כדי להימנע מחיוב נוסף, אין לשלם שוב לפני בדיקה. אפשר לפנות אלינו לבירור.
-        </p>
+        <div className="mt-3 rounded-xl bg-amber-50 p-4 text-center text-sm leading-6 text-amber-900" role="status" aria-live="polite">
+          <p>{checkingPayment
+            ? "בודקים את אישור העסקה מול האתר. אין צורך לשלם שוב."
+            : "אישור העסקה עדיין לא אומת באתר. כדי להימנע מחיוב נוסף, אין לשלם שוב."}</p>
+          {!checkingPayment && checkoutAttemptRef.current?.purchaseTrackingToken && checkoutAttemptRef.current?.processToken && (
+            <button type="button" className="mt-2 font-bold underline" onClick={() => void checkoutAttemptRef.current?.checkStatus?.()}>
+              בדיקת אישור התשלום בלבד
+            </button>
+          )}
+          <a className="mt-2 block font-bold underline" target="_blank" rel="noopener noreferrer"
+             href={`https://wa.me/972552442334?text=${encodeURIComponent(`היי הילית, ניסיתי לרכוש באתר ${PRODUCT_CONFIGS[product]?.description || "מוצר"} ואשמח לעזרה בבדיקת אישור התשלום`)}`}>
+            עזרה בבדיקת התשלום בוואטסאפ
+          </a>
+        </div>
       )}
 
       <div

@@ -13,7 +13,7 @@ const EXPIRY = "התשלום נכשל: נגמר הזמן לתשלום. אנא ר
 const walletSource = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
 
 /** Execute the real component with tiny hook/JSX/DOM mocks, not a browser. */
-function walletHarness(servicesLoaded = true, visible = true) {
+function walletHarness(servicesLoaded = true, visible = true, withTrackingProof = false) {
   const storage = new Map<string, string>();
   const sessionStorage = {
     getItem: (key: string) => storage.get(key) ?? null,
@@ -44,12 +44,14 @@ function walletHarness(servicesLoaded = true, visible = true) {
   let loaded = servicesLoaded;
   const renderPaymentOptions = vi.fn();
   const init = vi.fn(async (config: any) => { events = config.events; });
-  const createProcess = vi.fn().mockResolvedValue({ authCode: "synthetic-auth", processToken: "synthetic-process" });
+  const createProcess = vi.fn().mockResolvedValue({ authCode: "synthetic-auth", processToken: "synthetic-process",
+    ...(withTrackingProof ? { purchaseTrackingToken: "a".repeat(64) } : {}) });
+  const checkoutStatus = vi.fn().mockResolvedValue({ status: "pending" });
   const reportFailure = vi.fn();
   const logStep = vi.fn();
   const success = vi.fn();
   const failure = vi.fn();
-  const toast = { error: vi.fn(), success: vi.fn(), message: vi.fn() };
+  const toast = { error: vi.fn().mockReturnValue("unknown-payment-toast"), success: vi.fn(), message: vi.fn(), dismiss: vi.fn() };
   const windowMock = {
     location: { origin: "https://synthetic.example.test", search: "", assign: vi.fn() },
     sessionStorage,
@@ -70,6 +72,7 @@ function walletHarness(servicesLoaded = true, visible = true) {
     "@/components/ui/label": { Label: "Label" },
     sonner: { toast },
     "@/lib/trpc": { trpc: {
+      useUtils: () => ({ client: { payment: { checkoutStatus: { query: checkoutStatus } } } }),
       coupons: { validate: mutation(), saveLead: mutation() },
       payment: { createProcess: mutation(createProcess), reportFailure: mutation(undefined, reportFailure), logStep: mutation(undefined, logStep) },
     } },
@@ -119,8 +122,9 @@ function walletHarness(servicesLoaded = true, visible = true) {
   const initial = render();
   initial.age.props.onCheckedChange(true);
   return {
-    render, createProcess, renderPaymentOptions, init, reportFailure, logStep, toast, success, failure,
+    render, createProcess, checkoutStatus, renderPaymentOptions, init, reportFailure, logStep, toast, success, failure,
     storage, sessionStorage,
+    unmount: () => { refs.find(ref => ref.current === true).current = false; },
     events: () => events,
     setServicesLoaded: (value: boolean) => { loaded = value; },
     attempt: () => refs.find(ref => ref.current?.attemptId)?.current,
@@ -139,6 +143,114 @@ afterEach(() => {
 });
 
 describe("Grow wallet payment timeout safety (isolated real component)", () => {
+  it.each(["העסקה כבר בוצעה", "התשלום כבר בוצע", "Payment Not Completed", "PaymentNotCompleted", "already charged"])("treats %s as unknown, never paid or safe to replay", message => {
+    expect(readiness.isGrowPaymentOutcomeUnknown({ status: 0, message })).toBe(true);
+  });
+
+  it("reconciles an ApplePay error from the exact attempt proof and completes once without another charge", async () => {
+    const h = walletHarness(true, true, true);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700);
+    await paying;
+    h.checkoutStatus.mockResolvedValue({ status: "confirmed", product: "guide", amountAgorot: 14900, currency: "ILS", confirmedAt: Date.now() });
+    h.events().onError({ message: "העסקה כבר בוצעה" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.checkoutStatus).toHaveBeenCalledOnce();
+    expect(h.checkoutStatus).toHaveBeenCalledWith({ trackingToken: "a".repeat(64), processToken: "synthetic-process", expectedProduct: "guide" });
+    expect(h.success).toHaveBeenCalledOnce();
+    expect(h.success).toHaveBeenCalledWith({ status: 1, serverVerified: true, product: "guide", amountAgorot: 14900 }, undefined);
+    expect(h.toast.dismiss).toHaveBeenCalledOnce();
+    expect(h.toast.dismiss).toHaveBeenCalledWith("unknown-payment-toast");
+    expect(safety.isCheckoutAttemptCompleted(ATTEMPT_ID, h.sessionStorage)).toBe(true);
+    h.events().onError({ message: "another error" });
+    h.events().onTimeout();
+    h.events().onClose();
+    await h.pay();
+    expect(h.success).toHaveBeenCalledOnce();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+  });
+
+  it("waits for a delayed server confirmation after a pending response", async () => {
+    const h = walletHarness(true, true, true);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    h.checkoutStatus.mockResolvedValueOnce({ status: "pending" }).mockResolvedValue({ status: "confirmed", product: "guide", amountAgorot: 14900, currency: "ILS", confirmedAt: Date.now() });
+    h.events().onFailure({ message: "PaymentNotCompleted" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.success).not.toHaveBeenCalled();
+    expect(JSON.stringify(h.render().tree)).toContain("מאמתים את אישור התשלום");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(h.success).toHaveBeenCalledOnce();
+    expect(h.checkoutStatus).toHaveBeenCalledTimes(2);
+    expect(h.createProcess).toHaveBeenCalledOnce();
+  });
+
+  it.each(["pending", "invalid", "review", "unavailable"])("never treats %s as unpaid, unlocks, or calls success", async status => {
+    const h = walletHarness(true, true, true);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    h.checkoutStatus.mockResolvedValue({ status });
+    h.events().onError({ message: "העסקה כבר בוצעה" });
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(h.checkoutStatus).toHaveBeenCalledTimes(status === "pending" ? 30 : 1);
+    expect(h.success).not.toHaveBeenCalled();
+    expect(h.attempt().outcomeUnknown).toBe(true);
+    expect(h.render().button.props.disabled).toBe(true);
+    expect(JSON.stringify(h.render().tree)).toContain("עזרה בבדיקת התשלום בוואטסאפ");
+    await h.pay();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { product: "database" }, { amountAgorot: 0 }, { amountAgorot: 12.5 },
+    { currency: "USD" }, { confirmedAt: 0 }, { confirmedAt: Number.MAX_SAFE_INTEGER },
+  ])("rejects malformed or mismatched confirmation %j", async changed => {
+    const h = walletHarness(true, true, true);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    h.checkoutStatus.mockResolvedValue({ status: "confirmed", product: "guide", amountAgorot: 14900, currency: "ILS", confirmedAt: Date.now(), ...changed });
+    h.events().onError({ message: "error" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.success).not.toHaveBeenCalled();
+    expect(h.attempt().outcomeUnknown).toBe(true);
+  });
+
+  it("ignores a late read-only result after the component is unmounted", async () => {
+    const h = walletHarness(true, true, true);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    let finish!: (value: any) => void;
+    h.checkoutStatus.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    h.events().onError({ message: "error" });
+    h.unmount();
+    finish({ status: "confirmed", product: "guide", amountAgorot: 14900, currency: "ILS", confirmedAt: Date.now() });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.success).not.toHaveBeenCalled();
+    expect(safety.isCheckoutAttemptCompleted(ATTEMPT_ID, h.sessionStorage)).toBe(false);
+  });
+
+  it("does not steal an SDK lease held by another wallet when confirmation arrives", async () => {
+    const h = walletHarness(true, true, true);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    let finish!: (value: any) => void;
+    h.checkoutStatus.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    h.events().onError({ message: "error" });
+    const other = safety.acquireCheckoutOwner("22222222-2222-4222-8222-222222222222", "another-wallet");
+    finish({ status: "confirmed", product: "guide", amountAgorot: 14900, currency: "ILS", confirmedAt: Date.now() });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.success).not.toHaveBeenCalled();
+    expect(safety.isCheckoutOwner(other)).toBe(true);
+  });
+
+  it("never consumes the analytics claim or uses a shared tracking token for confirmation", () => {
+    expect(walletSource).not.toContain("confirmPurchaseTracking");
+    expect(walletSource).not.toContain("readPurchaseTrackingToken");
+    expect(walletSource).toContain("attempt.purchaseTrackingToken");
+  });
+
   it.each([EXPIRY, "פג תוקף התשלום", "פג  תוקף   התשלום", "נגמר  הזמן   לתשלום"])("recognizes exact Hebrew expiry as unknown: %s", message => {
     expect(readiness.isGrowPaymentOutcomeUnknown({ status: 0, message })).toBe(true);
   });
