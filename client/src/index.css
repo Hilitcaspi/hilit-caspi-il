@@ -320,3 +320,8 @@
   outline: 2px solid #ef4444;
   outline-offset: 2px;
 }
+
+/* Keep the approved November strip above fixed public navigation, not over it. */
+body.hc-november-bar-active nav.fixed.top-0 {
+  top: var(--hc-promo-height, 64px);
+}

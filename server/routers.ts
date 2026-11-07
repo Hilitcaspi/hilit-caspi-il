@@ -1,3 +1,4 @@
+import { NOVEMBER_COUPON_CODE, NOVEMBER_COUPON_ERROR, isNovemberCouponAllowed } from "../shared/novemberCoupon";
 import { rankAdvancedCandidates } from "./advancedMatchRanking";
 import { evaluateMatchPreview, previewScoreDimensions } from "./matchScorePreview";
 import { loadMatchScoreInputs, presentMatchScore } from "./pendingMatchScore";
@@ -7871,6 +7872,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       }))
       .mutation(async ({ input }) => {
         const requested = input.code.trim().toUpperCase();
+        if (requested === NOVEMBER_COUPON_CODE && !isNovemberCouponAllowed(input.product)) {
+          return { valid: false as const, error: NOVEMBER_COUPON_ERROR };
+        }
+
         const { isPurchaseRecoveryOfferCode, validatePurchaseRecoveryCoupon } = await import("./purchaseRecoveryOffers");
         if (isPurchaseRecoveryOfferCode(requested)) {
           return validatePurchaseRecoveryCoupon({ code: requested, product: input.product, email: input.email });
@@ -8165,6 +8170,17 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }
         const normalizedCheckoutEmail = input.email.trim().toLowerCase();
         const reservedCode = input.couponCode?.trim().toUpperCase();
+        if (reservedCode === NOVEMBER_COUPON_CODE) {
+          if (!isNovemberCouponAllowed(input.product)) throw new TRPCError({ code: "BAD_REQUEST", message: NOVEMBER_COUPON_ERROR });
+          const { discountCodes } = await import("../drizzle/schema");
+          const [promo] = await db.select().from(discountCodes).where(eq(discountCodes.code, NOVEMBER_COUPON_CODE)).limit(1);
+          if (!promo?.isActive || promo.discountPercent !== 10 || promo.discountAmount != null || promo.fixedPrice != null
+            || (promo.expiresAt != null && promo.expiresAt <= Date.now())
+            || (promo.maxUses != null && promo.usedCount >= promo.maxUses)) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "קוד november10 אינו זמין כרגע. לא נפתח תשלום במחיר מלא." });
+          }
+        }
+
         const diagnosticTest = reservedCode === "TEST1";
         if (input.product === NOVEMBER_BUNDLE_PRODUCT && reservedCode && reservedCode !== "TEST1") {
           throw new TRPCError({ code: "BAD_REQUEST", message: "קודי קופון אינם תקפים לחבילת נובמבר" });

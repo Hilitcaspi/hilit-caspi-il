@@ -1,3 +1,4 @@
+import { getSalesPromoCoupon } from "@/lib/novemberPromoPolicy";
 /**
  * CoachingSales - דף מכירה לשתי חבילות ליווי אישי
  * תהליך "הבנה": 8 פגישות - ₪2,960 (₪370 לפגישה)
@@ -45,7 +46,7 @@ const PAIN_POINTS = [
 
 export default function CoachingSales() {
   const query = new URLSearchParams(window.location.search);
-  const recoveryCoupon = query.get("coupon")?.toUpperCase() === "BACK10" ? "BACK10" : undefined;
+  const recoveryCoupon = getSalesPromoCoupon(query.toString());
   const recoveryEmail = query.get("email") || undefined;
   React.useEffect(() => {
     track({ eventType: "coaching_view" });

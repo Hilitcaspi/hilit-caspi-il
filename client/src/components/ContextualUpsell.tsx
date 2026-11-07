@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Sparkles, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { track } from "@/lib/track";
+import { isNovemberPopupPage } from "@/lib/novemberPromoPolicy";
 import { purchaseFromThankYouPath, selectSmartUpsell, type PurchaseFlags } from "@/lib/smartUpsellPolicy";
 
 const PURCHASE_KEYS: Array<keyof PurchaseFlags> = ["database", "guide", "course", "session", "coaching"];
@@ -43,7 +44,7 @@ export default function ContextualUpsell() {
 
   useEffect(() => {
     setVisible(false);
-    if (!offer) return;
+    if (!offer || isNovemberPopupPage(location)) return;
     const dismissedAt = Number(readPreference(`hilit_upsell_dismissed_${offer.id}`) || 0);
     if (dismissedAt && Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000) return;
     const timer = window.setTimeout(() => {
@@ -53,7 +54,7 @@ export default function ContextualUpsell() {
     return () => window.clearTimeout(timer);
   }, [location, offer?.id]);
 
-  if (!offer || !visible) return null;
+  if (!offer || !visible || isNovemberPopupPage(location)) return null;
 
   const close = () => {
     savePreference(`hilit_upsell_dismissed_${offer.id}`, String(Date.now()));

@@ -1,3 +1,4 @@
+import { getSalesPromoCoupon } from "@/lib/novemberPromoPolicy";
 /**
  * CourseSales - דף מכירה לקורס "המסע"
  * מחיר: ₪249 (מחיר מלא ₪497)
@@ -81,7 +82,7 @@ const WHAT_YOU_GET = [
 
 export default function CourseSales() {
   const query = new URLSearchParams(window.location.search);
-  const recoveryCoupon = query.get("coupon")?.toUpperCase() === "BACK10" ? "BACK10" : undefined;
+  const recoveryCoupon = getSalesPromoCoupon(query.toString());
   const recoveryEmail = query.get("email") || undefined;
   React.useEffect(() => {
     track({ eventType: "course_view" });

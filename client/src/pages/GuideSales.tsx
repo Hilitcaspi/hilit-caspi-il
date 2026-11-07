@@ -1,3 +1,4 @@
+import { getSalesPromoCoupon } from "@/lib/novemberPromoPolicy";
 /*
  * GuideSales - דף מכירה למדריך המעשי ₪149 - לבחור נכון
  * Route: /guide
@@ -33,7 +34,7 @@ function AnimatedSection({ children, className = "" }: { children: React.ReactNo
 export default function GuideSales() {
   const [, navigate] = useLocation();
   const query = new URLSearchParams(window.location.search);
-  const recoveryCoupon = query.get("coupon")?.toUpperCase() === "BACK10" ? "BACK10" : undefined;
+  const recoveryCoupon = getSalesPromoCoupon(query.toString());
   const recoveryEmail = query.get("email") || undefined;
   React.useEffect(() => {
     track({ eventType: "guide_view" });
