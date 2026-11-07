@@ -136,4 +136,23 @@ describe("email unsubscribe security and suppression", () => {
     await expect(isEmailMarketingSuppressed("declined@example.com"))
       .resolves.toEqual({ suppressed: true, reason: "marketing_consent" });
   });
+
+  it("lets checkout recovery reach an unpaid pre-payment draft, and nothing else", async () => {
+    const draft = { id: 4, isActive: false, isPaid: false, paymentRef: null, consentEmailMarketing: true };
+    const run = async (profile: Record<string, unknown>, journeyKey?: string, crm: unknown[] = []) => {
+      const mock = createDbMock([crm, [profile]]);
+      vi.mocked(getDb).mockResolvedValue(mock.db);
+      return isEmailMarketingSuppressed("draft@example.com", { journeyKey });
+    };
+    await expect(run(draft, "abandoned_database")).resolves.toEqual({ suppressed: false, reason: null });
+    // Other journeys keep the inactive-profile rule.
+    await expect(run(draft, "women_first_step_v2")).resolves.toEqual({ suppressed: true, reason: "inactive_profile" });
+    await expect(run(draft)).resolves.toEqual({ suppressed: true, reason: "inactive_profile" });
+    // Paid or previously paid inactive profiles stay suppressed even for recovery.
+    await expect(run({ ...draft, isPaid: true }, "abandoned_database")).resolves.toEqual({ suppressed: true, reason: "inactive_profile" });
+    await expect(run({ ...draft, paymentRef: "ref" }, "abandoned_database")).resolves.toEqual({ suppressed: true, reason: "inactive_profile" });
+    // Consent and unsubscribe are never bypassed.
+    await expect(run({ ...draft, consentEmailMarketing: false }, "abandoned_database")).resolves.toEqual({ suppressed: true, reason: "marketing_consent" });
+    await expect(run(draft, "abandoned_database", [{ id: 9 }])).resolves.toEqual({ suppressed: true, reason: "crm_unsubscribed" });
+  });
 });

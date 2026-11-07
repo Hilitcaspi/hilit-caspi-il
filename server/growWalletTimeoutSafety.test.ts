@@ -14,7 +14,8 @@ const EXPIRY = "התשלום נכשל: נגמר הזמן לתשלום. אנא ר
 const walletSource = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
 
 /** Execute the real component with tiny hook/JSX/DOM mocks, not a browser. */
-function walletHarness(servicesLoaded = true, visible = true, withTrackingProof = false) {
+function walletHarness(servicesLoaded = true, visible = true, withTrackingProof = false,
+  opts: { showCoupon?: boolean; validateCoupon?: ReturnType<typeof vi.fn> } = {}) {
   const storage = new Map<string, string>();
   const sessionStorage = {
     getItem: (key: string) => storage.get(key) ?? null,
@@ -74,7 +75,7 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
     sonner: { toast },
     "@/lib/trpc": { trpc: {
       useUtils: () => ({ client: { payment: { checkoutStatus: { query: checkoutStatus } } } }),
-      coupons: { validate: mutation(), saveLead: mutation() },
+      coupons: { validate: mutation(opts.validateCoupon), saveLead: mutation() },
       payment: { createProcess: mutation(createProcess), reportFailure: mutation(undefined, reportFailure), logStep: mutation(undefined, logStep) },
     } },
     "@/lib/ga": { gaBeginCheckout: vi.fn() },
@@ -117,9 +118,11 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
   }
   function render() {
     stateIndex = 0; refIndex = 0;
-    const tree = Component({ product: "guide", prefillName: "Synthetic Buyer", prefillEmail: "synthetic@example.test", prefillPhone: "0500000000", showCoupon: false, onSuccess: success, onFailure: failure });
+    const tree = Component({ product: "guide", prefillName: "Synthetic Buyer", prefillEmail: "synthetic@example.test", prefillPhone: "0500000000", showCoupon: opts.showCoupon ?? false, onSuccess: success, onFailure: failure });
     effects.splice(0).forEach(effect => effect());
-    return { tree, button: nodes(tree).find(node => node.type === "button" && node.props.onClick), age: nodes(tree).find(node => node.type === "Checkbox") };
+    const all = nodes(tree);
+    return { tree, button: all.find(node => node.type === "button" && node.props.onClick && node.props.className?.includes("bg-[#ffe27c]")) ?? all.find(node => node.type === "button" && node.props.onClick),
+      age: all.find(node => node.type === "Checkbox"), coupon: all.find(node => node.type === "Input" && String(node.props.id).startsWith("gw-coupon-")) };
   }
   const initial = render();
   initial.age.props.onCheckedChange(true);
@@ -203,6 +206,74 @@ describe("Grow wallet payment timeout safety (isolated real component)", () => {
     await h.pay();
     expect(h.createProcess).toHaveBeenCalledOnce();
     expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+  });
+
+  it("offers a conscious fresh production attempt only after reconciliation ends unconfirmed", async () => {
+    const h = walletHarness(true, true, true);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    h.checkoutStatus.mockResolvedValue({ status: "pending" });
+    h.events().onFailure({ message: "PaymentNotCompleted" });
+    await vi.advanceTimersByTimeAsync(0);
+    // While checking: no retry is offered and paying again is blocked.
+    expect(JSON.stringify(h.render().tree)).not.toContain("ניסיון תשלום חדש");
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(h.checkoutStatus).toHaveBeenCalledTimes(30);
+    const findRetry = () => {
+      const all: any[] = [];
+      const walk = (node: any) => {
+        if (!node || typeof node !== "object") return;
+        if (Array.isArray(node)) { node.forEach(walk); return; }
+        all.push(node); walk(node.props?.children);
+      };
+      walk(h.render().tree);
+      return all.find(node => node.type === "button" && JSON.stringify(node.props.children).includes("ניסיון תשלום חדש"));
+    };
+    const retry = findRetry();
+    expect(retry).toBeTruthy();
+    const priorId = h.attempt().attemptId;
+    vi.stubGlobal("crypto", { randomUUID: () => "22222222-2222-4222-8222-222222222222" });
+    retry.props.onClick();
+    expect(h.render().button.props.disabled).toBe(false);
+    // A late callback from the retired attempt is ignored.
+    h.events().onError({ message: "late" });
+    const second = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await second;
+    expect(h.createProcess).toHaveBeenCalledTimes(2);
+    const ids = h.createProcess.mock.calls.map((call: any[]) => call[0].checkoutAttemptId);
+    expect(ids[0]).toBe(priorId);
+    expect(ids[1]).not.toBe(priorId);
+    expect(h.success).not.toHaveBeenCalled();
+  });
+
+  it("validates a typed but unapplied coupon on the pay click and then continues the same payment", async () => {
+    const validateCoupon = vi.fn().mockResolvedValue({ valid: true, code: "LOVE10", discountPercent: 10 });
+    const h = walletHarness(true, true, false, { showCoupon: true, validateCoupon });
+    h.render().coupon.props.onChange({ target: { value: "love10" } });
+    await h.pay();
+    expect(validateCoupon).toHaveBeenCalledOnce();
+    expect(validateCoupon.mock.calls[0][0]).toMatchObject({ code: "LOVE10", product: "guide" });
+    expect(h.createProcess).not.toHaveBeenCalled();
+    h.render(); // commit the applied coupon; the pending click continues
+    await vi.advanceTimersByTimeAsync(700);
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.createProcess.mock.calls[0][0]).toMatchObject({ couponCode: "LOVE10" });
+    h.render();
+    await vi.advanceTimersByTimeAsync(700);
+    expect(h.createProcess).toHaveBeenCalledOnce();
+  });
+
+  it("keeps an invalid typed coupon from opening payment and explains what to do", async () => {
+    const validateCoupon = vi.fn().mockResolvedValue({ valid: false, error: "קוד קופון לא תקין" });
+    const h = walletHarness(true, true, false, { showCoupon: true, validateCoupon });
+    h.render().coupon.props.onChange({ target: { value: "nope" } });
+    await h.pay();
+    h.render();
+    await vi.advanceTimersByTimeAsync(700);
+    expect(validateCoupon).toHaveBeenCalledOnce();
+    expect(h.createProcess).not.toHaveBeenCalled();
+    expect(h.toast.error.mock.calls.at(-1)?.[0]).toContain("קוד ההנחה שהוזן לא הופעל");
+    expect(JSON.stringify(h.render().tree)).toContain("קוד קופון לא תקין");
   });
 
   it.each([

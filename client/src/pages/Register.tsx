@@ -7,6 +7,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import React from "react";
 import { track, trackCheckoutStage } from "@/lib/track";
 import { classifyInvalidField } from "@shared/checkoutFunnel";
+import { summarizeInvalidFields, type InvalidFieldSummary } from "@/lib/formValidationSummary";
 import { trackCompleteRegistration } from "@/lib/metaPixel";
 import { gaSignUp } from "@/lib/ga";
 import { motion, AnimatePresence } from "framer-motion";
@@ -392,6 +393,37 @@ export default function Register() {
     }
   };
 
+  // Clear, value-free list of what still blocks the profile form.
+  const [profileIssues, setProfileIssues] = useState<InvalidFieldSummary[]>([]);
+  const [profileSubmitAttempted, setProfileSubmitAttempted] = useState(false);
+  const profileFormRef = useRef<HTMLFormElement | null>(null);
+  const firstInvalidProfileField = () =>
+    profileFormRef.current?.querySelector(":invalid") as HTMLElement | null;
+  const jumpToFirstInvalidProfileField = () => {
+    const field = firstInvalidProfileField();
+    if (!field) return;
+    field.scrollIntoView({ behavior: "smooth", block: "center" });
+    field.focus({ preventScroll: true });
+  };
+  const refreshProfileIssues = () => {
+    const form = profileFormRef.current;
+    if (!form) return;
+    setProfileIssues(summarizeInvalidFields(Array.from(form.querySelectorAll(":invalid")) as any, 40));
+  };
+  useEffect(() => {
+    if (!profileSubmitAttempted || profileIssues.length === 0) return;
+    // Re-check after each edit so the list shrinks as fields are completed.
+    const form = profileFormRef.current;
+    if (!form) return;
+    const onEdit = () => window.setTimeout(refreshProfileIssues, 0);
+    form.addEventListener("input", onEdit);
+    form.addEventListener("change", onEdit);
+    return () => {
+      form.removeEventListener("input", onEdit);
+      form.removeEventListener("change", onEdit);
+    };
+  }, [profileSubmitAttempted, profileIssues.length]);
+
   const toggleReligiosityPref = (val: string) => {
     setReligiosityPref(prev =>
       prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]
@@ -402,27 +434,35 @@ export default function Register() {
     e.preventDefault();
     // Manual validation for iOS Safari (which doesn't show native validation popups)
     const form = e.target as HTMLFormElement;
+    profileFormRef.current = form;
+    setProfileSubmitAttempted(true);
+    const normalizedPhone = normalizeIsraeliPhone(phone);
+    const phoneInput = form.querySelector('input[type="tel"]') as HTMLInputElement | null;
+    if (!normalizedPhone && phone.trim()) {
+      phoneInput?.setCustomValidity("יש להזין מספר טלפון ישראלי מלא, לדוגמה 050-0000000");
+    }
     if (!form.checkValidity()) {
       const firstInvalid = form.querySelector(':invalid') as HTMLElement;
       // Anonymous: field type only, never the value.
       try { trackCheckoutStage("database", "profile_invalid", classifyInvalidField(firstInvalid as any)); } catch {}
+      setProfileIssues(summarizeInvalidFields(Array.from(form.querySelectorAll(":invalid")) as any, 40));
       if (firstInvalid) {
         firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        firstInvalid.focus();
+        firstInvalid.focus({ preventScroll: true });
       }
       form.reportValidity();
       return;
     }
-    const normalizedPhone = normalizeIsraeliPhone(phone);
     if (!normalizedPhone) {
       try { trackCheckoutStage("database", "profile_invalid", "phone"); } catch {}
-      const phoneInput = form.querySelector('input[type="tel"]') as HTMLInputElement | null;
       phoneInput?.setCustomValidity("יש להזין מספר טלפון ישראלי מלא, לדוגמה 050-0000000");
+      setProfileIssues([{ label: "טלפון", hint: "יש להזין מספר טלפון ישראלי מלא" }]);
       phoneInput?.scrollIntoView({ behavior: "smooth", block: "center" });
       phoneInput?.focus();
       phoneInput?.reportValidity();
       return;
     }
+    setProfileIssues([]);
     if (phone !== normalizedPhone) setPhone(normalizedPhone);
     // If DNA already known (came from quiz), skip DNA step entirely
     if (dnaFromQuiz) {
@@ -1202,9 +1242,13 @@ export default function Register() {
               </div>
 
               <form onSubmit={handleProfileSubmit}
+                ref={profileFormRef}
+                // Validate in handleProfileSubmit so the clear summary always
+                // appears; native bubbles are still shown via reportValidity().
+                noValidate
                 onChangeCapture={() => setDraftSavedBeforePayment(false)}
                 onClickCapture={() => setDraftSavedBeforePayment(false)}
-                className="space-y-6">
+                className={`space-y-6 ${profileSubmitAttempted ? "profile-submit-attempted" : ""}`}>
 
                 {/* Photo */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm">
@@ -1597,6 +1641,7 @@ export default function Register() {
                       setConsentDataSharing(event.target.checked);
                     }}
                     required
+                    data-field-label="אישור השתתפות בשירות ההתאמות"
                     className="mt-0.5 w-5 h-5 accent-[#191265] flex-shrink-0"
                   />
                   <span className="text-sm text-[#444] leading-relaxed text-right">
@@ -1614,6 +1659,40 @@ export default function Register() {
                     אני רוצה לקבל גם תוכן, עדכונים והטבות מהילית כספי בדואר אלקטרוני. אפשר להסיר את ההסכמה הזו בכל עת.
                   </span>
                 </label>
+                {profileIssues.length > 0 && (
+                  <div
+                    role="alert"
+                    aria-live="assertive"
+                    className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-lg rounded-2xl border-2 border-red-300 bg-white p-4 text-right shadow-2xl"
+                    dir="rtl"
+                  >
+                    <p className="text-sm font-black text-[#191265]">
+                      {profileIssues.length === 1 ? "נשאר עוד פרט אחד להשלים:" : `נשארו עוד ${profileIssues.length} פרטים להשלים:`}
+                    </p>
+                    <ul className="mt-2 space-y-1 text-sm text-[#444]">
+                      {profileIssues.slice(0, 5).map(issue => (
+                        <li key={issue.label}>
+                          <span className="font-bold text-red-700">{issue.label}</span>
+                          <span className="text-[#727272]"> · {issue.hint}</span>
+                        </li>
+                      ))}
+                      {profileIssues.length > 5 && (
+                        <li className="text-[#727272]">ועוד {profileIssues.length - 5} פרטים נוספים</li>
+                      )}
+                    </ul>
+                    <div className="mt-3 flex gap-2">
+                      <button type="button" onClick={jumpToFirstInvalidProfileField}
+                        className="flex-1 rounded-xl bg-[#191265] py-2.5 text-sm font-bold text-white">
+                        להשלמה עכשיו
+                      </button>
+                      <button type="button" onClick={() => setProfileIssues([])}
+                        aria-label="סגירת ההודעה"
+                        className="rounded-xl border border-[#e9e8e8] px-4 py-2.5 text-sm text-[#727272]">
+                        סגירה
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <button type="submit" disabled={paymentLoading}
                   className="w-full bg-[#191265] text-white font-black text-lg py-5 rounded-2xl hover:bg-[#1800ad] transition-all duration-300 shadow-xl disabled:opacity-60 disabled:cursor-wait">
                   {paymentLoading

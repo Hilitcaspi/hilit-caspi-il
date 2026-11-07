@@ -18,6 +18,7 @@ export const CHECKOUT_STAGES = [
   "sdk_closed",
   "rejected",
   "error",
+  "fresh_attempt",
 ] as const;
 export type CheckoutStage = (typeof CHECKOUT_STAGES)[number];
 

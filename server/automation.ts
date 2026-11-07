@@ -165,7 +165,7 @@ export async function startJourney({
     return;
   }
 
-  const initialSuppression = await isEmailMarketingSuppressed(email);
+  const initialSuppression = await isEmailMarketingSuppressed(email, { journeyKey });
 
   // Idempotency guard: check if this journey was already started for this email
   // Allow re-sending if the first email was sent more than 30 days ago (user may have re-engaged)
@@ -630,7 +630,7 @@ export async function processPendingEmails(options: { minMarketingGapHours?: num
         .where(and(eq(emailLog.id, entry.id), eq(emailLog.status, "pending")));
       continue;
     }
-    const suppression = await isEmailMarketingSuppressed(entry.recipientEmail);
+    const suppression = await isEmailMarketingSuppressed(entry.recipientEmail, { journeyKey: entry.journeyKey });
     if (suppression.suppressed && !isOperationalJourneyEmail(entry.journeyKey, entry.emailIndex)) {
       await db.update(emailLog)
         .set({ status: "cancelled", errorMessage: `suppressed:${suppression.reason}`, sentAt: Date.now() })

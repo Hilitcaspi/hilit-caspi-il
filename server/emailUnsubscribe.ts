@@ -74,7 +74,18 @@ export function buildSignedUnsubscribeUrl(input: SignedUnsubscribePayload & { ba
   return `${baseUrl}/unsubscribe?token=${encodeURIComponent(token)}`;
 }
 
-export async function isEmailMarketingSuppressed(email: string): Promise<{
+/**
+ * Checkout-recovery journeys exist for people who have not paid yet. A database
+ * profile saved before payment is intentionally inactive until the payment
+ * webhook activates it, so "inactive" alone must not cancel that recovery.
+ * Unsubscribe and marketing consent are still enforced, and a profile that
+ * was paid or carries a payment reference stays suppressed when inactive.
+ */
+export function isCheckoutRecoveryJourney(journeyKey: string | null | undefined): boolean {
+  return typeof journeyKey === "string" && journeyKey.startsWith("abandoned_");
+}
+
+export async function isEmailMarketingSuppressed(email: string, context: { journeyKey?: string | null } = {}): Promise<{
   suppressed: boolean;
   reason: "invalid" | "crm_unsubscribed" | "inactive_profile" | "marketing_consent" | null;
 }> {
@@ -94,12 +105,16 @@ export async function isEmailMarketingSuppressed(email: string): Promise<{
 
   const [profile] = await db.select({
     isActive: singles.isActive,
+    isPaid: singles.isPaid,
+    paymentRef: singles.paymentRef,
     consentEmailMarketing: singles.consentEmailMarketing,
   })
     .from(singles)
     .where(sql`LOWER(TRIM(${singles.email})) = ${normalized}`)
     .limit(1);
-  if (profile && !profile.isActive) return { suppressed: true, reason: "inactive_profile" };
+  const unpaidDraftRecovery = !!profile && isCheckoutRecoveryJourney(context.journeyKey)
+    && profile.isActive === false && profile.isPaid === false && !profile.paymentRef;
+  if (profile && !profile.isActive && !unpaidDraftRecovery) return { suppressed: true, reason: "inactive_profile" };
   if (profile && !profile.consentEmailMarketing) return { suppressed: true, reason: "marketing_consent" };
   return { suppressed: false, reason: null };
 }

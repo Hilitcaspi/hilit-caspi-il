@@ -33,7 +33,7 @@
 import crypto from "crypto";
 import { recordGrowPaymentOnce } from "./growPaymentAccounting";
 import { captureAcquisitionIfMissing } from "../shared/acquisitionAttribution";
-import { and, desc as orderDesc, eq, gt, or, sql } from "drizzle-orm";
+import { and, desc as orderDesc, eq, gt, inArray, ne, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { productAccessTokens, leads, singles, crmLeads, dnaQuizResults, liveEventRegistrations, webhookIdempotency, completedPayments, plusPilotMembers, plusCheckoutIntents, paymentLeads, discountCodes } from "../drizzle/schema";
 import { sendEmail } from "./brevo";
@@ -119,6 +119,74 @@ export function isValidNovemberBundleWebhookBinding(input: {
   if (!matchingProcess) return false;
   return input.sum === NOVEMBER_BUNDLE_PRICE
     || (input.sum === 1 && input.couponCode?.trim().toUpperCase() === "TEST1");
+}
+
+/**
+ * Owner-approved checkout takeover (7.11.2026) lets a returning buyer replace an
+ * abandoned November process. payment_leads keeps only the newest process token,
+ * so a late payment on the replaced process no longer matches exactly. Accept it
+ * only for the full November price, a canonical Grow transaction, an existing
+ * November checkout lead for this email, and (enforced by the caller) a
+ * provider-confirmed accounting receipt before any fulfilment.
+ */
+export function isSupersededNovemberProcessCandidate(input: {
+  sum: number;
+  transactionId: string;
+  webhookProcessToken?: string | null;
+  checkoutProcessToken?: string | null;
+  hasNovemberCheckoutLead: boolean;
+}): boolean {
+  return input.sum === NOVEMBER_BUNDLE_PRICE
+    && /^\d{3,30}$/.test(input.transactionId)
+    && Boolean(input.webhookProcessToken)
+    && input.webhookProcessToken !== input.checkoutProcessToken
+    && input.hasNovemberCheckoutLead;
+}
+
+/** Owner alert text for a probable double charge in the same one-time family. */
+export function buildPossibleDuplicateChargeNotification(input: {
+  email: string; product: string; priorProduct: string; amountAgorot: number; priorAmountAgorot: number;
+  transactionId: string; priorTransactionId: string;
+}) {
+  return {
+    title: "⚠️ ייתכן חיוב כפול – כדאי לבדוק ב-Grow",
+    content: [
+      `התקבל תשלום נוסף מ־${input.email} על אותו מוצר תוך 7 ימים.`,
+      `תשלום קודם: ${input.priorProduct}, ${input.priorAmountAgorot / 100} ₪ (Transaction ${input.priorTransactionId})`,
+      `תשלום חדש: ${input.product}, ${input.amountAgorot / 100} ₪ (Transaction ${input.transactionId})`,
+      "אם זה אותו אדם שחזר לשלם אחרי תקלה, אפשר לזכות את אחד החיובים ב-Grow.",
+    ].join("\n"),
+  };
+}
+
+async function notifyPossibleDuplicateCharge(input: { email: string; product: string; transactionId: string; amountAgorot: number }) {
+  try {
+    const { oneTimeCheckoutFamily } = await import("./checkoutReservation");
+    const family = oneTimeCheckoutFamily(input.product);
+    if (!family || !input.email) return;
+    const db = await getDb();
+    if (!db) return;
+    const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const [prior] = await db.select({
+      transactionId: completedPayments.transactionId,
+      product: completedPayments.product,
+      amountAgorot: completedPayments.amountAgorot,
+    }).from(completedPayments).where(and(
+      eq(completedPayments.email, input.email),
+      inArray(completedPayments.product, family),
+      ne(completedPayments.transactionId, input.transactionId),
+      gt(completedPayments.createdAt, since),
+    )).orderBy(orderDesc(completedPayments.createdAt)).limit(1);
+    if (!prior) return;
+    await notifyOwner(buildPossibleDuplicateChargeNotification({
+      email: input.email, product: input.product, priorProduct: prior.product,
+      amountAgorot: input.amountAgorot, priorAmountAgorot: Number(prior.amountAgorot) || 0,
+      transactionId: input.transactionId, priorTransactionId: prior.transactionId,
+    }));
+  } catch {
+    // An owner alert must never block or retry a confirmed payment.
+    console.error("[CheckoutSafety] Possible duplicate charge check failed");
+  }
 }
 
 export function completedPaymentDedupeKey(input: {
@@ -1003,6 +1071,7 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   // It must carry the dedicated canonical description and bind to the exact
   // server-created payment intent/process token. This retains historical 349
   // Tu B'Av callback behavior while rejecting fabricated or mismatched claims.
+  let novemberSupersededProcess = false;
   if (product === NOVEMBER_BUNDLE_PRODUCT) {
     if (!isValidNovemberBundleWebhookBinding({
       sum,
@@ -1010,7 +1079,27 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
       checkoutProcessToken: purchaseTracking?.providerProcessToken,
       couponCode: purchaseTracking?.couponCode,
     })) {
-      throw new Error("November bundle payment is not bound to the exact server checkout or price");
+      let hasNovemberCheckoutLead = false;
+      if (sum === NOVEMBER_BUNDLE_PRICE && email) {
+        try {
+          const db = await getDb();
+          const [lead] = db ? await db.select({ id: paymentLeads.id }).from(paymentLeads)
+            .where(and(eq(paymentLeads.email, email), eq(paymentLeads.product, NOVEMBER_BUNDLE_PRODUCT))).limit(1) : [];
+          hasNovemberCheckoutLead = Boolean(lead);
+        } catch {
+          hasNovemberCheckoutLead = false;
+        }
+      }
+      if (!isSupersededNovemberProcessCandidate({
+        sum, transactionId,
+        webhookProcessToken: liveProcessToken,
+        checkoutProcessToken: purchaseTracking?.providerProcessToken,
+        hasNovemberCheckoutLead,
+      })) {
+        throw new Error("November bundle payment is not bound to the exact server checkout or price");
+      }
+      novemberSupersededProcess = true;
+      console.warn("[CheckoutSafety] November payment on a superseded server process; fulfilment requires provider-confirmed accounting");
     }
   }
 
@@ -1071,6 +1160,23 @@ export async function handleGrowWebhook(body: any, context: { boostCheckoutRefer
   // A persisted review receipt is not proof of payment. Leave it for
   // reconciliation without activating a product, acknowledging or emailing.
   if (accountingResult === "review") return;
+  // A superseded November process is fulfilled only after Grow confirmed this
+  // exact transaction and amount (recorded / duplicate), never on notification alone.
+  if (novemberSupersededProcess && !["recorded", "duplicate"].includes(accountingResult)) {
+    console.warn("[CheckoutSafety] Superseded November payment held: provider confirmation required");
+    return;
+  }
+  if (novemberSupersededProcess && accountingResult === "recorded") {
+    await notifyOwner({
+      title: "תשלום נובמבר התקבל בתהליך תשלום קודם",
+      content: `התקבל תשלום של ${sum} ₪ מ־${email} בתהליך תשלום שנפתח קודם. Grow אישר את העסקה, והחבילה מופעלת כרגיל. Transaction: ${transactionId}`,
+    }).catch(() => false);
+  }
+  // Owner-approved returning-buyer takeover can rarely lead to two payments.
+  // Alert once per newly recorded receipt so the owner can refund in Grow.
+  if (accountingResult === "recorded" && !accountingInput.testCheckout && product) {
+    await notifyPossibleDuplicateCharge({ email, product, transactionId, amountAgorot: accountingInput.amountAgorot });
+  }
 
   // Terminalize only the authorization of a provider-confirmed paid receipt.
   // This bookkeeping never charges, fulfills a product or sends a message.

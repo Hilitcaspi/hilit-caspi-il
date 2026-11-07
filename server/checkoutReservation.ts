@@ -79,6 +79,12 @@ export interface CheckoutReservationStore {
   ): Promise<boolean>;
   claimFailed(record: CheckoutReservationRecord): Promise<boolean>;
   rotateOpen(record: CheckoutReservationRecord, previousAttemptId: string): Promise<boolean>;
+  /**
+   * Owner-approved (7.11.2026) recovery for a returning production buyer: replace a
+   * stale/unmatched open, creating or uncertain reservation with a fresh owner.
+   * CAS on the exact previous owner token and state, so only one request wins.
+   */
+  takeOver(record: CheckoutReservationRecord, previousOwnerToken: string, previousState: CheckoutReservationState): Promise<boolean>;
   findPaidEvidence(context: {
     email: string;
     product: string;
@@ -117,7 +123,7 @@ export class CheckoutReservationInfrastructureError extends Error {
 }
 
 export const CHECKOUT_RESERVATION_MESSAGES = {
-  creating: "בקשת התשלום כבר נמצאת בעיבוד. אין לפתוח תהליך נוסף; אפשר להמתין ולרענן.",
+  creating: "בקשת התשלום כבר נמצאת בעיבוד. אפשר לנסות שוב בעוד כ־2 דקות.",
   open: "כבר נפתח תהליך תשלום עבור בקשה זו. אין לפתוח תהליך נוסף.",
   uncertain: "לא ניתן לוודא אם נפתח תהליך תשלום. כדי למנוע חיוב כפול לא נפתח תהליך נוסף. אפשר לפנות לתמיכה עם פרטי הבקשה.",
   completed: "התשלום עבור מוצר זה כבר זוהה. אין צורך לפתוח תהליך תשלום נוסף.",
@@ -130,6 +136,16 @@ const UNCERTAIN_MESSAGE = CHECKOUT_RESERVATION_MESSAGES.uncertain;
 const PAID_MESSAGE = CHECKOUT_RESERVATION_MESSAGES.completed;
 const LEGACY_PENDING_MESSAGE = CHECKOUT_RESERVATION_MESSAGES.legacyPending;
 const RECENT_LEGACY_PENDING_MS = 6 * 60 * 60 * 1000;
+/**
+ * Production takeover thresholds (owner-approved 7.11.2026: a returning buyer must be
+ * able to pay; a rare double charge is refunded in Grow, a lost buyer is not).
+ * - creating/uncertain older than this: the earlier request is treated as abandoned.
+ * - an unmatched open process older than OPEN_TAKEOVER_MIN_AGE_MS is replaced.
+ * - a matching open process is replayed only while its authorization is fresh.
+ */
+export const STALE_TAKEOVER_MS = 2 * 60 * 1000;
+export const OPEN_TAKEOVER_MIN_AGE_MS = 30 * 1000;
+export const OPEN_REPLAY_MAX_AGE_MS = 15 * 60 * 1000;
 
 let testStore: CheckoutReservationStore | undefined;
 
@@ -224,6 +240,21 @@ function checkoutScope(product: string, boostMatchId: string | number | undefine
   // the existing CAS with a new explicit attempt ID; production is unchanged.
   if (diagnosticTest) scope = { ...scope, scopeKind: `${scope.scopeKind}:diagnostic`, repeatable: true };
   return scope;
+}
+
+/**
+ * Product aliases that form one one-time purchase family (for example the database
+ * and every database bundle). Repeatable products and Boost return null.
+ */
+export function oneTimeCheckoutFamily(product: string): string[] | null {
+  try {
+    const normalized = normalizeProduct(product);
+    if (normalized === "match_boost") return null;
+    const scope = checkoutScope(normalized, undefined, false);
+    return scope.oneTime ? [...scope.aliases] : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -340,14 +371,25 @@ export async function withCheckoutReservation<Result>(
   const store = await activeStore();
   const now = Date.now();
   let candidate = newRecord({ reservationKey, scopeKind: scope.scopeKind, attemptId, bindingHmac, diagnosticTest: Boolean(input.diagnosticTest), now });
+  let takenOver = false;
 
   // INSERT IGNORE on the unique HMAC key is the cross-instance ownership election.
   if (!(await store.insert(candidate))) {
     const existing = await store.get(reservationKey);
     if (!existing) throw new CheckoutReservationInfrastructureError();
 
-    if (existing.state === "creating") throw new CheckoutReservationConflictError("creating", CREATING_MESSAGE);
-    if (existing.state === "uncertain") throw new CheckoutReservationConflictError("uncertain", UNCERTAIN_MESSAGE);
+    const production = !input.diagnosticTest && !existing.diagnosticTest;
+    const ageMs = Math.max(0, now - Number(existing.updatedAt || existing.createdAt || 0));
+    // Production only (owner-approved 7.11.2026): an abandoned creating/uncertain
+    // request no longer blocks the buyer forever. Paid evidence below still wins.
+    const staleRecoverable = production
+      && (existing.state === "creating" || existing.state === "uncertain")
+      && ageMs >= STALE_TAKEOVER_MS;
+    if (existing.state === "creating" && !staleRecoverable) throw new CheckoutReservationConflictError("creating", CREATING_MESSAGE);
+    if (existing.state === "uncertain" && !staleRecoverable) {
+      if (production) throw new CheckoutReservationConflictError("creating", CREATING_MESSAGE);
+      throw new CheckoutReservationConflictError("uncertain", UNCERTAIN_MESSAGE);
+    }
     if (existing.state === "completed" && !scope.repeatable) throw new CheckoutReservationConflictError("completed", PAID_MESSAGE);
 
     if (existing.state === "failed") {
@@ -395,23 +437,41 @@ export async function withCheckoutReservation<Result>(
         throw new CheckoutReservationConflictError("completed", PAID_MESSAGE);
       }
 
-      if (!mayRotateCompletedRepeatable) {
+      if (!mayRotateCompletedRepeatable && staleRecoverable) {
+        // No paid evidence for the abandoned request: hand the reservation to
+        // this request. CAS on the exact previous owner and state.
+        if (!(await store.takeOver(candidate, existing.ownerToken, existing.state))) {
+          throw new CheckoutReservationConflictError("creating", CREATING_MESSAGE);
+        }
+        takenOver = true;
+      } else if (!mayRotateCompletedRepeatable) {
+        // A production authorization is replayed only while it is still fresh;
+        // an older open process may already be expired at the provider.
+        const replayable = existing.state === "open" && (!production || ageMs < OPEN_REPLAY_MAX_AGE_MS);
         // An open reservation can be replayed only by the same secure binding and
         // only after paid evidence has been rechecked.
-        if (existing.bindingHmac === bindingHmac && existing.attemptId === attemptId) return parseResult<Result>(existing);
-        if (existing.bindingHmac === bindingHmac && !input.checkoutAttemptId) return parseResult<Result>(existing);
+        if (replayable && existing.bindingHmac === bindingHmac && existing.attemptId === attemptId) return parseResult<Result>(existing);
+        if (replayable && existing.bindingHmac === bindingHmac && !input.checkoutAttemptId) return parseResult<Result>(existing);
         // A registration resume starts in a fresh browser session, so its opaque
         // client attempt UUID can be lost even though the unpaid profile still
         // proves the same buyer identity. The router may set this server-only bit
         // only after validating that unguessable bearer token. It never applies
         // to creating, uncertain, completed, or failed reservations, and paid
         // evidence above always wins before the stored authorization is replayed.
-        if (existing.state === "open"
+        if (replayable
           && existing.bindingHmac === bindingHmac
           && Boolean(input.verifiedOpenResume)) {
           return parseResult<Result>(existing);
         }
-        throw new CheckoutReservationConflictError("open", OPEN_MESSAGE);
+        if (!production || existing.state !== "open") throw new CheckoutReservationConflictError("open", OPEN_MESSAGE);
+        // Production returning buyer (other device/tab/email link, or an expired
+        // process): after the paid-evidence recheck above, open a fresh process.
+        // A very recent open process is protected against double clicks.
+        if (ageMs < OPEN_TAKEOVER_MIN_AGE_MS) throw new CheckoutReservationConflictError("creating", CREATING_MESSAGE);
+        if (!(await store.takeOver(candidate, existing.ownerToken, "open"))) {
+          throw new CheckoutReservationConflictError("creating", CREATING_MESSAGE);
+        }
+        takenOver = true;
       }
     }
   }
@@ -426,7 +486,8 @@ export async function withCheckoutReservation<Result>(
   // Legacy payment_leads are email/product global and carry no match identity, so
   // they cannot safely block a Boost for a different candidate. The durable
   // match-scoped reservation remains the dedupe boundary for Boost.
-  if (!input.diagnosticTest && product !== "match_boost" && await store.hasRecentLegacyPending({ email, productAliases: scope.aliases, sinceMs: Date.now() - RECENT_LEGACY_PENDING_MS })) {
+  // After a takeover the unconfirmed legacy lead is the abandoned process itself.
+  if (!input.diagnosticTest && !takenOver && product !== "match_boost" && await store.hasRecentLegacyPending({ email, productAliases: scope.aliases, sinceMs: Date.now() - RECENT_LEGACY_PENDING_MS })) {
     await store.updateOwned(candidate.reservationKey, candidate.ownerToken, "creating", { state: "failed", updatedAt: Date.now() });
     throw new CheckoutReservationConflictError("legacy_pending", LEGACY_PENDING_MESSAGE);
   }
@@ -536,6 +597,15 @@ class MysqlCheckoutReservationStore implements CheckoutReservationStore {
     const result = await this.pool.execute(
       "UPDATE checkout_reservations SET attempt_id = ?, binding_hmac = ?, owner_token = ?, state = 'creating', result_json = NULL, diagnostic_test = ?, updated_at = ? WHERE reservation_key = ? AND state IN ('open','completed') AND attempt_id = ?",
       [record.attemptId, record.bindingHmac, record.ownerToken, record.diagnosticTest ? 1 : 0, record.updatedAt, record.reservationKey, previousAttemptId],
+    );
+    return affected(result);
+  }
+
+  async takeOver(record: CheckoutReservationRecord, previousOwnerToken: string, previousState: CheckoutReservationState): Promise<boolean> {
+    if (!["open", "creating", "uncertain"].includes(previousState)) return false;
+    const result = await this.pool.execute(
+      "UPDATE checkout_reservations SET attempt_id = ?, binding_hmac = ?, owner_token = ?, state = 'creating', result_json = NULL, diagnostic_test = ?, updated_at = ? WHERE reservation_key = ? AND owner_token = ? AND state = ? AND diagnostic_test = 0",
+      [record.attemptId, record.bindingHmac, record.ownerToken, record.diagnosticTest ? 1 : 0, record.updatedAt, record.reservationKey, previousOwnerToken, previousState],
     );
     return affected(result);
   }

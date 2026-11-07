@@ -50,6 +50,7 @@ import {
   acquireCheckoutOwner,
   checkoutAttemptStorageKey,
   completeCheckoutOwner,
+  createFreshProductionCheckoutAttempt,
   createNextDiagnosticCheckoutAttempt,
   getOrCreateCheckoutAttemptId,
   isCheckoutAttemptCompleted,
@@ -370,6 +371,7 @@ interface GrowWalletProps {
 }
 
 type CheckoutCallbacks = Pick<GrowWalletProps, "onSuccess" | "onFailure">;
+type CouponApplyOutcome = "applied" | "free_access" | "invalid" | "error";
 
 interface LocalCheckoutAttempt {
   attemptId: string;
@@ -420,6 +422,8 @@ export default function GrowWallet({
   const [walletOpen, setWalletOpen] = useState(false);
   const [paymentStatusAmbiguous, setPaymentStatusAmbiguous] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(false);
+  // Production only: shown after reconciliation ended without a confirmation.
+  const [freshRetryReady, setFreshRetryReady] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
@@ -496,9 +500,26 @@ export default function GrowWallet({
   // Server-side step logger for debugging payment flow on mobile
   const logStepMutation = trpc.payment.logStep.useMutation();
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return;
+  // One in-flight validation per typed code: a blur and a pay click share it.
+  const couponValidationRef = useRef<{ code: string; promise: Promise<CouponApplyOutcome> } | null>(null);
+  // Set when the pay click validated a typed code; payment continues once it is applied.
+  const pendingPayAfterCouponRef = useRef(false);
+  const couponInputId = `gw-coupon-${instanceId}`;
+
+  const handleApplyCoupon = (): Promise<CouponApplyOutcome> => {
     const normalizedCode = couponCode.trim();
+    if (!normalizedCode) return Promise.resolve("invalid");
+    const inFlight = couponValidationRef.current;
+    if (inFlight && inFlight.code === normalizedCode.toUpperCase()) return inFlight.promise;
+    const promise = applyCouponCode(normalizedCode);
+    couponValidationRef.current = { code: normalizedCode.toUpperCase(), promise };
+    void promise.finally(() => {
+      if (couponValidationRef.current?.promise === promise) couponValidationRef.current = null;
+    });
+    return promise;
+  };
+
+  const applyCouponCode = async (normalizedCode: string): Promise<CouponApplyOutcome> => {
     setCouponError("");
     setCouponLoading(true);
     try {
@@ -528,18 +549,23 @@ export default function GrowWallet({
                     ? `₪${result.discountAmount} הנחה`
                     : "כרטיס ללייב במתנה";
         toast.success(`קוד הוחל! ${label}`);
+        return "applied";
       } else if (product === "database" && onFreeAccessCode) {
         const freeAccess = await onFreeAccessCode(normalizedCode, email.trim());
         if (!freeAccess.valid) {
           setCouponError(
             freeAccess.error || (result as any).error || "קוד לא תקין"
           );
+          return "invalid";
         }
+        return "free_access";
       } else {
         setCouponError((result as any).error || "קוד קופון לא תקין");
+        return "invalid";
       }
     } catch {
-      setCouponError("שגיאה בבדיקת הקופון. נסה שוב.");
+      setCouponError("שגיאה בבדיקת הקופון. אפשר לנסות שוב.");
+      return "error";
     } finally {
       setCouponLoading(false);
     }
@@ -632,9 +658,22 @@ export default function GrowWallet({
       couponCode.trim() &&
       couponApplied?.code !== couponCode.trim().toUpperCase()
     ) {
+      // A typed code that was never applied: validate it now instead of
+      // blocking. Payment continues automatically once the code is applied.
+      const outcome = await handleApplyCoupon();
+      if (outcome === "applied") {
+        pendingPayAfterCouponRef.current = true;
+        return;
+      }
+      if (outcome === "free_access") return;
       stage("validation_error", "coupon_unverified");
+      try {
+        const field = document.getElementById(couponInputId);
+        field?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        (field as HTMLInputElement | null)?.focus?.();
+      } catch {}
       toast.error(
-        "יש לאמת את הקוד שהוזן לפני פתיחת התשלום, או למחוק אותו כדי להמשיך במחיר הרגיל."
+        "קוד ההנחה שהוזן לא הופעל. אפשר לתקן אותו, או למחוק אותו ולהמשיך במחיר הרגיל."
       );
       return;
     }
@@ -736,13 +775,21 @@ export default function GrowWallet({
     // This is a bounded, SELECT-only reconciliation, never a payment retry.
     // The proof stays on this immutable attempt, not the shared analytics token.
     const reconcilePayment = async () => {
-      if (attempt.reconciling || attempt.terminal || !attempt.outcomeUnknown ||
-          !attempt.purchaseTrackingToken || !attempt.processToken ||
-          attempt.couponCode === "TEST1") return;
       const stillThisAttempt = () => mountedRef.current &&
         checkoutAttemptRef.current === attempt && !attempt.terminal;
+      const offerFreshAttempt = () => {
+        if (stillThisAttempt() && attempt.outcomeUnknown && !attempt.reconciling &&
+            attempt.couponCode?.toUpperCase() !== "TEST1") setFreshRetryReady(true);
+      };
+      if (attempt.reconciling || attempt.terminal || !attempt.outcomeUnknown ||
+          attempt.couponCode === "TEST1") return;
+      if (!attempt.purchaseTrackingToken || !attempt.processToken) {
+        offerFreshAttempt();
+        return;
+      }
       if (!stillThisAttempt()) return;
       attempt.reconciling = true;
+      setFreshRetryReady(false);
       setCheckingPayment(true);
       try {
         for (let check = 0; check < 30 && stillThisAttempt(); check++) {
@@ -792,6 +839,7 @@ export default function GrowWallet({
       } finally {
         attempt.reconciling = false;
         if (stillThisAttempt()) setCheckingPayment(false);
+        offerFreshAttempt();
       }
     };
     attempt.checkStatus = reconcilePayment;
@@ -1188,6 +1236,14 @@ export default function GrowWallet({
     paymentStatusAmbiguous,
   ]);
 
+  // Continue the click that validated a typed code, after React committed it.
+  useEffect(() => {
+    if (!pendingPayAfterCouponRef.current) return;
+    if (!couponApplied || couponApplied.code !== couponCode.trim().toUpperCase()) return;
+    pendingPayAfterCouponRef.current = false;
+    void handlePay();
+  }, [couponApplied, couponCode, handlePay]);
+
   const hasAllDetails = hasCompleteCheckoutPrefill(
     { fullName: name, email, phone },
     normalizeIsraeliPhone(phone),
@@ -1352,14 +1408,20 @@ export default function GrowWallet({
           ) : (
             <div className="flex gap-2">
               <Input
-                id={`gw-coupon-${instanceId}`}
+                id={couponInputId}
                 type="text"
                 value={couponCode}
                 disabled={customerInputFrozen}
+                aria-invalid={couponError ? true : undefined}
+                aria-describedby={couponError ? `${couponInputId}-error` : undefined}
                 onChange={e => {
                   setCouponCode(e.target.value.toUpperCase());
                   setCouponApplied(null);
                   setCouponError("");
+                  pendingPayAfterCouponRef.current = false;
+                }}
+                onBlur={() => {
+                  if (couponCode.trim() && !couponLoading && !customerInputFrozen) void handleApplyCoupon();
                 }}
                 placeholder={
                   product === "database" ? "הכנס/י קוד הנחה" : "הכנס קוד קופון"
@@ -1371,7 +1433,7 @@ export default function GrowWallet({
                 }}
               />
               <button
-                onClick={handleApplyCoupon}
+                onClick={() => { void handleApplyCoupon(); }}
                 disabled={!couponCode.trim() || couponLoading || customerInputFrozen}
                 className="shrink-0 bg-[#191265] text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-[#1800ad] transition-colors disabled:opacity-50"
               >
@@ -1380,7 +1442,7 @@ export default function GrowWallet({
             </div>
           )}
           {couponError && (
-            <p className="text-red-500 text-xs mt-1">{couponError}</p>
+            <p id={`${couponInputId}-error`} role="alert" className="text-red-600 text-xs mt-1">{couponError}</p>
           )}
         </div>
       )}
@@ -1496,7 +1558,37 @@ export default function GrowWallet({
         <div className="mt-3 rounded-xl bg-amber-50 p-4 text-center text-sm leading-6 text-amber-900" role="status" aria-live="polite">
           <p>{checkingPayment
             ? "בודקים את אישור העסקה מול האתר. אין צורך לשלם שוב."
-            : "אישור העסקה עדיין לא אומת באתר. כדי להימנע מחיוב נוסף, אין לשלם שוב."}</p>
+            : freshRetryReady
+              ? "לא קיבלנו אישור על התשלום הקודם. אם לא ירד חיוב בכרטיס, אפשר לנסות שוב. אם בסוף יתברר שהיה חיוב כפול, נחזיר אותו."
+              : "אישור העסקה עדיין לא אומת באתר. כדי להימנע מחיוב נוסף, אין לשלם שוב."}</p>
+          {!checkingPayment && freshRetryReady && couponApplied?.code !== "TEST1" && (
+            <button
+              type="button"
+              className="mt-3 w-full rounded-xl bg-[#191265] py-3 text-sm font-bold text-white"
+              onClick={() => {
+                const prior = checkoutAttemptRef.current;
+                if (!prior || prior.terminal || !prior.outcomeUnknown || prior.reconciling ||
+                    prior.couponCode?.toUpperCase() === "TEST1" || checkoutLockRef.current) return;
+                const next = createFreshProductionCheckoutAttempt(
+                  { product, email: prior.email, boostMatchId }, prior.couponCode, prior.attemptId,
+                );
+                if (!next) {
+                  toast.message("לא ניתן להכין ניסיון חדש כרגע. אפשר לפנות אלינו בוואטסאפ ונעזור.");
+                  return;
+                }
+                // Retire the old attempt: its late SDK callbacks and checks are ignored.
+                prior.terminal = true;
+                checkoutAttemptRef.current = null;
+                if (prior.statusToastId !== undefined) toast.dismiss(prior.statusToastId);
+                setFreshRetryReady(false);
+                setPaymentStatusAmbiguous(false);
+                try { trackCheckoutStage(product, "fresh_attempt", "-"); } catch {}
+                toast.message("אפשר ללחוץ שוב על כפתור התשלום.");
+              }}
+            >
+              ניסיון תשלום חדש
+            </button>
+          )}
           {!checkingPayment && checkoutAttemptRef.current?.purchaseTrackingToken && checkoutAttemptRef.current?.processToken && (
             <button type="button" className="mt-2 font-bold underline" onClick={() => void checkoutAttemptRef.current?.checkStatus?.()}>
               בדיקת אישור התשלום בלבד

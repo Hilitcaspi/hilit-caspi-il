@@ -26,6 +26,7 @@ function harness() {
     updateOwned: async (key, owner, state, patch) => { const r = records.get(key); if (!r || r.ownerToken !== owner || r.state !== state) return false; records.set(key, { ...r, ...patch }); return true; },
     claimFailed: async r => { if (records.get(r.reservationKey)?.state !== "failed") return false; records.set(r.reservationKey, { ...r }); return true; },
     rotateOpen: async (r, old) => { const p = records.get(r.reservationKey); if ((!p || !["open", "completed"].includes(p.state)) || p.attemptId !== old) return false; records.set(r.reservationKey, { ...r }); return true; },
+    takeOver: async (r, owner, state) => { const p = records.get(r.reservationKey); if (!p || p.ownerToken !== owner || p.state !== state || p.diagnosticTest || !["open", "creating", "uncertain"].includes(state)) return false; records.set(r.reservationKey, { ...r, createdAt: p.createdAt }); return true; },
     findPaidEvidence: async () => ({ paidForProductFamily: paid, databaseProfilePaid: paid, exactProviderProcessConfirmed: exact }),
     hasRecentLegacyPending: async () => legacy,
   };

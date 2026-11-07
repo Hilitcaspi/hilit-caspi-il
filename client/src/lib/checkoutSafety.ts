@@ -98,6 +98,37 @@ export function getOrCreateCheckoutAttemptId(
   }
 }
 
+/**
+ * Production only (owner-approved 7.11.2026): after the bounded read-only
+ * reconciliation ended without a confirmation, let the buyer consciously start a
+ * new checkout attempt. The server re-checks paid evidence first and replaces the
+ * abandoned reservation with a CAS. Never for TEST1, never while an SDK is open,
+ * never for an attempt this browser already marked completed.
+ */
+export function createFreshProductionCheckoutAttempt(
+  identity: CheckoutAttemptIdentity,
+  couponCode: string | undefined,
+  priorAttemptId: string,
+  storage: CheckoutStorage | null = sessionStorageOrNull(),
+  createId: () => string = createCheckoutAttemptId,
+): string | null {
+  if (couponCode?.trim().toUpperCase() === "TEST1" || currentCheckoutOwner ||
+      isCheckoutAttemptCompleted(priorAttemptId, storage)) return null;
+  try {
+    const next = createId();
+    if (!UUID_V4.test(next) || next === priorAttemptId) return null;
+    if (storage) {
+      const key = checkoutAttemptStorageKey(identity);
+      const stored = storage.getItem(key);
+      if (stored && stored !== priorAttemptId) return null;
+      storage.setItem(key, next);
+    }
+    return next;
+  } catch {
+    return null;
+  }
+}
+
 /** Prepare a new TEST1 label only; the server still requires confirmed prior payment. */
 export function createNextDiagnosticCheckoutAttempt(
   identity: CheckoutAttemptIdentity,

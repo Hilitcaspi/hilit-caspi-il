@@ -310,3 +310,13 @@
   height: 0 !important;
   overflow: visible !important;
 }
+
+/* Registration form: after a blocked submit, outline exactly what still needs attention. */
+.profile-submit-attempted :is(input, select, textarea):invalid {
+  border-color: #ef4444 !important;
+  background-color: #fff7f7;
+}
+.profile-submit-attempted input[type="checkbox"]:invalid {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
