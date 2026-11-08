@@ -1,3 +1,5 @@
+import WaitingQueuePagination from "@/components/WaitingQueuePagination";
+import type { WaitingQueueSortOrder } from "@shared/unmatchedQueuePresentation";
 /**
  * CRM Matchmaking   admin page for managing the singles database and matches
  * URL: /crm/matchmaking
@@ -427,6 +429,7 @@ export default function CRMMatchmaking() {
   const [editingSingleId, setEditingSingleId] = useState<number | null>(null);
   const [topMatchesPage, setTopMatchesPage] = useState<Record<number, number>>({}); // singleId -> page (0=first 3, 1=next 3, etc.)
   const [unmatchedPage, setUnmatchedPage] = useState(1);
+  const [unmatchedSortOrder, setUnmatchedSortOrder] = useState<WaitingQueueSortOrder>("longest");
   const [unmatchedNameSearch, setUnmatchedNameSearch] = useState("");
   const [debouncedUnmatchedNameSearch, setDebouncedUnmatchedNameSearch] = useState("");
   const [waitingExpandedId, setWaitingExpandedId] = useState<number | null>(null);
@@ -491,7 +494,7 @@ export default function CRMMatchmaking() {
     refetchOnWindowFocus: false,
     trpc: { context: { skipBatch: true } },
   });
-  const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } }, refetch: refetchUnmatched, isLoading: unmatchedLoading, isFetching: unmatchedFetching, isError: unmatchedError } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40, search: debouncedUnmatchedNameSearch || undefined }, {
+  const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } }, refetch: refetchUnmatched, isLoading: unmatchedLoading, isFetching: unmatchedFetching, isError: unmatchedError } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40, search: debouncedUnmatchedNameSearch || undefined, sortOrder: unmatchedSortOrder }, {
     enabled: !!user && user.role === "admin" && activeTab === "unmatched",
     staleTime: 30_000,
     refetchOnWindowFocus: false,
@@ -501,6 +504,19 @@ export default function CRMMatchmaking() {
   const unmatchedSearchIsDebouncing = unmatchedNameSearch !== debouncedUnmatchedNameSearch;
   const unmatchedQueueIsRefreshing = unmatchedFetching && unmatchedView === "matches";
   const hasUnmatchedNameSearch = debouncedUnmatchedNameSearch.trim().length > 0;
+  const changeUnmatchedPage = (page: number) => {
+    setUnmatchedPage(page);
+    setWaitingExpandedId(null);
+  };
+  const changeUnmatchedSortOrder = (order: WaitingQueueSortOrder) => {
+    setUnmatchedSortOrder(order);
+    changeUnmatchedNameSearch(unmatchedNameSearch);
+  };
+  useEffect(() => {
+    if (unmatchedLoading || unmatchedFetching || unmatchedError) return;
+    const lastPage = Math.max(1, Math.ceil(unmatchedResult.total / unmatchedResult.limit));
+    if (unmatchedPage > lastPage) setUnmatchedPage(lastPage);
+  }, [unmatchedPage, unmatchedResult.total, unmatchedResult.limit, unmatchedLoading, unmatchedFetching, unmatchedError]);
   const changeUnmatchedNameSearch = (value: string) => {
     setUnmatchedNameSearch(value);
     setUnmatchedPage(1);
@@ -3210,7 +3226,7 @@ export default function CRMMatchmaking() {
             <div className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-[#191265]">🔍 לא קיבלו התאמה יותר מ־14 יום או ביקשו טיפול דרך המשוב</p>
-                <p className="text-xs text-[#727272]">ממוינים מההמתנה הארוכה לקצרה לפי השליחה האישית האחרונה; למי שטרם קיבלו, מהשלמת הפרופיל. רק חברי מאגר פעילים ומשולמים עם שאלון והסכמה. מועמדות פנימית שלא נשלחה אינה נספרת.</p>
+                <p className="text-xs text-[#727272]">{unmatchedSortOrder === "longest" ? "ממוינים מההמתנה הארוכה לקצרה" : "ממוינים מההמתנה הקצרה לארוכה"} לפי השליחה האישית האחרונה; למי שטרם קיבלו, מהשלמת הפרופיל. רק חברי מאגר פעילים ומשולמים עם שאלון והסכמה. מועמדות פנימית שלא נשלחה אינה נספרת.</p>
                 <p className="text-xs font-semibold text-[#191265] mt-1">{unmatchedLoading ? "טוענת נתונים מעודכנים..." : `${unmatchedResult.total} ממתינים לטיפול · עמוד ${unmatchedResult.page} מתוך ${Math.max(1, Math.ceil(unmatchedResult.total / unmatchedResult.limit))}`}{unmatchedFetching && !unmatchedLoading ? " · מרעננת..." : ""}</p>
                 {!unmatchedLoading && <div className="flex flex-wrap gap-2 mt-2 text-[10px]"><span className="bg-orange-100 text-orange-800 rounded-full px-2 py-1">{unmatchedResult.summary.over14} מעל 14 יום</span><span className="bg-violet-100 text-violet-800 rounded-full px-2 py-1">{unmatchedResult.summary.fromFeedback} בעקבות משוב</span><span className="bg-red-100 text-red-800 rounded-full px-2 py-1">{unmatchedResult.summary.neverDelivered} מעולם לא קיבלו</span>{unmatchedResult.summary.blocked > 0 && <span className="bg-yellow-100 text-yellow-800 rounded-full px-2 py-1">{unmatchedResult.summary.blocked} עם הצעה פתוחה לטיפול</span>}{unmatchedResult.summary.missingPhoto > 0 && <span className="bg-slate-100 text-slate-700 rounded-full px-2 py-1">{unmatchedResult.summary.missingPhoto} חסרי תמונה</span>}</div>}
               </div>
@@ -3222,6 +3238,14 @@ export default function CRMMatchmaking() {
                 רענן
               </button>
             </div>
+            <div className="rounded-xl bg-white p-3 shadow-sm">
+              <label htmlFor="unmatched-sort-order" className="mb-2 block text-xs font-bold text-[#191265]">סדר לפי זמן המתנה</label>
+              <select id="unmatched-sort-order" value={unmatchedSortOrder} onChange={event => changeUnmatchedSortOrder(event.target.value as WaitingQueueSortOrder)} className="w-full rounded-lg border border-[#191265]/20 bg-white px-3 py-2 text-sm text-[#191265] focus:outline-none focus:ring-2 focus:ring-[#ffe27c]">
+                <option value="longest">ההמתנה הארוכה ביותר קודם (ברירת המחדל)</option>
+                <option value="shortest">ההמתנה הקצרה ביותר קודם</option>
+              </select>
+            </div>
+            {!unmatchedLoading && !unmatchedError && <WaitingQueuePagination page={unmatchedPage} total={unmatchedResult.total} limit={unmatchedResult.limit} disabled={unmatchedFetching} onPageChange={changeUnmatchedPage} />}
             {unmatchedError ? (
               <div className="bg-white rounded-xl p-8 text-center text-rose-800">לא הצלחנו לטעון את הרשימה כרגע. לחצי ״רענן״ כדי לנסות שוב.</div>
             ) : unmatchedLoading ? (
@@ -3274,7 +3298,7 @@ export default function CRMMatchmaking() {
                   </div>
                 </section>;
               })}
-              {unmatchedResult.total > unmatchedResult.limit && <div className="flex items-center justify-center gap-3 bg-white rounded-xl p-3 shadow-sm"><button disabled={unmatchedPage <= 1} onClick={() => setUnmatchedPage(page => Math.max(1, page - 1))} className="px-4 py-2 rounded-lg border text-sm font-semibold disabled:opacity-40">הקודם</button><span className="text-sm text-[#727272]">עמוד {unmatchedPage} מתוך {Math.ceil(unmatchedResult.total / unmatchedResult.limit)}</span><button disabled={unmatchedPage >= Math.ceil(unmatchedResult.total / unmatchedResult.limit)} onClick={() => setUnmatchedPage(page => page + 1)} className="px-4 py-2 rounded-lg bg-[#191265] text-white text-sm font-semibold disabled:opacity-40">הבא</button></div>}
+              {unmatchedResult.total > unmatchedResult.limit && <WaitingQueuePagination page={unmatchedPage} total={unmatchedResult.total} limit={unmatchedResult.limit} disabled={unmatchedFetching} onPageChange={changeUnmatchedPage} />}
             </>)}
             </>}
           </div>

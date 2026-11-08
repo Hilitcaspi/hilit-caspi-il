@@ -78,16 +78,19 @@ export function getWaitingFrom(
     || Number(profile.questionnaireCompletedAt || profile.createdAt || now);
 }
 
-/** Queue priority is strictly longest waiting first; feedback never reorders it. */
+export type WaitingQueueSortOrder = "longest" | "shortest";
+
+/** Longest waiting is the default; direction only changes display order. */
 export function sortWaitingProfilesByWaitingFrom<T extends WaitingQueueProfile>(
   profiles: readonly T[],
   lastAcceptedDeliveryBySingle: ReadonlyMap<number, number>,
   now = Date.now(),
+  sortOrder: WaitingQueueSortOrder = "longest",
 ): T[] {
   return [...profiles].sort((a, b) => {
     const waitingDifference = getWaitingFrom(a, lastAcceptedDeliveryBySingle, now)
       - getWaitingFrom(b, lastAcceptedDeliveryBySingle, now);
-    return waitingDifference || a.id - b.id;
+    return (sortOrder === "shortest" ? -waitingDifference : waitingDifference) || a.id - b.id;
   });
 }
 

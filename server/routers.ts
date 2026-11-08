@@ -5530,7 +5530,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
      * delivery evidence prevents failed email for one side from being counted.
      */
     getSinglesWithoutMatches: teamProcedure
-      .input(z.object({ page: z.number().int().min(1).default(1), limit: z.number().int().min(10).max(100).default(40), search: z.string().max(100).optional() }).optional())
+      .input(z.object({ page: z.number().int().min(1).default(1), limit: z.number().int().min(10).max(100).default(40), search: z.string().max(100).optional(), sortOrder: z.enum(["longest", "shortest"]).default("longest") }).optional())
       .query(async ({ ctx, input }) => {
       if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
@@ -5615,9 +5615,9 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (!lastMatch) return eligibleSince < fourteenDaysAgo;
         return lastMatch < fourteenDaysAgo;
       });
-      // Longest waiting always comes first; feedback affects inclusion only.
+      // Longest waiting is the default; an explicit display direction never changes eligibility.
       const nameFilteredSinglesWithout = filterProfilesByName(singlesWithout, input?.search || "");
-      const sortedSinglesWithout = sortWaitingProfilesByWaitingFrom(nameFilteredSinglesWithout, lastMatchDateBySingle, queueNow);
+      const sortedSinglesWithout = sortWaitingProfilesByWaitingFrom(nameFilteredSinglesWithout, lastMatchDateBySingle, queueNow, input?.sortOrder);
       const pagedSingles = sortedSinglesWithout.slice((page - 1) * limit, page * limit);
       const pagedSingleIds = new Set(pagedSingles.map(single => single.id));
       const historicalOpponentIds = new Set<number>();
