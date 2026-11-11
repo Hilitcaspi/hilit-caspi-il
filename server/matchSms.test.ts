@@ -8,6 +8,12 @@ import {
   sendInitialMatchSmsOnce,
 } from "./matchSms";
 
+vi.mock("./vibrate", () => ({ sendSMS: vi.fn() }));
+vi.mock("./matchDeliveryLog", () => ({
+  recordMatchDelivery: vi.fn().mockResolvedValue(undefined),
+  matchDeliveryEventKey: vi.fn().mockReturnValue("synthetic-delivery"),
+}));
+
 describe("automatic match SMS delivery via Vibrate", () => {
   it("builds concise initial, follow-up and expiry messages", () => {
     const initial = buildInitialMatchSmsMessage("דנה", "עידו", 85);
@@ -101,6 +107,37 @@ describe("automatic match SMS delivery via Vibrate", () => {
     expect(activeSources).not.toContain("sendWhatsAppViaMake");
     expect(activeSources).not.toContain('from "./matchWhatsApp"');
     expect(activeSources).not.toContain('from "./whatsappWebhook"');
+  });
+
+  it("integrates all initial callsites without caller-supplied response tokens", () => {
+    const routers = readFileSync(new URL("./routers.ts", import.meta.url), "utf8");
+    const boost = readFileSync(new URL("./matchBoostRouter.ts", import.meta.url), "utf8");
+    const regularCalls = [...routers.matchAll(/sendInitialMatchSmsOnce\(db, \{([\s\S]*?)\n\s*\}\);/g)];
+    expect(regularCalls).toHaveLength(3);
+    for (const call of regularCalls) {
+      expect(call[1]).toContain("recipientA: { singleId: singleA.id");
+      expect(call[1]).toContain("recipientB: { singleId: singleB.id");
+      expect(call[1]).not.toContain("approvalToken");
+    }
+    const boostCall = boost.match(/sendInitialMatchSmsOnce\(db, \{([\s\S]*?)\n\s*\}\);/)!;
+    expect(boostCall[1]).toContain("recipientA: { singleId: partyA.id");
+    expect(boostCall[1]).toContain("recipientB: { singleId: partyB.id");
+  });
+
+  it("keeps token-only entry read-only and existing response/expiry checks intact", () => {
+    const page = readFileSync(new URL("../client/src/pages/MatchRespond.tsx", import.meta.url), "utf8");
+    const routers = readFileSync(new URL("./routers.ts", import.meta.url), "utf8");
+    expect(page).toContain("getMatchDetails.useQuery");
+    expect(page).toContain('onClick={() => handleDecision("yes")}');
+    expect(page).toContain('onClick={() => handleDecision("no")}');
+    expect(page).not.toContain('params.get("response")');
+    expect(page).not.toContain("useEffect");
+    const details = routers.slice(routers.indexOf("getMatchDetails: publicProcedure"), routers.indexOf("respondToMatch: publicProcedure"));
+    expect(details).not.toContain("db.update(");
+    const response = routers.slice(routers.indexOf("respondToMatch: publicProcedure"));
+    expect(response).toContain("match.approvalExpiresAt && Date.now() > match.approvalExpiresAt");
+    expect(response).toContain("if (tokenAlreadyUsed)");
+    expect(response).toContain("updated.approvedByA && updated.approvedByB");
   });
 
   it("recognizes MySQL affected-row claims", () => {

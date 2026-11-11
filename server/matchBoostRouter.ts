@@ -952,8 +952,8 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     score,
     proposalSource: "boost",
     boostSenderSide: senderIsA ? "A" : "B",
-    recipientA: { phone: partyA.phone, firstName: partyA.firstName, matchFirstName: partyB.firstName, isActive: partyA.isActive, isSeed: partyA.isSeed },
-    recipientB: { phone: partyB.phone, firstName: partyB.firstName, matchFirstName: partyA.firstName, isActive: partyB.isActive, isSeed: partyB.isSeed },
+    recipientA: { singleId: partyA.id, phone: partyA.phone, firstName: partyA.firstName, matchFirstName: partyB.firstName, isActive: partyA.isActive, isSeed: partyA.isSeed },
+    recipientB: { singleId: partyB.id, phone: partyB.phone, firstName: partyB.firstName, matchFirstName: partyA.firstName, isActive: partyB.isActive, isSeed: partyB.isSeed },
   });
   const bothSidesReceivedAtLeastOneChannel = Boolean(emailAResult.success || smsResult.sentA)
     && Boolean(emailBResult.success || smsResult.sentB);

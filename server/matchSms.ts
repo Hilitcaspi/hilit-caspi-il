@@ -3,6 +3,8 @@ import { matches } from "../drizzle/schema";
 import type { getDb } from "./db";
 import { sendSMS } from "./vibrate";
 import { matchDeliveryEventKey, recordMatchDelivery } from "./matchDeliveryLog";
+import { getMatchSmsLinkPreference } from "./matchSmsPreferences";
+import { buildMatchSmsResponseLink } from "./matchSmsResponseLink";
 
 type AppDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type MatchSide = "A" | "B";
@@ -29,7 +31,17 @@ export function buildInitialMatchSmsMessage(
   score: number,
   proposalSource: "manual" | "boost" = "manual",
   boostRole: BoostRecipientRole = "recipient",
+  responseLink?: string | null,
 ): string {
+  if (responseLink) {
+    if (proposalSource === "boost") {
+      const introduction = boostRole === "sender"
+        ? `בקשת ה־Boost שלך עם ${score}% התאמה נשלחה לשני הצדדים. השליחה והתשלום אינם אישור להתאמה.`
+        : `נשלחה אליך התאמת Boost עם ${score}% התאמה. זו הצעה אלגוריתמית שלא נבחרה אישית על ידי הילית.`;
+      return `היי ${firstName}, ${introduction} לצפייה ולהחלטה אישית: ${responseLink} פתיחת הקישור אינה אישור להתאמה. הילית כספי`;
+    }
+    return `היי ${firstName}, בחרתי עבורך התאמה של ${score}%. ${matchFirstName} מחכה לתשובתך. לצפייה ולהחלטה אישית: ${responseLink} פתיחת הקישור אינה אישור להתאמה. הילית`;
+  }
   if (proposalSource === "boost") {
     if (boostRole === "sender") {
       return `היי ${firstName}, בקשת ה־Boost שלך עם ${score}% התאמה נשלחה לשני הצדדים. השליחה והתשלום אינם אישור להתאמה. התמונה, הפרטים וכפתורי האישור מחכים במייל. הילית כספי`;
@@ -76,6 +88,30 @@ export async function sendInitialMatchSmsOnce(
       return { skipped: true, sentA: false, sentB: false };
     }
 
+    const [preferenceA, preferenceB] = await Promise.all([
+      canReceiveMatchSms(input.recipientA) ? getMatchSmsLinkPreference(db, input.recipientA.singleId) : Promise.resolve(null),
+      canReceiveMatchSms(input.recipientB) ? getMatchSmsLinkPreference(db, input.recipientB.singleId) : Promise.resolve(null),
+    ]);
+    let linkA: string | null = null;
+    let linkB: string | null = null;
+    if (preferenceA?.enabled || preferenceB?.enabled) {
+      try {
+        // Read the persisted state, never accept caller-supplied bearer tokens or
+        // regenerate/renew them. Each preference is bound to its own match side.
+        const [match] = await db.select().from(matches).where(eq(matches.id, input.matchId)).limit(1);
+        if (match) {
+          if (preferenceA?.enabled && input.recipientA.singleId) {
+            linkA = buildMatchSmsResponseLink(match, "A", input.recipientA.singleId, preferenceA);
+          }
+          if (preferenceB?.enabled && input.recipientB.singleId) {
+            linkB = buildMatchSmsResponseLink(match, "B", input.recipientB.singleId, preferenceB);
+          }
+        }
+      } catch {
+        console.warn("[MatchSms] Match link unavailable; using default messages");
+      }
+    }
+
     const messageA = canReceiveMatchSms(input.recipientA)
       ? buildInitialMatchSmsMessage(
           input.recipientA.firstName,
@@ -83,6 +119,7 @@ export async function sendInitialMatchSmsOnce(
           input.score,
           input.proposalSource,
           input.proposalSource === "boost" && input.boostSenderSide === "A" ? "sender" : "recipient",
+          linkA,
         )
       : null;
     const messageB = canReceiveMatchSms(input.recipientB)
@@ -92,6 +129,7 @@ export async function sendInitialMatchSmsOnce(
           input.score,
           input.proposalSource,
           input.proposalSource === "boost" && input.boostSenderSide === "B" ? "sender" : "recipient",
+          linkB,
         )
       : null;
 
