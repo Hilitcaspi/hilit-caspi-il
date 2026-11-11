@@ -8082,7 +8082,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           phone: input.phone,
           product: input.product,
           createdAt: Date.now(),
-        }).onDuplicateKeyUpdate({ set: { name: input.name, phone: input.phone, createdAt: Date.now() } });
+        // A preflight retry must not refresh the age of an existing provider process.
+        // The reservation legacy guard uses createdAt; refreshing it here can keep
+        // an abandoned process blocked forever. Only createProcess may start a new
+        // payment tracking lifecycle after acquiring the durable reservation.
+        }).onDuplicateKeyUpdate({ set: { name: input.name, phone: input.phone } });
         return { success: true };
       }),
   }),

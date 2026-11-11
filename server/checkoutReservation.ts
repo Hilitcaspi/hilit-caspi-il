@@ -488,7 +488,10 @@ export async function withCheckoutReservation<Result>(
   // match-scoped reservation remains the dedupe boundary for Boost.
   // After a takeover the unconfirmed legacy lead is the abandoned process itself.
   if (!input.diagnosticTest && !takenOver && product !== "match_boost" && await store.hasRecentLegacyPending({ email, productAliases: scope.aliases, sinceMs: Date.now() - RECENT_LEGACY_PENDING_MS })) {
-    await store.updateOwned(candidate.reservationKey, candidate.ownerToken, "creating", { state: "failed", updatedAt: Date.now() });
+    // The older provider process is unresolved, not definitely rejected. Preserve
+    // its uncertainty so the existing paid-rechecked, production-only CAS recovery
+    // can handle a deliberate retry after the protected two-minute window.
+    await store.updateOwned(candidate.reservationKey, candidate.ownerToken, "creating", { state: "uncertain", updatedAt: Date.now() });
     throw new CheckoutReservationConflictError("legacy_pending", LEGACY_PENDING_MESSAGE);
   }
 

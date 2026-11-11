@@ -43,7 +43,7 @@ class FakeStore implements CheckoutReservationStore {
   async claimFailed(record: CheckoutReservationRecord) {
     const old = this.rows.get(record.reservationKey);
     if (!old || old.state !== "failed") return false;
-    this.rows.set(record.reservationKey, { ...record });
+    this.rows.set(record.reservationKey, { ...record, createdAt: old.createdAt });
     return true;
   }
   async rotateOpen(record: CheckoutReservationRecord, prior: string) {
@@ -338,6 +338,179 @@ describe("withCheckoutReservation", () => {
     store.evidence = { ...noPaid, exactProviderProcessConfirmed: true };
     await expect(withCheckoutReservation(changedAttempt, async () => ({ processToken: "plus-process-2" })))
       .resolves.toEqual({ processToken: "plus-process-2" });
+  });
+
+  describe("legacy-pending production recovery", () => {
+    let now: number;
+
+    beforeEach(() => {
+      now = 1_800_000_000_000;
+      vi.spyOn(Date, "now").mockImplementation(() => now);
+      store.legacyPending = true;
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("stores the first legacy hit as uncertain without a provider result or provider call", async () => {
+      const create = vi.fn(async () => ({ processToken: "must-not-create" }));
+      const blocked = await conflict(withCheckoutReservation(input(), create));
+
+      expect(blocked.state).toBe("legacy_pending");
+      expect(blocked.message).toBe(CHECKOUT_RESERVATION_MESSAGES.legacyPending);
+      expect(store.rows.size).toBe(1);
+      expect([...store.rows.values()][0]).toMatchObject({
+        state: "uncertain", resultJson: null, attemptId: ATTEMPT_A,
+        createdAt: now, updatedAt: now, diagnosticTest: false,
+      });
+      expect(create).not.toHaveBeenCalled();
+      expect(store.evidenceCalls).toBe(1);
+      expect(store.legacyCalls).toBe(1);
+      expect(store.takeOverCalls).toBe(0);
+    });
+
+    it.each([ATTEMPT_A, ATTEMPT_B])("does not reset the timestamp or call the provider on an immediate retry with attempt %s", async checkoutAttemptId => {
+      const create = vi.fn(async () => ({ processToken: "must-not-create" }));
+      await conflict(withCheckoutReservation(input(), create));
+      const original = { ...[...store.rows.values()][0] };
+      now += 1_000;
+
+      const blocked = await conflict(withCheckoutReservation(input({ checkoutAttemptId }), create));
+
+      expect(blocked.state).toBe("creating");
+      expect(blocked.message).toBe(CHECKOUT_RESERVATION_MESSAGES.creating);
+      expect([...store.rows.values()][0]).toEqual(original);
+      expect(create).not.toHaveBeenCalled();
+      expect(store.evidenceCalls).toBe(1);
+      expect(store.legacyCalls).toBe(1);
+      expect(store.takeOverCalls).toBe(0);
+    });
+
+    it("protects the full two-minute window, then elects exactly one recovery owner and skips the abandoned legacy lead", async () => {
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      const recovered = { processToken: "recovered-provider-process", checkoutUrl: "synthetic-private-url" };
+      const create = vi.fn(async () => { await gate; return recovered; });
+      await conflict(withCheckoutReservation(input(), create));
+      const original = { ...[...store.rows.values()][0] };
+      expect(STALE_TAKEOVER_MS).toBe(120_000);
+      now += STALE_TAKEOVER_MS - 1;
+      expect((await conflict(withCheckoutReservation(input({ checkoutAttemptId: ATTEMPT_B }), create))).state).toBe("creating");
+      expect([...store.rows.values()][0]).toEqual(original);
+      expect(create).not.toHaveBeenCalled();
+
+      now += 1;
+      const next = input({ checkoutAttemptId: ATTEMPT_B });
+      const winner = withCheckoutReservation(next, create);
+      const loser = conflict(withCheckoutReservation(next, create));
+      await expect.poll(() => create.mock.calls.length).toBe(1);
+      expect((await loser).state).toBe("creating");
+      expect(store.legacyPending).toBe(true);
+      expect(store.legacyCalls).toBe(1);
+      release();
+      await expect(winner).resolves.toEqual(recovered);
+      await expect(withCheckoutReservation(next, create)).resolves.toEqual(recovered);
+
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(store.legacyCalls).toBe(1);
+      expect(store.rows.size).toBe(1);
+      expect([...store.rows.values()][0]).toMatchObject({
+        state: "open", attemptId: ATTEMPT_B, resultJson: JSON.stringify(recovered),
+        createdAt: original.createdAt, updatedAt: now,
+      });
+      expect([...store.rows.values()][0].ownerToken).not.toBe(original.ownerToken);
+    });
+
+    it("converts an old failed legacy row to uncertain, preserves immediate retry timestamps, and later recovers", async () => {
+      const create = vi.fn(async () => ({ processToken: "old-failed-recovered" }));
+      await conflict(withCheckoutReservation(input(), create));
+      const old = [...store.rows.values()][0];
+      old.state = "failed"; // Simulate a row persisted by the previous legacy guard.
+      age(store, STALE_TAKEOVER_MS);
+      const oldCreatedAt = old.createdAt;
+      const oldOwner = old.ownerToken;
+
+      const blocked = await conflict(withCheckoutReservation(input({ checkoutAttemptId: ATTEMPT_B }), create));
+      expect(blocked.state).toBe("legacy_pending");
+      const migrated = { ...[...store.rows.values()][0] };
+      expect(migrated).toMatchObject({
+        state: "uncertain", resultJson: null, createdAt: oldCreatedAt, updatedAt: now,
+      });
+      expect(migrated.ownerToken).not.toBe(oldOwner);
+      expect(create).not.toHaveBeenCalled();
+      expect(store.legacyCalls).toBe(2);
+
+      now += 1_000;
+      expect((await conflict(withCheckoutReservation(input({ checkoutAttemptId: ATTEMPT_B }), create))).state).toBe("creating");
+      expect([...store.rows.values()][0]).toEqual(migrated);
+      expect(create).not.toHaveBeenCalled();
+      expect(store.legacyCalls).toBe(2);
+
+      now = migrated.updatedAt + STALE_TAKEOVER_MS;
+      await expect(withCheckoutReservation(input({ checkoutAttemptId: ATTEMPT_B }), create))
+        .resolves.toEqual({ processToken: "old-failed-recovered" });
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(store.legacyCalls).toBe(2);
+      expect(store.takeOverCalls).toBe(1);
+      expect([...store.rows.values()][0]).toMatchObject({ state: "open", createdAt: oldCreatedAt });
+    });
+
+    it.each(["paidForProductFamily", "databaseProfilePaid"] as const)("lets initial %s evidence win before checking a legacy lead", async evidenceKey => {
+      store.evidence = { ...noPaid, [evidenceKey]: true };
+      const create = vi.fn(async () => ({ processToken: "must-not-create" }));
+      const blocked = await conflict(withCheckoutReservation(input(), create));
+
+      expect(blocked.state).toBe("completed");
+      expect(blocked.message).toBe(CHECKOUT_RESERVATION_MESSAGES.completed);
+      expect([...store.rows.values()][0]).toMatchObject({ state: "completed", resultJson: null });
+      expect(create).not.toHaveBeenCalled();
+      expect(store.legacyCalls).toBe(0);
+      expect(store.takeOverCalls).toBe(0);
+    });
+
+    it.each(["paidForProductFamily", "databaseProfilePaid"] as const)("lets %s evidence win over a stale legacy-blocked reservation", async evidenceKey => {
+      const create = vi.fn(async () => ({ processToken: "must-not-create" }));
+      await conflict(withCheckoutReservation(input(), create));
+      const original = { ...[...store.rows.values()][0] };
+      now += STALE_TAKEOVER_MS;
+      store.evidence = { ...noPaid, [evidenceKey]: true };
+
+      const blocked = await conflict(withCheckoutReservation(input({ checkoutAttemptId: ATTEMPT_B }), create));
+
+      expect(blocked.state).toBe("completed");
+      expect(blocked.message).toBe(CHECKOUT_RESERVATION_MESSAGES.completed);
+      expect(create).not.toHaveBeenCalled();
+      expect(store.takeOverCalls).toBe(0);
+      expect(store.legacyCalls).toBe(1);
+      expect([...store.rows.values()][0]).toEqual(original);
+    });
+
+    it("keeps explicit TEST1 diagnostics isolated from legacy and paid production evidence without allowing uncertain takeover", async () => {
+      store.evidence = { ...noPaid, paidForProductFamily: true, databaseProfilePaid: true };
+      const diagnostic = input({
+        diagnosticTest: true,
+        fingerprint: createCheckoutReservationFingerprint({
+          email: "buyer@example.test", product: "guide", couponCode: "TEST1", identity: "owner-test",
+        }),
+      });
+      const create = vi.fn(async () => ({ processToken: "test1-diagnostic-process" }));
+      const original = await withCheckoutReservation(diagnostic, create);
+      await expect(withCheckoutReservation(diagnostic, create)).resolves.toEqual(original);
+      expect(store.legacyCalls).toBe(0);
+      [...store.rows.values()][0].state = "uncertain";
+      const uncertain = { ...[...store.rows.values()][0] };
+      now += STALE_TAKEOVER_MS;
+
+      const blocked = await conflict(withCheckoutReservation({ ...diagnostic, checkoutAttemptId: ATTEMPT_B }, create));
+
+      expect(blocked.state).toBe("uncertain");
+      expect(blocked.message).toBe(CHECKOUT_RESERVATION_MESSAGES.uncertain);
+      expect([...store.rows.values()][0]).toEqual(uncertain);
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(store.legacyCalls).toBe(0);
+      expect(store.takeOverCalls).toBe(0);
+    });
   });
 
   describe("returning production buyer takeover (owner-approved 7.11.2026)", () => {

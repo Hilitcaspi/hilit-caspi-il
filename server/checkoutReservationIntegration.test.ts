@@ -52,6 +52,51 @@ beforeEach(() => {
 });
 afterEach(() => { setCheckoutReservationStoreForTests(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 describe("checkout reservation at payment API boundary", () => {
+  it.each(["database", "course", "guide", "session"] as const)("preflight preserves an abandoned %s process timestamp and binding, allowing a new reserved checkout", async product => {
+    const oldCreatedAt = Date.now() - 25 * 60 * 60 * 1000;
+    const lead = { createdAt: oldCreatedAt, providerProcessToken: "synthetic-old-process", trackingToken: "synthetic-old-tracking", confirmedTransactionId: null };
+    const upsert = vi.fn(async ({ set }) => { Object.assign(lead, set); });
+    const preflightDb = { insert: vi.fn(() => ({ values: vi.fn(() => ({ onDuplicateKeyUpdate: upsert })) })) };
+    mocks.getDb.mockResolvedValueOnce(preflightDb);
+    h.store.hasRecentLegacyPending = async () => Boolean(lead.providerProcessToken && lead.createdAt >= Date.now() - 6 * 60 * 60 * 1000);
+    const caller = appRouter.createCaller(ctx());
+    await caller.coupons.saveLead({ name: input.fullName, email: input.email, phone: input.phone, product });
+    expect(upsert).toHaveBeenCalledWith({ set: { name: input.fullName, phone: input.phone } });
+    expect(lead).toMatchObject({ createdAt: oldCreatedAt, providerProcessToken: "synthetic-old-process", trackingToken: "synthetic-old-tracking", confirmedTransactionId: null });
+    await expect(caller.payment.createProcess({ ...input, product })).resolves.toMatchObject({ processToken: "synthetic-process" });
+    expect(mocks.createPaymentProcess).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled(); expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+  it("preflight still blocks a genuinely recent legacy provider process without creating another payable checkout", async () => {
+    const lead = { createdAt: Date.now() - 60_000, providerProcessToken: "synthetic-recent-process" };
+    mocks.getDb.mockResolvedValueOnce({ insert: vi.fn(() => ({ values: vi.fn(() => ({ onDuplicateKeyUpdate: vi.fn(async ({ set }) => { Object.assign(lead, set); }) })) })) });
+    h.store.hasRecentLegacyPending = async () => Boolean(lead.providerProcessToken && lead.createdAt >= Date.now() - 6 * 60 * 60 * 1000);
+    const caller = appRouter.createCaller(ctx());
+    await caller.coupons.saveLead({ name: input.fullName, email: input.email, phone: input.phone, product: input.product });
+    await expect(caller.payment.createProcess(input)).rejects.toMatchObject({ code: "CONFLICT", message: expect.stringContaining("בקשת תשלום קודמת") });
+    expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+    expect(h.db.insert).not.toHaveBeenCalled();
+    expect([...h.records.values()][0].state).toBe("uncertain");
+  });
+  it("preflight cannot erase paid evidence or bypass the paid-product guard", async () => {
+    const lead = { createdAt: Date.now() - 25 * 60 * 60 * 1000, confirmedTransactionId: "synthetic-paid-receipt" };
+    mocks.getDb.mockResolvedValueOnce({ insert: vi.fn(() => ({ values: vi.fn(() => ({ onDuplicateKeyUpdate: vi.fn(async ({ set }) => { Object.assign(lead, set); }) })) })) });
+    const caller = appRouter.createCaller(ctx());
+    await caller.coupons.saveLead({ name: input.fullName, email: input.email, phone: input.phone, product: input.product });
+    expect(lead.confirmedTransactionId).toBe("synthetic-paid-receipt");
+    h.setPaid();
+    await expect(caller.payment.createProcess(input)).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+  });
+  it("initial preflight inserts a timestamp but never creates a provider process", async () => {
+    const values = vi.fn(() => ({ onDuplicateKeyUpdate: vi.fn().mockResolvedValue([{ affectedRows: 1 }]) }));
+    mocks.getDb.mockResolvedValueOnce({ insert: vi.fn(() => ({ values })) });
+    const before = Date.now();
+    await appRouter.createCaller(ctx()).coupons.saveLead({ name: input.fullName, email: input.email, phone: input.phone, product: input.product });
+    expect(values.mock.calls[0][0]).toMatchObject({ createdAt: expect.any(Number), product: input.product });
+    expect(values.mock.calls[0][0].createdAt).toBeGreaterThanOrEqual(before);
+    expect(mocks.createPaymentProcess).not.toHaveBeenCalled();
+  });
   it("concurrent requests create exactly one provider process and persist attribution once", async () => {
     let release!: (v: unknown) => void;
     mocks.createPaymentProcess.mockImplementation(() => new Promise(resolve => { release = resolve; }));
