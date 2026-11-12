@@ -29,7 +29,7 @@ describe("November purchasers CRM staff tab", () => {
   });
 
   it("keeps practical local filters, local name search, and evidence-backed timestamps", () => {
-    for (const label of ["לטיפול עכשיו", "ממתינים לפרופיל", "נדרש בירור", "קוימו", "הכול"]) {
+    for (const label of ["לטיפול עכשיו", "ממתינים לפרופיל", "נדרש בירור", "הצעה נשלחה", "הכול"]) {
       expect(novemberSource).toContain(label);
     }
     expect(novemberSource).toContain('state === "ready" || state === "overdue"');
@@ -43,7 +43,7 @@ describe("November purchasers CRM staff tab", () => {
     expect(novemberSource).toContain("row.firstProposalDeliveredAt");
     expect(novemberSource).toContain("row.dueAt ?");
     expect(novemberSource).toContain("אין דדליין מוצג ללא מועד השלמה מוכח");
-    expect(novemberSource).toContain("ראיית מסירה בפועל");
+    expect(novemberSource).toContain("מועד שליחה מתועדת");
   });
 
   it("uses established profile and compatibility routes without automatic matching", () => {

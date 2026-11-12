@@ -103,8 +103,9 @@ export function evaluateNovemberBundleFirstMatchPolicy(
   if (readinessTimestampNeedsReview) eligibilityIssues.push("readiness_time");
 
   let state: NovemberBundleFirstMatchQueueState;
-  if (readinessTimestampNeedsReview) state = "needs_review";
-  else if (input.firstProposalDeliveredAt) state = "fulfilled";
+  // Delivery is a recorded fact even when historical readiness needs review.
+  // Keep readyAt/dueAt unknown in that case; do not infer on-time fulfillment.
+  if (input.firstProposalDeliveredAt) state = "fulfilled";
   else if (eligibilityIssues.length > 0 || input.hasActiveMatchHold) state = "needs_review";
   else if (readyAt === null || input.profileRequirementsMissing.length > 0) state = "awaiting_profile";
   else if (dueAt !== null && now >= dueAt) state = "overdue";

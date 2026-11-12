@@ -126,4 +126,57 @@ describe("November bundle first-match queue", () => {
     expect(fulfilled.firstProposalDeliveredAt).toBe(QUESTIONNAIRE_AT + 1);
     expect(fulfilled.state).toBe("fulfilled");
   });
+
+  it("retains own accepted delivery after a later profile edit without inventing a deadline", () => {
+    const row = buildNovemberBundleFirstMatchQueueRow([completeRow({
+      profile_updated_at: QUESTIONNAIRE_AT + 60_000,
+      match_id: 12,
+      delivered_at: QUESTIONNAIRE_AT + 1,
+    }) as any], QUESTIONNAIRE_AT + 60_001);
+    expect(row.state).toBe("fulfilled");
+    expect(row.firstProposalDeliveredAt).toBe(QUESTIONNAIRE_AT + 1);
+    expect(row.readyAt).toBeNull();
+    expect(row.dueAt).toBeNull();
+    expect(row.eligibilityIssues).toContain("readiness_time");
+  });
+
+  it("uses accepted recipient evidence even without mutable legacy match flags", () => {
+    const row = buildNovemberBundleFirstMatchQueueRow([completeRow({
+      match_id: 12, match_status: "pending", delivered_at: QUESTIONNAIRE_AT + 1,
+    }) as any], QUESTIONNAIRE_AT + 2);
+    expect(row.state).toBe("fulfilled");
+    expect(row.firstProposalDeliveredAt).toBe(QUESTIONNAIRE_AT + 1);
+  });
+
+  it("does not erase an accepted proposal if current profile fields are later removed", () => {
+    const row = buildNovemberBundleFirstMatchQueueRow([completeRow({
+      photo_url: null, match_id: 12, delivered_at: QUESTIONNAIRE_AT + 1,
+    }) as any], QUESTIONNAIRE_AT + 2);
+    expect(row.state).toBe("fulfilled");
+    expect(row.profileRequirementsMissing).toContain("תמונה");
+    expect(row.dueAt).toBeNull();
+  });
+
+  it.each([
+    { match_owner_approved_at: QUESTIONNAIRE_AT },
+    { match_approval_token_a: "other-side-token" },
+    { match_wa_sent_at: QUESTIONNAIRE_AT },
+    { match_status: "matched" },
+  ])("does not confuse match-wide flags with own accepted delivery: %o", evidence => {
+    const row = buildNovemberBundleFirstMatchQueueRow([completeRow({
+      match_id: 12, ...evidence, delivered_at: null,
+    }) as any], QUESTIONNAIRE_AT + 1);
+    expect(row.firstProposalDeliveredAt).toBeNull();
+    expect(row.state).not.toBe("fulfilled");
+  });
+
+  it.each([PAID_AT - 1, QUESTIONNAIRE_AT - 1, QUESTIONNAIRE_AT + 10_000])(
+    "rejects delivery before the stable bound or in the future: %s", deliveredAt => {
+      const row = buildNovemberBundleFirstMatchQueueRow([completeRow({
+        match_id: 12, delivered_at: deliveredAt,
+      }) as any], QUESTIONNAIRE_AT + 2);
+      expect(row.firstProposalDeliveredAt).toBeNull();
+      expect(row.state).not.toBe("fulfilled");
+    },
+  );
 });

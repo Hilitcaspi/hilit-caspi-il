@@ -24,7 +24,7 @@ const FILTERS = [
   { value: "now", label: "לטיפול עכשיו" },
   { value: "awaiting_profile", label: "ממתינים לפרופיל" },
   { value: "needs_review", label: "נדרש בירור" },
-  { value: "fulfilled", label: "קוימו" },
+  { value: "fulfilled", label: "הצעה נשלחה" },
   { value: "all", label: "הכול" },
 ] as const;
 
@@ -35,7 +35,7 @@ const STATE_PRESENTATION: Record<string, { label: string; className: string }> =
   ready: { label: "אפשר להכין הצעה", className: "border-sky-200 bg-sky-50 text-sky-900" },
   overdue: { label: "באיחור", className: "border-rose-200 bg-rose-50 text-rose-900" },
   needs_review: { label: "נדרש בירור", className: "border-violet-200 bg-violet-50 text-violet-900" },
-  fulfilled: { label: "הצעה נמסרה", className: "border-emerald-200 bg-emerald-50 text-emerald-900" },
+  fulfilled: { label: "הצעה נשלחה", className: "border-emerald-200 bg-emerald-50 text-emerald-900" },
 };
 
 const ISSUE_LABELS: Record<string, string> = {
@@ -80,7 +80,7 @@ export default function NovemberMembersAdminSection() {
   const [search, setSearch] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const novemberQueue = trpc.liveOctober.adminNovemberBundleFirstMatchQueue.useQuery(undefined, {
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
@@ -138,11 +138,11 @@ export default function NovemberMembersAdminSection() {
               ["לטיפול עכשיו", nowCount, "text-rose-700"],
               ["ממתינים לפרופיל", summary.awaitingProfile, "text-slate-700"],
               ["נדרש בירור", summary.needsReview, "text-violet-700"],
-              ["הצעה נמסרה", summary.fulfilled, "text-emerald-700"],
+              ["הצעה נשלחה", summary.fulfilled, "text-emerald-700"],
             ].map(([label, value, color]) => <div key={String(label)} className="rounded-2xl border border-[#191265]/10 bg-white p-3 text-center"><div className={`text-2xl font-black ${color}`}>{value}</div><div className="mt-1 text-xs text-slate-500">{label}</div></div>)}
           </div>
 
-          <p className="rounded-xl bg-[#fffaf3] p-3 text-sm leading-6 text-[#514451]">התור לא יוצר, מסמן או שולח התאמות. סטטוס ״הצעה נמסרה״ נקבע רק מראיית מסירה שתועדה בשרת.</p>
+          <p className="rounded-xl bg-[#fffaf3] p-3 text-sm leading-6 text-[#514451]">התור לא יוצר, מסמן או שולח התאמות. סטטוס ״הצעה נשלחה״ נקבע לפי שליחה שהתקבלה אצל ספק ההודעות ותועדה בשרת. הוא אינו אישור שההודעה נקראה או שההצעה נשלחה בזמן.</p>
 
           <div className="flex flex-wrap gap-2">
             {FILTERS.map(item => <button key={item.value} type="button" onClick={() => setFilter(item.value)} className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${filter === item.value ? "bg-[#191265] text-white" : "bg-[#f0eadc] text-[#191265] hover:bg-[#e8dfcb]"}`}>{item.label} ({filterCount(item.value)})</button>)}
@@ -163,7 +163,7 @@ export default function NovemberMembersAdminSection() {
         const state = STATE_PRESENTATION[row.state] || STATE_PRESENTATION.needs_review;
         const hasDeliveryEvidence = Boolean(row.firstProposalDeliveredAt);
         const hasMissingRequirements = row.profileRequirementsMissing.length > 0;
-        const hasIssues = row.eligibilityIssues.length > 0 || row.activeMatchHold;
+        const hasIssues = row.eligibilityIssues.length > 0 || (row.activeMatchHold && !hasDeliveryEvidence);
         return <Card key={row.paymentId} className={`border shadow-sm ${row.state === "overdue" ? "border-rose-300" : row.state === "needs_review" ? "border-violet-300" : "border-[#191265]/10"}`}>
           <CardContent className="p-4 sm:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -174,15 +174,15 @@ export default function NovemberMembersAdminSection() {
                   <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs text-slate-500">מועד תשלום מאומת</span><strong className="mt-1 block text-slate-800">{formatJerusalemDateTime(row.paidAt)}</strong></div>
                   <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs text-slate-500">השלמה מוכחת</span><strong className="mt-1 block text-slate-800">{formatJerusalemDateTime(row.readyAt)}</strong></div>
                   <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs text-slate-500">דדליין להצעה ראשונה</span><strong className="mt-1 block text-slate-800">{formatJerusalemDateTime(row.dueAt)}</strong></div>
-                  <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs text-slate-500">ראיית מסירה בפועל</span><strong className="mt-1 block text-slate-800">{formatJerusalemDateTime(row.firstProposalDeliveredAt)}</strong></div>
+                  <div className="rounded-xl bg-slate-50 p-3"><span className="block text-xs text-slate-500">מועד שליחה מתועדת</span><strong className="mt-1 block text-slate-800">{formatJerusalemDateTime(row.firstProposalDeliveredAt)}</strong></div>
                 </div>
 
-                {row.dueAt ? <p className={`mt-3 flex items-center gap-2 text-sm font-bold ${row.state === "fulfilled" ? "text-emerald-700" : row.state === "overdue" ? "text-rose-700" : "text-[#514451]"}`}><Clock3 className="size-4" />{row.state === "fulfilled" ? "ההתחייבות תועדה כקוימה; הדדליין המוצג הוא המועד המקורי." : formatTimeRemaining(row.dueAt, now)}</p> : <p className="mt-3 flex items-center gap-2 text-sm font-bold text-violet-800"><Clock3 className="size-4" />אין דדליין מוצג ללא מועד השלמה מוכח.</p>}
+                {row.dueAt ? <p className={`mt-3 flex items-center gap-2 text-sm font-bold ${row.state === "fulfilled" ? "text-emerald-700" : row.state === "overdue" ? "text-rose-700" : "text-[#514451]"}`}><Clock3 className="size-4" />{row.state === "fulfilled" ? "הצעה נשלחה; הדדליין המוצג הוא המועד המקורי." : formatTimeRemaining(row.dueAt, now)}</p> : <p className="mt-3 flex items-center gap-2 text-sm font-bold text-violet-800"><Clock3 className="size-4" />אין דדליין מוצג ללא מועד השלמה מוכח.</p>}
 
-                <p className={`mt-2 flex items-center gap-2 text-sm font-bold ${hasDeliveryEvidence ? "text-emerald-700" : "text-slate-600"}`}>{hasDeliveryEvidence ? <CheckCircle2 className="size-4" /> : <UserRoundCheck className="size-4" />}{hasDeliveryEvidence ? "הצעה ראשונה נמסרה בפועל לפי ראיית המסירה המתועדת." : "אין ראיית מסירה מתועדת להצעה ראשונה."}</p>
+                <p className={`mt-2 flex items-center gap-2 text-sm font-bold ${hasDeliveryEvidence ? "text-emerald-700" : "text-slate-600"}`}>{hasDeliveryEvidence ? <CheckCircle2 className="size-4" /> : <UserRoundCheck className="size-4" />}{hasDeliveryEvidence ? "הצעה נשלחה לפי אישור קבלת השליחה אצל ספק ההודעות." : "אין כרגע אישור שליחה מתועד להצעה ראשונה."}</p>
 
                 {hasMissingRequirements && <div className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"><strong>חסרים להשלמה:</strong> {row.profileRequirementsMissing.join(" · ")}</div>}
-                {hasIssues && <div className="mt-3 rounded-xl bg-violet-50 p-3 text-sm text-violet-900"><strong>עיכובים ובדיקות:</strong><ul className="mt-1 list-inside list-disc space-y-1">{row.eligibilityIssues.map((issue: string) => <li key={issue}>{ISSUE_LABELS[issue] || issue}</li>)}{row.activeMatchHold && <li>יש התאמה פעילה עם ראיית שליחה — נדרש בירור ידני לפני הצעה נוספת.</li>}</ul></div>}
+                {hasIssues && <div className="mt-3 rounded-xl bg-violet-50 p-3 text-sm text-violet-900"><strong>{hasDeliveryEvidence ? "מידע נוסף לבדיקה, אינו מבטל את השליחה:" : "עיכובים ובדיקות:"}</strong><ul className="mt-1 list-inside list-disc space-y-1">{row.eligibilityIssues.map((issue: string) => <li key={issue}>{ISSUE_LABELS[issue] || issue}</li>)}{row.activeMatchHold && !hasDeliveryEvidence && <li>יש התאמה פעילה עם ראיית שליחה — נדרש בירור ידני לפני הצעה נוספת.</li>}</ul></div>}
                 {row.state === "needs_review" && !hasIssues && <p className="mt-3 rounded-xl bg-violet-50 p-3 text-sm font-bold text-violet-900">אין ראיה מספקת לקביעת מוכנות או דדליין; נדרש בירור ידני.</p>}
               </div>
 

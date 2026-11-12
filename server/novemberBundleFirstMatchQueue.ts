@@ -171,22 +171,15 @@ export function buildNovemberBundleFirstMatchQueueRow(rows: RawQueueRow[], now =
     && questionnaireCompletedAt !== null
     && profileUpdatedAt !== null
     && profileUpdatedAt > Math.max(paidAt, questionnaireCompletedAt);
-  const preliminary = evaluateNovemberBundleFirstMatchPolicy({
-    paidAt,
-    questionnaireCompletedAt,
-    hasAllProfileRequirements,
-    readinessTimestampNeedsReview,
-    isPaid: bool(base.is_paid),
-    isActive: bool(base.is_active),
-    isSeed: bool(base.is_seed),
-    firstProposalDeliveredAt: null,
-    hasActiveMatchHold: false,
-    profileRequirementsMissing,
-  }, now);
+  // A later profile edit must not erase an accepted proposal. Use the stable
+  // payment/questionnaire lower bound, independently of current completeness
+  // or uncertainty about the exact historical readiness time. The SQL below
+  // requires accepted evidence for this recipient and excludes Boost matches.
+  const deliveryLowerBound = Math.max(paidAt, questionnaireCompletedAt || 0);
   const sent = rows.filter(row => row.match_id && wasMatchProposalSent(matchFromRaw(row)));
-  const firstProposalDeliveredAt = preliminary.readyAt === null ? null : sent
+  const firstProposalDeliveredAt = paidAt <= 0 ? null : rows.filter(row => row.match_id)
     .map(row => positiveTime(row.delivered_at))
-    .filter((value): value is number => value !== null && value >= preliminary.readyAt!)
+    .filter((value): value is number => value !== null && value >= deliveryLowerBound && value <= now)
     .sort((left, right) => left - right)[0] || null;
   const activeMatchHold = sent.some(row => isActiveMatchHold(matchFromRaw(row), now));
   const policy = evaluateNovemberBundleFirstMatchPolicy({
@@ -304,8 +297,10 @@ export async function loadNovemberBundleFirstMatchQueue(now = Date.now()) {
         WHERE mde.singleId = rs.id
           AND mde.matchId = mm.match_id
           AND mde.status = 'accepted'
+          AND COALESCE(mde.providerMessageId, '') <> 'blocked'
           AND NOT EXISTS (SELECT 1 FROM match_boost_requests br WHERE br.match_id = mm.match_id)
-          AND COALESCE(mde.acceptedAt, mde.attemptedAt) >= ep.paid_at
+          AND COALESCE(mde.acceptedAt, mde.attemptedAt) >= GREATEST(ep.paid_at, COALESCE(rs.questionnaireCompletedAt, 0))
+          AND COALESCE(mde.acceptedAt, mde.attemptedAt) <= ${now}
       ) AS delivered_at
     FROM eligible_payments ep
     LEFT JOIN ranked_singles rs ON LOWER(TRIM(rs.email)) = ep.payment_email AND rs.profile_rank = 1
