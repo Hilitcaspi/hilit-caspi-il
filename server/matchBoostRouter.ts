@@ -952,6 +952,7 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     score,
     proposalSource: "boost",
     boostSenderSide: senderIsA ? "A" : "B",
+    boostEmailResults: { A: emailAResult, B: emailBResult },
     recipientA: { singleId: partyA.id, phone: partyA.phone, firstName: partyA.firstName, matchFirstName: partyB.firstName, isActive: partyA.isActive, isSeed: partyA.isSeed },
     recipientB: { singleId: partyB.id, phone: partyB.phone, firstName: partyB.firstName, matchFirstName: partyA.firstName, isActive: partyB.isActive, isSeed: partyB.isSeed },
   });

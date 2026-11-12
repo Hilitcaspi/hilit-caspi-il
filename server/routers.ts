@@ -1,3 +1,4 @@
+import { classifyMatchDecision, recordMatchDecision } from "./matchDecision";
 import { NOVEMBER_COUPON_CODE, NOVEMBER_COUPON_ERROR, isNovemberCouponAllowed } from "../shared/novemberCoupon";
 import { rankAdvancedCandidates } from "./advancedMatchRanking";
 import { evaluateMatchPreview, previewScoreDimensions } from "./matchScorePreview";
@@ -5,7 +6,7 @@ import { loadMatchScoreInputs, presentMatchScore } from "./pendingMatchScore";
 import { getCrmMatchIndex, getCrmMatchDetails } from "./crmMatchReadModel";
 import { getMatchResponseSummaries } from "./matchResponseMetrics";
 import { findBlockingMatchForSingle, visibleMatchSql, matchAvailabilityColumns, possibleBlockingMatchSql } from "./matchAvailabilityQueries";
-import { getMatchAvailability, isBlockingMatch } from "../shared/matchAvailability";
+import { getProposalDeadline, getMatchAvailability, isBlockingMatch } from "../shared/matchAvailability";
 import { pendingOwnerReviewSql, unclaimedHighBoostReviewSql } from "./boostRegularReview";
 import { regularReviewNotes } from "../shared/boostScorePolicy";
 import { CHOOSE50_CODE, validateChoose50Coupon } from "./choose50Coupon";
@@ -4954,7 +4955,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const partnerSingleId = isA ? match.singleBId : match.singleAId;
 
         // Check if expired — return expired flag instead of throwing so frontend can show a specific message
-        const isExpired = (match.approvalExpiresAt && Date.now() > match.approvalExpiresAt) || match.status === "expired";
+        const proposalDeadline = getProposalDeadline(match);
+        const isExpired = (proposalDeadline != null && Date.now() >= proposalDeadline) || match.status === "expired";
 
         const [[me], [partner]] = await Promise.all([
           db.select().from(singles).where(eq(singles.id, mySingleId)).limit(1),
@@ -4973,6 +4975,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           isExpired: !!isExpired,
           alreadyResponded,
           myDecision,
+          canRespondAfterDecline: classifyMatchDecision(match, input.token, Date.now()).kind === "feedback",
           proposalSource: isBoost ? "boost" as const : "manual" as const,
           partner: partner ? (isBoost ? {
             firstName: partner.firstName,
@@ -5018,41 +5021,27 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-        // Find match by token (either A or B)
-        const [match] = await db.select().from(matches).where(
-          or(
-            eq(matches.approvalTokenA, input.token),
-            eq(matches.approvalTokenB, input.token)
-          )
-        ).limit(1);
-
-        if (!match) throw new TRPCError({ code: "NOT_FOUND", message: "קישור לא תקין" });
-        const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
-        if (match.approvalExpiresAt && Date.now() > match.approvalExpiresAt) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "הקישור פג תוקף" });
-        }
-        if (match.status === "matched" || match.status === "rejected" || match.status === "expired") {
-          return { alreadyResponded: true, status: match.status };
-        }
-
-        const isA = match.approvalTokenA === input.token;
         const now = Date.now();
-
-        // One-time token: check if this token was already used
-        const tokenAlreadyUsed = isA ? !!match.tokenAUsedAt : !!match.tokenBUsedAt;
-        if (tokenAlreadyUsed) {
-          return { alreadyResponded: true, status: match.status };
+        const recorded = await recordMatchDecision(db, input.token, input.response);
+        if (recorded.kind === "invalid") throw new TRPCError({ code: "NOT_FOUND", message: "קישור לא תקין" });
+        if (recorded.kind === "expired") throw new TRPCError({ code: "BAD_REQUEST", message: "הקישור פג תוקף" });
+        if (recorded.kind === "already") return { alreadyResponded: true, status: recorded.match.status };
+        if (recorded.kind === "closed") return { alreadyResponded: false, closed: true, status: recorded.match.status };
+        const { match, isA } = recorded;
+        const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
+        if (recorded.lateFeedback) {
+          // Feedback only: never reopen, reveal contacts, or notify the decliner again.
+          if (input.response === "yes") {
+            const [recipient] = await db.select().from(singles).where(eq(singles.id, isA ? match.singleAId : match.singleBId)).limit(1);
+            if (recipient?.email) {
+              const consolation = buildConsolationEmail({ firstName: recipient.firstName, recipientEmail: recipient.email, singleId: recipient.id });
+              sendEmail({ to: { email: recipient.email, name: recipient.firstName }, subject: consolation.subject, htmlContent: consolation.htmlBody })
+                .catch(err => console.error("[Late match feedback email] Failed:", err));
+            }
+          }
+          return { success: true, closed: true, lateFeedback: true, status: "rejected" };
         }
-
-        // Mark token as used immediately (one-time use)
-        const tokenUsedField = isA ? { tokenAUsedAt: now } : { tokenBUsedAt: now };
-        await db.update(matches).set({ ...tokenUsedField, updatedAt: now }).where(eq(matches.id, match.id));
-
         if (input.response === "no") {
-          const rejectData: Record<string, unknown> = { status: "rejected", updatedAt: now };
-          if (isA) rejectData.approvedByA = false;
-          else rejectData.approvedByB = false;
-          await db.update(matches).set(rejectData).where(eq(matches.id, match.id));
           if (isBoost) {
             await syncBoostRequestAfterMatchDecision(db, {
               matchId: match.id,
@@ -5087,21 +5076,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           return { success: true, status: "rejected" };
         }
 
-        // response === "yes"
-        const updateData: Record<string, unknown> = { updatedAt: now };
-        if (isA) updateData.approvedByA = true;
-        else updateData.approvedByB = true;
-
-        await db.update(matches).set(updateData).where(eq(matches.id, match.id));
-
-        // Re-fetch to check if both approved
-        const [updated] = await db.select().from(matches).where(eq(matches.id, match.id)).limit(1);
-        if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-        if (updated.approvedByA && updated.approvedByB) {
-          // Both said yes! Reveal contact details
-          await db.update(matches).set({ status: "matched", matchedAt: now, updatedAt: now }).where(eq(matches.id, match.id));
-
+        // Only the transaction that transitions to mutual yes performs reveal effects.
+        if (recorded.becameMatched) {
           const [singleA] = await db.select().from(singles).where(eq(singles.id, match.singleAId)).limit(1);
           const [singleB] = await db.select().from(singles).where(eq(singles.id, match.singleBId)).limit(1);
 

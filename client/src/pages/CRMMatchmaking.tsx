@@ -25,6 +25,7 @@ import DatabaseNowSlaSection from "@/components/DatabaseNowSlaSection";
 import SelfServiceControlCenter from "@/components/SelfServiceControlCenter";
 import ProfileClosureDialog from "@/components/ProfileClosureDialog";
 import { ProgressiveList } from "@/lib/ProgressiveList";
+import { getCrmParticipantStatus, getRecordedParticipantChoice } from "@/lib/crmParticipantStatus";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -100,10 +101,19 @@ const MATCH_STATUS_CONFIG: Record<string, { label: string; color: string; icon: 
 
 // Internal admin notes component - editable textarea per single
 function AdminNotesField({ singleId }: { singleId: number }) {
+  const { user, loading, error } = useAuth();
+  // auth.me marks verified team sessions with isTeamMember (and an admin UI role).
+  // Do not expose cached notes while authentication is unresolved or has failed.
+  const canAccessNotes = !loading && !error && (
+    user?.role === "admin" || Boolean(user && "isTeamMember" in user && user.isTeamMember === true)
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const trpcUtils = trpc.useUtils();
-  const notesQuery = trpc.matchmaking.getAdminNotes.useQuery({ id: singleId });
+  const notesQuery = trpc.matchmaking.getAdminNotes.useQuery({ id: singleId }, {
+    enabled: canAccessNotes,
+    staleTime: 30_000,
+  });
   const updateNotes = trpc.matchmaking.updateAdminNotes.useMutation({
     onSuccess: () => {
       trpcUtils.matchmaking.getAdminNotes.invalidate({ id: singleId });
@@ -112,12 +122,13 @@ function AdminNotesField({ singleId }: { singleId: number }) {
   });
 
   const currentNotes = notesQuery.data?.notes || "";
+  if (!canAccessNotes) return null;
 
   return (
-    <div className="mt-3 pt-3 border-t border-[#e9e8e8]">
+    <div className="min-w-0 mt-3 pt-3 border-t border-[#e9e8e8]">
       <div className="flex items-center justify-between mb-1">
         <span className="text-sm font-bold text-[#191265]">📝 הערות פנימיות</span>
-        {!isEditing && (
+        {!isEditing && !notesQuery.isPending && !notesQuery.isError && (
           <button
             onClick={() => { setDraft(currentNotes); setIsEditing(true); }}
             className="text-xs text-[#191265] underline hover:text-[#ffe27c] transition-colors"
@@ -152,12 +163,23 @@ function AdminNotesField({ singleId }: { singleId: number }) {
             </button>
           </div>
         </div>
+      ) : notesQuery.isPending ? (
+        <p className="text-sm text-[#727272]" role="status">טוענת הערות פנימיות…</p>
+      ) : notesQuery.isError ? (
+        <div className="text-sm text-red-700" role="alert">
+          <p>לא ניתן לטעון את ההערות הפנימיות כרגע.</p>
+          <button type="button" onClick={() => void notesQuery.refetch()} className="mt-1 text-xs underline">נסי שוב</button>
+        </div>
       ) : (
-        <p className="text-sm text-[#727272] whitespace-pre-wrap">{currentNotes || "אין הערות עדיין"}</p>
+        <p className="text-sm text-[#727272] whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{currentNotes || "אין הערות עדיין"}</p>
       )}
     </div>
   );
 }
+
+// Reuse the existing private notes editor; never attach notes to profile cards
+// or compatibility/send payloads, which are shared with public surfaces.
+const InternalAdminNotes = AdminNotesField;
 
 // Full edit modal for all single fields
 function EditSingleModal({ single, onClose, onSave, isPending }: {
@@ -359,6 +381,7 @@ export default function CRMMatchmaking() {
   const [filterCompatDropdown, setFilterCompatDropdown] = useState(false);
   const [filterTargetVisibleLimit, setFilterTargetVisibleLimit] = useState(10);
   useEffect(() => { setFilterTargetVisibleLimit(10); }, [filterCompatSearch]);
+  const [expandedAdvancedComparisonIds, setExpandedAdvancedComparisonIds] = useState<Set<number>>(() => new Set());
   const [filterCompatResult, setFilterCompatResult] = useState<Record<number, any>>({});
   const [filterMinHeight, setFilterMinHeight] = useState("");
   const [filterMaxHeight, setFilterMaxHeight] = useState("");
@@ -392,6 +415,7 @@ export default function CRMMatchmaking() {
     filterTargetRef.current = filterCompatTarget;
     batchGeneration.current += 1;
     manualPreviewGeneration.current += 1;
+    setExpandedAdvancedComparisonIds(new Set());
     setBatchProgress(null);
     // A returned-to tab must not compare a cached preview with a fresh pending
     // score. Re-rank with current profiles/answers; stale in-flight work is fenced.
@@ -882,7 +906,7 @@ export default function CRMMatchmaking() {
     id: number; singleAId: number; singleBId: number; score?: number | null;
     status: string; proposedAt?: number | null; createdAt: Date | number;
     approvalTokenA?: string | null; approvalTokenB?: string | null;
-    approvedByA: boolean; approvedByB: boolean;
+    approvedByA: boolean | null; approvedByB: boolean | null;
     tokenAUsedAt?: number | null; tokenBUsedAt?: number | null;
     emailAOpenedAt?: number | null; emailBOpenedAt?: number | null;
     singleAName?: string; singleBName?: string;
@@ -1639,12 +1663,21 @@ export default function CRMMatchmaking() {
                         </div>
                       </div>
                       {compatData && filterTargetProfile && (
-                        <details className="mt-4 rounded-xl border border-[#191265]/10 bg-[#faf9f5] p-3">
+                        <details className="mt-4 rounded-xl border border-[#191265]/10 bg-[#faf9f5] p-3" onToggle={event => {
+                          const open = event.currentTarget.open;
+                          setExpandedAdvancedComparisonIds(previous => {
+                            if (previous.has(single.id) === open) return previous;
+                            const next = new Set(previous);
+                            if (open) next.add(single.id); else next.delete(single.id);
+                            return next;
+                          });
+                        }}>
                           <summary className="cursor-pointer text-sm font-bold text-[#191265]">השוואה זוגית · {Math.round(compatData.score)}%</summary>
                           <PairCriteriaLegend />
                           <div className="grid grid-cols-2 gap-3 mt-3">
                             {[filterTargetProfile, single].map(profile => <div key={profile.id} className={`rounded-xl p-3 ${profileStaffSurface(profile, "bg-[#f8f6f0]")}`}>
                               <MatchProfileCard profile={asMatchProfile(profile)} otherProfile={asMatchProfile(profile.id === filterTargetProfile.id ? single : filterTargetProfile)} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(profile.id)?.length || 0} />
+                              {expandedAdvancedComparisonIds.has(single.id) && <InternalAdminNotes singleId={profile.id} />}
                             </div>)}
                           </div>
                         </details>
@@ -2536,8 +2569,8 @@ export default function CRMMatchmaking() {
              const tracking = getMatchTrackingSummary(match);
              let displayStatus = tracking.mutualYes ? (match.returnedToPoolAt ? "released" : "matched") : match.status;
              if (!tracking.mutualYes && (match.status === 'rejected' || match.status === 'expired')) {
-                const aExplicit = match.tokenAUsedAt && match.approvedByA !== true;
-                const bExplicit = match.tokenBUsedAt && match.approvedByB !== true;
+                const aExplicit = getRecordedParticipantChoice(match, true) === "no";
+                const bExplicit = getRecordedParticipantChoice(match, false) === "no";
                if (aExplicit || bExplicit) {
                   displayStatus = 'rejected'; // Someone explicitly rejected
                 } else {
@@ -2552,30 +2585,10 @@ export default function CRMMatchmaking() {
               const isExpanded = expandedMatch === match.id;
 
 
-              // Per-person status helper
-              const getPersonStatus = (isA: boolean) => {
-                const emailOpened = isA ? match.emailAOpenedAt : match.emailBOpenedAt;
-                const tokenUsed = isA ? match.tokenAUsedAt : match.tokenBUsedAt;
-                const approved = isA ? match.approvedByA : match.approvedByB;
-                const isProposed = match.status === "proposed" || match.status === "matched" || match.status === "expired" || match.status === "rejected";
-                if (!isProposed) return null;
-               if (hasMutualYes(match)) return { icon: "❤️", label: "אישרו: התאמה!", color: "bg-green-100 text-green-800" };
-               // Explicitly rejected: clicked the link AND chose to reject
-                if (tokenUsed && approved !== true) return { icon: "❌", label: "דחה/תה", color: "bg-red-100 text-red-700" };
-               if (approved === true) return { icon: "✅", label: "אישר/ה", color: "bg-emerald-100 text-emerald-800" };
-               // For expired/rejected matches: if they never clicked, show "no response"
-               if (match.status === "expired" || match.status === "rejected") {
-                 if (!tokenUsed) return { icon: "⏰", label: "לא ענה", color: "bg-orange-100 text-orange-700" };
-                  // tokenUsed but not approved - they rejected
-                  return { icon: "❌", label: "דחה/תה", color: "bg-red-100 text-red-700" };
-               }
-                if (tokenUsed) return { icon: "👀", label: "צפה, טרם השיב/ה", color: "bg-amber-100 text-amber-800" };
-                if (emailOpened) return { icon: "📧", label: "פתח מייל, טרם השיב/ה", color: "bg-blue-100 text-blue-700" };
-                return { icon: "⏳", label: "לא פתח מייל", color: "bg-gray-100 text-gray-500" };
-              };
-
-              const statusA = getPersonStatus(true);
-              const statusB = getPersonStatus(false);
+              // Recorded personal choices remain accurate even after the pair
+              // closes. Pair-level mutual-yes history is displayed separately.
+              const statusA = getCrmParticipantStatus(match, true);
+              const statusB = getCrmParticipantStatus(match, false);
 
               const wantsKidsLabel: Record<string, string> = { yes: "רוצה ילדים", no: "לא רוצה ילדים", open: "פתוח לנושא" };
 
@@ -2730,6 +2743,7 @@ export default function CRMMatchmaking() {
                         {persons.map((s, i) => (
                           <div key={i} className={`rounded-xl p-3 ${profileStaffSurface(comparisonProfile(s), "bg-[#f8f6f0]")}`}>
                             <MatchProfileCard profile={comparisonProfile(s)} otherProfile={comparisonProfile(persons[i === 0 ? 1 : 0])} comparison onPhoto={setLightboxUrl} sentCount={matchHistoryBySingleId.get(s.id)?.length || 0} />
+                            <InternalAdminNotes singleId={s.id} />
                             {/* Per-person status badge */}
                             {s.personStatus && (
                               <div className={`mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${s.personStatus.color}`}>
@@ -4259,6 +4273,7 @@ function CompatibilityCheckTab({
               <div className="grid grid-cols-2 gap-3">
                 {comparisonProfiles.map((profile, index) => profile && <div key={profile.id} className={`min-w-0 rounded-xl p-3 ${profileStaffSurface(profile, "bg-[#f8f6f0]")}`}>
                   <MatchProfileCard profile={profile} otherProfile={comparisonProfiles[index === 0 ? 1 : 0]} comparison onPhoto={onPhoto} />
+                  <InternalAdminNotes singleId={profile.id} />
                 </div>)}
               </div>
             </div>

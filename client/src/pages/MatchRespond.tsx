@@ -28,7 +28,7 @@ export default function MatchRespond() {
 
   const [decision, setDecision] = useState<"yes" | "no" | null>(null);
   const [resultStatus, setResultStatus] = useState<
-    "idle" | "loading" | "matched" | "waiting" | "rejected" | "already" | "error"
+    "idle" | "loading" | "matched" | "waiting" | "rejected" | "already" | "closed" | "feedback" | "error"
   >("idle");
 
   // Fetch match details (non-destructive — does not consume token)
@@ -39,7 +39,11 @@ export default function MatchRespond() {
 
   const respond = trpc.matchmaking.respondToMatch.useMutation({
     onSuccess: (res) => {
-      if (res.alreadyResponded) {
+      if (res.lateFeedback) {
+        setResultStatus("feedback");
+      } else if (res.closed) {
+        setResultStatus("closed");
+      } else if (res.alreadyResponded) {
         setResultStatus("already");
       } else if (res.status === "matched") {
         setResultStatus("matched");
@@ -77,7 +81,7 @@ export default function MatchRespond() {
   }
 
   // ── Expired match ─────────────────────────────────────────────────────────
-  if ((data as any).isExpired) {
+  if (data.isExpired && !data.alreadyResponded) {
     return (
       <Screen>
         <div className="text-5xl mb-4">⏰</div>
@@ -111,9 +115,27 @@ export default function MatchRespond() {
         <div className="text-5xl mb-4">✅</div>
         <h1 className="text-2xl font-black text-[#191265] mb-3">כבר ענית</h1>
         <p className="text-[#727272] text-lg">
-          {answeredYes
-            ? "אמרת כן! כשגם הצד השני יאשר, תקבל/י מייל עם הפרטים."
-            : "תגובתך נרשמה. כשתהיה התאמה מתאימה יותר, אעדכן אותך."}
+          {status === "rejected"
+            ? "התשובה שלך נשמרה. ההצעה הזו לא הבשילה להתאמה הדדית הפעם. נמשיך לחפש חיבור מתאים."
+            : status === "matched"
+              ? "שניכם אישרתם את ההצעה. אפשר לבדוק את פרטי ההתאמה באזור האישי."
+              : answeredYes
+                ? "אמרת כן! כשגם הצד השני יאשר, נשלח הודעה עם הפרטים."
+                : "תגובתך נרשמה. כשתהיה התאמה מתאימה יותר, אעדכן אותך."}
+        </p>
+        <Footer />
+      </Screen>
+    );
+  }
+
+  if (resultStatus === "closed" || resultStatus === "feedback" || (status === "rejected" && !data.canRespondAfterDecline && resultStatus === "idle")) {
+    return (
+      <Screen>
+        <h1 className="text-2xl font-black text-[#191265] mb-3">ההצעה הזו נסגרה</h1>
+        <p className="text-[#727272] text-lg leading-relaxed">
+          {resultStatus === "feedback"
+            ? "תודה, התשובה שלך נשמרה. ההצעה הזו לא הבשילה להתאמה הדדית הפעם. נמשיך לחפש חיבור מתאים."
+            : "ההצעה הזו כבר נסגרה, ולכן אי אפשר להשיב עליה. זה לא אומר שכבר ענית."}
         </p>
         <Footer />
       </Screen>
@@ -272,6 +294,11 @@ export default function MatchRespond() {
             ההחלטה שלך נשמרת בסודיות מוחלטת.
           </p>
 
+          {data.canRespondAfterDecline && (
+            <p role="status" className="mb-4 rounded-xl bg-[#f0eadc] p-3 text-center text-sm text-[#191265]">
+              ההצעה הזו לא הבשילה להתאמה הדדית. אפשר עדיין לשמור את הבחירה שלך כמשוב עד תום זמן המענה המקורי. הבחירה לא תפתח את ההצעה מחדש.
+            </p>
+          )}
           {/* Yes / No buttons */}
           <div className="flex gap-3">
             <button

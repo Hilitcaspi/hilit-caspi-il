@@ -10,6 +10,12 @@ type AppDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type MatchSide = "A" | "B";
 export type BoostRecipientRole = "sender" | "recipient";
 type SmsSender = (phone: string, message: string) => Promise<boolean>;
+type ProposalEmailResult = { success: boolean; messageId?: string };
+
+/** Brevo's local blocklist returns success with "blocked", not provider acceptance. */
+export function isBoostProposalEmailAccepted(result?: ProposalEmailResult): boolean {
+  return result?.success === true && result.messageId !== "blocked";
+}
 
 export type MatchSmsRecipient = {
   side: MatchSide;
@@ -37,7 +43,7 @@ export function buildInitialMatchSmsMessage(
     if (proposalSource === "boost") {
       const introduction = boostRole === "sender"
         ? `בקשת ה־Boost שלך עם ${score}% התאמה נשלחה לשני הצדדים. השליחה והתשלום אינם אישור להתאמה.`
-        : `נשלחה אליך התאמת Boost עם ${score}% התאמה. זו הצעה אלגוריתמית שלא נבחרה אישית על ידי הילית.`;
+        : `נשלחה אליך התאמת Boost עם ${score}% התאמה. זו הצעה אלגוריתמית שלא נבחרה אישית על ידי הילית. התאמת ה־Boost ממתינה לך במייל; כדאי לבדוק גם בספאם ובתיקיית השיווק.`;
       return `היי ${firstName}, ${introduction} לצפייה ולהחלטה אישית: ${responseLink} פתיחת הקישור אינה אישור להתאמה. הילית כספי`;
     }
     return `היי ${firstName}, בחרתי עבורך התאמה של ${score}%. ${matchFirstName} מחכה לתשובתך. לצפייה ולהחלטה אישית: ${responseLink} פתיחת הקישור אינה אישור להתאמה. הילית`;
@@ -46,7 +52,7 @@ export function buildInitialMatchSmsMessage(
     if (boostRole === "sender") {
       return `היי ${firstName}, בקשת ה־Boost שלך עם ${score}% התאמה נשלחה לשני הצדדים. השליחה והתשלום אינם אישור להתאמה. התמונה, הפרטים וכפתורי האישור מחכים במייל. הילית כספי`;
     }
-    return `היי ${firstName}, נשלחה אליך התאמת Boost עם ${score}% התאמה. זו הצעה אלגוריתמית שלא נבחרה אישית על ידי הילית. התמונה, הפרטים וכפתורי האישור מחכים במייל. הילית כספי`;
+    return `היי ${firstName}, נשלחה אליך התאמת Boost עם ${score}% התאמה. זו הצעה אלגוריתמית שלא נבחרה אישית על ידי הילית. התאמת ה־Boost ממתינה לך במייל עם הפרטים וכפתורי האישור; כדאי לבדוק גם בספאם ובתיקיית השיווק. הילית כספי`;
   }
   return `היי ${firstName}, שלחתי לך במייל התאמה של ${score}% שבחרתי עבורך. ${matchFirstName} מחכה לתשובתך. כדאי לבדוק גם בספאם ובתיקיית השיווק ולאשר או לדחות דרך המייל. הילית`;
 }
@@ -74,6 +80,9 @@ export async function sendInitialMatchSmsOnce(
     recipientB: Omit<MatchSmsRecipient, "side">;
     proposalSource?: "manual" | "boost";
     boostSenderSide?: MatchSide;
+    // Only the non-requesting side is gated. Missing/failed/suppressed email
+    // results must not trigger a recipient SMS claiming a proposal is in email.
+    boostEmailResults?: Partial<Record<MatchSide, ProposalEmailResult>>;
   },
   sender: SmsSender = sendSMS,
 ) {
@@ -88,9 +97,16 @@ export async function sendInitialMatchSmsOnce(
       return { skipped: true, sentA: false, sentB: false };
     }
 
+    const eligibleForSide = (side: MatchSide, recipient: Omit<MatchSmsRecipient, "side">) =>
+      canReceiveMatchSms(recipient) && (input.proposalSource !== "boost"
+        || side === input.boostSenderSide
+        || isBoostProposalEmailAccepted(input.boostEmailResults?.[side]));
+    const eligibleA = eligibleForSide("A", input.recipientA);
+    const eligibleB = eligibleForSide("B", input.recipientB);
+
     const [preferenceA, preferenceB] = await Promise.all([
-      canReceiveMatchSms(input.recipientA) ? getMatchSmsLinkPreference(db, input.recipientA.singleId) : Promise.resolve(null),
-      canReceiveMatchSms(input.recipientB) ? getMatchSmsLinkPreference(db, input.recipientB.singleId) : Promise.resolve(null),
+      eligibleA ? getMatchSmsLinkPreference(db, input.recipientA.singleId) : Promise.resolve(null),
+      eligibleB ? getMatchSmsLinkPreference(db, input.recipientB.singleId) : Promise.resolve(null),
     ]);
     let linkA: string | null = null;
     let linkB: string | null = null;
@@ -112,7 +128,7 @@ export async function sendInitialMatchSmsOnce(
       }
     }
 
-    const messageA = canReceiveMatchSms(input.recipientA)
+    const messageA = eligibleA
       ? buildInitialMatchSmsMessage(
           input.recipientA.firstName,
           input.recipientA.matchFirstName,
@@ -122,7 +138,7 @@ export async function sendInitialMatchSmsOnce(
           linkA,
         )
       : null;
-    const messageB = canReceiveMatchSms(input.recipientB)
+    const messageB = eligibleB
       ? buildInitialMatchSmsMessage(
           input.recipientB.firstName,
           input.recipientB.matchFirstName,

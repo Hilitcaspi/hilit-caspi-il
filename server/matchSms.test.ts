@@ -135,9 +135,15 @@ describe("automatic match SMS delivery via Vibrate", () => {
     const details = routers.slice(routers.indexOf("getMatchDetails: publicProcedure"), routers.indexOf("respondToMatch: publicProcedure"));
     expect(details).not.toContain("db.update(");
     const response = routers.slice(routers.indexOf("respondToMatch: publicProcedure"));
-    expect(response).toContain("match.approvalExpiresAt && Date.now() > match.approvalExpiresAt");
-    expect(response).toContain("if (tokenAlreadyUsed)");
-    expect(response).toContain("updated.approvedByA && updated.approvedByB");
+    const decision = readFileSync(new URL("./matchDecision.ts", import.meta.url), "utf8");
+    expect(response).toContain("await recordMatchDecision(db, input.token, input.response)");
+    expect(decision).toContain("getProposalDeadline(match)");
+    expect(decision).toContain("deadline != null && now >= deadline");
+    expect(decision).toContain('kind: "already"');
+    expect(decision).toContain("isA ? match.tokenAUsedAt : match.tokenBUsedAt");
+    expect(decision).toContain("db.transaction(async (tx)");
+    expect(decision).toContain('.for("update")');
+    expect(response).toContain("if (recorded.becameMatched)");
   });
 
   it("recognizes MySQL affected-row claims", () => {
