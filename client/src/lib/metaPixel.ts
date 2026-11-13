@@ -29,7 +29,7 @@ function hiddenUtmFields(): Record<string, string> {
 
 export function trackLead(params?: { content_name?: string; value?: number; currency?: string }) {
   if (typeof window !== "undefined" && window.fbq) {
-    window.fbq("track", "Lead", { ...(params || {}), ...hiddenUtmFields() });
+    window.fbq("track", "Lead", { ...(params || {}), currency: params?.currency || "ILS", ...hiddenUtmFields() });
   }
 }
 

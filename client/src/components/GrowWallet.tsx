@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { gaBeginCheckout } from "@/lib/ga";
 import { trackInitiateCheckout } from "@/lib/metaPixel";
+import { preloadApplePaySDKScript } from "@/lib/applePaySdk";
 import { track, trackCheckoutStage } from "@/lib/track";
 import { classifyCheckoutErrorReason, type CheckoutReason, type CheckoutStage } from "@shared/checkoutFunnel";
 import {
@@ -584,6 +585,14 @@ export default function GrowWallet({
     });
   }, [product]);
 
+  // Hosted Plus has no embedded wallet; TEST1 still uses the one-time SDK flow.
+  useEffect(() => {
+    if (product !== "plus" || prefillCoupon?.trim().toUpperCase() === "TEST1" ||
+        couponApplied?.code === "TEST1" || couponCode.trim().toUpperCase() === "TEST1") {
+      void preloadApplePaySDKScript().catch(() => {});
+    }
+  }, [product, prefillCoupon, couponApplied?.code, couponCode]);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -850,11 +859,16 @@ export default function GrowWallet({
     let failureStage: "createProcess" | "sdk_failure" =
       product === "plus" ? "createProcess" : "sdk_failure";
 
+    let applePayReady = Promise.resolve();
     try {
       // Plus returns a hosted recurring-payment URL, so it must not depend on
       // the regular Grow wallet SDK. An authorized TEST1 Plus checkout is a
       // one-time diagnostic wallet, and therefore still initializes the SDK.
       if (product !== "plus" || attempt.couponCode === "TEST1") {
+        // Start before native boot: the shared loader's total 5s timeout runs
+        // concurrently, never an additional 5s wait after native readiness.
+        // Apple is optional; failure/hang must not block card checkout or alert.
+        applePayReady = preloadApplePaySDKScript().catch(() => {});
         logStep("1_script_load_start");
         await preloadGrowSDKScript();
         if (!isCurrentAttempt()) return;
@@ -1154,6 +1168,8 @@ export default function GrowWallet({
         failureStage = "sdk_failure";
         logStep("5_renderPaymentOptions_start");
         // Only a recoverable close reaches the cached-attempt redraw branch.
+        await applePayReady;
+        if (!isCurrentAttempt()) return;
         await renderGrowPaymentOptionsWithRetry(result.authCode, logStep, isCurrentAttempt);
         if (!isCurrentAttempt()) return;
         setWalletLoading(false);
@@ -1168,6 +1184,8 @@ export default function GrowWallet({
       logStep("5_renderPaymentOptions_start");
       // Re-check after the network round-trip as the SDK mutates its global
       // object asynchronously during initialization on some first loads.
+      await applePayReady;
+      if (!isCurrentAttempt()) return;
       await renderGrowPaymentOptionsWithRetry(attempt.authCode!, logStep, isCurrentAttempt);
       if (!isCurrentAttempt()) return;
       setWalletLoading(false);

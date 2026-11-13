@@ -13,11 +13,11 @@ import NovemberPromotion from "@/components/NovemberPromotion";
 import VerifiedPurchaseTracker from "@/components/VerifiedPurchaseTracker";
 
 // Eagerly loaded (critical path)
-import Home from "@/pages/Home";
 import DnaQuiz from "@/pages/DnaQuiz";
 import NotFound from "@/pages/NotFound";
 
 // Lazy loaded (non-critical)
+const Home = lazy(() => import("@/pages/Home"));
 const Register = lazy(() => import("@/pages/Register"));
 const RegistrationPaymentRecovery = lazy(() => import("@/pages/RegistrationPaymentRecovery"));
 const UploadPhoto = lazy(() => import("@/pages/UploadPhoto"));

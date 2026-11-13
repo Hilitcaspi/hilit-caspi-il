@@ -15,7 +15,8 @@ const walletSource = readFileSync(resolve(process.cwd(), "client/src/components/
 
 /** Execute the real component with tiny hook/JSX/DOM mocks, not a browser. */
 function walletHarness(servicesLoaded = true, visible = true, withTrackingProof = false,
-  opts: { showCoupon?: boolean; validateCoupon?: ReturnType<typeof vi.fn> } = {}) {
+  opts: { showCoupon?: boolean; validateCoupon?: ReturnType<typeof vi.fn>;
+    applePay?: ReturnType<typeof vi.fn>; product?: "guide" | "plus"; prefillCoupon?: string } = {}) {
   const storage = new Map<string, string>();
   const sessionStorage = {
     getItem: (key: string) => storage.get(key) ?? null,
@@ -23,8 +24,10 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
   };
   const states: any[] = [];
   const refs: any[] = [];
-  let stateIndex = 0, refIndex = 0;
+  let stateIndex = 0, refIndex = 0, effectIndex = 0;
   const effects: Array<() => unknown> = [];
+  const effectDeps: Array<any[] | undefined> = [];
+  const cleanups: Array<unknown> = [];
   const jsx = (type: any, props: any) => ({ type, props });
   const react = {
     useState(initial: any) {
@@ -38,7 +41,17 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
       const index = refIndex++;
       return refs[index] ??= { current: initial };
     },
-    useEffect(effect: () => unknown) { effects.push(effect); },
+    useEffect(effect: () => unknown, deps?: any[]) {
+      const index = effectIndex++;
+      const previous = effectDeps[index];
+      if (!deps || !previous || deps.some((value, i) => !Object.is(value, previous[i]))) {
+        effectDeps[index] = deps;
+        effects.push(() => {
+          if (typeof cleanups[index] === "function") (cleanups[index] as () => void)();
+          cleanups[index] = effect();
+        });
+      }
+    },
     useCallback(callback: any) { return callback; },
     useId: () => "synthetic-wallet",
   };
@@ -46,6 +59,7 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
   let loaded = servicesLoaded;
   const renderPaymentOptions = vi.fn();
   const init = vi.fn(async (config: any) => { events = config.events; });
+  const applePay = opts.applePay ?? vi.fn().mockResolvedValue(undefined);
   const createProcess = vi.fn().mockResolvedValue({ authCode: "synthetic-auth", processToken: "synthetic-process",
     ...(withTrackingProof ? { purchaseTrackingToken: "a".repeat(64) } : {}) });
   const checkoutStatus = vi.fn().mockResolvedValue({ status: "pending" });
@@ -81,6 +95,7 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
     "@/lib/ga": { gaBeginCheckout: vi.fn() },
     "@/lib/metaPixel": { trackInitiateCheckout: vi.fn() },
     "@/lib/track": { track: vi.fn(), trackCheckoutStage: vi.fn() },
+    "@/lib/applePaySdk": { preloadApplePaySDKScript: applePay },
     "@shared/checkoutFunnel": checkoutFunnel,
     "@/lib/growSdkReadiness": readiness,
     "@shared/profileValidation": { normalizeIsraeliPhone },
@@ -117,8 +132,8 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
     return [node, ...nodes(node.props?.children)];
   }
   function render() {
-    stateIndex = 0; refIndex = 0;
-    const tree = Component({ product: "guide", prefillName: "Synthetic Buyer", prefillEmail: "synthetic@example.test", prefillPhone: "0500000000", showCoupon: opts.showCoupon ?? false, onSuccess: success, onFailure: failure });
+    stateIndex = 0; refIndex = 0; effectIndex = 0;
+    const tree = Component({ product: opts.product ?? "guide", prefillCoupon: opts.prefillCoupon, prefillName: "Synthetic Buyer", prefillEmail: "synthetic@example.test", prefillPhone: "0500000000", showCoupon: opts.showCoupon ?? false, onSuccess: success, onFailure: failure });
     effects.splice(0).forEach(effect => effect());
     const all = nodes(tree);
     return { tree, button: all.find(node => node.type === "button" && node.props.onClick && node.props.className?.includes("bg-[#ffe27c]")) ?? all.find(node => node.type === "button" && node.props.onClick),
@@ -127,9 +142,10 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
   const initial = render();
   initial.age.props.onCheckedChange(true);
   return {
-    render, createProcess, checkoutStatus, renderPaymentOptions, init, reportFailure, logStep, toast, success, failure,
+    render, createProcess, checkoutStatus, renderPaymentOptions, init, applePay, reportFailure, logStep, toast, success, failure,
+    location: windowMock.location,
     storage, sessionStorage,
-    unmount: () => { refs.find(ref => ref.current === true).current = false; },
+    unmount: () => { cleanups.forEach(cleanup => { if (typeof cleanup === "function") cleanup(); }); },
     events: () => events,
     setServicesLoaded: (value: boolean) => { loaded = value; },
     attempt: () => refs.find(ref => ref.current?.attemptId)?.current,
@@ -148,6 +164,144 @@ afterEach(() => {
 });
 
 describe("Grow wallet payment timeout safety (isolated real component)", () => {
+  it("preloads Apple on wallet mount and an immediate pay click waits for script readiness before draw", async () => {
+    let ready!: () => void;
+    const applePay = vi.fn(() => new Promise<void>(resolve => { ready = resolve; }));
+    // The mocked provider shares the same pending load, like the real loader.
+    const shared = applePay();
+    applePay.mockReturnValue(shared); applePay.mockClear();
+    const h = walletHarness(true, true, false, { applePay });
+    expect(applePay).toHaveBeenCalledOnce();
+    expect(h.init).not.toHaveBeenCalled();
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700);
+    expect(h.init).toHaveBeenCalledOnce();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+    ready();
+    await vi.advanceTimersByTimeAsync(400); await paying;
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.reportFailure).not.toHaveBeenCalled();
+    expect(h.toast.error).not.toHaveBeenCalled();
+  });
+
+  it("bounds optional Apple hang to the shared total 5s boot budget and permits card checkout", async () => {
+    const shared = new Promise<void>((_resolve, reject) => {
+      setTimeout(() => reject(new Error("Apple Pay SDK script load timeout")), 5_000);
+    });
+    const h = walletHarness(true, true, false, { applePay: vi.fn().mockReturnValue(shared) });
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(401); await paying;
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.reportFailure).not.toHaveBeenCalled();
+    expect(h.toast.error).not.toHaveBeenCalled();
+    expect(h.attempt().outcomeUnknown).toBeUndefined();
+    expect(h.failure).not.toHaveBeenCalled();
+  });
+
+  it("overlaps Apple timeout with slow native boot instead of adding another five seconds", async () => {
+    const shared = new Promise<void>((_resolve, reject) => {
+      setTimeout(() => reject(new Error("Optional Apple timeout")), 5_000);
+    });
+    const h = walletHarness(false, true, false, { applePay: vi.fn().mockReturnValue(shared) });
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(h.createProcess).not.toHaveBeenCalled();
+    h.setServicesLoaded(true);
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.reportFailure).not.toHaveBeenCalled();
+    expect(h.toast.error).not.toHaveBeenCalled();
+  });
+
+  it("ignores optional Apple script failure without outcomeUnknown or operational alerts", async () => {
+    const h = walletHarness(true, true, false, { applePay: vi.fn().mockRejectedValue(new Error("Apple script failed")) });
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.reportFailure).not.toHaveBeenCalled();
+    expect(h.toast.error).not.toHaveBeenCalled();
+    expect(h.failure).not.toHaveBeenCalled();
+    expect(h.attempt().outcomeUnknown).toBeUndefined();
+  });
+
+  it.each(["unmounted", "stale lease"])("never creates or draws when %s during native boot", async mode => {
+    const h = walletHarness(false);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(1_000);
+    let other;
+    if (mode === "unmounted") h.unmount();
+    else {
+      safety.releaseCheckoutOwner(h.attempt().lease);
+      other = safety.acquireCheckoutOwner("22222222-2222-4222-8222-222222222222", "other-wallet");
+    }
+    h.setServicesLoaded(true);
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.createProcess).not.toHaveBeenCalled();
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+    expect(h.reportFailure).not.toHaveBeenCalled();
+    if (other) expect(safety.isCheckoutOwner(other)).toBe(true);
+  });
+
+  it.each(["unmounted", "stale lease"])("never draws a created process when %s during the optional Apple wait", async mode => {
+    let ready!: () => void;
+    const shared = new Promise<void>(resolve => { ready = resolve; });
+    const h = walletHarness(true, true, false, { applePay: vi.fn().mockReturnValue(shared) });
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700);
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    let other;
+    if (mode === "unmounted") h.unmount();
+    else {
+      safety.releaseCheckoutOwner(h.attempt().lease);
+      other = safety.acquireCheckoutOwner("22222222-2222-4222-8222-222222222222", "other-wallet");
+    }
+    ready();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+    expect(h.reportFailure).not.toHaveBeenCalled();
+    if (other) expect(safety.isCheckoutOwner(other)).toBe(true);
+  });
+
+  it("ordinary hosted Plus never preloads or waits for Apple or initializes the embedded wallet", async () => {
+    const applePay = vi.fn(() => new Promise<void>(() => {}));
+    const h = walletHarness(false, true, false, { product: "plus", applePay });
+    h.createProcess.mockResolvedValue({ url: "https://synthetic.example.test/hosted-plus" } as any);
+    await h.pay();
+    expect(applePay).not.toHaveBeenCalled();
+    expect(h.init).not.toHaveBeenCalled();
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.location.assign).toHaveBeenCalledWith("https://synthetic.example.test/hosted-plus");
+    expect(h.reportFailure).not.toHaveBeenCalled();
+  });
+
+  it("validated TEST1 Plus includes Apple readiness and the one-time native wallet", async () => {
+    let ready!: () => void;
+    const shared = new Promise<void>(resolve => { ready = resolve; });
+    const applePay = vi.fn().mockReturnValue(shared);
+    const validateCoupon = vi.fn().mockResolvedValue({ valid: true, code: "TEST1", fixedPrice: 1 });
+    const h = walletHarness(true, true, false, { product: "plus", prefillCoupon: "TEST1", applePay, validateCoupon });
+    expect(applePay).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(0);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700);
+    expect(h.init).toHaveBeenCalledOnce();
+    expect(h.createProcess).toHaveBeenCalledWith(expect.objectContaining({ product: "plus", couponCode: "TEST1" }));
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+    ready();
+    await vi.advanceTimersByTimeAsync(400); await paying;
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.location.assign).not.toHaveBeenCalled();
+    expect(h.reportFailure).not.toHaveBeenCalled();
+  });
+
   it.each(["העסקה כבר בוצעה", "התשלום כבר בוצע", "Payment Not Completed", "PaymentNotCompleted", "already charged"])("treats %s as unknown, never paid or safe to replay", message => {
     expect(readiness.isGrowPaymentOutcomeUnknown({ status: 0, message })).toBe(true);
   });

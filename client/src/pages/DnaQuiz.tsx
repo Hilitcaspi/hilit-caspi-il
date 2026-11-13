@@ -355,7 +355,8 @@ export default function DnaQuiz() {
 
   // ── Gender selection ────────────────────────────────────────────────────────
   if (phase === "gender") {
-    const PROFILE_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
+    // Same approved portrait, sized for this 80px avatar (including 3x screens).
+    const PROFILE_IMG = "/manus-storage/hilit-dna-profile-240_2633cb2b.webp";
     return (
       <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">
         {/* Back to home bar */}
@@ -368,7 +369,8 @@ export default function DnaQuiz() {
         </div>
         <div className="bg-[#191265] pt-10 pb-16 px-5 text-center relative overflow-hidden">
           <div className="absolute inset-0 opacity-20" style={{backgroundImage: "radial-gradient(circle at 50% 0%, #ffe27c 0%, transparent 60%)"}} />
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="relative z-10">
+          {/* Critical copy and start buttons must be visible on the first paint. */}
+          <div className="relative z-10">
             {/* Free badge */}
             <div className="inline-block bg-[#ffe27c] text-[#191265] text-xs font-black px-4 py-1.5 rounded-full mb-5 tracking-wide">
               ✦ חינם לגמרי
@@ -381,6 +383,9 @@ export default function DnaQuiz() {
                   className="w-20 h-20 rounded-full object-cover object-[center_20%] shadow-xl"
                   style={{border: "3px solid #ffe27c"}}
                   loading="eager"
+                  decoding="async"
+                  width={80}
+                  height={80}
                 />
                 <div className="absolute -bottom-1 -left-1 bg-[#ffe27c] rounded-full w-6 h-6 flex items-center justify-center text-xs">🧬</div>
               </div>
@@ -423,7 +428,7 @@ export default function DnaQuiz() {
                 גבר
               </button>
             </div>
-          </motion.div>
+          </div>
         </div>
         <div className="px-5 py-8 max-w-md mx-auto">
           <p className="text-center text-[#191265] font-bold text-xs mb-5 opacity-60 uppercase tracking-widest">מה מקבלים בסיום</p>
@@ -435,7 +440,7 @@ export default function DnaQuiz() {
             ].map((item, i) => (
               <motion.div
                 key={item.title}
-                initial={{ opacity: 0, x: 20 }}
+                initial={false}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 + i * 0.1 }}
                 className="bg-white rounded-2xl p-4 shadow-sm flex items-start gap-3"
