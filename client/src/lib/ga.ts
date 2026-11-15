@@ -7,6 +7,8 @@
  * Configure GA4 tags in GTM to fire on these custom events.
  */
 
+import { getMarketingUtmParams } from "./acquisitionTracking";
+
 declare global {
   interface Window {
     dataLayer: Record<string, unknown>[];
@@ -15,34 +17,21 @@ declare global {
 
 /**
  * Hidden UTM fields attached to EVERY GA/GTM dataLayer event.
- * NEVER rendered in the UI — read from the URL / stored campaign data and
- * pushed only inside the event payload so GA4 can attribute leads and
- * purchases to their traffic source (utm_source / utm_medium / utm_campaign).
+ * NEVER rendered in the UI — read as one sanitized last-explicit-visit bundle.
+ * Link tags are not verified ad clicks and are not merged with legacy keys or
+ * first touch. This does not establish GA4 session attribution by itself.
  */
-function hiddenUtmFields(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const p = new URLSearchParams(window.location.search);
-  const get = (key: string): string | undefined => {
-    const urlValue = p.get(key);
-    if (urlValue !== null) return urlValue;
-    try {
-      const stored = sessionStorage.getItem(key);
-      if (stored !== null) return stored;
-    } catch { /* Campaign storage is optional in privacy/embedded browsers. */ }
-    try { return localStorage.getItem(key) ?? undefined; } catch { return undefined; }
+function hiddenUtmFields(): Record<string, string | null> {
+  const utm = getMarketingUtmParams();
+  // GTM's data model survives individual pushes. Clear missing fields so it
+  // cannot silently carry a campaign/medium forward from another visit.
+  return {
+    utm_source: utm.utmSource ?? null,
+    utm_medium: utm.utmMedium ?? null,
+    utm_campaign: utm.utmCampaign ?? null,
+    utm_content: utm.utmContent ?? null,
+    utm_term: utm.utmTerm ?? null,
   };
-  const out: Record<string, string> = {};
-  const s = get("utm_source");
-  const m = get("utm_medium");
-  const c = get("utm_campaign");
-  const content = get("utm_content");
-  const term = get("utm_term");
-  if (s) out.utm_source = s;
-  if (m) out.utm_medium = m;
-  if (c) out.utm_campaign = c;
-  if (content) out.utm_content = content;
-  if (term) out.utm_term = term;
-  return out;
 }
 
 function push(event: Record<string, unknown>) {
@@ -50,7 +39,9 @@ function push(event: Record<string, unknown>) {
   try {
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({ ...event, ...hiddenUtmFields() });
-  } catch { /* Analytics failures must never block registration or payment. */ }
+  } catch {
+    /* Analytics failures must never block registration or payment. */
+  }
 }
 
 // ─── Products catalogue ────────────────────────────────────────────────────────
@@ -179,7 +170,11 @@ export function gaBeginCheckout(productKey: ProductKey) {
 }
 
 /** Purchase from a confirmed server response; optional actual charge overrides list price. */
-export function gaPurchase(productKey: ProductKey, transactionId?: string, actualAmount?: number) {
+export function gaPurchase(
+  productKey: ProductKey,
+  transactionId?: string,
+  actualAmount?: number
+) {
   const product = GA_PRODUCTS[productKey];
   const value = actualAmount ?? product.price;
   if (!Number.isFinite(value) || value <= 0) return;

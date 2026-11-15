@@ -1698,3 +1698,24 @@ export { smsMarketingOptouts } from './smsMarketingSchema';
 export { checkoutReservations } from './checkoutReservationSchema';
 
 export * from "./liveOpenRegistrationSchema";
+
+/** Owner-controlled website editorial automation; no customer or marketing lists. */
+export const editorialAutomationSettings = mysqlTable("editorial_automation_settings", {
+  id: int("id").primaryKey(),
+  scheduleCronTaskUid: varchar("schedule_cron_task_uid", { length: 65 }),
+  enabled: boolean("enabled").notNull().default(false),
+  timezone: varchar("timezone", { length: 64 }).notNull().default("Asia/Jerusalem"),
+  model: varchar("model", { length: 100 }).notNull().default("gpt-6.1-sol"),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull().default(0),
+}, t => ({ taskUidIdx: uniqueIndex("editorial_settings_task_uid_idx").on(t.scheduleCronTaskUid) }));
+
+export const editorialAutomationRuns = mysqlTable("editorial_automation_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  slotKey: varchar("slot_key", { length: 32 }).notNull(),
+  topicKey: varchar("topic_key", { length: 100 }).notNull(),
+  status: mysqlEnum("status", ["working", "draft", "published", "failed"]).notNull().default("working"),
+  articleId: int("article_id"),
+  qualityNotes: varchar("quality_notes", { length: 500 }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull().default(0),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull().default(0),
+}, t => ({ slotIdx: uniqueIndex("editorial_runs_slot_idx").on(t.slotKey) }));

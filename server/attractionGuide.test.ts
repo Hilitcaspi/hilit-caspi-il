@@ -170,9 +170,9 @@ describe("attraction editorial guide and funnel", () => {
     expect(url.searchParams.get("utm_medium")).toBe(source === "whatsapp" ? "community" : "organic_social");
   });
   it.each(links)("retains acquisition through inline $destination $placement", link => {
-    expect(captureNavigation(attractionHref(link.destination, link.placement))).toMatchObject({ utmSource: "website", utmMedium: "onsite", utmCampaign: ATTRACTION_CAMPAIGN, utmContent: `${link.destination}_${link.placement}` });
+    expect(captureNavigation(attractionHref(link.destination, link.placement))).toMatchObject({ utmSource: "instagram", utmMedium: "organic_social", utmCampaign: ATTRACTION_CAMPAIGN, utmContent: "podcast_reel" });
   });
   it.each([{ destination: "dna", placement: "self_understanding" }, { destination: "guide", placement: "secondary" }, { destination: "database", placement: "main" }] as const)("retains acquisition through final $destination $placement", link => {
-    expect(captureNavigation(attractionHref(link.destination, link.placement))).toMatchObject({ utmSource: "website", utmMedium: "onsite", utmCampaign: ATTRACTION_CAMPAIGN, utmContent: `${link.destination}_${link.placement}` });
+    expect(captureNavigation(attractionHref(link.destination, link.placement))).toMatchObject({ utmSource: "instagram", utmMedium: "organic_social", utmCampaign: ATTRACTION_CAMPAIGN, utmContent: "podcast_reel" });
   });
 });

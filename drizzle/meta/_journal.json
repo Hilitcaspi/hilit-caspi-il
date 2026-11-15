@@ -337,6 +337,13 @@
       "when": 1792948293561,
       "tag": "0048_plus_cancellation_provider_stop",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "5",
+      "when": 1794756944707,
+      "tag": "0048_editorial_autopublishing",
+      "breakpoints": true
     }
   ]
 }

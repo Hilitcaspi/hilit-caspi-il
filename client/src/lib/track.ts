@@ -9,6 +9,11 @@ import {
   type CheckoutReason,
   type CheckoutStage,
 } from "@shared/checkoutFunnel";
+import {
+  marketingUtmParams,
+  sanitizeMarketingPagePath,
+} from "@shared/marketingAttributionStorage";
+import { getMarketingUtmParams } from "./acquisitionTracking";
 
 type TrackEventType =
   | "email_open"
@@ -51,23 +56,43 @@ interface TrackPayload {
   metadata?: Record<string, string | number | boolean>;
 }
 
-function getUtmParams(): { utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string } {
-  if (typeof window === "undefined") return {};
-  const params = new URLSearchParams(window.location.search);
+function getUtmParams(): {
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+} {
+  const utm = getMarketingUtmParams();
   return {
-    utmSource: params.get("utm_source") ?? sessionStorage.getItem("utm_source") ?? undefined,
-    utmMedium: params.get("utm_medium") ?? sessionStorage.getItem("utm_medium") ?? undefined,
-    utmCampaign: params.get("utm_campaign") ?? sessionStorage.getItem("utm_campaign") ?? undefined,
-    utmContent: params.get("utm_content") ?? sessionStorage.getItem("utm_content") ?? undefined,
+    utmSource: utm.utmSource,
+    utmMedium: utm.utmMedium,
+    utmCampaign: utm.utmCampaign,
+    utmContent: utm.utmContent,
   };
 }
 
 export function track(payload: TrackPayload): void {
   try {
+    const { utmSource, utmMedium, utmCampaign, utmContent, page, ...event } =
+      payload;
+    const hasExplicitBundle = [
+      "utmSource",
+      "utmMedium",
+      "utmCampaign",
+      "utmContent",
+    ].some(field => Object.prototype.hasOwnProperty.call(payload, field));
+    // Explicit callers replace the entire bundle, never partially merge their
+    // source/campaign with an unrelated persisted visit. Sanitize both paths.
+    const utm = hasExplicitBundle
+      ? marketingUtmParams({ utmSource, utmMedium, utmCampaign, utmContent })
+      : getUtmParams();
     const enriched = {
-      ...getUtmParams(),
-      page: typeof window !== "undefined" ? window.location.pathname : undefined,
-      ...payload,
+      ...event,
+      ...utm,
+      page: sanitizeMarketingPagePath(
+        page ??
+          (typeof window !== "undefined" ? window.location.pathname : undefined)
+      ),
     };
     fetch("/api/track", {
       method: "POST",
@@ -82,7 +107,12 @@ export function track(payload: TrackPayload): void {
 
 /** Track a page view automatically */
 export function trackPageView(page?: string): void {
-  track({ eventType: "page_view", page: page ?? (typeof window !== "undefined" ? window.location.pathname : undefined) });
+  track({
+    eventType: "page_view",
+    page:
+      page ??
+      (typeof window !== "undefined" ? window.location.pathname : undefined),
+  });
 }
 
 const LANDING_PATH_KEY = "hc_landing_path";
@@ -92,7 +122,12 @@ export function rememberLandingPath(): void {
   try {
     if (typeof window === "undefined") return;
     if (!sessionStorage.getItem(LANDING_PATH_KEY)) {
-      sessionStorage.setItem(LANDING_PATH_KEY, sanitizeLandingPath(window.location.pathname));
+      sessionStorage.setItem(
+        LANDING_PATH_KEY,
+        sanitizeLandingPath(
+          sanitizeMarketingPagePath(window.location.pathname) ?? "/"
+        )
+      );
     }
   } catch {
     // storage may be blocked; tracking must never throw
@@ -102,7 +137,11 @@ export function rememberLandingPath(): void {
 export function getLandingPath(): string {
   try {
     if (typeof window === "undefined") return "/";
-    return sessionStorage.getItem(LANDING_PATH_KEY) || sanitizeLandingPath(window.location.pathname);
+    return sanitizeLandingPath(
+      sanitizeMarketingPagePath(
+        sessionStorage.getItem(LANDING_PATH_KEY) || window.location.pathname
+      ) ?? "/"
+    );
   } catch {
     return "/";
   }
@@ -115,7 +154,7 @@ export function getLandingPath(): string {
 export function trackCheckoutStage(
   product: string,
   stage: CheckoutStage,
-  reason: CheckoutReason | "-" = "-",
+  reason: CheckoutReason | "-" = "-"
 ): void {
   track({
     eventType: "button_click",

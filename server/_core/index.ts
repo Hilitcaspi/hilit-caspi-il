@@ -1,3 +1,4 @@
+import { editorialArticleHandler } from "../editorialAutomation";
 import "dotenv/config";
 import { recordAcquisitionSafely } from "../acquisitionCapture";
 import { fetchMetaLeadDetails, metaAcquisitionSnapshot } from "../metaAcquisitionSnapshot";
@@ -1170,6 +1171,8 @@ async function startServer() {
   });
 
   // development mode uses Vite, production mode uses static files
+  app.post("/api/scheduled/editorial-article", editorialArticleHandler);
+
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {

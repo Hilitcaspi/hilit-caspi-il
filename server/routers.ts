@@ -1,3 +1,5 @@
+import { marketingChannelsRouter } from "./marketingChannelsRouter";
+import { editorialAutomationRouter } from "./editorialAutomation";
 import { classifyMatchDecision, recordMatchDecision } from "./matchDecision";
 import { NOVEMBER_COUPON_CODE, NOVEMBER_COUPON_ERROR, isNovemberCouponAllowed } from "../shared/novemberCoupon";
 import { rankAdvancedCandidates } from "./advancedMatchRanking";
@@ -687,6 +689,8 @@ export const appRouter = router({
   }),
   purchaseRecovery: purchaseRecoveryRouter,
   dashboard: dashboardRouter,
+  marketingChannels: marketingChannelsRouter,
+  editorialAutomation: editorialAutomationRouter,
   plusPilot: plusPilotRouter,
   matchBoost: matchBoostRouter,
   matchBoostPilot: matchBoostPilotRouter,

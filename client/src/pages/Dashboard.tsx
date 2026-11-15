@@ -1,3 +1,5 @@
+import { MarketingChannelsPanel } from "@/components/MarketingChannelsPanel";
+import EditorialAutomationPanel from "@/components/EditorialAutomationPanel";
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -154,7 +156,7 @@ export default function Dashboard() {
             <span className="text-white/60 text-[11px]">—</span>
             <input type="date" value={customEnd || toDateStr(endDate)} onChange={(e) => { setCustomEnd(e.target.value); setUseCustom(true); }}
               className="bg-white/10 text-white text-[11px] rounded-lg px-2 py-1 border border-white/20 [color-scheme:dark]" />
-            <button onClick={() => { setRefreshedAt(Date.now()); void utils.dashboard.invalidate(); }} className="px-3 py-1 rounded-lg text-xs bg-white/10 hover:bg-white/20">רענון</button>
+            <button onClick={() => { setRefreshedAt(Date.now()); void utils.dashboard.invalidate(); void utils.marketingChannels.invalidate(); void utils.editorialAutomation.invalidate(); }} className="px-3 py-1 rounded-lg text-xs bg-white/10 hover:bg-white/20">רענון</button>
           </div>
         </div>
       </div>
@@ -272,6 +274,8 @@ export default function Dashboard() {
           </>
         )}
 
+        <EditorialAutomationPanel />
+        <MarketingChannelsPanel startDate={startDate} endDate={endDate} useSummary={trpc.marketingChannels.summary.useQuery} />
         <SalesSourcesTable data={intelligence.data} loading={intelligence.isLoading} error={!!intelligence.error} />
         {intelligence.data && <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs text-gray-500">סה״כ הוצאות מתועדות</p><strong>{intelligence.data.summary.totalExpenseAgorot == null ? "לא זמין" : fmt(intelligence.data.summary.totalExpenseAgorot / 100)}</strong></div>
@@ -684,13 +688,13 @@ export default function Dashboard() {
         {siteTraffic.data && (
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
-              <div className="flex items-center gap-2"><BarChart3 size={18} className="text-indigo-500" /><h3 className="font-bold text-gray-900">SEO ותנועה</h3><Badge className="bg-indigo-100 text-indigo-700 text-[10px]">{siteTraffic.data.uniqueVisitors} מבקרים</Badge></div>
+              <div className="flex items-center gap-2"><BarChart3 size={18} className="text-indigo-500" /><h3 className="font-bold text-gray-900">אירועי פעילות באתר</h3><Badge className="bg-indigo-100 text-indigo-700 text-[10px]">ספירות אירועים</Badge></div>
             </CardHeader>
             <CardContent>
               {/* Funnel */}
               <div className="flex items-center justify-center gap-2 flex-wrap mb-4">
                 {[
-                  { label: "ביקור", value: siteTraffic.data.funnel.pageViews, color: "bg-indigo-500" },
+                  { label: "צפייה בעמוד", value: siteTraffic.data.funnel.pageViews, color: "bg-indigo-500" },
                   { label: "DNA", value: siteTraffic.data.funnel.dnaStarts, color: "bg-blue-500" },
                   { label: "השלמה", value: siteTraffic.data.funnel.dnaCompletes, color: "bg-purple-500" },
                   { label: "פתיחת תשלום", value: siteTraffic.data.funnel.paymentStarts, color: "bg-green-500" },
@@ -704,10 +708,11 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
+              <p className="mb-4 text-xs leading-6 text-gray-500">אלה ספירות של אירועים, לא מספר אנשים או ביקורים ייחודיים. השלבים אינם בהכרח אותם אנשים, ולכן אינם משפך המרה מוכח.</p>
               {/* Daily traffic */}
               {siteTraffic.data.dailyViews.length > 0 && (
                 <div>
-                  <div className="text-[10px] text-gray-500 mb-1">תנועה יומית</div>
+                  <div className="text-[10px] text-gray-500 mb-1">אירועי צפייה יומיים</div>
                   <MiniBarChart data={siteTraffic.data.dailyViews.map((d: any) => ({ label: d.day, value: d.views }))} color="bg-indigo-400" height={40} />
                 </div>
               )}
