@@ -21,8 +21,8 @@ export function editorialNextStep(slug: string, now = Date.now()) {
   if (/chemistry|dna|psychology|signs/.test(slug)) {
     return { title: "מה חשוב לך בקשר הבא?", text: "אפשר להתחיל בהתבוננות דרך שאלון DNA הזוגי החינמי, ולהמשיך להיכרות דרך המאגר או לשיחה אישית על הבחירות והדפוסים שלך.", primaryHref: "/dna-quiz", primaryLabel: "לשאלון DNA החינמי" };
   }
-  if (/shahar|story|attraction|coaching/.test(slug)) {
-    return { title: "מהסיפור שלי לבחירה שלך", text: "פגישה אישית היא מקום לעצור, להבין מה חשוב לך בזוגיות ולחשוב על הצעד הבא. לתיאום עם הילית יש לבדוק את האפשרויות בעמוד הפגישה.", primaryHref: "/single-session", primaryLabel: "לפרטים ולתיאום פגישה אישית" };
+  if (/attraction|coaching/.test(slug)) {
+    return { title: "לבחון את הבחירות שלך בזוגיות", text: "פגישה אישית היא מקום לעצור, להבין מה חשוב לך בזוגיות ולחשוב על הצעד הבא. לתיאום עם הילית יש לבדוק את האפשרויות בעמוד הפגישה.", primaryHref: "/single-session", primaryLabel: "לפרטים ולתיאום פגישה אישית" };
   }
   return { title: "לפתוח אפשרות להיכרות חדשה", text: "במאגר ההיכרויות מתחילים מהפרופיל, ההעדפות והשאלונים. במסלול הרגיל הצעות עוברות גם בחינה אנושית, והבחירה אם להתקדם נשארת של שני הצדדים.", primaryHref: "/database", primaryLabel: "לפרטי המאגר ולהצטרפות" };
 }

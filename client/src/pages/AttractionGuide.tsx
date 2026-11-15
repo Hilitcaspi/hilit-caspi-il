@@ -142,7 +142,7 @@ export default function AttractionGuide() {
         </section>
         <section className="mx-auto max-w-[47rem] px-5 pb-8 sm:px-8" aria-label="עוד מהסיפור ומהגישה שלי">
           <EditorialNextStep slug="attraction" />
-          <p className="mt-6 text-sm leading-8"><Link href="/blog/hilit-shahar-story-relationship-criteria" className={textLink}>איך הכרתי את שחר ומה למדתי על הרשימה שלי</Link>. להמשך קריאה: <Link href="/signs" className={textLink}>סימנים לעניין בתחילת קשר</Link> ו<Link href="/blog" className={textLink}>כל המאמרים</Link>.</p>
+          <p className="mt-6 text-sm leading-8">להמשך קריאה: <Link href="/signs" className={textLink}>סימנים לעניין בתחילת קשר</Link> ו<Link href="/blog" className={textLink}>כל המאמרים</Link>.</p>
         </section>
       </main>
 

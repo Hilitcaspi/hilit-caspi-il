@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { blogPosts } from "../drizzle/schema";
 import { getDb } from "./db";
 import { sanitizeBlogContent } from "./blogContent";
+import { PRIVACY_SECTIONS, PRIVACY_CONTACT, PRIVACY_UPDATED } from "../shared/israeliPrivacyPolicy";
 import { blogStructuredData, serializeStructuredData } from "../shared/blogStructuredData";
 import {
   editorialNextStep,
@@ -302,6 +303,11 @@ function renderBlogArticle(post: BlogArticle, now: number): string {
     : "";
   return `<div data-seo-prerender="true" dir="rtl" class="min-h-screen bg-[#f0eadc] font-rubik text-[#191265]"><nav class="bg-[#191265] px-6 py-4 text-white"><div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4"><a href="/" class="text-xl font-bold">הילית כספי</a><div class="flex flex-wrap gap-5 text-sm"><a href="/database">המאגר</a><a href="/single-session">פגישה אישית</a><a href="/blog">כל המאמרים</a></div></div></nav>${cover}<main class="mx-auto max-w-3xl px-6 py-10"><article><div class="mb-4 flex flex-wrap gap-2">${tags}</div><h1 class="mb-4 text-3xl font-bold leading-tight md:text-4xl">${escapeHtml(post.title)}</h1><p class="mb-8 border-b border-[#191265]/15 pb-6 text-sm text-[#605b6a]">הילית כספי · ${escapeHtml(formatDate(post.publishedAt))}</p>${notice}<div class="editorial-body max-w-none text-[#191265]">${sanitizeBlogContent(post.content)}</div>${renderEditorialNextStep(post.slug, now)}<section class="mt-8 border-t border-[#191265]/15 pt-6" aria-label="עוד לקריאה"><h2 class="mb-3 text-lg font-bold">להמשיך לקרוא</h2><div class="flex flex-wrap gap-6 text-sm underline"><a href="/signs">סימנים לעניין בתחילת קשר</a><a href="/attraction">על משיכה וחיזור</a><a href="/blog">כל המאמרים</a></div></section></article></main></div>`;
 }
+function renderPrivacyPage(): string {
+  const sections = PRIVACY_SECTIONS.map(section => `<section id="${escapeHtml(section.id)}" class="border-b border-[#191265]/10 py-7"><h2 class="mb-4 text-xl font-bold">${escapeHtml(section.title)}</h2>${section.paragraphs.map(p => `<p class="mt-3 leading-8 text-[#514d5c]">${escapeHtml(p)}</p>`).join("")}</section>`).join("");
+  return `<div dir="rtl" class="min-h-screen bg-[#f0eadc] font-rubik text-[#191265]"><nav class="bg-[#191265] px-6 py-5 text-white"><a href="/" class="text-xl font-bold">הילית כספי</a></nav><main class="mx-auto max-w-4xl px-5 py-10 sm:px-8"><h1 class="text-3xl font-bold sm:text-4xl">מדיניות פרטיות</h1><p class="mt-3 text-sm">עודכן: ${escapeHtml(PRIVACY_UPDATED)}</p><aside class="my-7 rounded-2xl bg-[#191265] p-6 text-white"><h2 class="text-lg font-bold">פנייה בנוגע למידע שלכם</h2><p class="my-3">${escapeHtml(PRIVACY_CONTACT.name)}. ${escapeHtml(PRIVACY_CONTACT.address)}.</p><a class="underline" href="mailto:${escapeHtml(PRIVACY_CONTACT.email)}">${escapeHtml(PRIVACY_CONTACT.email)}</a> <a class="underline" href="tel:${escapeHtml(PRIVACY_CONTACT.phone)}">${escapeHtml(PRIVACY_CONTACT.phone)}</a></aside><div class="rounded-3xl bg-white p-6 sm:p-9">${sections}</div><nav class="mt-8 flex flex-wrap gap-6 underline"><a href="/terms/database">תקנון המאגר</a><a href="/terms/single-session">תקנון פגישה אישית</a><a href="/terms/november-love">תקנון חבילת נובמבר</a></nav></main></div>`;
+}
+
 export type SeoPage = {
   html: string;
   status: number;
@@ -334,6 +340,7 @@ export async function prepareSeoPage(
     (blogMatch ? PUBLIC_ROUTE_META["/blog"] : undefined);
   if (!meta) return { html: template, status: 200, noindex: false };
   try {
+    if (path === "/privacy") return { html: composeSeoHtml(template, meta, path, renderPrivacyPage()), status: 200, noindex: false };
     if (path === "/blog")
       return {
         html: composeSeoHtml(

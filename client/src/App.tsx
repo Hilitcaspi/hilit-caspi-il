@@ -12,6 +12,7 @@ import ContextualUpsell from "@/components/ContextualUpsell";
 import NovemberPromotion from "@/components/NovemberPromotion";
 import VerifiedPurchaseTracker from "@/components/VerifiedPurchaseTracker";
 import ClientSeoHead from "@/components/ClientSeoHead";
+import PrivacyFooter from "@/components/PrivacyFooter";
 
 // Eagerly loaded (critical path)
 import DnaQuiz from "@/pages/DnaQuiz";
@@ -30,6 +31,7 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const EmailPreview = lazy(() => import("@/pages/EmailPreview"));
 const Unsubscribe = lazy(() => import("@/pages/Unsubscribe"));
 const Blog = lazy(() => import("@/pages/Blog"));
+const Privacy = lazy(() => import("@/pages/Privacy"));
 const BlogPost = lazy(() => import("@/pages/BlogPost"));
 const Speaking = lazy(() => import("@/pages/Speaking"));
 const BlogAdmin = lazy(() => import("@/pages/BlogAdmin"));
@@ -341,6 +343,7 @@ function HeRouter() {
           <Route path={"/now"} component={DatabaseNowRedirect} />
           <Route path={"/maagar"} component={DatabaseLanding} />
           <Route path={"/terms/database"} component={TermsDatabase} />
+          <Route path={"/privacy"} component={Privacy} />
           <Route path={"/database-plus"} component={DatabasePlusSales} />
           <Route path={"/terms/plus"} component={TermsPlus} />
           <Route path={"/thank-you/plus"} component={ThankYouPlus} />
@@ -417,6 +420,7 @@ function HeRouter() {
           <Route component={NotFound} />
         </Switch>
       </Suspense>
+      <PrivacyFooter />
       <ContextualUpsell />
     </>
   );

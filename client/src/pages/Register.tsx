@@ -1645,7 +1645,7 @@ export default function Register() {
                     className="mt-0.5 w-5 h-5 accent-[#191265] flex-shrink-0"
                   />
                   <span className="text-sm text-[#444] leading-relaxed text-right">
-                    אני מסכימה/מסכים להשתתף בשירות ההתאמות ולקבל הצעות אישיות. הפרטים שלי ייחשפו רק במסגרת תהליך התאמה ובהתאם למדיניות הפרטיות.
+                    ההשתתפות בשירות ההתאמות וקבלת הצעות אישיות מקובלות עליי. לצורך בחינת הצעה יוצגו פרטי פרופיל ותמונה; פרטי קשר יימסרו לאחר אישור הדדי, בהתאם ל<a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline text-[#191265]">מדיניות הפרטיות</a>.
                   </span>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer px-4 py-3 bg-white border border-[#e9e8e8] rounded-xl">

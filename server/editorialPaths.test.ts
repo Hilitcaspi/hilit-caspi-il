@@ -8,8 +8,8 @@ describe("editorial acquisition paths", () => {
   it("allows reflection before a purchase", () => {
     expect(editorialNextStep("chemistry-vs-compatibility-first-date").primaryHref).toBe("/dna-quiz");
   });
-  it("connects Hilit's personal story to a meeting", () => {
-    expect(editorialNextStep("hilit-shahar-story-relationship-criteria").primaryHref).toBe("/single-session");
+  it("connects personal coaching content to a meeting", () => {
+    expect(editorialNextStep("relationship-coaching-guide").primaryHref).toBe("/single-session");
   });
   it("promotes the bundle only inside its existing offer window", () => {
     const slug = "november-2026-database-course-offer";

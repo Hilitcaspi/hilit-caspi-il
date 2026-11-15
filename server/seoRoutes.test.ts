@@ -219,7 +219,7 @@ describe("safe request-local head and public pre-render", () => {
     expect(page.html).not.toContain("כותרת פנימית");
   });
   it("keeps the shared story CTA and all three pathways in the styled article body", async () => {
-    const story = { ...post, slug: "hilit-shahar-story-relationship-criteria" };
+    const story = { ...post, slug: "relationship-coaching-guide" };
     const page = await prepareSeoPage(
       template,
       `/blog/${story.slug}`,
@@ -230,7 +230,7 @@ describe("safe request-local head and public pre-render", () => {
     expect(page.html).toContain(
       'class="min-h-screen bg-[#f0eadc] font-rubik text-[#191265]"'
     );
-    expect(page.html).toContain("מהסיפור שלי לבחירה שלך");
+    expect(page.html).toContain("לבחון את הבחירות שלך בזוגיות");
     expect(page.html).toContain('href="/single-session"');
     expect(page.html).toContain('href="/database"');
     expect(page.html).toContain('href="/dna-quiz"');
