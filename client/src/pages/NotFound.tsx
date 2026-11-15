@@ -2,9 +2,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Home } from "lucide-react";
 import { useLocation } from "wouter";
+import { useEffect } from "react";
 
 export default function NotFound() {
   const [, setLocation] = useLocation();
+  useEffect(() => {
+    const existing = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const robots = existing ?? document.createElement("meta");
+    const previous = robots.content;
+    robots.name = "robots";
+    robots.content = "noindex,nofollow";
+    if (!existing) document.head.appendChild(robots);
+    return () => { if (existing) robots.content = previous; else robots.remove(); };
+  }, []);
 
   const handleGoHome = () => {
     setLocation("/");

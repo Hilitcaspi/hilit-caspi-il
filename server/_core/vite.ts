@@ -5,6 +5,12 @@ import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
+import {
+  applySeoPageHeaders,
+  isPageRequest,
+  prepareSeoPage,
+  registerSeoRoutes,
+} from "../seoRoutes";
 
 // ─── English OG meta tags for /en/* paths ─────────────────────────────────────
 // WhatsApp and social crawlers read OG tags from the raw HTML served by the server.
@@ -93,8 +99,10 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
+  registerSeoRoutes(app);
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
+    if (!isPageRequest(req)) return next();
     const url = req.originalUrl;
 
     try {
@@ -115,8 +123,21 @@ export async function setupVite(app: Express, server: Server) {
       if (url.startsWith("/en")) {
         template = injectEnglishOgTags(template, url);
       }
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      const seoPage = await prepareSeoPage(template, url);
+      let page = await vite.transformIndexHtml(url, seoPage.html);
+      // Vite's normal CSS is JS-injected. Block first paint of blog pre-render
+      // until the same app stylesheet is available; keep runtime/HMR injection.
+      if (seoPage.html.includes('data-seo-prerender="true"')) {
+        page = page.replace(
+          "</head>",
+          () => '<link rel="stylesheet" href="/src/index.css?direct" /></head>'
+        );
+      }
+      applySeoPageHeaders(res, seoPage);
+      res
+        .status(seoPage.status)
+        .set({ "Content-Type": "text/html; charset=utf-8" })
+        .end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -135,18 +156,28 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  registerSeoRoutes(app);
+  // The HTML handler must own /, not express.static's automatic index serving.
+  app.use(express.static(distPath, { index: false, redirect: false }));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    const url = _req.originalUrl;
+  // API and missing assets must never receive the SPA HTML/SEO fallback.
+  app.use("*", async (req, res, next) => {
+    if (!isPageRequest(req)) return next();
+    const url = req.originalUrl;
     const htmlPath = path.resolve(distPath, "index.html");
-    if (url.startsWith("/en")) {
-      let html = fs.readFileSync(htmlPath, "utf-8");
-      html = injectEnglishOgTags(html, url);
-      res.status(200).set({ "Content-Type": "text/html" }).end(html);
-    } else {
-      res.sendFile(htmlPath);
+    try {
+      let template = await fs.promises.readFile(htmlPath, "utf-8");
+      if (url.startsWith("/en")) {
+        template = injectEnglishOgTags(template, url);
+      }
+      const page = await prepareSeoPage(template, url);
+      applySeoPageHeaders(res, page);
+      res
+        .status(page.status)
+        .set({ "Content-Type": "text/html; charset=utf-8" })
+        .end(page.html);
+    } catch (error) {
+      next(error);
     }
   });
 }

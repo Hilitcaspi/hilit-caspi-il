@@ -104,6 +104,7 @@ import {
 import { hashActor, recordSelfServiceEventSafely } from "./usageMetrics";
 import { isInvalidMatchPlaceholder } from "./invalidMatchPlaceholder";
 import { requestRegistrationResumeLink } from "./registrationResumeLink";
+import { isSafeBlogCoverImage, sanitizeBlogContent } from "./blogContent";
 
 // ─── Payment log ring buffer (in-memory, last 200 entries) ─────────────────────
 const PAYMENT_LOG_BUFFER: string[] = [];
@@ -6801,6 +6802,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           coverImage: blogPosts.coverImage,
           tags: blogPosts.tags,
           publishedAt: blogPosts.publishedAt,
+          createdAt: blogPosts.createdAt,
+          updatedAt: blogPosts.updatedAt,
         })
           .from(blogPosts)
           .where(eq(blogPosts.isPublished, true))
@@ -6816,46 +6819,86 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           .where(and(eq(blogPosts.slug, input.slug), eq(blogPosts.isPublished, true)))
           .limit(1);
         if (!post) throw new TRPCError({ code: "NOT_FOUND", message: "מאמר לא נמצא" });
+        return { ...post, content: sanitizeBlogContent(post.content) };
+      }),
+    listAdmin: teamProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(200).default(50) }).optional())
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db.select().from(blogPosts)
+          .orderBy(desc(blogPosts.updatedAt), desc(blogPosts.id))
+          .limit(input?.limit ?? 50);
+      }),
+    getForEdit: teamProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [post] = await db.select().from(blogPosts)
+          .where(eq(blogPosts.id, input.id)).limit(1);
+        if (!post) throw new TRPCError({ code: "NOT_FOUND", message: "מאמר לא נמצא" });
         return post;
       }),
     upsert: teamProcedure
       .input(z.object({
-        id: z.number().optional(),
-        title: z.string().min(1),
-        slug: z.string().min(1),
-        excerpt: z.string().min(1),
-        content: z.string().min(1),
-        coverImage: z.string().optional(),
+        id: z.number().int().positive().optional(),
+        title: z.string().trim().min(1).max(300),
+        slug: z.string().trim().min(1).max(300),
+        excerpt: z.string().trim().min(1),
+        content: z.string().trim().min(1),
+        coverImage: z.string().trim().refine(isSafeBlogCoverImage, "כתובת תמונה לא תקינה").optional(),
         metaDescription: z.string().max(160).optional(),
-        tags: z.string().optional(),
-        isPublished: z.boolean().default(true),
-        publishedAt: z.number().optional(),
+        tags: z.string().max(500).optional(),
+        isPublished: z.boolean().optional(),
+        publishedAt: z.number().int().positive().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const now = Date.now();
+        const content = sanitizeBlogContent(input.content);
+        if (!content.replace(/<[^>]*>/g, "").trim() && !/<img\b[^>]*\bsrc=/.test(content)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "תוכן המאמר ריק לאחר ניקוי HTML" });
+        }
+        const fields = {
+          title: input.title,
+          slug: input.slug,
+          excerpt: input.excerpt,
+          content,
+          ...(input.coverImage !== undefined ? { coverImage: input.coverImage || null } : {}),
+          ...(input.metaDescription !== undefined ? { metaDescription: input.metaDescription || null } : {}),
+          ...(input.tags !== undefined ? {
+            tags: Array.from(new Set(input.tags.split(",").map(tag => tag.trim()).filter(Boolean))).join(",") || null,
+          } : {}),
+        };
         if (input.id) {
+          const [existing] = await db.select().from(blogPosts)
+            .where(eq(blogPosts.id, input.id)).limit(1);
+          if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "מאמר לא נמצא" });
+          const isPublished = input.isPublished ?? existing.isPublished;
+          // Zero is the unpublished sentinel required by the existing NOT NULL schema.
+          // Once set, the original publication date survives edits and republication.
+          const publishedAt = existing.publishedAt > 0 ? existing.publishedAt : isPublished ? now : 0;
+          const changes = { ...fields, isPublished, publishedAt };
+          const changed = Object.entries(changes).some(([key, value]) =>
+            existing[key as keyof typeof existing] !== value);
+          if (!changed) return { id: input.id };
           await db.update(blogPosts)
-            .set({ ...input, updatedAt: now })
+            .set({ ...changes, updatedAt: now })
             .where(eq(blogPosts.id, input.id));
           return { id: input.id };
         } else {
+          const isPublished = input.isPublished ?? false;
           const [result] = await db.insert(blogPosts).values({
-            title: input.title,
-            slug: input.slug,
-            excerpt: input.excerpt,
-            content: input.content,
-            coverImage: input.coverImage,
-            metaDescription: input.metaDescription,
-            tags: input.tags,
-            isPublished: input.isPublished,
-            publishedAt: input.publishedAt ?? now,
+            ...fields,
+            isPublished,
+            publishedAt: isPublished ? input.publishedAt ?? now : 0,
             createdAt: now,
             updatedAt: now,
           });
-          return { id: (result as any)[0].insertId };
+          return { id: result.insertId };
         }
       }),
     delete: teamProcedure

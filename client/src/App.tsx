@@ -11,6 +11,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import ContextualUpsell from "@/components/ContextualUpsell";
 import NovemberPromotion from "@/components/NovemberPromotion";
 import VerifiedPurchaseTracker from "@/components/VerifiedPurchaseTracker";
+import ClientSeoHead from "@/components/ClientSeoHead";
 
 // Eagerly loaded (critical path)
 import DnaQuiz from "@/pages/DnaQuiz";
@@ -290,6 +291,7 @@ function UsRouter() {
 function HeRouter() {
   return (
     <>
+      <ClientSeoHead />
       <ReferrerDetector />
       <ScrollToTop />
       <VerifiedPurchaseTracker />

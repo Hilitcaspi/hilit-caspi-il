@@ -351,7 +351,10 @@ export default function Home() {
             className="order-1 md:order-2 flex justify-center">
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-br from-[#ffe27c]/30 to-[#1800ad]/30 rounded-3xl blur-2xl" />
-              <img src={HERO_IMG} alt="הילית כספי" className="relative w-72 md:w-96 h-auto rounded-3xl object-cover shadow-2xl" />
+              <picture>
+                <source type="image/webp" srcSet="/manus-storage/hilit-hero-seo-480_e0de1569.webp 480w, /manus-storage/hilit-hero-seo-800_c1688eef.webp 800w" sizes="(min-width: 768px) 384px, 288px" />
+                <img src={HERO_IMG} alt="הילית כספי" width={1080} height={1440} fetchPriority="high" decoding="async" className="relative w-72 md:w-96 h-auto rounded-3xl object-cover shadow-2xl" />
+              </picture>
               {/* Floating badge */}
               <motion.div animate={{ y: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
                 className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl px-4 py-3 text-center">

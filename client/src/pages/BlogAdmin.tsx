@@ -24,6 +24,20 @@ type BlogPost = {
   updatedAt: number;
 };
 
+function normalizeTags(value?: string | null): string {
+  if (!value) return "";
+  let tags: unknown = value;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) tags = parsed;
+  } catch {
+    // Existing records normally store comma-separated tags.
+  }
+  const items = Array.isArray(tags) ? tags : value.split(",");
+  return Array.from(new Set(items.filter((tag): tag is string => typeof tag === "string")
+    .map(tag => tag.trim()).filter(Boolean))).join(",");
+}
+
 function BlogPostForm({ post, onSave, onCancel }: {
   post?: BlogPost | null;
   onSave: (data: Partial<BlogPost>) => void;
@@ -33,9 +47,10 @@ function BlogPostForm({ post, onSave, onCancel }: {
   const [slug, setSlug] = useState(post?.slug ?? "");
   const [excerpt, setExcerpt] = useState(post?.excerpt ?? "");
   const [content, setContent] = useState(post?.content ?? "");
+  const [coverImage, setCoverImage] = useState(post?.coverImage ?? "");
   const [metaDescription, setMetaDescription] = useState(post?.metaDescription ?? "");
-  const [tags, setTags] = useState(post?.tags ?? "");
-  const [isPublished, setIsPublished] = useState(post?.isPublished ?? true);
+  const [tags, setTags] = useState(normalizeTags(post?.tags));
+  const [isPublished, setIsPublished] = useState(post?.isPublished ?? false);
 
   const generateSlug = (t: string) =>
     t.trim()
@@ -52,11 +67,12 @@ function BlogPostForm({ post, onSave, onCancel }: {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !slug || !excerpt || !content) {
+    if (!title.trim() || !slug.trim() || !excerpt.trim() || !content.trim()) {
       toast.error("נא למלא את כל השדות החובה");
       return;
     }
-    onSave({ id: post?.id, title, slug, excerpt, content, metaDescription, tags, isPublished });
+    onSave({ id: post?.id, title: title.trim(), slug: slug.trim(), excerpt: excerpt.trim(),
+      content, coverImage: coverImage.trim(), metaDescription, tags: normalizeTags(tags), isPublished });
   };
 
   return (
@@ -106,6 +122,18 @@ function BlogPostForm({ post, onSave, onCancel }: {
         <p className="text-xs text-gray-400 mt-1">ניתן להשתמש ב-HTML: &lt;h2&gt;, &lt;p&gt;, &lt;strong&gt;, &lt;a href=&quot;...&quot;&gt;</p>
       </div>
       <div>
+        <label htmlFor="blog-cover-image" className="block text-sm font-medium text-[#191265] mb-1">תמונת שער (כתובת URL)</label>
+        <input
+          id="blog-cover-image"
+          value={coverImage}
+          onChange={e => setCoverImage(e.target.value)}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-left focus:outline-none focus:border-[#191265]"
+          dir="ltr"
+          placeholder="https://... או /manus-storage/..."
+        />
+        <p className="text-xs text-gray-400 mt-1">תמונת המאמר שמופיעה בבלוג ובשיתוף קישור. השאירי ריק להסרת תמונה.</p>
+      </div>
+      <div>
         <label className="block text-sm font-medium text-[#191265] mb-1">Meta Description (לגוגל, עד 160 תווים)</label>
         <input
           value={metaDescription}
@@ -141,7 +169,7 @@ function BlogPostForm({ post, onSave, onCancel }: {
           ביטול
         </Button>
         <Button type="submit" className="bg-[#191265] hover:bg-[#1800ad] text-white text-sm">
-          {post?.id ? "עדכן מאמר" : "פרסם מאמר"}
+          {post?.id ? "עדכן מאמר" : isPublished ? "פרסם מאמר" : "שמור טיוטה"}
         </Button>
       </div>
     </form>
@@ -150,14 +178,25 @@ function BlogPostForm({ post, onSave, onCancel }: {
 
 export default function BlogAdmin() {
   const { user, loading } = useAuth();
-  const [editingPost, setEditingPost] = useState<BlogPost | null | "new">(null);
+  const [editingPost, setEditingPost] = useState<number | null | "new">(null);
+  const isAdmin = user?.role === "admin";
 
-  const { data: posts, refetch } = trpc.blog.list.useQuery({ limit: 50 });
+  const { data: posts, refetch, isLoading: postsLoading, error: postsError } = trpc.blog.listAdmin.useQuery(
+    { limit: 50 }, { enabled: !loading && isAdmin },
+  );
+  const editingId = typeof editingPost === "number" ? editingPost : null;
+  const { data: fullPost, isLoading: editLoading, error: editError } = trpc.blog.getForEdit.useQuery(
+    { id: editingId ?? 1 }, { enabled: !loading && isAdmin && editingId !== null },
+  );
+  const utils = trpc.useUtils();
   const upsert = trpc.blog.upsert.useMutation({
     onSuccess: () => {
       toast.success("המאמר נשמר בהצלחה ✓");
       setEditingPost(null);
       refetch();
+      void utils.blog.getForEdit.invalidate();
+      void utils.blog.list.invalidate();
+      void utils.blog.getBySlug.invalidate();
     },
     onError: (e) => toast.error(`שגיאה: ${e.message}`),
   });
@@ -165,14 +204,20 @@ export default function BlogAdmin() {
     onSuccess: () => {
       toast.success("המאמר נמחק");
       refetch();
+      setEditingPost(null);
+      void utils.blog.getForEdit.invalidate();
+      void utils.blog.list.invalidate();
+      void utils.blog.getBySlug.invalidate();
     },
     onError: (e) => toast.error(`שגיאה: ${e.message}`),
   });
 
   if (loading) return <div className="min-h-screen bg-[#f0eadc] flex items-center justify-center"><div className="text-[#191265]">טוען...</div></div>;
   if (!user || user.role !== "admin") {
-    window.location.href = getLoginUrl();
-    return null;
+    return <div className="min-h-screen bg-[#f0eadc] flex flex-col gap-3 items-center justify-center" dir="rtl">
+      <p className="text-[#191265]">נדרשת הרשאת ניהול לצפייה במאמרים.</p>
+      {!user && <Button onClick={() => { window.location.href = getLoginUrl(); }}>כניסה לניהול</Button>}
+    </div>;
   }
 
   const handleSave = (data: Partial<BlogPost>) => {
@@ -185,7 +230,7 @@ export default function BlogAdmin() {
       coverImage: data.coverImage ?? undefined,
       metaDescription: data.metaDescription ?? undefined,
       tags: data.tags ?? undefined,
-      isPublished: data.isPublished ?? true,
+      isPublished: data.isPublished ?? false,
     });
   };
 
@@ -206,7 +251,7 @@ export default function BlogAdmin() {
           <span className="text-white/60 text-sm">({posts?.length ?? 0} מאמרים)</span>
         </div>
         <div className="flex items-center gap-2">
-          <a href="/blog" target="_blank">
+          <a href="/blog" target="_blank" rel="noopener noreferrer">
             <Button size="sm" variant="outline" className="h-8 text-xs bg-white/10 border-white/30 text-white hover:bg-white/20">
               <Eye size={12} className="ml-1" /> צפה בבלוג
             </Button>
@@ -227,21 +272,28 @@ export default function BlogAdmin() {
           <Card className="mb-6 border-[#191265]/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base text-[#191265]">
-                {editingPost === "new" ? "מאמר חדש" : `עריכה: ${(editingPost as BlogPost).title}`}
+                {editingPost === "new" ? "מאמר חדש" : `עריכה: ${fullPost?.title ?? "טוען..."}`}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <BlogPostForm
-                post={editingPost === "new" ? null : editingPost as BlogPost}
+              {editingPost !== "new" && editError ? (
+                <p role="alert" className="text-sm text-red-600">לא ניתן לטעון את המאמר לעריכה: {editError.message}</p>
+              ) : editingPost !== "new" && (editLoading || !fullPost || fullPost.id !== editingId) ? (
+                <p className="text-sm text-[#727272]">טוען את תוכן המאמר המלא...</p>
+              ) : <BlogPostForm
+                key={editingPost}
+                post={editingPost === "new" ? null : fullPost}
                 onSave={handleSave}
                 onCancel={() => setEditingPost(null)}
-              />
+              />}
             </CardContent>
           </Card>
         )}
 
         {/* Posts list */}
-        {!posts || posts.length === 0 ? (
+        {postsLoading ? <p className="text-center py-16 text-[#727272]">טוען מאמרים...</p>
+        : postsError ? <p role="alert" className="text-center py-16 text-red-600">לא ניתן לטעון את רשימת המאמרים: {postsError.message}</p>
+        : !posts || posts.length === 0 ? (
           <div className="text-center py-16 text-[#727272]">
             <div className="text-4xl mb-3">✍️</div>
             <p className="font-medium">אין מאמרים עדיין</p>
@@ -249,7 +301,7 @@ export default function BlogAdmin() {
           </div>
         ) : (
           <div className="space-y-3">
-            {(posts as BlogPost[]).map(post => (
+            {posts.map(post => (
               <Card key={post.id} className="border-r-4 border-r-[#191265]/20">
                 <CardContent className="pt-4 pb-3 px-4">
                   <div className="flex items-start justify-between gap-3">
@@ -276,22 +328,22 @@ export default function BlogAdmin() {
                         {post.tags && (
                           <>
                             <span>·</span>
-                            <span>{post.tags}</span>
+                            <span>{normalizeTags(post.tags)}</span>
                           </>
                         )}
                       </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
-                      <a href={`/blog/${post.slug}`} target="_blank">
+                      {post.isPublished && <a href={`/blog/${encodeURIComponent(post.slug)}`} target="_blank" rel="noopener noreferrer">
                         <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
                           <Eye size={11} /> צפה
                         </Button>
-                      </a>
+                      </a>}
                       <Button
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs gap-1 text-blue-700 border-blue-200 hover:bg-blue-50"
-                        onClick={() => setEditingPost(post)}
+                        onClick={() => setEditingPost(post.id)}
                       >
                         <Edit2 size={11} /> ערוך
                       </Button>

@@ -1,156 +1,81 @@
-/**
- * BlogPost - single article page with SEO meta tags
- */
-
 import { useEffect } from "react";
-import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { Link, useParams } from "wouter";
-import { track } from "@/lib/track";
-
-const WHATSAPP_URL = "https://wa.me/972552442334?text=%D7%94%D7%99%D7%99%20%D7%94%D7%99%D7%9C%D7%99%D7%AA%2C%20%D7%A7%D7%A8%D7%90%D7%AA%D7%99%20%D7%90%D7%AA%20%D7%94%D7%9B%D7%AA%D7%91%D7%94%20%D7%95%D7%99%D7%A9%20%D7%9C%D7%99%20%D7%A9%D7%90%D7%9C%D7%94";
-// Calendly removed - using /single-session for intro meetings
+import { parseEditorialTags } from "@shared/editorialPaths";
+import { isNovemberBundleOfferActive } from "@shared/novemberBundleOffer";
+import EditorialNextStep from "@/components/EditorialNextStep";
+import { blogStructuredData, serializeStructuredData } from "@shared/blogStructuredData";
 
 function formatDate(ts: number) {
-  return new Date(ts).toLocaleDateString("he-IL", { year: "numeric", month: "long", day: "numeric" });
+  return new Date(ts).toLocaleDateString("he-IL", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Jerusalem" });
 }
 
 export default function BlogPost() {
-  const params = useParams<{ slug: string }>();
-  const slug = params.slug;
+  const { slug = "" } = useParams<{ slug: string }>();
+  const { data: post, isLoading, error, refetch } = trpc.blog.getBySlug.useQuery({ slug }, { enabled: !!slug });
+  const notFound = error?.data?.code === "NOT_FOUND";
+  const novemberExpired = slug === "november-2026-database-course-offer" && !isNovemberBundleOfferActive();
 
-  const { data: post, isLoading, error } = trpc.blog.getBySlug.useQuery(
-    { slug: slug ?? "" },
-    { enabled: !!slug }
-  );
-
-  // Update page title and meta description for SEO
   useEffect(() => {
-    if (post) {
-      document.title = `${post.title} | הילית כספי`;
-      const metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc) {
-        metaDesc.setAttribute("content", post.metaDescription ?? post.excerpt);
-      } else {
-        const meta = document.createElement("meta");
-        meta.name = "description";
-        meta.content = post.metaDescription ?? post.excerpt;
-        document.head.appendChild(meta);
-      }
-    }
-    return () => {
-      document.title = "הילית כספי | מאמנת ומשדכת";
+    if (!post && !notFound) return;
+    const previousTitle = document.title;
+    const saved: Array<() => void> = [];
+    const setMeta = (key: string, value: string, property = false) => {
+      const attribute = property ? "property" : "name";
+      const existing = document.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
+      const element = existing ?? document.createElement("meta");
+      const previous = element.content;
+      element.setAttribute(attribute, key); element.content = value;
+      if (!existing) document.head.appendChild(element);
+      saved.push(() => { if (existing) element.content = previous; else element.remove(); });
     };
-  }, [post]);
+    const existingSchema = document.getElementById("blog-structured-data");
+    if (existingSchema) existingSchema.remove();
+    if (post) {
+      const schema = document.createElement("script"); schema.id = "blog-structured-data"; schema.type = "application/ld+json";
+      schema.textContent = serializeStructuredData(blogStructuredData(post)); document.head.appendChild(schema);
+      saved.push(() => schema.remove());
+    }
+    document.title = post ? `${post.title} | הילית כספי` : "מאמר לא נמצא | הילית כספי";
+    const description = novemberExpired ? "הטבת נובמבר 2026 הסתיימה. אפשר לקרוא על מאגר ההיכרויות והשירותים הזמינים באתר." : post?.metaDescription?.trim() || post?.excerpt || "המאמר המבוקש לא נמצא.";
+    setMeta("description", description);
+    setMeta("og:title", document.title, true); setMeta("og:description", description, true);
+    setMeta("og:type", "article", true); setMeta("og:url", `https://hilitcaspi.com/blog/${encodeURIComponent(slug)}`, true);
+    setMeta("twitter:title", document.title); setMeta("twitter:description", description);
+    if (notFound) setMeta("robots", "noindex,nofollow");
+    const canonicalTags = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"]'));
+    const canonical = canonicalTags[0] ?? document.createElement("link");
+    const oldHref = canonical.href; canonical.rel = "canonical";
+    canonical.href = `https://hilitcaspi.com/blog/${encodeURIComponent(slug)}`;
+    if (!canonicalTags.length) document.head.appendChild(canonical);
+    canonicalTags.slice(1).forEach(tag => tag.remove());
+    saved.push(() => { if (canonicalTags.length) canonical.href = oldHref; else canonical.remove(); });
+    return () => { document.title = previousTitle; saved.reverse().forEach(restore => restore()); };
+  }, [post, notFound, slug, novemberExpired]);
 
   return (
     <div className="min-h-screen bg-[#f0eadc] font-rubik" dir="rtl">
-
-      {/* ── HEADER ── */}
-      <nav className="bg-[#191265] py-4 px-6">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <a href="/" className="text-white font-bold text-xl">הילית כספי</a>
-          <Link href="/blog" className="text-white/80 hover:text-[#ffe27c] text-sm transition-colors">
-            ← כל המאמרים
-          </Link>
+      <nav className="bg-[#191265] px-6 py-4 text-white" aria-label="ניווט המאמר">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4">
+          <Link href="/" className="text-xl font-bold">הילית כספי</Link>
+          <div className="flex flex-wrap gap-5 text-sm"><Link href="/database">המאגר</Link><Link href="/single-session">פגישה אישית</Link><Link href="/blog">כל המאמרים</Link></div>
         </div>
       </nav>
-
-      {isLoading && (
-        <div className="max-w-3xl mx-auto px-6 py-20 animate-pulse">
-          <div className="h-8 bg-gray-200 rounded mb-4 w-3/4" />
-          <div className="h-4 bg-gray-100 rounded mb-2" />
-          <div className="h-4 bg-gray-100 rounded mb-2 w-5/6" />
-          <div className="h-4 bg-gray-100 rounded w-4/6" />
-        </div>
-      )}
-
-      {error && (
-        <div className="max-w-3xl mx-auto px-6 py-20 text-center">
-          <div className="text-5xl mb-4">😕</div>
-          <h1 className="text-2xl font-black text-[#191265] mb-3">מאמר לא נמצא</h1>
-          <Link href="/blog" className="text-[#1800ad] font-semibold hover:underline">
-            ← חזרה לכל המאמרים
-          </Link>
-        </div>
-      )}
-
-      {post && (
-        <>
-          {/* ── HERO ── */}
-          {post.coverImage && (
-            <div className="w-full h-64 md:h-96 overflow-hidden">
-              <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover" />
-            </div>
-          )}
-          {!post.coverImage && (
-            <div className="w-full h-48 bg-gradient-to-br from-[#191265] to-[#1800ad]" />
-          )}
-
-          {/* ── ARTICLE ── */}
-          <article className="max-w-3xl mx-auto px-6 py-12">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-              {/* Tags */}
-              {post.tags && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {post.tags.split(",").map(tag => (
-                    <span key={tag} className="bg-[#ffe27c]/40 text-[#191265] text-xs px-3 py-1 rounded-full font-medium">
-                      {tag.trim()}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Title */}
-              <h1 className="text-3xl md:text-4xl font-black text-[#191265] leading-tight mb-4">
-                {post.title}
-              </h1>
-
-              {/* Meta */}
-              <div className="flex items-center gap-4 text-[#727272] text-sm mb-8 pb-8 border-b border-[#e9e8e8]">
-                <span>הילית כספי</span>
-                <span>·</span>
-                <span>{formatDate(post.publishedAt)}</span>
-              </div>
-
-              {/* Content */}
-              <div
-                className="prose prose-lg max-w-none text-[#191265] leading-relaxed"
-                style={{ direction: "rtl" }}
-                dangerouslySetInnerHTML={{ __html: post.content.replace(/\n/g, "<br />") }}
-              />
-            </motion.div>
-
-            {/* ── CTA ── */}
-            <div className="mt-16 bg-[#191265] rounded-3xl p-8 text-center">
-              <h2 className="text-2xl font-black text-white mb-3">רוצה לדעת מה מתאים לך?</h2>
-              <p className="text-white/70 mb-6">פגישת היכרות אישית. 60 דקות שישנו לך את הכיוון.</p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <a href="/single-session"
-                  className="bg-[#ffe27c] text-[#191265] font-black px-6 py-3 rounded-xl hover:bg-white transition-all">
-                  ♡ לפרטים ולקביעת פגישה
-                </a>
-                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
-                  className="border-2 border-white/40 text-white font-semibold px-6 py-3 rounded-xl hover:border-[#ffe27c] hover:text-[#ffe27c] transition-all">
-                  💬 כתבי לי בוואטסאפ
-                </a>
-              </div>
-            </div>
-
-            {/* ── BACK ── */}
-            <div className="mt-8 text-center">
-              <Link href="/blog" className="text-[#1800ad] font-semibold hover:underline">
-                ← כל המאמרים
-              </Link>
-            </div>
-          </article>
-        </>
-      )}
-
-      {/* ── FOOTER ── */}
-      <footer className="bg-[#191265] py-8 px-6 text-center mt-8">
-        <p className="text-white/50 text-sm">© 2025 הילית כספי. כל הזכויות שמורות.</p>
-      </footer>
+      {isLoading && <div className="mx-auto max-w-3xl animate-pulse px-6 py-16" aria-label="טעינת המאמר"><div className="mb-4 h-8 rounded bg-[#191265]/10" /><div className="h-40 rounded bg-[#191265]/5" /></div>}
+      {error && <div className="mx-auto max-w-3xl px-6 py-16 text-center"><h1 className="mb-3 text-2xl font-bold text-[#191265]">{notFound ? "מאמר לא נמצא" : "לא הצלחנו לטעון את המאמר כרגע"}</h1>{!notFound && <button type="button" onClick={() => void refetch()} className="mb-5 rounded-xl bg-[#191265] px-6 py-3 text-white">לנסות שוב</button>}<p><Link href="/blog" className="font-semibold text-[#1800ad] underline">חזרה לכל המאמרים</Link></p></div>}
+      {post && <>
+        {post.coverImage && <div className="w-full overflow-hidden bg-[#191265]"><img src={post.coverImage} alt={post.title} className="mx-auto max-h-96 w-full object-cover" width={1200} height={500} decoding="async" /></div>}
+        <article className="mx-auto max-w-3xl px-6 py-10 text-[#191265]">
+          <div className="mb-4 flex flex-wrap gap-2">{parseEditorialTags(post.tags).map(tag => <span key={tag} className="rounded-full bg-[#ffe27c]/40 px-3 py-1 text-xs font-medium">{tag}</span>)}</div>
+          <h1 className="mb-4 text-3xl font-bold leading-tight md:text-4xl">{post.title}</h1>
+          <div className="mb-8 flex items-center gap-4 border-b border-[#191265]/15 pb-6 text-sm text-[#605b6a]"><span>הילית כספי</span><time dateTime={new Date(post.publishedAt).toISOString()}>{formatDate(post.publishedAt)}</time></div>
+          {novemberExpired && <aside className="mb-6 rounded-xl border border-[#191265]/20 bg-white p-5 leading-7"><strong>הטבת נובמבר 2026 הסתיימה.</strong><p>הכתבה נשמרת כתיעוד של ההצעה שהייתה. המחיר וההטבה המתוארים אינם הצעה פעילה. <Link href="/database" className="font-bold underline">לפרטי המאגר כיום</Link>.</p></aside>}
+          <div className="editorial-body max-w-none text-[#191265]" dangerouslySetInnerHTML={{ __html: post.content }} />
+          <EditorialNextStep slug={slug} />
+          <section className="mt-8 border-t border-[#191265]/15 pt-6" aria-label="עוד לקריאה"><h2 className="mb-3 text-lg font-bold">להמשיך לקרוא</h2><div className="flex flex-wrap gap-x-6 gap-y-3 text-sm"><Link href="/signs" className="underline">סימנים לעניין בתחילת קשר</Link><Link href="/attraction" className="underline">על משיכה וחיזור</Link><Link href="/blog" className="underline">כל המאמרים</Link></div></section>
+        </article>
+      </>}
+      <footer className="mt-8 bg-[#191265] px-6 py-6 text-center text-sm text-white/75"><p>© {new Date().getFullYear()} הילית כספי. כל הזכויות שמורות.</p><Link href="/terms/database" className="mt-3 inline-block underline">תקנון המאגר</Link></footer>
     </div>
   );
 }

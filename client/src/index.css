@@ -325,3 +325,17 @@
 body.hc-november-bar-active nav.fixed.top-0 {
   top: var(--hc-promo-height, 64px);
 }
+
+/* Public editorial typography, shared by the HTML preview and React article. */
+.editorial-body { font-size: 1.0625rem; line-height: 1.95; overflow-wrap: anywhere; }
+.editorial-body p { margin: 1.15rem 0; }
+.editorial-body h2 { margin: 2rem 0 1rem; font-size: 1.55rem; font-weight: 700; line-height: 1.4; }
+.editorial-body h3 { margin: 1.5rem 0 .75rem; font-size: 1.25rem; font-weight: 700; line-height: 1.5; }
+.editorial-body a { color: #94265b; text-decoration: underline; text-underline-offset: .2em; }
+.editorial-body a:hover { color: #191265; }
+.editorial-body ul, .editorial-body ol { padding-inline-start: 1.5rem; margin: 1rem 0; }
+.editorial-body ul { list-style-type: disc; }
+.editorial-body ol { list-style-type: decimal; }
+.editorial-body li { margin: .4rem 0; }
+.editorial-body blockquote { margin: 1.4rem 0; padding-inline-start: 1rem; border-inline-start: 3px solid #d792b1; }
+.editorial-body img { max-width: 100%; height: auto; }

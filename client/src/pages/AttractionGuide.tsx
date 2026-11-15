@@ -7,6 +7,7 @@ import { captureAcquisition } from "@/lib/acquisitionTracking";
 import { getUtmParams } from "@/lib/utils";
 import { track } from "@/lib/track";
 import { trackViewContent } from "@/lib/metaPixel";
+import EditorialNextStep from "@/components/EditorialNextStep";
 
 const PORTRAIT = "https://d2xsxph8kpxj0f.cloudfront.net/310519663464075430/ByosHxKceEZVvPCNnZPjYz/hilit-profile_6821862b.jpg";
 const GUIDE_NAME = "על משיכה, חיזור והחיים שביניהם";
@@ -126,7 +127,7 @@ export default function AttractionGuide() {
             <div data-guide-path="new-relationship" className="mt-7 border-t border-[#191265]/15 pt-7">
               <h3 className="text-[22px] font-bold leading-snug text-[#191265]">לקראת היכרות חדשה</h3>
               <p className="mt-3 text-[17px] leading-8">אם אין כרגע קשר זוגי ויש רצון להכיר אדם מתאים וליישם את הדברים שעליהם כתבתי, אני מזמינה להצטרף למאגר ההיכרויות שלי. אנחנו מתחילים מפרופיל אישי, מההעדפות ומהשאלונים של שני הצדדים, כדי לבדוק חיבורים אפשריים.</p>
-              <p className="mt-3 text-[17px] leading-8">המערכת ואני בודקות התאמות, ואני עוברת על ההצעה לפני שהיא נשלחת. כל צד מחליט בנפרד אם להתקדם, ופרטי הקשר נחשפים רק לאחר אישור הדדי.</p>
+              <p className="mt-3 text-[17px] leading-8">במסלול המאגר הרגיל ההצעות עוברות גם בחינה אנושית לפני שליחה. כל צד מחליט בנפרד אם להתקדם, ופרטי הקשר נחשפים רק לאחר אישור הדדי.</p>
               <Link href={attractionHref("database", "main")} onClick={() => clicked("database", "main")} data-guide-cta="database" className={`mt-5 inline-flex w-full items-center justify-center gap-3 rounded-full bg-[#191265] px-6 py-4 text-center font-bold text-white transition-colors hover:bg-[#2d247e] sm:w-auto ${focusClass}`}>להיכרות דרך המאגר <ArrowLeft size={18} className="shrink-0" aria-hidden="true" /></Link>
               <p className="mt-3 text-xs leading-6 text-[#605765]">הצטרפות בתשלום חד־פעמי למאגר. במסלול הרגיל אין התחייבות למספר התאמות, לתדירות או לתוצאה. המדריך החינמי אינו מקנה חברות במאגר.</p>
             </div>
@@ -138,6 +139,10 @@ export default function AttractionGuide() {
             <p>ומעניין אותי לשמוע גם מהצד השני של החיזור: מה מושך יותר, עניין שממהר לדרוש תשובות או עניין שמשאיר מקום להתקרב? אפשר להגיב לסרטון הפודקאסט ולהוסיף גם את נקודת המבט הזאת. לקראת קשר חדש, <Link href={attractionHref("database", "men")} onClick={() => clicked("database", "men")} data-guide-cta="database-men" className={textLink}>המאגר פתוח לנשים ולגברים</Link>.</p>
             <p className="flex flex-wrap items-center gap-x-2"><MessageCircle size={17} aria-hidden="true" />נמשיך לדבר על זה? <a href={attractionHref("community", "footer")} onClick={() => clicked("community", "footer")} target="_blank" rel="noopener noreferrer" className={textLink}>לקבוצת הווטסאפ השקטה שלי</a>. תכנים ועדכונים, וההצטרפות בחינם.</p>
           </div>
+        </section>
+        <section className="mx-auto max-w-[47rem] px-5 pb-8 sm:px-8" aria-label="עוד מהסיפור ומהגישה שלי">
+          <EditorialNextStep slug="attraction" />
+          <p className="mt-6 text-sm leading-8"><Link href="/blog/hilit-shahar-story-relationship-criteria" className={textLink}>איך הכרתי את שחר ומה למדתי על הרשימה שלי</Link>. להמשך קריאה: <Link href="/signs" className={textLink}>סימנים לעניין בתחילת קשר</Link> ו<Link href="/blog" className={textLink}>כל המאמרים</Link>.</p>
         </section>
       </main>
 
