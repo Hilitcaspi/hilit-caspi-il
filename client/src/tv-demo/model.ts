@@ -19,3 +19,20 @@ export const DEMO_PROFILES = [
   { name: 'מאיה', age: 42, city: 'רמת גן', job: 'עצמאית בתחום העיצוב', image: '/manus-storage/tv-demo-fictional-maya_d18c6c36.webp', about: 'אוהבת אנשים וסיפורים. מאמינה בקשר עם כנות, מרחב אישי ותוכניות משותפות.', values: 'תקשורת · עצמאות · חברות' },
   { name: 'תמר', age: 35, city: 'הרצליה', job: 'מנהלת בתחום החינוך', image: '/manus-storage/tv-demo-fictional-tamar_82047198.webp', about: 'רוצה קשר עם נוכחות, קלילות ועומק. אוהבת טבע, חברים וארוחות ביתיות.', values: 'ביטחון · נתינה · צמיחה' },
 ];
+
+export const FEMALE_LABELS: Record<DnaType,string> = { leader:'המנהיגה הממגנטת', romantic:'הרומנטיקנית העמוקה', free_spirit:'הרוח החופשית', anchor:'העוגן היציב' };
+export type DemoQuestion = { id:string; text:string; text_f:string; options:string[]; type?:string; chapter2Only?:boolean; forParentsOnly?:boolean; conditionalAge?:number; categoryLabel:string };
+export function selectDemoQuestions<T extends DemoQuestion>(all:T[], profile:{age:string; marital:string; kids:string}, short:boolean) {
+  const chapter2=profile.marital==='divorced'||profile.marital==='widowed';
+  const parent=profile.kids==='yes';
+  const eligible=all.filter(q=>{
+    if(q.chapter2Only&&!chapter2)return false;
+    if(q.forParentsOnly&&!parent)return false;
+    if(q.conditionalAge&&Number(profile.age)<q.conditionalAge)return false;
+    if(chapter2&&parent&&['q_kids_future','q_kids_flexibility','q_marriage'].includes(q.id))return false;
+    return true;
+  });
+  if(!short)return eligible;
+  const ids=['q_commitment','q_conflict_style','q_communication','q_religion','q_energy','q_pets','q_relationship_pace'];
+  return ids.flatMap(id=>eligible.filter(q=>q.id===id));
+}

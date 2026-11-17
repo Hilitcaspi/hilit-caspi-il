@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { RESULTS, TYPE_ORDER, scoreDna } from '../client/src/tv-demo/model';
+import { RESULTS, TYPE_ORDER, scoreDna, selectDemoQuestions } from '../client/src/tv-demo/model';
+import followup from '../client/src/tv-demo/followup.json';
 
 describe('isolated television demo', () => {
   for (const [i,type] of (['leader','romantic','free_spirit','anchor'] as const).entries()) {
@@ -35,5 +36,31 @@ describe('isolated television demo', () => {
     expect(code).toContain('מספר בדיוני להמחשה בלבד');
     expect(code).toContain('אין כאן נשים אמיתיות שממתינות לך');
     expect(code).toContain('דמות AI בדיונית');
+  });
+  it('offers a clearly separate short sequence with pets',()=>{
+    const items=selectDemoQuestions(followup,{age:'40',marital:'single',kids:'no'},true);
+    expect(items).toHaveLength(6);
+    expect(items.map(x=>x.id)).toContain('q_pets');
+    expect(items.map(x=>x.id)).toContain('q_commitment');
+  });
+  it('filters child and marriage plans for divorced parents but keeps chapter-two questions',()=>{
+    const ids=selectDemoQuestions(followup,{age:'45',marital:'divorced',kids:'yes'},false).map(x=>x.id);
+    for(const id of ['q_kids_future','q_kids_flexibility','q_marriage'])expect(ids).not.toContain(id);
+    for(const id of ['q_step_parent','q_kids_involvement','q_relationship_pace','q_pets'])expect(ids).toContain(id);
+  });
+  it('respects conditional age and parent-only topics',()=>{
+    const ids=selectDemoQuestions(followup,{age:'30',marital:'single',kids:'no'},false).map(x=>x.id);
+    expect(ids).not.toContain('q_kids_flexibility');
+    expect(ids).not.toContain('q_kids_involvement');
+  });
+  it('retains original colors and same-sex preference choices in the isolated demo',()=>{
+    const css=readFileSync('client/src/tv-demo/style.css','utf8');
+    expect(css).toContain('background:#191265');
+    expect(css).toContain('background:#ffde59');
+    const code=readFileSync('client/src/tv-demo/main.tsx','utf8');
+    expect(code).toContain('מעוניין להכיר נשים');
+    expect(code).toContain('מעוניין להכיר גברים');
+    expect(code).toContain('בתרחיש ההדגמה בלבד');
+    expect(code).toContain('גרסה מקוצרת לצורכי המחשה');
   });
 });
