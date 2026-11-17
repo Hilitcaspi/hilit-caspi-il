@@ -100,6 +100,17 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   registerSeoRoutes(app);
+  // Isolated TV demonstration: no production app bootstrap or debug replay.
+  app.get("/tv-demo.html", async (_req, res, next) => {
+    try {
+      const source = await fs.promises.readFile(path.resolve(import.meta.dirname, "../..", "client/tv-demo.html"), "utf-8");
+      const transformed = await vite.transformIndexHtml("/tv-demo.html", source);
+      const html = transformed.replace(/<script[^>]*src=["']\/__manus__\/debug-collector\.js["'][^>]*><\/script>/g, "");
+      res.set({ "X-Robots-Tag": "noindex, nofollow, noarchive", "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }).send(html);
+    } catch (error) {
+      next(error);
+    }
+  });
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
     if (!isPageRequest(req)) return next();

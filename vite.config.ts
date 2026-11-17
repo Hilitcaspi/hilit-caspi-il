@@ -150,7 +150,21 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const isolatedTvDemo: Plugin = {
+  name: "isolated-tv-demo-html",
+  enforce: "post",
+  transformIndexHtml: {
+    order: "post",
+    handler(html, ctx) {
+      if (!ctx.path.endsWith("/tv-demo.html")) return html;
+      return html
+        .replace(/<script\b[^>]*id=["']manus-runtime["'][^>]*>[\s\S]*?<\/script>/g, "")
+        .replace(/<script[^>]*src=["']\/__manus__\/debug-collector\.js["'][^>]*><\/script>/g, "");
+    },
+  },
+};
+
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), isolatedTvDemo];
 
 export default defineConfig({
   plugins,
@@ -167,6 +181,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(import.meta.dirname, "client/index.html"),
+        tvDemo: path.resolve(import.meta.dirname, "client/tv-demo.html"),
+      },
+    },
   },
   server: {
     host: true,
