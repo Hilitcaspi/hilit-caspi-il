@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { RESULTS, TYPE_ORDER, scoreDna, selectDemoQuestions } from '../client/src/tv-demo/model';
 import followup from '../client/src/tv-demo/followup.json';
+import { RESULT_DETAILS, scorePercent, fixtureAnswers } from '../client/src/tv-demo/resultDetails';
 
 describe('isolated television demo', () => {
   for (const [i,type] of (['leader','romantic','free_spirit','anchor'] as const).entries()) {
@@ -62,5 +63,36 @@ describe('isolated television demo', () => {
     expect(code).toContain('מעוניין להכיר גברים');
     expect(code).toContain('בתרחיש ההדגמה בלבד');
     expect(code).toContain('גרסה מקוצרת לצורכי המחשה');
+  });
+  it('keeps an explicitly timed single-choice flash rather than styling old answers',()=>{
+    const code=readFileSync('client/src/tv-demo/main.tsx','utf8');
+    expect(code).toContain('if(selectionLocked.current)return');
+    expect(code).toContain('},280)');
+    expect(code).toContain("className={selectedValue===n?'selected':''}");
+    expect(code).not.toContain("className={answers[idx]===n?'selected':''}");
+    expect(code).toContain('clearTimeout(transitionTimer.current)');
+  });
+  it('retains fictional-count disclosure after removing example from the count headline',()=>{
+    const code=readFileSync('client/src/tv-demo/main.tsx','utf8');
+    expect(code).toContain('נשים המתאימות לפרופיל שלך');
+    expect(code).not.toContain('נשים המתאימות לפרופיל הדוגמה');
+    expect(code).toContain('מספר בדיוני להמחשה בלבד');
+  });
+  it('renders every original result topic using the same four type ids and labels',()=>{
+    const original=readFileSync('client/src/pages/DnaQuiz.tsx','utf8');
+    for(const t of TYPE_ORDER){
+      expect(original).toContain(RESULTS[t].label);
+      expect(original).toContain(RESULT_DETAILS[t].subtitle);
+      for(const key of ['superpower','challenge','relationshipNeed','practice','reflection'] as const)expect(RESULT_DETAILS[t][key].length).toBeGreaterThan(20);
+      expect(RESULT_DETAILS[t].partnerQualities).toHaveLength(4);
+    }
+  });
+  it('uses scores out of 25 per type, not a compatibility percentage',()=>{
+    expect(scorePercent(10)).toBe(40);
+    expect(scorePercent(25)).toBe(100);
+    expect(scorePercent(-1)).toBe(0);
+    expect(scorePercent(30)).toBe(100);
+    for(const t of TYPE_ORDER){const result=scoreDna(fixtureAnswers(t));expect(result.type).toBe(t);expect(result.scores[t]).toBe(25);}
+    expect(readFileSync('client/src/tv-demo/main.tsx','utf8')).toContain('זה לא אחוז התאמה לאדם אחר');
   });
 });
