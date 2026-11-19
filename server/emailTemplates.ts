@@ -1522,7 +1522,7 @@ export function buildMatchProposalEmail(params: MatchEmailProfileDetails & {
     ? `${params.compatibilityScore}%` : "";
   const yesLabel = params.recipientGender === "female" ? "מאשרת התאמה" : params.recipientGender === "male" ? "מאשר התאמה" : "אישור התאמה";
   const noLabel = params.recipientGender === "female" ? "לא מאשרת התאמה" : params.recipientGender === "male" ? "לא מאשר התאמה" : "לא לאשר התאמה";
-  const instruction = `כדי להשיב להצעה, יש ללחוץ על אחד הכפתורים: ״${yesLabel}״ או ״${noLabel}״. התגובה נרשמת דרך הכפתורים, ולא במענה למייל.`;
+  const instruction = `כדי להשיב להצעה, יש ללחוץ על אחד הכפתורים שמופיעים למטה, בתחתית המייל: ״${yesLabel}״ או ״${noLabel}״. התגובה נרשמת דרך הכפתורים, ולא במענה למייל.`;
   const intro = isBoost
     ? (isBoostSender
       ? "בקשת ה־Boost שלך נשלחה לשני הצדדים. התשלום ושליחת ה־Boost אינם אישור להתאמה. גם האישור שלך עדיין נדרש במייל. ההצעה לא נבחרה או נבדקה אישית על ידי הילית."

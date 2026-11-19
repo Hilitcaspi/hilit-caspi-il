@@ -319,3 +319,14 @@ describe("service-only match updates", () => {
     }
   });
 });
+
+
+describe("proposal button location", () => {
+  it("places the bottom-button instruction in HTML and text for both recipient genders", () => {
+    for (const recipientGender of ["male", "female"] as const) {
+      const email = buildMatchProposalEmail({ firstName: "בדיקה", matchFirstName: "בדיקה", recipientGender, compatibilityScore: 80, yesUrl: "https://hilitcaspi.com/match/respond?token=synthetic", noUrl: "https://hilitcaspi.com/match/respond?token=synthetic" });
+      expect(email.htmlBody).toContain("הכפתורים שמופיעים למטה, בתחתית המייל");
+      expect(email.textBody).toContain("הכפתורים שמופיעים למטה, בתחתית המייל");
+    }
+  });
+});
