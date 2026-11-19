@@ -76,6 +76,8 @@ const matchRow = (overrides: Partial<Match> = {}): Match =>
     singleAId: 101,
     singleBId: 102,
     score: 80,
+    approvalTokenA: "synthetic-token",
+    approvalTokenB: "synthetic-B",
     status: "rejected",
     approvedByA: false,
     approvedByB: false,
@@ -193,7 +195,7 @@ describe("matchmaking.respondToMatch decision integration", () => {
       },
     ])
   )(
-    "late yes from $side ($source) sends consolation only to the responder",
+    "late yes from $side ($source) confirms the choice on-screen without a duplicate email",
     async ({ side, overrides }) => {
       const h = fakeDb();
       mocks.getDb.mockResolvedValue(h.db);
@@ -202,12 +204,12 @@ describe("matchmaking.respondToMatch decision integration", () => {
         token: `synthetic-${side}`,
         response: "yes",
       });
-      const responder = participants[side === "A" ? 0 : 1]!;
       expect(result).toEqual({
         success: true,
         closed: true,
         lateFeedback: true,
         status: "rejected",
+        responseOutcome: "not_matched",
       });
       expect(mocks.recordMatchDecision).toHaveBeenCalledOnce();
       expect(mocks.recordMatchDecision).toHaveBeenCalledWith(
@@ -215,19 +217,9 @@ describe("matchmaking.respondToMatch decision integration", () => {
         `synthetic-${side}`,
         "yes"
       );
-      expect(h.ids).toEqual([responder.id]);
-      expect(mocks.consolation).toHaveBeenCalledOnce();
-      expect(mocks.consolation).toHaveBeenCalledWith({
-        firstName: responder.firstName,
-        recipientEmail: responder.email,
-        singleId: responder.id,
-      });
-      expect(mocks.sendEmail).toHaveBeenCalledOnce();
-      expect(mocks.sendEmail).toHaveBeenCalledWith({
-        to: { email: responder.email, name: responder.firstName },
-        subject: "Synthetic consolation",
-        htmlContent: "Synthetic consolation only",
-      });
+      expect(h.ids).toEqual([]);
+      expect(mocks.consolation).not.toHaveBeenCalled();
+      expect(mocks.sendEmail).not.toHaveBeenCalled();
       expectNoRevealEffects();
       expect(h.forbidden).not.toHaveBeenCalled();
       expect(result).not.toHaveProperty("partner");
@@ -256,6 +248,7 @@ describe("matchmaking.respondToMatch decision integration", () => {
         closed: true,
         lateFeedback: true,
         status: "rejected",
+        responseOutcome: "not_matched",
       });
       expect(h.select).not.toHaveBeenCalled();
       expect(mocks.consolation).not.toHaveBeenCalled();
@@ -282,14 +275,14 @@ describe("matchmaking.respondToMatch decision integration", () => {
         lateFeedback: true,
         status: "rejected",
       });
-      expect(h.ids).toEqual([101]);
+      expect(h.ids).toEqual([]);
       expect(mocks.sendEmail).not.toHaveBeenCalled();
       expect(mocks.consolation).not.toHaveBeenCalled();
       expectNoRevealEffects();
     }
   );
 
-  it("keeps feedback successful if the fire-and-forget consolation email fails", async () => {
+  it("keeps feedback independent of unavailable email providers", async () => {
     const h = fakeDb();
     mocks.getDb.mockResolvedValue(h.db);
     mocks.sendEmail.mockRejectedValueOnce(
@@ -299,7 +292,7 @@ describe("matchmaking.respondToMatch decision integration", () => {
     expect(
       await caller().respondToMatch({ token: "synthetic-A", response: "yes" })
     ).toMatchObject({ success: true, closed: true, lateFeedback: true });
-    expect(mocks.sendEmail).toHaveBeenCalledOnce();
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
     expectNoRevealEffects();
   });
 
@@ -329,11 +322,11 @@ describe("matchmaking.respondToMatch decision integration", () => {
       decision({
         kind: "already",
         isA: true,
-        match: matchRow({ status, tokenAUsedAt: NOW - 10 }),
+        match: matchRow({ status, approvalTokenA: "used-token", tokenAUsedAt: NOW - 10 }),
       });
       expect(
         await caller().respondToMatch({ token: "used-token", response: "no" })
-      ).toEqual({ alreadyResponded: true, status });
+      ).toMatchObject({ alreadyResponded: true, status, canRespond: false });
       expect(h.select).not.toHaveBeenCalled();
       expect(mocks.sendEmail).not.toHaveBeenCalled();
       expectNoRevealEffects();
@@ -408,7 +401,7 @@ describe("matchmaking.respondToMatch decision integration", () => {
         token: "synthetic-token",
         response: "yes",
       })
-    ).toEqual({ success: true, status: "waiting", bothApproved: false });
+    ).toEqual({ success: true, status: "waiting", bothApproved: false, responseOutcome: "waiting" });
     expect(h.select).not.toHaveBeenCalled();
     expect(mocks.sendEmail).not.toHaveBeenCalled();
     expectNoRevealEffects();
@@ -430,7 +423,7 @@ describe("matchmaking.respondToMatch decision integration", () => {
         token: "synthetic-token",
         response: "yes",
       })
-    ).toEqual({ success: true, status: "matched", bothApproved: true });
+    ).toEqual({ success: true, status: "matched", bothApproved: true, responseOutcome: "matched" });
     expect(h.ids).toEqual([101, 102]);
     expect(mocks.reveal).toHaveBeenCalledTimes(2);
     expect(mocks.sendEmail).toHaveBeenCalledTimes(2);
@@ -449,14 +442,14 @@ describe("matchmaking.respondToMatch decision integration", () => {
     decision({
       kind: "already",
       isA: true,
-      match: matchRow({ status: "matched", tokenAUsedAt: NOW }),
+      match: matchRow({ status: "matched", tokenAUsedAt: NOW, approvedByA: true, approvedByB: true }),
     });
     expect(
       await caller().respondToMatch({
         token: "synthetic-token",
         response: "no",
       })
-    ).toEqual({ alreadyResponded: true, status: "matched" });
+    ).toMatchObject({ alreadyResponded: true, status: "matched", responseOutcome: "matched", myDecision: true, canRespond: false });
     expect(mocks.sendEmail).toHaveBeenCalledTimes(2);
     expect(mocks.reveal).toHaveBeenCalledTimes(2);
     expect(mocks.ensureFeedback).toHaveBeenCalledTimes(2);

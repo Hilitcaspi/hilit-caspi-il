@@ -80,7 +80,7 @@ describe("contact reveal personal-area link", () => {
   it("labels an approved Boost and includes the recipient's dashboard link in HTML and text", () => {
     const email = buildContactRevealEmail({ ...baseParams, proposalSource: "boost" });
     expect(email.subject).toContain("התאמת ה־Boost אושרה");
-    expect(email.htmlBody).toContain(`href="${dashboardUrl}"`);
+    expect(email.htmlBody).toContain(`href="${dashboardUrl.replaceAll("&", "&amp;")}"`);
     expect(email.htmlBody).toContain("כניסה לאזור האישי");
     expect(email.textBody).toContain(dashboardUrl);
     expect(email.htmlBody).not.toContain("https://hilitcaspi.com/my\"");

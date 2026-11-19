@@ -63,7 +63,7 @@ export function buildMatchFollowUpSmsMessage(firstName: string, proposalSource: 
 }
 
 export function buildMatchExpiredSmsMessage(firstName: string): string {
-  return `היי ${firstName}, ההתאמה האחרונה פגה לאחר שלא התקבלה תשובה בתוך 48 שעות. בהתאמה הבאה חשוב להשיב בזמן כדי לשמור אותה פעילה. הילית כספי`;
+  return `היי ${firstName}, תוקף הצעת ההתאמה האחרונה הסתיים לפני שהתקבלה תשובתך. בהצעה הבאה חשוב להשיב לפני סיום התוקף. הילית כספי`;
 }
 
 export function didClaimMatchSms(result: unknown): boolean {

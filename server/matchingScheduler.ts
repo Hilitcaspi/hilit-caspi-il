@@ -14,7 +14,8 @@ import { regularMatchingAccessSql } from "./regularMatchingEligibility";
 
 import { getDb } from "./db";
 import { singles, matches, matchmakingAnswers } from "../drizzle/schema";
-import { eq, and, isNotNull, lt } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, gt, lte } from "drizzle-orm";
+import { getProposalDeadline, PROPOSAL_WINDOW_MS } from "../shared/matchAvailability";
 import { sendSMS } from "./vibrate";
 import { buildMatchExpiredSmsMessage } from "./matchSms";
 import {
@@ -315,38 +316,65 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
 }
 
 /**
- * 48-hour auto-expiry for unanswered match proposals.
- * Runs every 5 minutes. If a match was sent (status=proposed) and
- * neither single has responded within 48 hours, mark it as expired
- * and send a consolation email to whoever DID respond (if any).
+ * Auto-expiry for proposals whose response deadline has passed.
+ * Runs every 5 minutes. Explicit deadlines (including extended windows) win;
+ * legacy proposals without one retain the 48-hour fallback. Claim expiry under
+ * the same row lock as participant decisions, then notify outside the transaction.
  */
 import { buildConsolationEmail } from "./emailTemplates";
 
-const MATCH_EXPIRY_MS = 48 * 60 * 60 * 1000; // 48 hours
+// SQL equivalent of getProposalDeadline for persisted numeric timestamps.
+function proposalDeadlineReached(now: number) {
+  return or(
+    and(gt(matches.approvalExpiresAt, 0), lte(matches.approvalExpiresAt, now)),
+    and(
+      or(isNull(matches.approvalExpiresAt), lte(matches.approvalExpiresAt, 0)),
+      gt(matches.proposedAt, 0),
+      lte(matches.proposedAt, now - PROPOSAL_WINDOW_MS),
+    ),
+  );
+}
 
 export async function expireStaleMatches(): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
 
-  const cutoff = Date.now() - MATCH_EXPIRY_MS;
-
-  // Find proposed matches where proposedAt is older than 48h and not yet resolved
+  // This scan only finds candidates; its snapshots must never authorize expiry.
   const staleMatches = await db
     .select()
     .from(matches)
     .where(
       and(
         eq(matches.status, "proposed"),
-        lt(matches.proposedAt, cutoff)
+        proposalDeadlineReached(Date.now()),
       )
     );
 
   let expired = 0;
-  for (const match of staleMatches) {
-    // Mark as expired
-    await db.update(matches)
-      .set({ status: "expired", updatedAt: Date.now() })
-      .where(eq(matches.id, match.id));
+  for (const candidate of staleMatches) {
+    const match = await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(matches)
+        .where(eq(matches.id, candidate.id)).limit(1).for("update");
+      if (!current || current.status !== "proposed") return null;
+      // Mutual consent is never an unanswered proposal, even on a legacy row.
+      if (current.approvedByA && current.approvedByB) return null;
+      const now = Date.now();
+      const deadline = getProposalDeadline(current);
+      if (deadline === null || now < deadline) return null;
+
+      const [result] = await tx.update(matches)
+        .set({ status: "expired", updatedAt: now })
+        .where(and(
+          eq(matches.id, current.id),
+          eq(matches.status, "proposed"),
+          proposalDeadlineReached(now),
+          or(eq(matches.approvedByA, false), eq(matches.approvedByB, false)),
+        ));
+      if (result.affectedRows !== 1) return null;
+      return { ...current, status: "expired" as const, updatedAt: now };
+    });
+    // Only the transaction that actually claimed expiry may notify or count it.
+    if (!match) continue;
     expired++;
 
     // Fetch both singles for notifications
@@ -357,36 +385,34 @@ export async function expireStaleMatches(): Promise<number> {
 
     // Send Vibrate SMS notification to parties who did not respond.
     await Promise.all([
-      !match.approvedByA && singleA?.phone && singleA.isActive && !singleA.isSeed
+      !match.tokenAUsedAt && singleA?.phone && singleA.isActive && !singleA.isSeed
         ? sendSMS(singleA.phone, buildMatchExpiredSmsMessage(singleA.firstName))
         : Promise.resolve(false),
-      !match.approvedByB && singleB?.phone && singleB.isActive && !singleB.isSeed
+      !match.tokenBUsedAt && singleB?.phone && singleB.isActive && !singleB.isSeed
         ? sendSMS(singleB.phone, buildMatchExpiredSmsMessage(singleB.firstName))
         : Promise.resolve(false),
     ]);
 
     // If one party said yes but the other didn't respond, send consolation to the one who said yes
-    const aRespondedYes = match.approvedByA && !match.approvedByB;
-    const bRespondedYes = match.approvedByB && !match.approvedByA;
+    const aRespondedYes = match.approvedByA && !match.tokenBUsedAt;
+    const bRespondedYes = match.approvedByB && !match.tokenAUsedAt;
 
     if (aRespondedYes || bRespondedYes) {
-      const consolationSingleId = aRespondedYes ? match.singleAId : match.singleBId;
-      const otherSingleId = aRespondedYes ? match.singleBId : match.singleAId;
-      const [consolationSingle, otherSingle] = await Promise.all([
-        db.select().from(singles).where(eq(singles.id, consolationSingleId)).limit(1).then(r => r[0]),
-        db.select().from(singles).where(eq(singles.id, otherSingleId)).limit(1).then(r => r[0]),
-      ]);
+      const consolationSingle = aRespondedYes ? singleA : singleB;
+      const otherSingle = aRespondedYes ? singleB : singleA;
       if (consolationSingle?.email) {
         const email = buildConsolationEmail({
           firstName: consolationSingle.firstName,
           matchFirstName: otherSingle?.firstName,
           recipientEmail: consolationSingle.email,
           singleId: consolationSingle.id,
+          reason: "expired",
         });
-        sendEmail({
+        await sendEmail({
           to: { email: consolationSingle.email, name: consolationSingle.firstName },
           subject: email.subject,
           htmlContent: email.htmlBody,
+          textContent: email.textBody,
         }).catch(err => console.error("[ExpiryScheduler] Consolation email failed:", err));
       }
     }

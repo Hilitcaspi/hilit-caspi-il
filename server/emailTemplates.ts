@@ -1350,13 +1350,139 @@ export function renderTemplate(
 
 // ─── MATCHMAKING EMAILS ───────────────────────────────────────────────────────
 
+/** Optional, allowlisted profile facts shared by proposal and contact-reveal renderers. */
+export type MatchEmailProfileDetails = {
+  matchGender?: "male" | "female" | "other" | null;
+  matchHeight?: number | null;
+  matchAbout?: string | null;
+  matchMaritalStatus?: string | null;
+  matchEducation?: string | null;
+  matchHasKids?: boolean | null;
+  matchNumKids?: number | null;
+  matchWantsKids?: string | null;
+  matchReligiosity?: string | null;
+  matchInterests?: string | null;
+  matchSmokingStatus?: string | null;
+  matchReligiosityOrigin?: string | null;
+  matchShomerShabbat?: boolean | null;
+  matchHasPets?: boolean | null;
+  matchPetType?: string | null;
+};
+
+function escapeMatchHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[character]!);
+}
+
+/** Free-text profile fields can contain contact details even before mutual consent. */
+export function redactMatchProposalText(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[פרטי קשר מוסתרים]")
+    .replace(/(?:https?:\/\/|www\.)[^\s<>"']+/gi, "[קישור מוסתר]")
+    .replace(/(?:\+?\d[\s().-]*){8,14}\d/g, "[פרטי קשר מוסתרים]")
+    .replace(/(?:^|\s)@[A-Za-z0-9א-ת_.]+/g, " [פרטי קשר מוסתרים]")
+    // A generated note must not expose the other party's answer, either.
+    .replace(/[^.!?\n]*(?:כבר (?:אישר[ה]?|ענה|ענתה|הסכים|הסכימה)|(?:הצד השני|הוא|היא)[^.!?\n]*(?:אישר[ה]?|דחה|דחתה|סירב[ה]?|מעוניי[ןנת]+|(?:אמר|אמרה) (?:כן|לא)))[^.!?\n]*[.!?]?/g, "")
+    .replace(/[^.!?\n]*(?:other (?:party|person)|candidate|match)[^.!?\n]*(?:already|approved|accepted|declined|said yes|said no)[^.!?\n]*[.!?]?/gi, "")
+    .trim();
+}
+
+function matchLink(value: string): string {
+  try {
+    const parsed = new URL(value);
+    if (["https:", "http:"].includes(parsed.protocol) && !parsed.username && !parsed.password) {
+      return escapeMatchHtml(value);
+    }
+  } catch { /* Missing or unsafe links are not made clickable. */ }
+  return "#";
+}
+
+/** Deliberately separate from the marketing baseTemplate and its social/sales footer. */
+function matchServiceTemplate(content: string, recipientEmail: string, singleId: number): string {
+  const preferencesUrl = buildSignedUnsubscribeUrl({ email: recipientEmail, singleId });
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="he"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>body{margin:0;padding:0;background:#f0eadc;font-family:Arial,sans-serif;direction:rtl}.container{max-width:600px;margin:0 auto;background:#fff}.header{background:#191265;padding:28px;text-align:center}.header img{width:60px;height:60px;border-radius:50%;border:3px solid #ffe27c}.header h1{color:#ffe27c;font-size:22px;margin:12px 0 4px}.body{padding:32px;color:#191265;line-height:1.8;text-align:right}.body p{margin:0 0 16px}.footer{background:#191265;padding:24px;text-align:center}.footer p{color:#fff;font-size:12px;margin:8px 0}.footer a{color:#ffe27c}.divider{border:none;border-top:1px solid #f0eadc;margin:24px 0}@media(max-width:480px){.body{padding:20px}}</style></head>
+<body><div class="container"><div class="header"><img src="${HILIT_IMG}" alt="הילית כספי"><h1>הילית כספי</h1><p style="color:#fff;font-size:13px;">Relationship Expert &amp; Matchmaker</p></div>
+<div class="body">${content}</div><div class="footer"><p>זהו עדכון שירות בקשר להתאמה שלך במאגר, ולא דיוור שיווקי.</p>
+<p><a href="https://hilitcaspi.com/my-profile">ניהול הפרופיל באזור האישי</a> · <a href="${WHATSAPP_LINK}">פנייה להילית בנושא ההתאמה</a></p>
+<p><a href="${escapeMatchHtml(preferencesUrl)}">העדפות דיוור</a></p></div></div></body></html>`;
+}
+
+function matchServiceSignature(): string {
+  return `<hr class="divider"><p style="font-size:14px;color:#444;">באהבה,<br><strong>הילית כספי</strong><br>מאמנת ומשדכת | Relationship Expert &amp; Matchmaker</p>`;
+}
+
+type MatchProfileFact = { label: string; value: string };
+
+function matchProfileFacts(params: MatchEmailProfileDetails & {
+  matchAge: number; matchCity: string; matchOccupation?: string;
+}, redactContacts: boolean): MatchProfileFact[] {
+  const facts: MatchProfileFact[] = [];
+  const text = (value: string | null | undefined) => redactContacts ? redactMatchProposalText(value) : String(value ?? "").trim();
+  const add = (label: string, value: string | null | undefined) => {
+    const safeValue = text(value);
+    if (safeValue) facts.push({ label, value: safeValue });
+  };
+  const gendered = (male: string, female: string, neutral: string) =>
+    params.matchGender === "male" ? male : params.matchGender === "female" ? female : neutral;
+  if (Number.isFinite(params.matchAge) && params.matchAge > 0) add("גיל", String(params.matchAge));
+  if (typeof params.matchHeight === "number" && Number.isFinite(params.matchHeight) && params.matchHeight > 0) add("גובה", `${params.matchHeight} ס״מ`);
+  add("עיר", params.matchCity);
+  const education: Record<string, string> = { high_school: "תיכונית", vocational: "מקצועית", technician: "לימודי הנדסאות", student: "בלימודים", bachelor: "תואר ראשון", master: "תואר שני", phd: "דוקטורט", other: "השכלה אחרת" };
+  if (params.matchEducation) add("השכלה", education[params.matchEducation] ?? params.matchEducation);
+  add("עיסוק", params.matchOccupation);
+  const religiosity: Record<string, string> = {
+    secular: gendered("חילוני", "חילונית", "חילוני או חילונית"),
+    traditional: gendered("מסורתי", "מסורתית", "מסורתי או מסורתית"),
+    religious: gendered("דתי", "דתייה", "דתי או דתייה"),
+    orthodox: gendered("חרדי", "חרדית", "חרדי או חרדית"),
+    datlash: gendered("דתי לשעבר", "דתייה לשעבר", "רקע דתי בעבר"),
+  };
+  if (params.matchReligiosity) add("רמת דתיות", religiosity[params.matchReligiosity] ?? params.matchReligiosity);
+  const origins: Record<string, string> = { cultural: "מסורת תרבותית ומשפחתית", halachic: "שמירת הלכה" };
+  if (params.matchReligiosityOrigin) add("אופי המסורת", origins[params.matchReligiosityOrigin] ?? params.matchReligiosityOrigin);
+  if (typeof params.matchShomerShabbat === "boolean") add("שמירת שבת", params.matchShomerShabbat ? "כן" : "לא");
+  const marital: Record<string, string> = { single: gendered("רווק", "רווקה", "ללא נישואים קודמים"), divorced: gendered("גרוש", "גרושה", "לאחר גירושים"), widowed: gendered("אלמן", "אלמנה", "לאחר התאלמנות") };
+  if (params.matchMaritalStatus) add("מצב משפחתי", marital[params.matchMaritalStatus] ?? params.matchMaritalStatus);
+  if (typeof params.matchHasKids === "boolean") {
+    const count = params.matchHasKids && typeof params.matchNumKids === "number" && Number.isInteger(params.matchNumKids) && params.matchNumKids > 0 ? ` (${params.matchNumKids})` : "";
+    add("ילדים", params.matchHasKids ? `יש ילדים${count}` : "אין ילדים");
+  } else if (typeof params.matchNumKids === "number" && Number.isInteger(params.matchNumKids) && params.matchNumKids > 0) {
+    add("ילדים", `${params.matchNumKids} ילדים`);
+  }
+  const wantsKids: Record<string, string> = { yes: "רוצה ילדים", no: "לא רוצה ילדים", open: "פתיחות לנושא" };
+  if (params.matchWantsKids) add("רצון בילדים", wantsKids[params.matchWantsKids] ?? params.matchWantsKids);
+  const smoking: Record<string, string> = { no: "לא", occasionally: "לעיתים", yes: "כן" };
+  if (params.matchSmokingStatus) add("עישון", smoking[params.matchSmokingStatus] ?? params.matchSmokingStatus);
+  if (typeof params.matchHasPets === "boolean") add("חיות מחמד", params.matchHasPets ? (params.matchPetType || "יש חיות מחמד") : "אין חיות מחמד");
+  add("תחומי עניין", params.matchInterests);
+  return facts;
+}
+
+function matchFactsHtml(facts: MatchProfileFact[]): string {
+  return `<table role="presentation" style="width:100%;border-collapse:collapse;">${facts.map(fact => `<tr><td style="padding:6px 0;color:#727272;width:38%;vertical-align:top;">${escapeMatchHtml(fact.label)}</td><td style="padding:6px 0;color:#191265;">${escapeMatchHtml(fact.value)}</td></tr>`).join("")}</table>`;
+}
+
+function matchFactsText(facts: MatchProfileFact[]): string {
+  return facts.map(fact => `${fact.label}: ${fact.value}`).join("\n");
+}
+
+function matchDnaSummary(dnaType: string | undefined, gender: MatchEmailProfileDetails["matchGender"]): string {
+  const profile = dnaType ? DNA_PROFILES[dnaType] : undefined;
+  if (!profile) return "";
+  const neutralLabels: Record<string, string> = { leader: "מנהיגות וכריזמה", romantic: "רומנטיקה ועומק רגשי", free_spirit: "הרוח החופשית", anchor: "העוגן היציב" };
+  return `${gender === "male" ? profile.label_m : gender === "female" ? profile.label_f : neutralLabels[dnaType!]} — ${profile.subtitle}`;
+}
+
 /**
  * Match proposal email   sent to both parties when Hilit approves a match
  * Variables: {{firstName}}, {{matchFirstName}}, {{matchAge}}, {{matchCity}},
  *            {{matchOccupation}}, {{compatibilityScore}}, {{hilitsNote}},
  *            {{yesUrl}}, {{noUrl}}, {{matchId}}
  */
-export function buildMatchProposalEmail(params: {
+export function buildMatchProposalEmail(params: MatchEmailProfileDetails & {
   firstName: string;
   recipientGender?: "male" | "female" | "other";
   matchFirstName: string;
@@ -1365,13 +1491,10 @@ export function buildMatchProposalEmail(params: {
   matchOccupation?: string;
   matchDnaType?: string;
   matchPhotoUrl?: string;
-  matchEducation?: string | null;
-  matchHasKids?: boolean | null;
-  matchNumKids?: number | null;
-  matchWantsKids?: string | null;
-  matchReligiosity?: string | null;
   compatibilityScore: number;
   hilitsNote: string;
+  /** Generated reasons are not a personal review; default conservatively to AI. */
+  noteSource?: "ai" | "hilit";
   yesUrl: string;
   noUrl: string;
   recipientEmail: string;
@@ -1381,140 +1504,71 @@ export function buildMatchProposalEmail(params: {
   boostRole?: "sender" | "recipient";
 }): EmailTemplate {
   const matchPhotoUrl = toEmailImageUrl(params.matchPhotoUrl);
-  const isFemale = params.recipientGender === "female";
   const isBoost = params.proposalSource === "boost";
   const isBoostSender = isBoost && params.boostRole === "sender";
-  const dnaLabel = params.matchDnaType
-    ? (isFemale ? DNA_PROFILES[params.matchDnaType]?.label_m ?? "" : DNA_PROFILES[params.matchDnaType]?.label_f ?? DNA_PROFILES[params.matchDnaType]?.label_m ?? "")
-    : "";
-  const occupationLine = params.matchOccupation
-    ? `<p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">💼 ${params.matchOccupation}</p>`
-    : "";
-  const dnaLine = dnaLabel
-    ? `<p style="margin:4px 0; color:#ffe27c; font-size:13px; font-weight:600;">🧬 ${dnaLabel}</p>`
-    : "";
-  const educationLine = params.matchEducation
-    ? `<p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">🎓 ${params.matchEducation}</p>`
-    : "";
-  const kidsStatus = params.matchHasKids != null
-    ? (params.matchHasKids ? `יש ילדים${params.matchNumKids ? ` (${params.matchNumKids})` : ""}` : "אין ילדים")
-    : null;
-  const wantsKidsLabel: Record<string, string> = { yes: "רוצה ילדים", no: "לא רוצה ילדים", open: "פתוח לנושא" };
-  const kidsLine = kidsStatus
-    ? `<p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">👶 ${kidsStatus}${params.matchWantsKids ? ` · ${wantsKidsLabel[params.matchWantsKids] || params.matchWantsKids}` : ""}</p>`
-    : "";
-  const religiosityLabels: Record<string, string> = { secular: "חילוני או חילונית", traditional: "מסורתי או מסורתית", religious: "דתי או דתייה", orthodox: "חרדי או חרדית" };
-  const religiosityLine = params.matchReligiosity
-    ? `<p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">✡️ ${religiosityLabels[params.matchReligiosity] || params.matchReligiosity}</p>`
-    : "";
-
+  const firstName = redactMatchProposalText(params.firstName);
+  const matchFirstName = redactMatchProposalText(params.matchFirstName);
+  const facts = matchProfileFacts(params, true);
+  const about = redactMatchProposalText(params.matchAbout);
+  const note = redactMatchProposalText(params.hilitsNote);
+  const personalNote = !isBoost && params.noteSource === "hilit";
+  const noteHeading = personalNote ? "למה הילית חושבת שכדאי להכיר" : "למה הוצעה ההתאמה — ניתוח אלגוריתמי";
+  const noteAttribution = personalNote
+    ? "הנימוק נכתב על ידי הילית."
+    : "מבוסס על נתוני הפרופיל ושאלוני ההתאמה.";
+  // Never infer the match's gender from the recipient: same-sex matches are supported.
+  const dna = matchDnaSummary(params.matchDnaType, params.matchGender);
+  const score = Number.isFinite(params.compatibilityScore) && params.compatibilityScore >= 0 && params.compatibilityScore <= 100
+    ? `${params.compatibilityScore}%` : "";
+  const yesLabel = params.recipientGender === "female" ? "מאשרת התאמה" : params.recipientGender === "male" ? "מאשר התאמה" : "אישור התאמה";
+  const noLabel = params.recipientGender === "female" ? "לא מאשרת התאמה" : params.recipientGender === "male" ? "לא מאשר התאמה" : "לא לאשר התאמה";
+  const instruction = `כדי להשיב להצעה, יש ללחוץ על אחד הכפתורים: ״${yesLabel}״ או ״${noLabel}״. התגובה נרשמת דרך הכפתורים, ולא במענה למייל.`;
+  const intro = isBoost
+    ? (isBoostSender
+      ? "בקשת ה־Boost שלך נשלחה לשני הצדדים. התשלום ושליחת ה־Boost אינם אישור להתאמה. גם האישור שלך עדיין נדרש במייל. ההצעה לא נבחרה או נבדקה אישית על ידי הילית."
+      : "נשלחה עבורך התאמה במסגרת מסלול Boost. ההתאמה ממתינה לאישור שלך במייל. ההצעה לא נבחרה או נבדקה אישית על ידי הילית.")
+    : "יש לך הצעת התאמה חדשה במאגר של הילית. כדאי לקרוא את הפרטים ולבחור אם מתאים לך להכיר.";
+  const mutualNote = "פרטי יצירת הקשר נחשפים רק אחרי אישור הדדי. אם שני הצדדים מאשרים, יישלח לשניהם מייל המשך עם פרטי הקשר.";
   const content = `
-    <!-- Instruction note at top -->
-    <div style="background:#fff3cd; border:1.5px solid #ffe27c; border-radius:10px; padding:12px 18px; margin-bottom:20px; text-align:center;">
-      <p style="font-size:13px; color:#191265; font-weight:700; margin:0;">📌 את התגובה יש להזין בתחתית המייל</p>
+    <div style="background:#fff8e1;border:2px solid #ffe27c;border-radius:12px;padding:18px 20px;margin-bottom:20px;">
+      <p style="font-size:16px;font-weight:700;color:#191265;margin:0;">${escapeMatchHtml(instruction)}</p>
     </div>
-
-    ${isBoost ? `
-    <div style="background:#f3ecff; border:2px solid #8b65c9; border-radius:14px; padding:18px 22px; margin-bottom:20px; text-align:center;">
-      <p style="font-size:17px; color:#4f287e; font-weight:900; margin:0 0 6px;">⚡ ${isBoostSender ? "זו בקשת ה־Boost שבחרת לשלוח" : "זו התאמה שהגיעה עבורך דרך שירות Boost"}</p>
-      <p style="font-size:13px; color:#5f4a73; line-height:1.7; margin:0;">${isBoostSender ? "ההצעה נשלחה לשני הצדדים, וגם האישור שלך נדרש כעת." : "ההצעה נשלחה במסגרת Boost על ידי חבר או חברת המאגר, ולא נבחרה ונשלחה אישית על ידי הילית."}</p>
-    </div>` : ""}
-
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה ומחכה לאישור שלך" : "נשלחה עבורך התאמת Boost שמחכה לאישור שלך") : "יש לך הצעה"}, ${params.firstName} 💛</h2>
-    <p style="color:#444; font-size:16px; line-height:1.8;">
-      ${isBoost
-        ? (isBoostSender
-          ? `בקשת ה־Boost שלך נשלחה לשני הצדדים. היא נוצרה על בסיס אלגוריתם ההתאמה והנתונים שמילאו שני הצדדים. <strong>התשלום ושליחת ה־Boost אינם אישור להתאמה. גם האישור שלך עדיין נדרש במייל.</strong> ההצעה לא נבחרה או נבדקה אישית על ידי הילית.`
-          : `נשלחה עבורך התאמה במסגרת מסלול Boost. היא נוצרה על בסיס אלגוריתם ההתאמה והנתונים שמילאו שני הצדדים. <strong>ההתאמה ממתינה לאישור שלך במייל.</strong> ההצעה לא נבחרה או נבדקה אישית על ידי הילית.`)
-        : `מצאתי עבורך התאמה שחשבתי עליה הרבה לפני שהחלטתי לשלוח אותה. לא כל ההצעות נשלחות, רק אלו שאני מאמינה בהן.`}
-    </p>
-
-    <!-- Compatibility score badge -->
-    <div style="background:#191265; border-radius:16px; padding:28px 32px; margin:24px 0; text-align:center;">
-      <p style="color:rgba(255,255,255,0.6); font-size:13px; margin:0 0 6px; letter-spacing:1px;">אחוז ההתאמה שלכם</p>
-      <div style="font-size:52px; font-weight:900; color:#ffe27c; line-height:1;">${params.compatibilityScore}%</div>
-      <p style="color:rgba(255,255,255,0.7); font-size:13px; margin:8px 0 0;">מבוסס על שאלון פסיכולוגי + ניתוח DNA זוגי</p>
+    <h2 style="font-size:22px;color:#191265;">${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה ומחכה לאישור שלך" : "נשלחה עבורך התאמת Boost שמחכה לאישור שלך") : "הצעת התאמה חדשה"}, ${escapeMatchHtml(firstName)}</h2>
+    <p style="font-size:15px;color:#444;">${escapeMatchHtml(intro)}</p>
+    ${isBoost ? `<p style="font-size:13px;color:#727272;">${isBoostSender ? "זו בקשת ה־Boost שבחרת לשלוח" : "זו התאמה שהגיעה עבורך דרך שירות Boost. ההצעה לא נבחרה ונשלחה אישית על ידי הילית."}</p>` : ""}
+    <div style="background:#f9f6f0;border-radius:14px;padding:24px;margin:20px 0;">
+      ${matchPhotoUrl ? `<a href="${escapeMatchHtml(matchPhotoUrl)}" target="_blank" rel="noopener noreferrer" style="display:block;margin:0 auto 20px;width:200px;height:200px;border-radius:16px;overflow:hidden;background:#191265;"><img src="${escapeMatchHtml(matchPhotoUrl)}" alt="" width="200" height="200" style="width:200px;height:200px;border-radius:16px;object-fit:cover;object-position:center 20%;border:3px solid #ffe27c;box-sizing:border-box;display:block;background:#191265;color:transparent;"></a>` : ""}
+      <h3 style="font-size:22px;color:#191265;margin:0 0 12px;">${escapeMatchHtml(matchFirstName)}</h3>
+      ${matchFactsHtml(facts)}
     </div>
-
-    <!-- Match profile (no last name, no phone) -->
-    <div style="background:#f9f6f0; border-radius:14px; padding:24px 28px; margin:20px 0;">
-      <p style="color:#191265; font-size:13px; font-weight:700; margin:0 0 12px; letter-spacing:0.5px;">${isBoost ? "⚡ התאמת Boost" : "✨ ההתאמה שלך"}</p>
-      <div style="background:#191265; border-radius:12px; padding:20px 24px; text-align:center;">
-        ${matchPhotoUrl ? `<a href="${matchPhotoUrl}" target="_blank" rel="noopener noreferrer" style="display:block; margin:0 auto 16px; width:200px; height:200px; border-radius:16px; overflow:hidden; background:#2a1b7a; text-decoration:none;"><img src="${matchPhotoUrl}" alt="" width="200" height="200" style="width:200px; height:200px; border-radius:16px; object-fit:cover; object-position:center 20%; border:3px solid #ffe27c; box-sizing:border-box; display:block; background:#2a1b7a; color:transparent;" /></a>` : ""}
-        <p style="color:#ffffff; font-size:22px; font-weight:800; margin:0 0 4px;">${params.matchFirstName}</p>
-        <p style="margin:4px 0; color:rgba(255,255,255,0.8); font-size:14px;">🎂 ${params.matchAge} · 📍 ${params.matchCity}</p>
-        ${occupationLine}
-        ${educationLine}
-        ${religiosityLine}
-        ${kidsLine}
-        ${dnaLine}
-      </div>
-    </div>
-
-        <!-- Below 80% personal note from Hilit -->
-    ${!isBoost && params.compatibilityScore < 80 ? `
-    <div style="background:#fff3cd; border-right:4px solid #ffe27c; border-radius:8px; padding:16px 20px; margin:16px 0;">
-      <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">✨ הערה אישית מהילית</p>
-      <p style="font-size:14px; color:#333; line-height:1.8; margin:0;">
-        אני יודעת שההתאמה הזו מתחת לרף ה-80% שאני בדרך כלל שומרת עליו — אבל היא קפצה לי, ואני מאמינה בה.
-        לפעמים יש ירידה קלה באחוזים בגלל דברים פחות מהותיים בעיני, ואני בוחרת לשחרר אותה כי אני מוצאת בה קסם ופוטנציאל אמיתי.
-        <br><br>
-        <strong>אחוז ההתאמה הוא נקודת פתיחה, לא כל הסיפור</strong>. במקרה הזה בחרתי לעבור על הנתונים ולאשר את ההצעה באופן אישי. 💛
-      </p>
-      <p style="font-size:12px; color:#727272; margin:10px 0 0; text-align:left;">הילית כספי</p>
-    </div>` : ""}
-    ${isBoost ? `
-    <div style="background:#f5f2ff; border-right:4px solid #6b57b9; border-radius:8px; padding:20px 24px; margin:20px 0;">
-      <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">⚡ למה האלגוריתם מצא כאן פוטנציאל</p>
-      <p style="font-size:15px; color:#333; line-height:1.9; margin:0;">${params.hilitsNote}</p>
-      <p style="font-size:12px; color:#727272; margin:12px 0 0;">הצעת Boost אלגוריתמית. לא נבדקה ידנית על ידי הילית.</p>
-    </div>` : `
-    <!-- Hilit's personal note -->
-    <div style="background:#fff8e1; border-right:4px solid #ffe27c; border-radius:8px; padding:20px 24px; margin:20px 0;">
-      <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">💬 המלצה אישית שלי</p>
-      <p style="font-size:15px; color:#333; line-height:1.9; margin:0; font-style:italic;">"${params.hilitsNote}"</p>
-      <p style="font-size:13px; color:#727272; margin:12px 0 0; text-align:left;">הילית כספי</p>
-    </div>`}
-
-    <p style="color:#444; font-size:15px; line-height:1.8; margin:20px 0;">
-      ${isBoost ? "אם ההצעה מעניינת, אפשר ללחוץ על \"כן, מעניין אותי\". גם מי ששלח את ה־Boost נדרש לאשר בנפרד." : `אם ההצעה מעניינת, אפשר ללחוץ על "כן, מעניין אותי".`}
-      אם שני הצדדים מאשרים, פרטי יצירת הקשר נשלחים לשניהם.
-      <br><br>
-      <strong>אין מחויבות. אין לחץ. רק הזדמנות.</strong>
-    </p>
-
-    <a href="${params.yesUrl}" style="display:block; background:#ffe27c; color:#191265 !important; font-weight:800; font-size:18px; text-align:center; padding:18px 32px; border-radius:14px; text-decoration:none; margin:16px 0;">
-      💛 כן, מעניין אותי
-    </a>
-    <a href="${params.noUrl}" style="display:block; border:2px solid #ddd; color:#727272 !important; font-weight:500; font-size:15px; text-align:center; padding:12px 24px; border-radius:12px; text-decoration:none; margin:8px 0;">
-      לא בשלב הזה
-    </a>
-
-    <p style="color:#aaa; font-size:12px; text-align:center; margin-top:16px;">
-      ההצעה תקפה ל-48 שעות. פרטי יצירת הקשר נחשפים רק אחרי אישור הדדי.
-    </p>
-
-    ${emailSignature()}
-    ${params.trackingPixelUrl ? `<img src="${params.trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />` : ""}
+    ${about ? `<div style="margin:20px 0;"><h3 style="font-size:16px;color:#191265;">תיאור עצמי</h3><p style="font-size:15px;color:#444;white-space:pre-line;">${escapeMatchHtml(about)}</p></div>` : ""}
+    ${note ? `<div style="background:#fff8e1;border-right:4px solid #ffe27c;border-radius:8px;padding:20px;margin:20px 0;"><h3 style="font-size:16px;color:#191265;margin:0 0 8px;">${noteHeading}</h3><p style="font-size:15px;color:#333;white-space:pre-line;">${escapeMatchHtml(note)}</p><p style="font-size:12px;color:#727272;margin:0;">${noteAttribution}</p></div>` : ""}
+    ${dna ? `<div style="background:#191265;border-radius:12px;padding:20px;margin:20px 0;"><h3 style="font-size:15px;color:#ffe27c;margin:0 0 8px;">DNA זוגי של ${escapeMatchHtml(matchFirstName)}</h3><p style="font-size:15px;color:#fff;margin:0;">${escapeMatchHtml(dna)}</p><p style="font-size:12px;color:#fff;margin:8px 0 0;">תיאור כללי לפי השאלון, ולא אבחון אישי או הבטחה להתאמה.</p></div>` : ""}
+    ${score ? `<p style="font-size:15px;color:#191265;">ציון התאמה אלגוריתמי: <strong>${score}</strong>. הציון הוא נקודת פתיחה להיכרות, לא הבטחה לזוגיות.</p>` : ""}
+    <a href="${matchLink(params.yesUrl)}" style="display:block;background:#ffe27c;color:#191265!important;font-weight:800;font-size:18px;text-align:center;padding:18px 24px;border-radius:12px;text-decoration:none;margin:16px 0;">${yesLabel}</a>
+    <a href="${matchLink(params.noUrl)}" style="display:block;background:#fff;border:2px solid #191265;color:#191265!important;font-weight:700;font-size:16px;text-align:center;padding:14px 24px;border-radius:12px;text-decoration:none;margin:8px 0;">${noLabel}</a>
+    <p style="font-size:12px;color:#727272;">${mutualNote}</p>
+    <p style="font-size:12px;color:#727272;">אין מחויבות להמשך קשר. הקישורים אישיים; לשמירה על הפרטיות אין להעביר אותם לאחרים.</p>
+    ${matchServiceSignature()}
+    ${params.trackingPixelUrl && matchLink(params.trackingPixelUrl) !== "#" ? `<img src="${matchLink(params.trackingPixelUrl)}" width="1" height="1" style="display:none;" alt="">` : ""}
   `;
-
   return {
     subject: isBoost
-      ? (isBoostSender
-        ? `⚡ בקשת ה־Boost שלך נשלחה ומחכה לאישור · ${params.compatibilityScore}%`
-        : `⚡ התאמת Boost מחכה לאישור · ${params.compatibilityScore}%`)
-      : `💛 יש לך התאמה שמחכה לך! ${params.compatibilityScore}%`,
-    htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\n${isBoost ? (isBoostSender ? "בקשת ה־Boost שלך נשלחה לשני הצדדים. התשלום והשליחה אינם אישור להתאמה, וגם האישור שלך עדיין נדרש במייל" : "נשלחה עבורך התאמה במסגרת מסלול Boost והיא ממתינה לאישור שלך במייל") : "יש לך הצעת התאמה חדשה"}. ${isBoost ? "ההצעה נוצרה על ידי האלגוריתם ולא נבחרה או נבדקה אישית על ידי הילית." : ""}\n\nאחוז התאמה: ${params.compatibilityScore}%\nהתאמה: ${params.matchFirstName}, ${params.matchAge}, ${params.matchCity}\n\nלאישור: ${params.yesUrl}\nלדחייה: ${params.noUrl}\n\nצוות הילית כספי`,
+      ? (isBoostSender ? `בקשת ה־Boost שלך נשלחה ומחכה לאישור${score ? ` · ${score}` : ""}` : `התאמת Boost מחכה לאישור${score ? ` · ${score}` : ""}`)
+      : `יש לך הצעת התאמה חדשה${score ? ` · ${score}` : ""}`,
+    htmlBody: matchServiceTemplate(content, params.recipientEmail, params.singleId),
+    textBody: [instruction, `שלום ${firstName},`, intro.replace("נשלחה עבורך התאמה במסגרת מסלול Boost. ההתאמה ממתינה לאישור שלך במייל.", "נשלחה עבורך התאמה במסגרת מסלול Boost והיא ממתינה לאישור שלך במייל."),
+      matchPhotoUrl ? `תמונה: ${matchPhotoUrl}` : "", `ההתאמה: ${matchFirstName}`, matchFactsText(facts),
+      about ? `תיאור עצמי:\n${about}` : "", note ? `${noteHeading}:\n${note}\n${noteAttribution}` : "",
+      dna ? `DNA זוגי: ${dna}` : "", score ? `ציון התאמה אלגוריתמי: ${score}. הציון אינו הבטחה לזוגיות.` : "",
+      `${yesLabel}: ${matchLink(params.yesUrl) !== "#" ? params.yesUrl : "קישור אינו זמין"}`,
+      `${noLabel}: ${matchLink(params.noUrl) !== "#" ? params.noUrl : "קישור אינו זמין"}`, mutualNote,
+      "הקישורים אישיים; אין להעביר אותם לאחרים.", "הילית כספי"].filter(Boolean).join("\n\n"),
   };
 }
 
-/**
- * Contact reveal email   sent to both parties after mutual approval
- * Variables: firstName, matchFirstName, matchLastName, matchPhone, matchEmail,
- *            matchAge, matchCity, matchOccupation, matchDnaType, preDateTip, gender
- */
-export function buildContactRevealEmail(params: {
+/** Contact details are supplied by the caller only after mutual approval. */
+export function buildContactRevealEmail(params: MatchEmailProfileDetails & {
   firstName: string;
   gender: "male" | "female" | "other";
   matchFirstName: string;
@@ -1525,94 +1579,60 @@ export function buildContactRevealEmail(params: {
   matchCity: string;
   matchOccupation?: string;
   matchDnaType?: string;
+  matchPhotoUrl?: string;
   compatibilityScore: number;
   preDateTip: string;
   recipientEmail: string;
   singleId: number;
   dashboardUrl: string;
   proposalSource?: "regular" | "boost";
+  /** Kept for caller compatibility; testimonials/gifts do not belong in a service email. */
   feedbackUrl?: string;
 }): EmailTemplate {
   const isBoost = params.proposalSource === "boost";
-  const dnaProfile = params.matchDnaType ? DNA_PROFILES[params.matchDnaType] : null;
-  const dnaSection = dnaProfile ? `
-    <div style="background:#f0f4ff; border-right:4px solid #191265; border-radius:8px; padding:16px 20px; margin:16px 0;">
-      <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 6px;">🧬 הפרופיל הזוגי של ${params.matchFirstName}</p>
-      <p style="font-size:15px; color:#333; line-height:1.8; margin:0;">${params.gender === "female" ? dnaProfile.label_m : dnaProfile.label_f}   ${dnaProfile.subtitle}</p>
-    </div>` : "";
-
+  const facts = matchProfileFacts(params, false);
+  const matchPhotoUrl = toEmailImageUrl(params.matchPhotoUrl);
+  const fullName = [params.matchFirstName, params.matchLastName].filter(Boolean).join(" ");
+  const dna = matchDnaSummary(params.matchDnaType, params.matchGender);
+  const about = params.matchAbout?.trim();
+  const title = isBoost ? "התאמת ה־Boost אושרה" : "יש אישור משני הצדדים";
+  const recommendation = "כדאי ליצור קשר, להתחיל בשיחה ולהכיר בקצב שנוח לשני הצדדים. אפשר לדבר על ערכים, ציפיות ואורח חיים ולבדוק יחד אם יש התאמה גם מעבר לפרופיל. האישור הוא הזדמנות להיכרות, לא התחייבות לקשר.";
+  const phone = params.matchPhone?.trim();
+  const email = params.matchEmail?.trim();
+  const dialablePhone = phone?.replace(/[\s().-]/g, "");
+  const phoneHref = dialablePhone && /^\+?\d{7,15}$/.test(dialablePhone) ? `tel:${dialablePhone}` : "";
   const content = `
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${isBoost ? "התאמת ה־Boost אושרה" : "זה קרה! יש אישור משני הצדדים"} 💛</h2>
-    <p style="color:#444; font-size:16px; line-height:1.8;">
-      ${params.firstName}, אני שמחה לשתף אותך   גם הצד השני מעוניין.
-      הנה הפרטים המלאים של ההתאמה שלך:
-    </p>
-
-    <!-- Match full details -->
-    <div style="background:#191265; border-radius:16px; padding:28px 32px; margin:24px 0;">
-      <p style="color:#ffe27c; font-size:13px; font-weight:700; margin:0 0 16px; letter-spacing:1px; text-align:center;">✨ ההתאמה שלך   ${params.compatibilityScore}%</p>
-      <table style="width:100%; border-collapse:collapse;">
-        <tr>
-          <td style="padding:8px 0; color:rgba(255,255,255,0.6); font-size:14px; width:40%;">שם מלא</td>
-          <td style="padding:8px 0; color:#ffffff; font-size:16px; font-weight:700;">${params.matchFirstName}${params.matchLastName ? " " + params.matchLastName : ""}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0; color:rgba(255,255,255,0.6); font-size:14px;">טלפון</td>
-          <td style="padding:8px 0; color:#ffe27c; font-size:16px; font-weight:700;"><a href="tel:${params.matchPhone}" style="color:#ffe27c; text-decoration:none;">${params.matchPhone}</a></td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0; color:rgba(255,255,255,0.6); font-size:14px;">מייל</td>
-          <td style="padding:8px 0; color:rgba(255,255,255,0.8); font-size:14px;">${params.matchEmail}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0; color:rgba(255,255,255,0.6); font-size:14px;">גיל ועיר</td>
-          <td style="padding:8px 0; color:rgba(255,255,255,0.8); font-size:14px;">${params.matchAge} · ${params.matchCity}</td>
-        </tr>
-        ${params.matchOccupation ? `<tr><td style="padding:8px 0; color:rgba(255,255,255,0.6); font-size:14px;">עיסוק</td><td style="padding:8px 0; color:rgba(255,255,255,0.8); font-size:14px;">${params.matchOccupation}</td></tr>` : ""}
-      </table>
+    <h2 style="font-size:22px;color:#191265;">${title}</h2>
+    <p style="font-size:16px;color:#444;">${escapeMatchHtml(params.firstName)}, יש הסכמה הדדית להיכרות. הנה פרטי ההתאמה ופרטי יצירת הקשר:</p>
+    <div style="background:#f9f6f0;border-radius:14px;padding:24px;margin:20px 0;">
+      ${matchPhotoUrl ? `<img src="${escapeMatchHtml(matchPhotoUrl)}" alt="" width="200" height="200" style="display:block;width:200px;height:200px;margin:0 auto 20px;border-radius:16px;object-fit:cover;border:3px solid #ffe27c;">` : ""}
+      <h3 style="font-size:22px;color:#191265;margin:0 0 12px;">${escapeMatchHtml(fullName)}</h3>
+      ${matchFactsHtml(facts)}
     </div>
-
-    ${dnaSection}
-
-    <a href="${params.dashboardUrl}" style="display:block; background:#191265; color:#fff !important; font-weight:700; font-size:16px; text-align:center; padding:14px 28px; border-radius:12px; text-decoration:none; margin:20px 0;">
-      כניסה לאזור האישי
-    </a>
-    <p style="font-size:13px;color:#727272;line-height:1.7;text-align:center;margin:0 0 18px;">באזור האישי אפשר לצפות בהתאמה, לעדכן את הפרופיל ולנהל את סטטוס ההתאמות במקום אחד.</p>
-
-    ${params.feedbackUrl ? `<div style="background:#fff1f5;border:1px solid #efc9d6;border-radius:14px;padding:22px 24px;margin:22px 0;text-align:center;"><p style="font-size:17px;color:#6f3f52;font-weight:700;margin:0 0 8px;">אשמח לשמוע על החוויה שלך</p><p style="font-size:14px;color:#795e69;line-height:1.7;margin:0 0 16px;">השיתוף שלך יכול לעזור לעוד אנשים שמחפשים אהבה להכיר דרך וכלים שיכולים לקדם גם אותם. בסיום מחכה לך מתנה אישית ממני.</p><a href="${params.feedbackUrl}" style="display:inline-block;background:#a75f78;color:#fff !important;font-weight:700;font-size:15px;padding:13px 24px;border-radius:999px;text-decoration:none;">אשמח לשתף ולקבל את המתנה שלי</a><p style="font-size:12px;color:#8a6673;line-height:1.6;margin:13px 0 0;">המתנה ניתנת על עצם השיתוף, גם בלי אישור לפרסם. רק אם מתאים לך, אפשר לבחור מה מותר לנו לשתף.</p></div>` : ""}
-
-    <!-- Pre-date tip -->
-    <div style="background:#fff8e1; border-right:4px solid #ffe27c; border-radius:8px; padding:20px 24px; margin:20px 0;">
-      <p style="font-size:13px; color:#191265; font-weight:700; margin:0 0 8px;">💡 טיפ שלי לפני הפגישה הראשונה</p>
-      <p style="font-size:15px; color:#333; line-height:1.9; margin:0; font-style:italic;">"${params.preDateTip}"</p>
-      <p style="font-size:13px; color:#727272; margin:12px 0 0; text-align:left;">  הילית כספי</p>
+    ${about ? `<h3 style="font-size:16px;color:#191265;">תיאור עצמי</h3><p style="font-size:15px;color:#444;white-space:pre-line;">${escapeMatchHtml(about)}</p>` : ""}
+    ${dna ? `<div style="background:#191265;border-radius:12px;padding:20px;margin:20px 0;"><h3 style="font-size:15px;color:#ffe27c;margin:0 0 8px;">DNA זוגי</h3><p style="font-size:15px;color:#fff;margin:0;">${escapeMatchHtml(dna)}</p></div>` : ""}
+    <div style="background:#fff8e1;border-right:4px solid #ffe27c;border-radius:12px;padding:24px;margin:24px 0;">
+      <h3 style="font-size:18px;color:#191265;margin:0 0 12px;">פרטי יצירת קשר</h3>
+      ${phone ? `<p style="font-size:16px;color:#191265;">טלפון: ${phoneHref ? `<a href="${phoneHref}" style="color:#191265;" dir="ltr">${escapeMatchHtml(phone)}</a>` : escapeMatchHtml(phone)}</p>` : ""}
+      ${email ? `<p style="font-size:15px;color:#191265;">מייל: <span dir="ltr">${escapeMatchHtml(email)}</span></p>` : ""}
+      <p style="font-size:12px;color:#727272;margin:0;">הפרטים נמסרו לצורך ההיכרות ביניכם בלבד. אין להעביר אותם לאחרים ללא הסכמה.</p>
     </div>
-
-    <p style="color:#444; font-size:15px; line-height:1.8; margin:20px 0;">
-      אני מאחלת לכם פגישה נפלאה! 🤍<br>
-      אם יש שאלות, תמיד אפשר לפנות אלי בוואטסאפ.
-    </p>
-
-    <a href="${WHATSAPP_LINK}" style="display:block; background:#25D366; color:#fff !important; font-weight:700; font-size:16px; text-align:center; padding:14px 28px; border-radius:12px; text-decoration:none; margin:16px 0;">
-      💬 שליחת הודעה בוואטסאפ
-    </a>
-
-    <div style="background:#f5f5f5; border-radius:8px; padding:16px 20px; margin:16px 0;">
-      <p style="font-size:13px; color:#666; line-height:1.7; margin:0;">
-        💡 <strong>לא הסתדר?</strong> אפשר לשחרר את ההתאמה בכל שלב דרך <a href="${params.dashboardUrl}" style="color:#191265;">האזור האישי</a> שלך, בטאב "התאמות", או לשלוח לי הודעה בוואטסאפ.
-        לאחר השחרור, שניכם חוזרים למאגר ויכולים לקבל התאמות חדשות.
-      </p>
-    </div>
-
-    ${emailSignature()}
+    <h3 style="font-size:16px;color:#191265;">הצעד הבא: לדבר ולבדוק התאמה</h3>
+    <p style="font-size:15px;color:#444;">${recommendation}</p>
+    ${params.preDateTip?.trim() ? `<div style="background:#fff8e1;border-right:4px solid #ffe27c;padding:20px;border-radius:8px;margin:20px 0;"><h3 style="font-size:15px;color:#191265;margin:0 0 8px;">טיפ לפני המפגש</h3><p style="font-size:15px;color:#444;white-space:pre-line;margin:0;">${escapeMatchHtml(params.preDateTip)}</p></div>` : ""}
+    <a href="${matchLink(params.dashboardUrl)}" style="display:block;background:#191265;color:#ffe27c!important;font-weight:700;font-size:16px;text-align:center;padding:16px 24px;border-radius:12px;text-decoration:none;margin:20px 0;">כניסה לאזור האישי</a>
+    <p style="font-size:13px;color:#727272;">באזור האישי אפשר לצפות בהתאמה ולעדכן את הפרופיל. אם ההיכרות לא מתאימה, אפשר לשחרר את ההתאמה בטאב ״התאמות״ או לפנות להילית בוואטסאפ.</p>
+    ${matchServiceSignature()}
   `;
-
   return {
-    subject: isBoost
-      ? `התאמת ה־Boost אושרה! הנה הפרטים של ${params.matchFirstName} 💛`
-      : `יש אישור משני הצדדים! הנה הפרטים של ${params.matchFirstName} 💛`,
-    htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\n${isBoost ? "התאמת ה־Boost אושרה" : "יש אישור משני הצדדים"}!\n\nשם: ${params.matchFirstName}${params.matchLastName ? " " + params.matchLastName : ""}\nטלפון: ${params.matchPhone}\nמייל: ${params.matchEmail}\n\nכניסה לאזור האישי: ${params.dashboardUrl}\n${params.feedbackUrl ? `\nאשמח לשמוע על החוויה שלך. השיתוף שלך יכול לעזור לעוד אנשים שמחפשים אהבה. בסיום מחכה לך מתנה אישית ממני: ${params.feedbackUrl}\n` : ""}\nטיפ לפני הפגישה: ${params.preDateTip}\n\nהילית כספי`,
+    subject: `${title}! הנה הפרטים של ${params.matchFirstName.replace(/[\r\n]/g, " ")}`,
+    htmlBody: matchServiceTemplate(content, params.recipientEmail, params.singleId),
+    textBody: [`שלום ${params.firstName},`, `${title}.`, matchPhotoUrl ? `תמונה: ${matchPhotoUrl}` : "",
+      `שם מלא: ${fullName}`, matchFactsText(facts), about ? `תיאור עצמי:\n${about}` : "", dna ? `DNA זוגי: ${dna}` : "",
+      "פרטי יצירת קשר", phone ? `טלפון: ${phone}` : "", email ? `מייל: ${email}` : "",
+      "הפרטים נמסרו לצורך ההיכרות בלבד; אין להעביר אותם ללא הסכמה.", recommendation,
+      params.preDateTip?.trim() ? `טיפ לפני המפגש: ${params.preDateTip}` : "",
+      `כניסה לאזור האישי: ${matchLink(params.dashboardUrl) !== "#" ? params.dashboardUrl : "קישור אינו זמין"}`, "הילית כספי"].filter(Boolean).join("\n\n"),
   };
 }
 
@@ -1625,23 +1645,20 @@ export function buildMatchRejectionAckEmail(params: {
   singleId: number;
 }): EmailTemplate {
   const content = `
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">קיבלתי, ${params.firstName} 🤍</h2>
+    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">קיבלתי את תגובתך, ${escapeMatchHtml(params.firstName)}</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      תודה שענית   זה עוזר לי להבין מה מתאים לך יותר.
+      נרשמה בחירה שלא לאשר את הצעת ההתאמה. תודה על המענה.
     </p>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      אני ממשיכה לחפש עבורך. כשתימצא התאמה שאני מאמינה בה, תישלח הצעה חדשה.
+      ההצעה הזו לא תתקדם לחשיפת פרטי קשר. כשתהיה הצעת התאמה חדשה, תישלח הודעה נפרדת.
     </p>
-    <div class="quote">
-      "ההתאמה הנכונה לא תמיד מגיעה ראשונה, אבל כשהיא מגיעה — זה מורגש."
-    </div>
-    ${emailSignature()}
+    ${matchServiceSignature()}
   `;
 
   return {
-    subject: "קיבלתי את תגובתך 🤍",
-    htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\nקיבלתי את תגובתך. אני ממשיכה לחפש עבורך.\n\nהילית כספי`,
+    subject: "קיבלתי את תגובתך להצעת ההתאמה",
+    htmlBody: matchServiceTemplate(content, params.recipientEmail, params.singleId),
+    textBody: `שלום ${params.firstName},\n\nנרשמה בחירה שלא לאשר את הצעת ההתאמה. ההצעה הזו לא תתקדם לחשיפת פרטי קשר. כשתהיה הצעת התאמה חדשה, תישלח הודעה נפרדת.\n\nהילית כספי`,
   };
 }
 
@@ -1728,31 +1745,30 @@ export function buildConsolationEmail(params: {
   matchFirstName?: string;
   recipientEmail: string;
   singleId: number;
+  reason?: "declined" | "expired";
 }): { subject: string; htmlBody: string; textBody: string } {
+  const matchFirstName = redactMatchProposalText(params.matchFirstName);
+  const title = matchFirstName ? `עדכון על ההצעה עם ${matchFirstName}` : "עדכון על הצעת ההתאמה";
+  const explanation = params.reason === "expired"
+    ? "תוקף ההצעה הסתיים בלי שהתקבל אישור משני הצדדים. לכן ההצעה לא תתקדם לחשיפת פרטי קשר. אין בכך מידע על הסיבה להיעדר המענה."
+    : "ההצעה לא המשיכה להיכרות הדדית, ולכן לא ייחשפו פרטי קשר. בחירה אחת אינה מעידה על הערך שלך או על האפשרות למצוא קשר מתאים.";
   const content = `
-    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">הילית כאן 🤍</h2>
+    <h2 style="color:#191265; font-size:22px; margin-bottom:8px;">${escapeMatchHtml(title)}</h2>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      ${params.firstName},
+      ${escapeMatchHtml(params.firstName)},
     </p>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      הפעם ההתאמה עם ${params.matchFirstName ? `<strong>${params.matchFirstName}</strong>` : 'הצד השני'} לא המשיכה הלאה — וזה בסדר גמור. זה חלק מהתהליך.
+      ${explanation}
     </p>
     <p style="color:#444; font-size:16px; line-height:1.8;">
-      העובדה שניתן אישור להצעה מראה על נכונות לאהבה. זה הדבר הכי חשוב.
+      זה יכול להיות מאכזב, וזה חלק מתהליך ההיכרות. כשתהיה הצעת התאמה חדשה, תישלח הודעה נפרדת. לשאלות על ההצעה אפשר לפנות להילית.
     </p>
-    <div style="background:#f0eadc; border-right:4px solid #ffe27c; padding:16px 20px; border-radius:8px; margin:20px 0; font-style:italic; color:#444;">
-      "כל 'לא' מקרב אותך ל'כן' הנכון. אני כאן, ממשיכה לחפש עבורך."
-    </div>
-    <p style="color:#444; font-size:16px; line-height:1.8;">
-      אני ממשיכה לעבוד עבורך: כשתהיה התאמה שאני מאמינה בה, תישלח הודעה חדשה.
-    </p>
-    <hr style="border:none; border-top:1px solid #f0eadc; margin:24px 0;" />
-    <p style="font-size:14px; color:#444;">באהבה,<br><strong>הילית כספי</strong><br>מאמנת ומשדכת | Relationship Expert &amp; Matchmaker</p>
+    ${matchServiceSignature()}
   `;
   return {
-    subject: "הילית כאן: ממשיכה לחפש עבורך 🤍",
-    htmlBody: baseTemplate(content, params.recipientEmail, params.singleId),
-    textBody: `שלום ${params.firstName},\n\nהפעם ההתאמה עם ${params.matchFirstName ?? 'הצד השני'} לא המשיכה הלאה, אבל אני ממשיכה לחפש עבורך.\n\nהילית כספי`,
+    subject: params.reason === "expired" ? `תוקף ההצעה${matchFirstName ? ` עם ${matchFirstName}` : ""} הסתיים` : title,
+    htmlBody: matchServiceTemplate(content, params.recipientEmail, params.singleId),
+    textBody: `שלום ${params.firstName},\n\n${title}\n\n${explanation}\n\nזה יכול להיות מאכזב. כשתהיה הצעת התאמה חדשה, תישלח הודעה נפרדת. לשאלות על ההצעה אפשר לפנות להילית.\n\nהילית כספי`,
   };
 }
 

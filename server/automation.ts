@@ -1,3 +1,6 @@
+import { matchEmailProfile, matchEmailReason } from "./matchEmailProfile";
+import { classifyMatchDecision } from "./matchDecision";
+import { buildMatchProposalEmail } from "./emailTemplates";
 // © 2024–2025 Hilit Caspi. All rights reserved. Proprietary and confidential.
 // שיטת ההתאמה, האלגוריתם והתכנים מוגנים בזכויות יוצרים ומהווים סוד מסחרי של הילית כספי.
 
@@ -941,24 +944,22 @@ export async function processMatchFollowUps(): Promise<number> {
       const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
 
       // Send to A if they haven't responded
-      if (!match.approvedByA && match.approvalTokenA && singleA.email) {
+      if (match.approvalTokenA && singleA.email && classifyMatchDecision(match, match.approvalTokenA, Date.now()).kind === "active") {
         const yesUrl = `${SITE_BASE}/match/respond?token=${match.approvalTokenA}&response=yes`;
         const noUrl = `${SITE_BASE}/match/respond?token=${match.approvalTokenA}&response=no`;
         const feedbackUrl = `${SITE_BASE}/match/respond?token=${match.approvalTokenA}&response=no`;
 
-        const emailTemplate = buildMatchFollowUpEmail({
+        const emailTemplate = buildMatchProposalEmail({
           firstName: singleA.firstName,
-          matchFirstName: singleB.firstName,
-          matchAge: singleB.age,
-          matchCity: singleB.city,
-          yesUrl,
-          noUrl,
-          feedbackUrl,
+          recipientGender: singleA.gender,
+          ...matchEmailProfile(singleB),
+          compatibilityScore: Math.round(Number(match.score || 0)),
+          hilitsNote: matchEmailReason(match, isBoost),
+          yesUrl, noUrl,
           recipientEmail: singleA.email,
           singleId: singleA.id,
-          proposalSource: isBoost ? "boost" : "regular",
+          proposalSource: isBoost ? "boost" : "manual",
         });
-
         const result = await sendEmail({
           to: { email: singleA.email, name: singleA.firstName },
           subject: emailTemplate.subject,
@@ -973,24 +974,22 @@ export async function processMatchFollowUps(): Promise<number> {
       }
 
       // Send to B if they haven't responded
-      if (!match.approvedByB && match.approvalTokenB && singleB.email) {
+      if (match.approvalTokenB && singleB.email && classifyMatchDecision(match, match.approvalTokenB, Date.now()).kind === "active") {
         const yesUrl = `${SITE_BASE}/match/respond?token=${match.approvalTokenB}&response=yes`;
         const noUrl = `${SITE_BASE}/match/respond?token=${match.approvalTokenB}&response=no`;
         const feedbackUrl = `${SITE_BASE}/match/respond?token=${match.approvalTokenB}&response=no`;
 
-        const emailTemplate = buildMatchFollowUpEmail({
+        const emailTemplate = buildMatchProposalEmail({
           firstName: singleB.firstName,
-          matchFirstName: singleA.firstName,
-          matchAge: singleA.age,
-          matchCity: singleA.city,
-          yesUrl,
-          noUrl,
-          feedbackUrl,
+          recipientGender: singleB.gender,
+          ...matchEmailProfile(singleA),
+          compatibilityScore: Math.round(Number(match.score || 0)),
+          hilitsNote: matchEmailReason(match, isBoost),
+          yesUrl, noUrl,
           recipientEmail: singleB.email,
           singleId: singleB.id,
-          proposalSource: isBoost ? "boost" : "regular",
+          proposalSource: isBoost ? "boost" : "manual",
         });
-
         const result = await sendEmail({
           to: { email: singleB.email, name: singleB.firstName },
           subject: emailTemplate.subject,

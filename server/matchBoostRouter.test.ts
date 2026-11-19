@@ -721,13 +721,15 @@ describe("match boost privacy and payment gate", () => {
     expect(emailSource).toContain("לא נבחרה או נבדקה אישית על ידי הילית");
     expect(emailSource).toContain("const matchPhotoUrl = toEmailImageUrl(params.matchPhotoUrl)");
     expect(emailSource).toContain("${matchPhotoUrl ?");
-    expect(source).toContain("matchPhotoUrl: partyB.photoUrl ?? undefined");
-    expect(source).toContain("matchPhotoUrl: partyA.photoUrl ?? undefined");
+    expect(source).toContain("...matchEmailProfile(partyB)");
+    expect(source).toContain("...matchEmailProfile(partyA)");
+    const profileSource = fs.readFileSync(new URL("./matchEmailProfile.ts", import.meta.url), "utf8");
+    expect(profileSource).toContain("matchPhotoUrl: single.photoUrl ?? undefined");
     expect(smsSource).toContain('proposalSource === "boost"');
     expect(smsSource).toContain("בקשת ה־Boost שלך");
     expect(smsSource).toContain("נשלחה אליך התאמת Boost");
     expect(smsSource).toContain("לא נבחרה אישית על ידי הילית");
-    expect(automationSource).toContain('proposalSource: isBoost ? "boost" : "regular"');
+    expect(automationSource).toContain('proposalSource: isBoost ? "boost" : "manual"');
     expect(emailSource).toContain('proposalSource?: "regular" | "boost"');
     expect(emailSource).toContain("התאמת ה־Boost עדיין ממתינה לאישור שלך");
     expect(emailSource).not.toContain("לפני שבוע שלחתי לך הצעה: ${params.matchFirstName}");

@@ -27,8 +27,8 @@ describe("automatic match SMS delivery via Vibrate", () => {
     expect(followUp).not.toContain("כבר התקבלה תשובה חיובית מהצד השני");
 
     const expired = buildMatchExpiredSmsMessage("דנה");
-    expect(expired).toContain("פגה");
-    expect(expired).toContain("48 שעות");
+    expect(expired).toContain("תוקף הצעת ההתאמה האחרונה הסתיים");
+    expect(expired).not.toContain("48 שעות");
   });
 
   it("keeps Boost sender and recipient wording private and distinct", () => {

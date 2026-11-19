@@ -1,3 +1,4 @@
+import { matchEmailProfile } from "./matchEmailProfile";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
@@ -898,17 +899,7 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   const emailA = buildMatchProposalEmail({
     firstName: partyA.firstName,
     recipientGender: partyA.gender ?? undefined,
-    matchFirstName: partyB.firstName,
-    matchAge: cardB.age,
-    matchCity: cardB.region,
-    matchOccupation: cardB.occupation,
-    matchDnaType: partyB.dnaType ?? undefined,
-    matchPhotoUrl: partyB.photoUrl ?? undefined,
-    matchEducation: cardB.education,
-    matchHasKids: partyB.hasKids,
-    matchNumKids: partyB.numKids,
-    matchWantsKids: partyB.wantsKids,
-    matchReligiosity: partyB.religiosity,
+    ...matchEmailProfile(partyB),
     compatibilityScore: score,
     hilitsNote: reasonText(cardB),
     yesUrl: `${baseUrl}/match/respond?token=${tokenA}&response=yes`,
@@ -922,17 +913,7 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   const emailB = buildMatchProposalEmail({
     firstName: partyB.firstName,
     recipientGender: partyB.gender ?? undefined,
-    matchFirstName: partyA.firstName,
-    matchAge: cardA.age,
-    matchCity: cardA.region,
-    matchOccupation: cardA.occupation,
-    matchDnaType: partyA.dnaType ?? undefined,
-    matchPhotoUrl: partyA.photoUrl ?? undefined,
-    matchEducation: cardA.education,
-    matchHasKids: partyA.hasKids,
-    matchNumKids: partyA.numKids,
-    matchWantsKids: partyA.wantsKids,
-    matchReligiosity: partyA.religiosity,
+    ...matchEmailProfile(partyA),
     compatibilityScore: score,
     hilitsNote: reasonText(cardA),
     yesUrl: `${baseUrl}/match/respond?token=${tokenB}&response=yes`,
@@ -944,8 +925,8 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
     boostRole: senderIsA ? "recipient" : "sender",
   });
   const [emailAResult, emailBResult] = await Promise.all([
-    sendEmail({ to: { email: partyA.email, name: partyA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
-    sendEmail({ to: { email: partyB.email, name: partyB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
+    sendEmail({ to: { email: partyA.email, name: partyA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody, textContent: emailA.textBody }),
+    sendEmail({ to: { email: partyB.email, name: partyB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody, textContent: emailB.textBody }),
   ]);
   const smsResult = await sendInitialMatchSmsOnce(db, {
     matchId: match.id,

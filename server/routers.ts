@@ -1,6 +1,8 @@
+import { redactMatchProposalText } from "./emailTemplates";
 import { marketingChannelsRouter } from "./marketingChannelsRouter";
 import { editorialAutomationRouter } from "./editorialAutomation";
-import { classifyMatchDecision, recordMatchDecision } from "./matchDecision";
+import { classifyMatchDecision, getMatchResponseView, recordMatchDecision } from "./matchDecision";
+import { matchEmailProfile, matchEmailReason } from "./matchEmailProfile";
 import { NOVEMBER_COUPON_CODE, NOVEMBER_COUPON_ERROR, isNovemberCouponAllowed } from "../shared/novemberCoupon";
 import { rankAdvancedCandidates } from "./advancedMatchRanking";
 import { evaluateMatchPreview, previewScoreDimensions } from "./matchScorePreview";
@@ -3417,25 +3419,16 @@ export const appRouter = router({
         const dnaA = singleA.dnaType ? (singleA.gender === "female" ? DNA_PROFILES[singleA.dnaType]?.label_f : singleA.gender === "male" ? DNA_PROFILES[singleA.dnaType]?.label_m : undefined) || dnaLabels[singleA.dnaType] || singleA.dnaType : null;
         const dnaB = singleB.dnaType ? (singleB.gender === "female" ? DNA_PROFILES[singleB.dnaType]?.label_f : singleB.gender === "male" ? DNA_PROFILES[singleB.dnaType]?.label_m : undefined) || dnaLabels[singleB.dnaType] || singleB.dnaType : null;
         const defaultNote = input.hilitsNote ||
-          `בחרתי לחבר ביניכם כי ראיתי ${score >= 80 ? "התאמה גבוהה מאוד" : score >= 60 ? "התאמה טובה" : "פוטנציאל אמיתי"} בכמה רמות${dnaA && dnaB ? `. הפרופיל של ${singleA.firstName}: ${dnaA}, והפרופיל של ${singleB.firstName}: ${dnaB}, ושני הסוגים האלה משלימים אחד את השני בצורה יוצאת דופן` : ""}. ${singleA.city === singleB.city ? `שניכם מ${singleA.city}, מה שמקל על מפגש ראשון. ` : ""}אני מאמינה שיש כאן בסיס לקשר אמיתי. תנו לזה צ'אנס.`;
+          `ההצעה נבחרה על בסיס ${score >= 80 ? "התאמה גבוהה בנתוני הפרופיל" : score >= 60 ? "התאמה בנתוני הפרופיל" : "פוטנציאל להיכרות"} בכמה רמות${dnaA && dnaB ? `. הפרופיל של ${singleA.firstName}: ${dnaA}, והפרופיל של ${singleB.firstName}: ${dnaB}, ושאלוני ההתאמה מצביעים על נקודות שכדאי לבדוק בהיכרות` : ""}. ${singleA.city === singleB.city ? `שניכם מ${singleA.city}, מה שמקל על מפגש ראשון. ` : ""}ההיכרות תאפשר לבדוק אם יש גם חיבור אישי.`;
 
         const baseUrl = "https://hilitcaspi.com";
         const emailA = buildMatchProposalEmailTemplate({
           firstName: singleA.firstName,
           recipientGender: (singleA.gender as "male" | "female" | "other") ?? undefined,
-          matchFirstName: singleB.firstName,
-          matchAge: singleB.age ?? 0,
-          matchCity: singleB.city ?? "",
-          matchOccupation: singleB.occupation ?? undefined,
-          matchDnaType: singleB.dnaType ?? undefined,
-          matchPhotoUrl: singleB.photoUrl ? (singleB.photoUrl.startsWith("http") ? singleB.photoUrl : `https://hilitcaspi.com${singleB.photoUrl}`) : undefined,
-          matchEducation: singleB.education ?? undefined,
-          matchHasKids: singleB.hasKids ?? undefined,
-          matchNumKids: singleB.numKids ?? undefined,
-          matchWantsKids: singleB.wantsKids ?? undefined,
-          matchReligiosity: singleB.religiosity ?? undefined,
+          ...matchEmailProfile(singleB),
           compatibilityScore: score,
           hilitsNote: defaultNote,
+          noteSource: input.hilitsNote?.trim() ? "hilit" : "ai",
           yesUrl: `${baseUrl}/match/respond?token=${tokenA}&response=yes`,
           noUrl: `${baseUrl}/match/respond?token=${tokenA}&response=no`,
           recipientEmail: singleA.email!,
@@ -3445,19 +3438,10 @@ export const appRouter = router({
         const emailB = buildMatchProposalEmailTemplate({
           firstName: singleB.firstName,
           recipientGender: (singleB.gender as "male" | "female" | "other") ?? undefined,
-          matchFirstName: singleA.firstName,
-          matchAge: singleA.age ?? 0,
-          matchCity: singleA.city ?? "",
-          matchOccupation: singleA.occupation ?? undefined,
-          matchDnaType: singleA.dnaType ?? undefined,
-          matchPhotoUrl: singleA.photoUrl ? (singleA.photoUrl.startsWith("http") ? singleA.photoUrl : `https://hilitcaspi.com${singleA.photoUrl}`) : undefined,
-          matchEducation: singleA.education ?? undefined,
-          matchHasKids: singleA.hasKids ?? undefined,
-          matchNumKids: singleA.numKids ?? undefined,
-          matchWantsKids: singleA.wantsKids ?? undefined,
-          matchReligiosity: singleA.religiosity ?? undefined,
+          ...matchEmailProfile(singleA),
           compatibilityScore: score,
           hilitsNote: defaultNote,
+          noteSource: input.hilitsNote?.trim() ? "hilit" : "ai",
           yesUrl: `${baseUrl}/match/respond?token=${tokenB}&response=yes`,
           noUrl: `${baseUrl}/match/respond?token=${tokenB}&response=no`,
           recipientEmail: singleB.email!,
@@ -3466,8 +3450,8 @@ export const appRouter = router({
         });
 
         const [emailResultA, emailResultB] = await Promise.all([
-          sendEmail({ to: { email: singleA.email!, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
-          sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
+          sendEmail({ to: { email: singleA.email!, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody, textContent: emailA.textBody }),
+          sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody, textContent: emailB.textBody }),
         ]);
         await recordProposalEmailResults(db, {
           matchId,
@@ -4742,25 +4726,16 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const dnaA = singleA.dnaType ? (singleA.gender === "female" ? DNA_PROFILES[singleA.dnaType]?.label_f : singleA.gender === "male" ? DNA_PROFILES[singleA.dnaType]?.label_m : undefined) || dnaLabels[singleA.dnaType] || singleA.dnaType : null;
         const dnaB = singleB.dnaType ? (singleB.gender === "female" ? DNA_PROFILES[singleB.dnaType]?.label_f : singleB.gender === "male" ? DNA_PROFILES[singleB.dnaType]?.label_m : undefined) || dnaLabels[singleB.dnaType] || singleB.dnaType : null;
         const defaultNote = input.hilitsNote ||
-          `בחרתי לחבר ביניכם כי ראיתי ${score >= 80 ? "התאמה גבוהה מאוד" : score >= 60 ? "התאמה טובה" : "פוטנציאל אמיתי"} בכמה רמות${dnaA && dnaB ? `. הפרופיל של ${singleA.firstName}: ${dnaA}, והפרופיל של ${singleB.firstName}: ${dnaB}, ושני הסוגים האלה משלימים אחד את השני בצורה יוצאת דופן` : ""}. ${singleA.city === singleB.city ? `שניכם מ${singleA.city}, מה שמקל על מפגש ראשון. ` : ""}אני מאמינה שיש כאן בסיס לקשר אמיתי. תנו לזה צ'אנס.`;
+          `ההצעה נבחרה על בסיס ${score >= 80 ? "התאמה גבוהה בנתוני הפרופיל" : score >= 60 ? "התאמה בנתוני הפרופיל" : "פוטנציאל להיכרות"} בכמה רמות${dnaA && dnaB ? `. הפרופיל של ${singleA.firstName}: ${dnaA}, והפרופיל של ${singleB.firstName}: ${dnaB}, ושאלוני ההתאמה מצביעים על נקודות שכדאי לבדוק בהיכרות` : ""}. ${singleA.city === singleB.city ? `שניכם מ${singleA.city}, מה שמקל על מפגש ראשון. ` : ""}ההיכרות תאפשר לבדוק אם יש גם חיבור אישי.`;
 
         // Send proposal emails to both singles
         const emailA = buildMatchProposalEmailTemplate({
           firstName: singleA.firstName,
           recipientGender: (singleA.gender as "male" | "female" | "other") ?? undefined,
-          matchFirstName: singleB.firstName,
-          matchAge: singleB.age ?? 0,
-          matchCity: singleB.city ?? "",
-          matchOccupation: singleB.occupation ?? undefined,
-          matchDnaType: singleB.dnaType ?? undefined,
-          matchPhotoUrl: singleB.photoUrl ? (singleB.photoUrl.startsWith("http") ? singleB.photoUrl : `https://hilitcaspi.com${singleB.photoUrl}`) : undefined,
-          matchEducation: singleB.education ?? undefined,
-          matchHasKids: singleB.hasKids ?? undefined,
-          matchNumKids: singleB.numKids ?? undefined,
-          matchWantsKids: singleB.wantsKids ?? undefined,
-          matchReligiosity: singleB.religiosity ?? undefined,
+          ...matchEmailProfile(singleB),
           compatibilityScore: score,
           hilitsNote: defaultNote,
+          noteSource: input.hilitsNote?.trim() ? "hilit" : "ai",
           yesUrl: `${baseUrl}/match/respond?token=${tokenA}&response=yes`,
           noUrl: `${baseUrl}/match/respond?token=${tokenA}&response=no`,
           recipientEmail: singleA.email!,
@@ -4770,19 +4745,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const emailB = buildMatchProposalEmailTemplate({
           firstName: singleB.firstName,
           recipientGender: (singleB.gender as "male" | "female" | "other") ?? undefined,
-          matchFirstName: singleA.firstName,
-          matchAge: singleA.age ?? 0,
-          matchCity: singleA.city ?? "",
-          matchOccupation: singleA.occupation ?? undefined,
-          matchDnaType: singleA.dnaType ?? undefined,
-          matchPhotoUrl: singleA.photoUrl ? (singleA.photoUrl.startsWith("http") ? singleA.photoUrl : `https://hilitcaspi.com${singleA.photoUrl}`) : undefined,
-          matchEducation: singleA.education ?? undefined,
-          matchHasKids: singleA.hasKids ?? undefined,
-          matchNumKids: singleA.numKids ?? undefined,
-          matchWantsKids: singleA.wantsKids ?? undefined,
-          matchReligiosity: singleA.religiosity ?? undefined,
+          ...matchEmailProfile(singleA),
           compatibilityScore: score,
           hilitsNote: defaultNote,
+          noteSource: input.hilitsNote?.trim() ? "hilit" : "ai",
           yesUrl: `${baseUrl}/match/respond?token=${tokenB}&response=yes`,
           noUrl: `${baseUrl}/match/respond?token=${tokenB}&response=no`,
           recipientEmail: singleB.email!,
@@ -4791,8 +4757,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         });
 
         const [emailResultA, emailResultB] = await Promise.all([
-          sendEmail({ to: { email: singleA.email!, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
-          sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
+          sendEmail({ to: { email: singleA.email!, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody, textContent: emailA.textBody }),
+          sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody, textContent: emailB.textBody }),
         ]);
         await recordProposalEmailResults(db, {
           matchId: input.matchId,
@@ -4876,19 +4842,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         }).where(eq(matches.id, match.id));
         const score = verifiedBreakdown.total;
         const baseUrl = "https://hilitcaspi.com";
-        const matchReason = `על בסיס ${score}% התאמה, שניכם חולקים ערכים דומים בתחום הזוגיות, אורח החיים והתקשורת. זה בדיוק הסוג של חיבור שמוביל לזוגיות אמיתית. במידה ושניכם תאשרו: יחשפו הפרטים. אם לא: צפו להתאמה הבאה 💛`;
+        const matchReason = "ההצעה מבוססת על השוואת נתוני הפרופיל, ההעדפות ושאלוני ההתאמה. כדאי לבדוק בשיחה את הציפיות, אורח החיים והתקשורת, ולראות אם יש גם חיבור אישי.";
         const emailA = buildMatchProposalEmailTemplate({
           firstName: singleA.firstName,
           recipientGender: (singleA.gender as "male" | "female" | "other") ?? undefined,
-          matchFirstName: singleB.firstName,
-          matchAge: singleB.age ?? 0,
-          matchCity: singleB.city ?? "",
-          matchOccupation: singleB.occupation ?? undefined,
-          matchDnaType: singleB.dnaType ?? undefined,
-          matchPhotoUrl: singleB.photoUrl ? (singleB.photoUrl.startsWith("http") ? singleB.photoUrl : `https://hilitcaspi.com${singleB.photoUrl}`) : undefined,
-          matchHasKids: singleB.hasKids ?? undefined,
-          matchNumKids: singleB.numKids ?? undefined,
-          matchWantsKids: singleB.wantsKids ?? undefined,
+          ...matchEmailProfile(singleB),
           compatibilityScore: score,
           hilitsNote: matchReason,
           yesUrl: `${baseUrl}/match/respond?token=${tokenA}&response=yes`,
@@ -4900,15 +4858,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const emailB = buildMatchProposalEmailTemplate({
           firstName: singleB.firstName,
           recipientGender: (singleB.gender as "male" | "female" | "other") ?? undefined,
-          matchFirstName: singleA.firstName,
-          matchAge: singleA.age ?? 0,
-          matchCity: singleA.city ?? "",
-          matchOccupation: singleA.occupation ?? undefined,
-          matchDnaType: singleA.dnaType ?? undefined,
-          matchPhotoUrl: singleA.photoUrl ? (singleA.photoUrl.startsWith("http") ? singleA.photoUrl : `https://hilitcaspi.com${singleA.photoUrl}`) : undefined,
-          matchHasKids: singleA.hasKids ?? undefined,
-          matchNumKids: singleA.numKids ?? undefined,
-          matchWantsKids: singleA.wantsKids ?? undefined,
+          ...matchEmailProfile(singleA),
           compatibilityScore: score,
           hilitsNote: matchReason,
           yesUrl: `${baseUrl}/match/respond?token=${tokenB}&response=yes`,
@@ -4918,8 +4868,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           trackingPixelUrl: `${baseUrl}/api/match-open?token=${tokenB}&side=b`,
         });
         const [emailResultA, emailResultB] = await Promise.all([
-          sendEmail({ to: { email: singleA.email!, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody }),
-          sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody }),
+          sendEmail({ to: { email: singleA.email!, name: singleA.firstName }, subject: emailA.subject, htmlContent: emailA.htmlBody, textContent: emailA.textBody }),
+          sendEmail({ to: { email: singleB.email!, name: singleB.firstName }, subject: emailB.subject, htmlContent: emailB.htmlBody, textContent: emailB.textBody }),
         ]);
         await recordProposalEmailResults(db, {
           matchId: match.id,
@@ -4968,19 +4918,15 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           db.select().from(singles).where(eq(singles.id, partnerSingleId)).limit(1),
         ]);
 
-        const alreadyResponded = isA ? !!match.tokenAUsedAt : !!match.tokenBUsedAt;
-        const myDecision = isA ? match.approvedByA : match.approvedByB;
+        const responseView = getMatchResponseView(match, input.token, Date.now());
         const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
         const boostPartnerCard = partner && isBoost ? buildAnonymousBoostCard(partner, match, me) : null;
 
         return {
           matchId: match.id,
           score: Math.round(Number(match.score || 0)),
-          status: match.status,
-          isExpired: !!isExpired,
-          alreadyResponded,
-          myDecision,
-          canRespondAfterDecline: classifyMatchDecision(match, input.token, Date.now()).kind === "feedback",
+          ...responseView,
+          canRespondAfterDecline: responseView.canRespond,
           proposalSource: isBoost ? "boost" as const : "manual" as const,
           partner: partner ? (isBoost ? {
             firstName: partner.firstName,
@@ -4988,10 +4934,16 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             city: partner.city,
             height: partner.height,
             education: partner.education,
-            occupation: partner.occupation,
-            about: partner.about,
+            occupation: redactMatchProposalText(partner.occupation),
+            about: redactMatchProposalText(partner.about),
             photoUrl: partner.photoUrl,
             religiosity: partner.religiosity,
+            maritalStatus: partner.maritalStatus,
+            hasKids: partner.hasKids,
+            numKids: partner.numKids,
+            wantsKids: partner.wantsKids,
+            dnaType: partner.dnaType,
+            gender: partner.gender,
             reasons: boostPartnerCard?.reasons || [],
             considerations: [],
             isAnonymous: false,
@@ -5001,10 +4953,16 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             city: partner.city,
             height: partner.height,
             education: partner.education,
-            occupation: partner.occupation,
-            about: partner.about,
+            occupation: redactMatchProposalText(partner.occupation),
+            about: redactMatchProposalText(partner.about),
             photoUrl: partner.photoUrl,
             religiosity: partner.religiosity,
+            maritalStatus: partner.maritalStatus,
+            hasKids: partner.hasKids,
+            numKids: partner.numKids,
+            wantsKids: partner.wantsKids,
+            dnaType: partner.dnaType,
+            gender: partner.gender,
             reasons: [],
             considerations: [],
             isAnonymous: false,
@@ -5030,21 +4988,13 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const recorded = await recordMatchDecision(db, input.token, input.response);
         if (recorded.kind === "invalid") throw new TRPCError({ code: "NOT_FOUND", message: "קישור לא תקין" });
         if (recorded.kind === "expired") throw new TRPCError({ code: "BAD_REQUEST", message: "הקישור פג תוקף" });
-        if (recorded.kind === "already") return { alreadyResponded: true, status: recorded.match.status };
+        if (recorded.kind === "already") return getMatchResponseView(recorded.match, input.token, now);
         if (recorded.kind === "closed") return { alreadyResponded: false, closed: true, status: recorded.match.status };
         const { match, isA } = recorded;
         const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
         if (recorded.lateFeedback) {
-          // Feedback only: never reopen, reveal contacts, or notify the decliner again.
-          if (input.response === "yes") {
-            const [recipient] = await db.select().from(singles).where(eq(singles.id, isA ? match.singleAId : match.singleBId)).limit(1);
-            if (recipient?.email) {
-              const consolation = buildConsolationEmail({ firstName: recipient.firstName, recipientEmail: recipient.email, singleId: recipient.id });
-              sendEmail({ to: { email: recipient.email, name: recipient.firstName }, subject: consolation.subject, htmlContent: consolation.htmlBody })
-                .catch(err => console.error("[Late match feedback email] Failed:", err));
-            }
-          }
-          return { success: true, closed: true, lateFeedback: true, status: "rejected" };
+          // Choice is recorded; the current page explains the outcome. No duplicate email.
+          return { success: true, closed: true, lateFeedback: true, status: "rejected", responseOutcome: "not_matched" as const };
         }
         if (input.response === "no") {
           if (isBoost) {
@@ -5074,11 +5024,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               sendEmail({
                 to: { email: otherSingle.email, name: otherSingle.firstName },
                 subject: consolation.subject,
-                htmlContent: consolation.htmlBody,
+                htmlContent: consolation.htmlBody, textContent: consolation.textBody,
               }).catch(err => console.error("[Consolation email] Failed:", err));
             }
           }
-          return { success: true, status: "rejected" };
+          return { success: true, status: "rejected", responseOutcome: "not_matched" as const };
         }
 
         // Only the transaction that transitions to mutual yes performs reveal effects.
@@ -5130,14 +5080,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             const emailRevealA = buildContactRevealEmailTemplate({
               firstName: singleA.firstName,
               gender: (singleA.gender as "male" | "female" | "other") ?? "other",
-              matchFirstName: singleB.firstName,
+              ...matchEmailProfile(singleB),
               matchLastName: singleB.lastName ?? undefined,
               matchPhone: singleB.phone ?? "",
               matchEmail: singleB.email ?? "",
-              matchAge: singleB.age ?? 0,
-              matchCity: singleB.city ?? "",
-              matchOccupation: singleB.occupation ?? undefined,
-              matchDnaType: singleB.dnaType ?? undefined,
               compatibilityScore: score,
               preDateTip: singleA.gender === "female" ? tipFemale : singleA.gender === "male" ? tipMale : "כדאי להגיע למפגש בסקרנות ובלב פתוח, בלי ציפייה לשלמות.",
               recipientEmail: singleA.email!,
@@ -5149,14 +5095,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             const emailRevealB = buildContactRevealEmailTemplate({
               firstName: singleB.firstName,
               gender: (singleB.gender as "male" | "female" | "other") ?? "other",
-              matchFirstName: singleA.firstName,
+              ...matchEmailProfile(singleA),
               matchLastName: singleA.lastName ?? undefined,
               matchPhone: singleA.phone ?? "",
               matchEmail: singleA.email ?? "",
-              matchAge: singleA.age ?? 0,
-              matchCity: singleA.city ?? "",
-              matchOccupation: singleA.occupation ?? undefined,
-              matchDnaType: singleA.dnaType ?? undefined,
               compatibilityScore: score,
               preDateTip: singleB.gender === "female" ? tipFemale : singleB.gender === "male" ? tipMale : "כדאי להגיע למפגש בסקרנות ובלב פתוח, בלי ציפייה לשלמות.",
               recipientEmail: singleB.email!,
@@ -5170,12 +5112,12 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               sendEmail({
                 to: { email: singleA.email!, name: singleA.firstName },
                 subject: emailRevealA.subject,
-                htmlContent: emailRevealA.htmlBody,
+                htmlContent: emailRevealA.htmlBody, textContent: emailRevealA.textBody,
               }),
               sendEmail({
                 to: { email: singleB.email!, name: singleB.firstName },
                 subject: emailRevealB.subject,
-                htmlContent: emailRevealB.htmlBody,
+                htmlContent: emailRevealB.htmlBody, textContent: emailRevealB.textBody,
               }),
             ]);
             await notifyOwner({
@@ -5184,10 +5126,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
             });
           }
 
-          return { success: true, status: "matched", bothApproved: true };
+          return { success: true, status: "matched", bothApproved: true, responseOutcome: "matched" as const };
         }
 
-        return { success: true, status: "waiting", bothApproved: false };
+        return { success: true, status: "waiting", bothApproved: false, responseOutcome: "waiting" as const };
       }),
 
     /**
@@ -5200,7 +5142,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const now = Date.now();
-        await db.update(matches).set({ status: "rejected", updatedAt: now }).where(eq(matches.id, input.matchId));
+        await db.update(matches).set({ status: "rejected", matchDetailStatus: "ended", updatedAt: now }).where(eq(matches.id, input.matchId));
         await syncBoostRequestAfterMatchDecision(db, { matchId: input.matchId, decision: "rejected", now });
         return { success: true };
       }),
@@ -5923,6 +5865,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const [current] = await db.select({ notes: matches.notes }).from(matches).where(eq(matches.id, input.matchId)).limit(1);
         await db.update(matches).set({
           status: "rejected",
+          matchDetailStatus: "ended",
           notes: setLegacyMatchNote(current?.notes, "נשלחה בעבר"),
           updatedAt: Date.now()
         }).where(eq(matches.id, input.matchId));
@@ -6085,25 +6028,26 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         const opponentId = isA ? match.singleBId : match.singleAId;
         const [opponent] = await db.select().from(singles).where(eq(singles.id, opponentId)).limit(1);
         const token = isA ? match.approvalTokenA : match.approvalTokenB;
+        if (!opponent || !token || classifyMatchDecision(match, token, Date.now()).kind !== "active") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "ההצעה אינה ממתינה לתשובה או שתוקפה הסתיים" });
+        }
         const baseUrl = "https://hilitcaspi.com";
-        const approveUrl = token ? `${baseUrl}/match/respond?token=${token}&response=yes` : '';
-        const declineUrl = token ? `${baseUrl}/match/respond?token=${token}&response=no` : '';
-        const opponentName = opponent ? `${opponent.firstName} ${opponent.lastName || ''}`.trim() : 'מישהו מיוחד';
-        const opponentAge = opponent?.age ?? null;
-        const opponentCity = opponent?.city ?? null;
-        const subject = `תזכורת: ממתינים לתשובתך 💛`;
-        const html = `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-          <h2 style="color:#191265;">היי ${single.firstName} 💛</h2>
-          <p>שלחנו לך לאחרונה הצעת התאמה עם ${opponentName}${opponentAge ? `, גיל ${opponentAge}` : ''}${opponentCity ? `, ${opponentCity}` : ''}.</p>
-          <p>עדיין לא קיבלנו את תשובתך. אנחנו מזכירים לך שההצעה ממתינה לך!</p>
-          ${approveUrl ? `<div style="margin:20px 0;">
-            <a href="${approveUrl}" style="background:#191265;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;margin-left:10px;">✅ מעוניינת</a>
-            <a href="${declineUrl}" style="background:#e5e7eb;color:#374151;padding:12px 24px;border-radius:8px;text-decoration:none;">❌ לא מעוניינת</a>
-          </div>` : ''}
-          <p style="color:#727272;font-size:12px;">בברכה, הילית כספי</p>
-        </div>`;
+        const isBoost = String(match.autoExplanation || "").startsWith("[BOOST]") || String(match.notes || "").startsWith("[BOOST_SENT]");
+        const template = buildMatchProposalEmailTemplate({
+          firstName: single.firstName,
+          recipientGender: single.gender,
+          ...matchEmailProfile(opponent),
+          compatibilityScore: Math.round(Number(match.score || 0)),
+          hilitsNote: matchEmailReason(match, isBoost),
+          yesUrl: `${baseUrl}/match/respond?token=${token}&response=yes`,
+          noUrl: `${baseUrl}/match/respond?token=${token}&response=no`,
+          recipientEmail: single.email,
+          singleId: single.id,
+          proposalSource: isBoost ? "boost" : "manual",
+          trackingPixelUrl: `${baseUrl}/api/match-open?token=${token}&side=${isA ? "a" : "b"}`,
+        });
         const attemptedAt = Date.now();
-        const result = await sendEmail({ to: { email: single.email, name: single.firstName }, subject, htmlContent: html });
+        const result = await sendEmail({ to: { email: single.email, name: single.firstName }, subject: `תזכורת: ${template.subject}`, htmlContent: template.htmlBody, textContent: template.textBody });
         await recordMatchDelivery(db, {
           eventKey: matchDeliveryEventKey({ matchId: match.id, singleId: single.id, channel: "email", attemptType: "followup", attemptRef: attemptedAt }),
           matchId: match.id,

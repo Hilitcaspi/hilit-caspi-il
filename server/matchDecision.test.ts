@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { MySqlDialect } from "drizzle-orm/mysql-core";
 import type { SQL } from "drizzle-orm";
 import { matches, type Match } from "../drizzle/schema";
-import { classifyMatchDecision, recordMatchDecision } from "./matchDecision";
+import {
+  classifyMatchDecision,
+  getMatchResponseView,
+  recordMatchDecision,
+} from "./matchDecision";
 
 // A real database connection must never be created by these unit tests.
 vi.mock("./db", () => ({
@@ -471,7 +475,13 @@ describe("recordMatchDecision with a serialized fake transaction", () => {
   );
 
   it("evaluates the production clock after acquiring the row lock", async () => {
-    const h = serializedDb(matchRow({ status: "rejected", tokenBUsedAt: NOW - 100, approvalExpiresAt: NOW }));
+    const h = serializedDb(
+      matchRow({
+        status: "rejected",
+        tokenBUsedAt: NOW - 100,
+        approvalExpiresAt: NOW,
+      })
+    );
     let current = NOW - 1;
     const clock = vi.fn(() => current);
     const pending = recordMatchDecision(h.db, TOKEN_A, "yes", clock);
@@ -738,5 +748,204 @@ describe("recordMatchDecision with a serialized fake transaction", () => {
     ).rejects.toThrow("synthetic update failure");
     expect(h.read()).toEqual(before);
     expect(h.writes).toHaveLength(0);
+  });
+});
+
+describe("participant response view and complete decision truth table", () => {
+  it.each(SIDES)(
+    "does not disclose the partner's answer to unused token %s",
+    side => {
+      const states = [
+        matchRow(),
+        matchRow(decisionFields(otherSide(side), true, NOW - 100)),
+        matchRow({
+          status: "rejected",
+          ...decisionFields(otherSide(side), false, NOW - 100),
+        }),
+      ];
+      const views = states.map(row =>
+        getMatchResponseView(row, tokenFor(side), NOW)
+      );
+      expect(views[0]).toEqual({
+        canRespond: true,
+        closed: false,
+        isExpired: false,
+        alreadyResponded: false,
+        myDecision: null,
+        status: "proposed",
+        responseOutcome: null,
+      });
+      expect(views[1]).toEqual(views[0]);
+      expect(views[2]).toEqual(views[0]);
+      expect(views[2]).not.toHaveProperty("canRespondAfterDecline");
+    }
+  );
+
+  it.each(SIDES)(
+    "shows a saved yes from %s as waiting, not mutual consent",
+    side => {
+      const row = matchRow(decisionFields(side, true, NOW - 100));
+      expect(getMatchResponseView(row, tokenFor(side), NOW)).toMatchObject({
+        alreadyResponded: true,
+        myDecision: true,
+        canRespond: false,
+        responseOutcome: "waiting",
+      });
+    }
+  );
+
+  it.each(
+    SIDES.flatMap(first =>
+      (["yes", "no"] as const).flatMap(firstVote =>
+        (["yes", "no"] as const).map(secondVote => ({
+          first,
+          firstVote,
+          secondVote,
+        }))
+      )
+    )
+  )(
+    "$first first: $firstVote then $secondVote records both immutable votes",
+    async ({ first, firstVote, secondVote }) => {
+      const h = serializedDb(matchRow());
+      const second = otherSide(first);
+      const firstResult = await recordMatchDecision(
+        h.db,
+        tokenFor(first),
+        firstVote,
+        NOW
+      );
+      expect(firstResult).toMatchObject({
+        kind: "recorded",
+        becameMatched: false,
+      });
+      // The remaining side always sees the proposal, even after a no.
+      expect(
+        getMatchResponseView(h.read()!, tokenFor(second), NOW + 1)
+      ).toMatchObject({
+        canRespond: true,
+        status: "proposed",
+        responseOutcome: null,
+        myDecision: null,
+      });
+      const secondResult = await recordMatchDecision(
+        h.db,
+        tokenFor(second),
+        secondVote,
+        NOW + 1
+      );
+      const mutual = firstVote === "yes" && secondVote === "yes";
+      expect(secondResult).toMatchObject({
+        kind: "recorded",
+        becameMatched: mutual,
+        lateFeedback: firstVote === "no",
+        status: mutual ? "matched" : "rejected",
+      });
+      const saved = h.read()!;
+      expect(saved).toMatchObject({
+        ...decisionFields(first, firstVote === "yes", NOW),
+        ...decisionFields(second, secondVote === "yes", NOW + 1),
+        status: mutual ? "matched" : "rejected",
+        matchedAt: mutual ? NOW + 1 : null,
+        returnedToPoolAt: null,
+      });
+      for (const side of SIDES) {
+        const view = getMatchResponseView(saved, tokenFor(side), NOW + 2);
+        expect(view).toMatchObject({
+          alreadyResponded: true,
+          canRespond: false,
+          responseOutcome: mutual ? "matched" : "not_matched",
+        });
+        for (const replayVote of ["yes", "no"] as const) {
+          expect(
+            await recordMatchDecision(h.db, tokenFor(side), replayVote, NOW + 2)
+          ).toMatchObject({ kind: "already" });
+        }
+      }
+      expect(h.read()).toEqual(saved);
+      expect(h.writes).toHaveLength(2);
+    }
+  );
+
+  it.each(SIDES)(
+    "concurrent no/no with %s first saves both without reopening",
+    async first => {
+      const h = serializedDb(matchRow());
+      const results = await Promise.all([
+        recordMatchDecision(h.db, tokenFor(first), "no", NOW),
+        recordMatchDecision(h.db, tokenFor(otherSide(first)), "no", NOW + 1),
+      ]);
+      expect(results[0]).toMatchObject({
+        kind: "recorded",
+        lateFeedback: false,
+        becameMatched: false,
+      });
+      expect(results[1]).toMatchObject({
+        kind: "recorded",
+        lateFeedback: true,
+        becameMatched: false,
+      });
+      expect(h.read()).toMatchObject({
+        status: "rejected",
+        approvedByA: false,
+        approvedByB: false,
+        matchedAt: null,
+      });
+      expect(h.writes).toHaveLength(2);
+      expect(h.maxActive()).toBe(1);
+      expect(h.locks).toEqual(["update", "update"]);
+    }
+  );
+
+  it.each([
+    { returnedToPoolAt: NOW - 1 },
+    { matchDetailStatus: "ended" as const },
+    { approvalExpiresAt: NOW },
+    { status: "expired" as const },
+  ])(
+    "keeps lifecycle block %j guarded before and after own vote",
+    lifecycle => {
+      const rejected = matchRow({
+        status: "rejected",
+        tokenBUsedAt: NOW - 100,
+        ...lifecycle,
+      });
+      expect(getMatchResponseView(rejected, TOKEN_A, NOW).canRespond).toBe(
+        false
+      );
+      const savedYes = matchRow({
+        tokenAUsedAt: NOW - 200,
+        approvedByA: true,
+        ...lifecycle,
+      });
+      expect(getMatchResponseView(savedYes, TOKEN_A, NOW)).toMatchObject({
+        alreadyResponded: true,
+        canRespond: false,
+        myDecision: true,
+        responseOutcome: "closed",
+      });
+    }
+  );
+
+  it("does not show an active mutual match as expired after the proposal deadline", () => {
+    const row = matchRow({
+      status: "matched",
+      approvedByA: true,
+      approvedByB: true,
+      tokenAUsedAt: NOW - 100,
+      tokenBUsedAt: NOW - 50,
+    });
+    expect(getMatchResponseView(row, TOKEN_A, NOW + 20_000)).toMatchObject({
+      isExpired: false,
+      responseOutcome: "matched",
+      canRespond: false,
+    });
+    expect(
+      getMatchResponseView(
+        { ...row, returnedToPoolAt: NOW },
+        TOKEN_A,
+        NOW + 20_000
+      ).responseOutcome
+    ).toBe("closed");
   });
 });
