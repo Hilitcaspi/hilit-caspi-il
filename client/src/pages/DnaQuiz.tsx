@@ -13,6 +13,9 @@ import { trpc } from "@/lib/trpc";
 import { trackLead } from "@/lib/metaPixel";
 import { gaGenerateLead, gaQuizComplete } from "@/lib/ga";
 import { getFirstTouchAcquisition, getLastUtmAcquisition } from "@/lib/acquisitionTracking";
+import DnaResultProfileCard from "@/components/DnaResultProfileCard";
+import { track } from "@/lib/track";
+import { buildDnaJoinReturnHref } from "@shared/dnaResultNavigation";
 import {
   buildNovemberDnaResultHref,
   clearNovemberDnaContext,
@@ -336,7 +339,14 @@ export default function DnaQuiz() {
   const label = info ? (gender === "female" ? info.label_f : info.label_m) : "";
   const matchText = info ? (gender === "female" ? info.match_f : info.match_m) : "";
   const novemberResultHref = buildNovemberDnaResultHref(novemberContext);
-  const continueToGenericJoin = () => {
+  // Track the CTA placement separately, never replacing the external UTM bundle.
+  const trackDatabaseCta = (placement: string) => track({
+    eventType: "database_cta",
+    page: "/dna-quiz",
+    metadata: { placement, product: "database", destination: novemberResultHref ? "november-love" : "join" },
+  });
+  const continueToGenericJoin = (placement = "main_result") => {
+    trackDatabaseCta(placement);
     // Keep contact details off the address bar. Register already reads this
     // short-lived continuity payload when the same DNA session continues.
     try {
@@ -863,6 +873,14 @@ export default function DnaQuiz() {
             <p className="text-[#191265]/80 leading-relaxed text-right">{matchText}</p>
           </motion.div>
 
+          {returnTo !== "join" && <DnaResultProfileCard
+            name={captureForm.name}
+            gender={gender}
+            resultLabel={label}
+            href={novemberResultHref}
+            onContinue={() => novemberResultHref ? trackDatabaseCta("profile_card") : continueToGenericJoin("profile_card")}
+          />}
+
           {/* CTA - Join database */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -883,6 +901,7 @@ export default function DnaQuiz() {
                 </p>
                 <a
                   href={novemberResultHref}
+                  onClick={() => trackDatabaseCta("main_result")}
                   data-testid="dna-november-result-cta"
                   className="block w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-[1.02] shadow-xl"
                 >
@@ -900,9 +919,6 @@ export default function DnaQuiz() {
                 </p>
                 <button
                   onClick={() => {
-                    const base = returnFreeToken
-                      ? `/join?free_token=${returnFreeToken}`
-                      : `/join`;
                     // If opened in a new tab from /join, send DNA result via postMessage and close this tab
                     if (window.opener && !window.opener.closed) {
                       window.opener.postMessage({
@@ -913,7 +929,7 @@ export default function DnaQuiz() {
                       }, window.location.origin);
                       window.close();
                     } else {
-                      navigate(`${base}&dna=${dnaType}&gender=${gender}&session=${sessionId.current}`);
+                      navigate(buildDnaJoinReturnHref({ dnaType, gender, sessionId: sessionId.current, freeToken: returnFreeToken }));
                     }
                   }}
                   className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-[1.02] shadow-xl"
@@ -930,9 +946,11 @@ export default function DnaQuiz() {
                 <p className="text-white/75 text-sm leading-relaxed mb-4">
                   מתוך ניסיון בליווי רווקים ורווקות, הקמתי מאגר שידוכים דיסקרטי ואקסקלוסיבי.
                   גברים ונשים איכותיים פונים אליי מדי יום. ברגע שמצטרפים למאגר - הפרופיל שלכם
-                  (כולל תוצאות האבחון הזה) נשמר אצלי, ואני אצור איתכם קשר ברגע שתהיה התאמה מתאימת.
+                  (כולל תוצאות האבחון הזה) נשמר אצלי, ואני אצור איתכם קשר ברגע שתהיה התאמה מתאימה.
                   <br /><br />
                   <strong className="text-white">אין החלקות שמאלה וימינה. ההתאמות מבוססות על חישובים מתקדמים ופסיכולוגיה חיובית, ועוברות אישור אישי של הילית לפני כל הצעה.</strong>
+                  <br /><br />
+                  כל הצעת התאמה נשלחת לשני הצדדים לאישור. רק אם שניכם מאשרים, נשלחים פרטי הקשר ואפשר להתחיל להכיר.
                 </p>
                 {/* 2-step process explanation */}
                 <div className="bg-white/10 rounded-2xl p-4 mb-5 text-right">
@@ -942,7 +960,7 @@ export default function DnaQuiz() {
                       <div className="w-5 h-5 rounded-full bg-[#ffe27c] text-[#191265] text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
                       <div>
                         <p className="text-white text-sm font-bold">אבחון DNA ✓ הושלם</p>
-                        <p className="text-white/60 text-xs">מילאת את השאלון + תשלום דמי רישום</p>
+                        <p className="text-white/60 text-xs">השאלון החינמי הושלם. הצטרפות למאגר היא הצעד הבא.</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
@@ -957,7 +975,7 @@ export default function DnaQuiz() {
                 <div className="text-[#ffe27c] font-black text-lg mb-1">דמי רצינות ורישום: ₪299 (חד-פעמי)</div>
                 <p className="text-white/50 text-xs mb-6">כל שאלון עובר בעיניי אישית לפני שמוזן למאגר</p>
                 <button
-                  onClick={continueToGenericJoin}
+                  onClick={() => continueToGenericJoin()}
                   data-testid="dna-generic-result-cta"
                   className="w-full bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-2xl hover:bg-white transition-all duration-300 hover:scale-[1.02] shadow-xl"
                 >
@@ -999,6 +1017,8 @@ export default function DnaQuiz() {
             </p>
             <a
               href="https://hilitcaspi.com/api/wa/site"
+              onClick={() => track({ eventType: "whatsapp_click", page: "/dna-quiz", metadata: { placement: "result_hilit", destination: "quiet_group" } })}
+              data-testid="dna-result-whatsapp-cta"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-4 flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-2xl transition-all duration-300 text-sm"
@@ -1008,7 +1028,7 @@ export default function DnaQuiz() {
             </a>
           </motion.div>
 
-          {/* Upsell - coaching package */}
+          {/* Optional personal introductory meeting — existing product, no pricing change. */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1016,22 +1036,23 @@ export default function DnaQuiz() {
             className="bg-[#ffe27c] rounded-3xl p-6 text-right"
           >
             <span className="bg-[#191265] text-white text-xs font-bold px-3 py-1.5 rounded-full">💎 שדרוג מומלץ</span>
-            <h3 className="text-[#191265] font-black text-lg mt-4 mb-2">רוצה ליווי אישי עמוק?</h3>
+            <h3 className="text-[#191265] font-black text-lg mt-4 mb-2">רוצה להכיר אותי אישית?</h3>
             <p className="text-[#191265]/80 text-sm leading-relaxed mb-4">
-              מעבר למאגר, הילית מציעה תהליך ליווי אישי של 8 פגישות - שבו עובדים יחד על הדפוסים שלך,
-              בונים את הפרופיל הנכון, ומוצאים את הדרך שלך לזוגיות.
-              <br /><strong>הצטרפות לליווי אישי כוללת כניסה למאגר הרווקים (שווי ₪299).</strong>
+              אפשר לקבוע איתי פגישת היכרות אישית. נכיר את הסיפור שלך, נבין מה חשוב לך בקשר ומה יכול לעזור לך להתקדם לזוגיות.
+              <br /><strong>פגישה אחת, בלי התחייבות לתהליך ליווי.</strong>
             </p>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-[#191265] font-black text-2xl">₪2,900</div>
-                <div className="text-[#191265]/60 text-xs line-through">₪4,000</div>
+                <div className="text-[#191265] font-black text-2xl">₪500</div>
+                <div className="text-[#191265]/60 text-xs">פגישת היכרות אישית</div>
               </div>
               <a
-                href="/coaching"
+                href="/single-session"
+                onClick={() => track({ eventType: "intro_meeting_click", page: "/dna-quiz", metadata: { placement: "result_meeting", product: "session" } })}
+                data-testid="dna-result-meeting-cta"
                 className="bg-[#191265] text-white font-black px-6 py-3 rounded-2xl hover:bg-[#1800ad] transition-colors text-sm"
               >
-                ♡ פרטים על ליווי אישי
+                ♡ לפרטים ולקביעת פגישה
               </a>
             </div>
           </motion.div>

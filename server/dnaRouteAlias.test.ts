@@ -19,10 +19,10 @@ describe("DNA route aliases", () => {
     expect(usRouter).toContain('<Route path={"/dna"} component={EnDnaQuiz} />');
   });
 
-  it("reads query parameters directly so the alias preserves UTM and return-flow values", () => {
+  it("uses unified acquisition attribution while reading return-flow parameters from either alias", () => {
     expect(dnaQuiz).toContain("useSearch()");
-    expect(dnaQuiz).toContain('urlParams.get("utm_source")');
-    expect(dnaQuiz).toContain('urlParams.get("utm_campaign")');
+    expect(dnaQuiz).toContain("getLastUtmAcquisition()");
+    expect(dnaQuiz).toContain("getFirstTouchAcquisition()");
     expect(dnaQuiz).toContain('urlParams.get("return_to")');
   });
 });
