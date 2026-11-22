@@ -174,6 +174,8 @@ export function buildPlusCancellationTracking(
         phone: row.single.phone,
         isCoachingClient: row.single.isCoachingClient,
         isNotBasic: row.single.isNotBasic,
+        isMatchingDifficult: row.single.isMatchingDifficult,
+        matchingDifficultyNote: row.single.matchingDifficultyNote,
       },
       // Waitlisting is not activation. Do not substitute waitlistedAt or a billing date here.
       joinedAt: timestamp(member.activatedAt),

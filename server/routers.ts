@@ -39,7 +39,7 @@ import { calculateCompatibility, findMatches, findMatchesWithText, computeFullSc
 import type { ScoreBreakdown as FullScoreBreakdown } from "./compatibility";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
 import crypto from "crypto";
-import { eq, and, ne, sql, desc, lt, gt, isNull, isNotNull, or, asc, inArray, notLike } from "drizzle-orm";
+import { eq, and, ne, sql, desc, lt, gt, isNull, isNotNull, or, asc, inArray, notLike, getTableColumns } from "drizzle-orm";
 import { storagePut } from "./storage";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "./_core/notification";
@@ -97,12 +97,12 @@ import { orientParticipantsToStoredMatch } from "./matchParticipantOrientation";
 import { wasMatchProposalSent } from "../shared/matchDelivery";
 import { blocksNewMatch } from "./unmatchedQueue";
 import { filterProfilesByName } from "../shared/profileNameSearch";
+import { WAITING_QUEUE_CATEGORIES, emptyWaitingQueueSummary, selectWaitingQueueCategory } from "../shared/waitingQueueCategories";
 import {
   buildLastAcceptedDeliveryBySingle,
   buildRecipientMatchHistory,
   getWaitingFrom,
   normalizeQueueEmail,
-  sortWaitingProfilesByWaitingFrom,
   UNMATCHED_QUEUE_HISTORY_DISCLAIMER,
 } from "../shared/unmatchedQueuePresentation";
 import { hashActor, recordSelfServiceEventSafely } from "./usageMetrics";
@@ -165,6 +165,10 @@ const JOURNEY_LABELS_SERVER: Record<string, string> = {
 };
 
 type SingleRow = typeof singles.$inferSelect;
+
+// These fields are private staff metadata even when the customer owns the token.
+// Keep them out of the customer full-profile projections and resulting spreads.
+const { isMatchingDifficult: _privateDifficultyFlag, matchingDifficultyNote: _privateDifficultyNote, ...customerSingleColumns } = getTableColumns(singles);
 
 /**
  * Auto-link DNA quiz result to a single's profile.
@@ -1946,7 +1950,7 @@ export const appRouter = router({
         const matchedProfiles = await Promise.all(
           myMatches.map(async (m) => {
             const otherId = m.singleAId === input.singleId ? m.singleBId : m.singleAId;
-            const [profile] = await db.select().from(singles).where(eq(singles.id, otherId));
+            const [profile] = await db.select(customerSingleColumns).from(singles).where(eq(singles.id, otherId));
             if (!profile) return null;
             return {
               ...profile,
@@ -2688,7 +2692,7 @@ export const appRouter = router({
      .query(async ({ input }) => {
        const db = await getDb();
        if (!db) return null;
-       const [profile] = await db.select().from(singles)
+       const [profile] = await db.select(customerSingleColumns).from(singles)
          .where(eq(singles.questionnaireToken, input.token))
          .limit(1);
        if (!profile) return null;
@@ -3290,8 +3294,8 @@ export const appRouter = router({
           warnings, hasHardBlock, hardBlockReason, canOverrideCriteria,
           breakdown: previewScoreDimensions(preview),
           narrative,
-          personA: { id: singleA.id, firstName: singleA.firstName, lastName: singleA.lastName, age: singleA.age, city: singleA.city, gender: singleA.gender, photoUrl: singleA.photoUrl, isCoachingClient: singleA.isCoachingClient, isNotBasic: singleA.isNotBasic },
-          personB: { id: singleB.id, firstName: singleB.firstName, lastName: singleB.lastName, age: singleB.age, city: singleB.city, gender: singleB.gender, photoUrl: singleB.photoUrl, isCoachingClient: singleB.isCoachingClient, isNotBasic: singleB.isNotBasic },
+          personA: { id: singleA.id, firstName: singleA.firstName, lastName: singleA.lastName, age: singleA.age, city: singleA.city, gender: singleA.gender, photoUrl: singleA.photoUrl, isCoachingClient: singleA.isCoachingClient, isNotBasic: singleA.isNotBasic, isMatchingDifficult: singleA.isMatchingDifficult, matchingDifficultyNote: singleA.matchingDifficultyNote },
+          personB: { id: singleB.id, firstName: singleB.firstName, lastName: singleB.lastName, age: singleB.age, city: singleB.city, gender: singleB.gender, photoUrl: singleB.photoUrl, isCoachingClient: singleB.isCoachingClient, isNotBasic: singleB.isNotBasic, isMatchingDifficult: singleB.isMatchingDifficult, matchingDifficultyNote: singleB.matchingDifficultyNote },
         };
       }),
 
@@ -3649,6 +3653,8 @@ export const appRouter = router({
         isPaid: singles.isPaid,
         isCoachingClient: singles.isCoachingClient,
         isNotBasic: singles.isNotBasic,
+        isMatchingDifficult: singles.isMatchingDifficult,
+        matchingDifficultyNote: singles.matchingDifficultyNote,
         questionnaireCompletedAt: singles.questionnaireCompletedAt,
         questionnaireToken: singles.questionnaireToken,
         createdAt: singles.createdAt,
@@ -5205,6 +5211,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         firstName: singles.firstName,
         isCoachingClient: singles.isCoachingClient,
         isNotBasic: singles.isNotBasic,
+        isMatchingDifficult: singles.isMatchingDifficult,
+        matchingDifficultyNote: singles.matchingDifficultyNote,
         lastName: singles.lastName,
         email: singles.email,
         phone: singles.phone,
@@ -5373,6 +5381,10 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           singleBIsCoachingClient: b?.isCoachingClient,
           singleAIsNotBasic: a?.isNotBasic,
           singleBIsNotBasic: b?.isNotBasic,
+          singleAIsMatchingDifficult: a?.isMatchingDifficult,
+          singleBIsMatchingDifficult: b?.isMatchingDifficult,
+          singleAMatchingDifficultyNote: a?.matchingDifficultyNote,
+          singleBMatchingDifficultyNote: b?.matchingDifficultyNote,
           singleAUpdatedAt: a?.updatedAt,
           singleBUpdatedAt: b?.updatedAt,
           singleAQuestionnaireCompleted: !!a?.questionnaireCompletedAt,
@@ -5448,18 +5460,18 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     }),
 
     /**
-     * Admin: active, eligible singles whose last accepted proposal delivery was
-     * more than 14 days ago (or who never received one). Recipient-level
-     * delivery evidence prevents failed email for one side from being counted.
+     * Staff operational categories over the same eligible base pool. Default:
+     * waitingFrom is strictly older than 14 days, with no active delivered connection.
+     * Recipient-level delivery evidence never counts a failed recipient as delivered.
      */
     getSinglesWithoutMatches: teamProcedure
-      .input(z.object({ page: z.number().int().min(1).default(1), limit: z.number().int().min(10).max(100).default(40), search: z.string().max(100).optional(), sortOrder: z.enum(["longest", "shortest"]).default("longest") }).optional())
+      .input(z.object({ page: z.number().int().min(1).default(1), limit: z.number().int().min(10).max(100).default(40), search: z.string().max(100).optional(), sortOrder: z.enum(["longest", "shortest"]).default("longest"), category: z.enum(WAITING_QUEUE_CATEGORIES).default("over14") }).optional())
       .query(async ({ ctx, input }) => {
       if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" }); if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       const page = input?.page ?? 1;
       const limit = input?.limit ?? 40;
-      if (!db) return { items: [], total: 0, page, limit, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } };
+      if (!db) return { items: [], total: 0, page, limit, summary: emptyWaitingQueueSummary() };
 
       // Get all active singles
       const allSingles = await db.select({
@@ -5478,6 +5490,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         questionnaireCompletedAt: singles.questionnaireCompletedAt,
         isCoachingClient: singles.isCoachingClient,
         isNotBasic: singles.isNotBasic,
+        isMatchingDifficult: singles.isMatchingDifficult,
+        matchingDifficultyNote: singles.matchingDifficultyNote,
         createdAt: singles.createdAt,
       }).from(singles)
         .where(and(
@@ -5514,34 +5528,36 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         blockingMatchStatusBySingle.set(match.singleAId, activeStatus);
         blockingMatchStatusBySingle.set(match.singleBId, activeStatus);
       }
-      const fourteenDaysAgo = queueNow - (14 * 24 * 60 * 60 * 1000);
       const acceptedByMatchAndSingle = new Set(acceptedDeliveries.map(row => `${row.matchId}:${row.singleId}`));
       const feedbackAttentionIds = new Set(feedbackAttentionRows.map(row => Number(row.singleId)).filter(Boolean));
 
       // Track the latest provider-accepted delivery for each recipient.
       const lastMatchDateBySingle = buildLastAcceptedDeliveryBySingle(acceptedDeliveries);
-      const activeProposalBySingle = new Map<number, boolean>();
+      const activeDeliveredConnectionIds = new Set<number>();
       for (const m of sentMatchRows) {
         for (const id of [m.singleAId, m.singleBId]) {
           if (!acceptedByMatchAndSingle.has(`${m.id}:${id}`)) continue;
           const stillInActiveConnection = blocksNewMatch(m, queueNow);
-          if (stillInActiveConnection) activeProposalBySingle.set(id, true);
+          if (stillInActiveConnection) activeDeliveredConnectionIds.add(id);
         }
       }
 
-      // Never delivered, or last accepted delivery is older than 14 days.
-      const singlesWithout = allSingles.filter(s => {
-        if (activeProposalBySingle.get(s.id)) return false;
-        if (feedbackAttentionIds.has(s.id)) return true;
-        const eligibleSince = getWaitingFrom(s, lastMatchDateBySingle, queueNow);
-        const lastMatch = lastMatchDateBySingle.get(s.id);
-        if (!lastMatch) return eligibleSince < fourteenDaysAgo;
-        return lastMatch < fourteenDaysAgo;
+      // Counts are global to the name-filtered eligible pool, independent of the
+      // selected category/page. Category filtering must precede sorting/paging.
+      const queue = selectWaitingQueueCategory(allSingles, {
+        lastAcceptedDeliveryBySingle: lastMatchDateBySingle,
+        activeDeliveredConnectionIds,
+        feedbackAttentionIds,
+        blockingIds: blockingProposalIds,
+      }, {
+        category: input?.category,
+        search: input?.search,
+        sortOrder: input?.sortOrder,
+        page,
+        limit,
+        now: queueNow,
       });
-      // Longest waiting is the default; an explicit display direction never changes eligibility.
-      const nameFilteredSinglesWithout = filterProfilesByName(singlesWithout, input?.search || "");
-      const sortedSinglesWithout = sortWaitingProfilesByWaitingFrom(nameFilteredSinglesWithout, lastMatchDateBySingle, queueNow, input?.sortOrder);
-      const pagedSingles = sortedSinglesWithout.slice((page - 1) * limit, page * limit);
+      const pagedSingles = queue.items;
       const pagedSingleIds = new Set(pagedSingles.map(single => single.id));
       const historicalOpponentIds = new Set<number>();
       for (const match of allMatchRows) {
@@ -5605,6 +5621,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
           questionnaireCompletedAt: s.questionnaireCompletedAt,
           isCoachingClient: s.isCoachingClient,
           isNotBasic: s.isNotBasic,
+          isMatchingDifficult: s.isMatchingDifficult,
+          matchingDifficultyNote: s.matchingDifficultyNote,
           createdAt: s.createdAt,
           waitingFrom,
           waitingDays,
@@ -5620,20 +5638,11 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
       });
       return {
         items,
-        total: sortedSinglesWithout.length,
+        total: queue.total,
         page,
         limit,
         historyDisclaimer: UNMATCHED_QUEUE_HISTORY_DISCLAIMER,
-        summary: {
-          over14: sortedSinglesWithout.filter(item => {
-            const waitingFrom = getWaitingFrom(item, lastMatchDateBySingle, queueNow);
-            return waitingFrom < fourteenDaysAgo;
-          }).length,
-          fromFeedback: sortedSinglesWithout.filter(item => feedbackAttentionIds.has(item.id)).length,
-          neverDelivered: sortedSinglesWithout.filter(item => !lastMatchDateBySingle.has(item.id)).length,
-          blocked: sortedSinglesWithout.filter(item => blockingProposalIds.has(item.id)).length,
-          missingPhoto: sortedSinglesWithout.filter(item => !item.photoUrl?.trim()).length,
-        },
+        summary: queue.summary,
       };
     }),
 
@@ -5688,6 +5697,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               partnerDescription: singles.partnerDescription, email: singles.email,
               minAgePreference: singles.minAgePreference,
               maxAgePreference: singles.maxAgePreference,
+              isMatchingDifficult: singles.isMatchingDifficult,
+              matchingDifficultyNote: singles.matchingDifficultyNote,
             }).from(singles).where(inArray(singles.id, allOpponentIds))
           : [];
         const allOpponentMap = new Map(allOpponents.map(o => [o.id, o]));
@@ -5768,6 +5779,8 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               about: opponent.about,
               partnerDescription: opponent.partnerDescription,
               email: opponent.email,
+              isMatchingDifficult: opponent.isMatchingDifficult,
+              matchingDifficultyNote: opponent.matchingDifficultyNote,
             } : null,
           };
         });
@@ -6417,6 +6430,29 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         return { success: true };
       }),
 
+    // Explicit SET, never a toggle. Omitted note preserves it; empty note clears it.
+    // Coaching and special-attention flags are intentionally not read or written.
+    setMatchingDifficulty: teamProcedure
+      .input(z.object({ id: z.number().int().positive(), isMatchingDifficult: z.boolean(), note: z.string().max(2000).optional() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [current] = await db.select({
+          isMatchingDifficult: singles.isMatchingDifficult,
+          matchingDifficultyNote: singles.matchingDifficultyNote,
+        }).from(singles).where(eq(singles.id, input.id)).limit(1);
+        if (!current) throw new TRPCError({ code: "NOT_FOUND" });
+        const matchingDifficultyNote = input.note === undefined ? current.matchingDifficultyNote : input.note.trim() || null;
+        if (current.isMatchingDifficult !== input.isMatchingDifficult || current.matchingDifficultyNote !== matchingDifficultyNote) {
+          await db.update(singles).set({
+            isMatchingDifficult: input.isMatchingDifficult,
+            ...(input.note === undefined ? {} : { matchingDifficultyNote }),
+            updatedAt: Date.now(),
+          }).where(eq(singles.id, input.id));
+        }
+        return { success: true, isMatchingDifficult: input.isMatchingDifficult, matchingDifficultyNote };
+      }),
+
     // Toggle coaching client flag (pink highlight)
     toggleCoachingClient: teamProcedure
       .input(z.object({ id: z.number() }))
@@ -6455,7 +6491,19 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
     getResponseSummaries: teamProcedure.query(async ({ ctx }) => {
       if (!ctx.user && !ctx.teamMember) throw new TRPCError({ code: "FORBIDDEN" });
       if (ctx.user && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      return getMatchResponseSummaries();
+      const summaries = await getMatchResponseSummaries();
+      const db = await getDb();
+      const ids = Object.keys(summaries).map(Number);
+      const profiles = db && ids.length ? await db.select({
+        id: singles.id, isMatchingDifficult: singles.isMatchingDifficult,
+        matchingDifficultyNote: singles.matchingDifficultyNote,
+      }).from(singles).where(inArray(singles.id, ids)) : [];
+      const byId = new Map(profiles.map(profile => [profile.id, profile]));
+      return Object.fromEntries(Object.entries(summaries).map(([id, summary]) => [id, {
+        ...summary,
+        isMatchingDifficult: byId.get(Number(id))?.isMatchingDifficult ?? false,
+        matchingDifficultyNote: byId.get(Number(id))?.matchingDifficultyNote ?? null,
+      }]));
     }),
 
     // Update admin notes for a single (internal only, never sent to clients)

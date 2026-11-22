@@ -1,9 +1,10 @@
 import React from "react";
-import { Heart, Star } from "lucide-react";
+import { Heart, Puzzle, Star } from "lucide-react";
 
 export type ProfileStaffFlags = {
   isCoachingClient?: boolean | null;
   isNotBasic?: boolean | null;
+  isMatchingDifficult?: boolean | null;
 };
 
 export function profileStaffSurface(profile?: ProfileStaffFlags | null, fallback = "bg-white"): string {
@@ -21,8 +22,9 @@ export default function ProfileStaffMarkers({
 }) {
   const coaching = profile?.isCoachingClient === true;
   const specialAttention = profile?.isNotBasic === true;
+  const matchingDifficult = profile?.isMatchingDifficult === true;
 
-  if (!coaching && !specialAttention) return null;
+  if (!coaching && !specialAttention && !matchingDifficult) return null;
 
   const badgeClass = compact
     ? "gap-1 px-1.5 py-0.5 text-[9px]"
@@ -53,6 +55,16 @@ export default function ProfileStaffMarkers({
         >
           <Star className={iconClass} fill="currentColor" aria-hidden="true" />
           <span>יחס מיוחד</span>
+        </span>
+      )}
+      {matchingDifficult && (
+        <span
+          className={`inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 ${badgeClass}`}
+          data-profile-matching-difficult="true"
+          aria-label="קשה להתאמה"
+        >
+          <Puzzle className={iconClass} aria-hidden="true" />
+          <span>קשה להתאמה</span>
         </span>
       )}
     </span>

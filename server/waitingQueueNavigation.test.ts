@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import WaitingQueuePagination, { type WaitingQueuePaginationProps } from "../client/src/components/WaitingQueuePagination";
-import { filterProfilesByName } from "../shared/profileNameSearch";
+import { selectWaitingQueueCategory } from "../shared/waitingQueueCategories";
 import {
   buildLastAcceptedDeliveryBySingle,
   getWaitingFrom,
@@ -36,25 +36,9 @@ const sortChangeSource = section(crmSource, "const changeUnmatchedSortOrder =", 
 const pageChangeSource = section(crmSource, "const changeUnmatchedPage =", "const changeUnmatchedSortOrder =");
 const boundsGuardSource = section(crmSource, "    if (unmatchedLoading || unmatchedFetching || unmatchedError) return;", "const changeUnmatchedNameSearch =");
 
-// Execute just the router's real, pure filter/sort/slice declarations against
-// synthetic profiles. This catches slice-before-sort regressions without DB,
-// network access, customers, or a duplicated implementation in the test.
-const pagingDeclarations = section(queueSource, "const nameFilteredSinglesWithout =", "const pagedSingleIds =");
+// Execute the real shared category/filter/sort/page policy used by the router.
+// No DB, network, customer data, or duplicate implementation is needed.
 type NamedFixture = WaitingQueueProfile & { firstName: string; lastName: string };
-const runRouterPaging = new Function(
-  "singlesWithout", "input", "lastMatchDateBySingle", "queueNow", "page", "limit",
-  "filterProfilesByName", "sortWaitingProfilesByWaitingFrom",
-  `${pagingDeclarations}\nreturn { items: pagedSingles, total: sortedSinglesWithout.length };`,
-) as (
-  profiles: readonly NamedFixture[],
-  input: { search?: string; sortOrder?: WaitingQueueSortOrder },
-  deliveries: ReadonlyMap<number, number>,
-  clock: number,
-  page: number,
-  limit: number,
-  filter: typeof filterProfilesByName,
-  sort: typeof sortWaitingProfilesByWaitingFrom,
-) => { items: NamedFixture[]; total: number };
 
 const synthetic707 = (): NamedFixture[] => Array.from({ length: 707 }, (_, index) => {
   const id = ((index * 97) % 707) + 1;
@@ -69,7 +53,11 @@ const synthetic707 = (): NamedFixture[] => Array.from({ length: 707 }, (_, index
 });
 
 function routerPage(profiles: readonly NamedFixture[], page: number, sortOrder?: WaitingQueueSortOrder, search = "Waiting Fixture") {
-  return runRouterPaging(profiles, { search, sortOrder }, new Map(), now, page, 40, filterProfilesByName, sortWaitingProfilesByWaitingFrom);
+  const result = selectWaitingQueueCategory(profiles, {
+    lastAcceptedDeliveryBySingle: new Map(), activeDeliveredConnectionIds: new Set(),
+    feedbackAttentionIds: new Set(), blockingIds: new Set(),
+  }, { search, sortOrder, now, page, limit: 40 });
+  return { items: result.items, total: result.total };
 }
 
 describe("waiting queue navigation: waiting-date direction", () => {
@@ -309,11 +297,13 @@ describe("waiting queue navigation: client/server source contracts", () => {
   });
 
   it("sorts the full filtered collection using the request direction before slicing, and counts the full result", () => {
-    expect(pagingDeclarations).toContain('filterProfilesByName(singlesWithout, input?.search || "")');
-    expect(pagingDeclarations).toContain("sortWaitingProfilesByWaitingFrom(nameFilteredSinglesWithout, lastMatchDateBySingle, queueNow, input?.sortOrder)");
-    expect(pagingDeclarations).toContain("sortedSinglesWithout.slice((page - 1) * limit, page * limit)");
+    expect(queueSource).toContain("selectWaitingQueueCategory(allSingles");
+    expect(queueSource).toContain("category: input?.category");
+    expect(queueSource).toContain("search: input?.search");
+    expect(queueSource).toContain("sortOrder: input?.sortOrder");
+    expect(queueSource).toContain("const pagedSingles = queue.items");
     expect(section(queueSource, "const allSingles =", "const pagedSingles =")).not.toContain(".slice(");
-    expect(queueSource).toContain("total: sortedSinglesWithout.length");
+    expect(queueSource).toContain("total: queue.total");
     expect(queueSource).toContain("buildLastAcceptedDeliveryBySingle(acceptedDeliveries)");
   });
 

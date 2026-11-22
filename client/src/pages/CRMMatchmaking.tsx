@@ -1,4 +1,6 @@
 import WaitingQueuePagination from "@/components/WaitingQueuePagination";
+import WaitingTreatmentTabs, { waitingTreatmentTitle, type WaitingTreatmentView } from "@/components/WaitingTreatmentTabs";
+import ProfileMatchingDifficultyControl from "@/components/ProfileMatchingDifficultyControl";
 import type { WaitingQueueSortOrder } from "@shared/unmatchedQueuePresentation";
 /**
  * CRM Matchmaking   admin page for managing the singles database and matches
@@ -390,7 +392,7 @@ export default function CRMMatchmaking() {
   const [filterHasKids, setFilterHasKids] = useState("");
   const [filterArea, setFilterArea] = useState("");
   const [filterVisibleLimit, setFilterVisibleLimit] = useState(10);
-  const [unmatchedView, setUnmatchedView] = useState<"matches" | "nonresponse">("matches");
+  const [unmatchedView, setUnmatchedView] = useState<WaitingTreatmentView>("over14");
   useEffect(() => { setFilterVisibleLimit(10); }, [filterCompatTarget, filterGender, filterMinAge, filterMaxAge, filterCity, filterReligiosity, filterDna, filterName, filterMinHeight, filterMaxHeight, filterMaritalStatus, filterWantsKids, filterHasKids, filterArea]);
   const filterTargetRef = useRef(filterCompatTarget);
   const batchGeneration = useRef(0);
@@ -518,7 +520,7 @@ export default function CRMMatchmaking() {
     refetchOnWindowFocus: false,
     trpc: { context: { skipBatch: true } },
   });
-  const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0 } }, refetch: refetchUnmatched, isLoading: unmatchedLoading, isFetching: unmatchedFetching, isError: unmatchedError } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40, search: debouncedUnmatchedNameSearch || undefined, sortOrder: unmatchedSortOrder }, {
+  const { data: unmatchedResult = { items: [], total: 0, page: 1, limit: 40, summary: { over14: 0, fromFeedback: 0, neverDelivered: 0, blocked: 0, missingPhoto: 0, difficulty: 0 } }, refetch: refetchUnmatched, isLoading: unmatchedLoading, isFetching: unmatchedFetching, isError: unmatchedError } = (trpc.matchmaking as any).getSinglesWithoutMatches.useQuery({ page: unmatchedPage, limit: 40, search: debouncedUnmatchedNameSearch || undefined, sortOrder: unmatchedSortOrder, category: unmatchedView === "nonresponse" ? "over14" : unmatchedView }, {
     enabled: !!user && user.role === "admin" && activeTab === "unmatched",
     staleTime: 30_000,
     refetchOnWindowFocus: false,
@@ -526,11 +528,15 @@ export default function CRMMatchmaking() {
   });
   const singlesWithoutMatches = unmatchedResult.items ?? [];
   const unmatchedSearchIsDebouncing = unmatchedNameSearch !== debouncedUnmatchedNameSearch;
-  const unmatchedQueueIsRefreshing = unmatchedFetching && unmatchedView === "matches";
+  const unmatchedQueueIsRefreshing = unmatchedFetching && unmatchedView !== "nonresponse";
   const hasUnmatchedNameSearch = debouncedUnmatchedNameSearch.trim().length > 0;
   const changeUnmatchedPage = (page: number) => {
     setUnmatchedPage(page);
     setWaitingExpandedId(null);
+  };
+  const changeUnmatchedView = (view: WaitingTreatmentView) => {
+    setUnmatchedView(view);
+    changeUnmatchedNameSearch(unmatchedNameSearch);
   };
   const changeUnmatchedSortOrder = (order: WaitingQueueSortOrder) => {
     setUnmatchedSortOrder(order);
@@ -897,6 +903,7 @@ export default function CRMMatchmaking() {
     questionnaireCompletedAt?: number | null; questionnaireToken?: string | null;
     plusStatus?: string | null; plusBillingStatus?: string | null; plusPremiumSupport?: boolean;
     boostStatus?: string | null; isCoachingClient?: boolean; isNotBasic?: boolean;
+    isMatchingDifficult?: boolean; matchingDifficultyNote?: string | null;
     locationPreference?: string | null; shomerShabbat?: boolean | null;
     religiosityPreference?: string | null; isSeed?: boolean; subscriptionStartedAt?: number | null;
     hasPets?: boolean | null; petType?: string | null; acceptsPets?: boolean | null; smokingStatus?: string | null;
@@ -2015,6 +2022,7 @@ export default function CRMMatchmaking() {
                     >
                       {(single as any).isNotBasic ? "⭐ דורש תשומת לב" : "⭐"}
                     </button>
+                    <ProfileMatchingDifficultyControl profile={single} compact />
                     {single.isActive ? (
                       <button
                         type="button"
@@ -2606,7 +2614,7 @@ export default function CRMMatchmaking() {
                   hasPets: match.singleAHasPets, petType: match.singleAPetType, acceptsPets: match.singleAAcceptsPets,
                   locationPref: match.singleALocationPref, smokingStatus: match.singleASmokingStatus,
                   subscriptionEnd: match.singleASubscriptionEnd, email: match.singleAEmail, isActive: match.singleAIsActive,
-                  isCoachingClient: (match as any).singleAIsCoachingClient, isNotBasic: (match as any).singleAIsNotBasic, updatedAt: (match as any).singleAUpdatedAt,
+                  isCoachingClient: (match as any).singleAIsCoachingClient, isNotBasic: (match as any).singleAIsNotBasic, isMatchingDifficult: (match as any).singleAIsMatchingDifficult, matchingDifficultyNote: (match as any).singleAMatchingDifficultyNote, updatedAt: (match as any).singleAUpdatedAt,
                 },
                 {
                   name: match.singleBName, gender: match.singleBGender, city: match.singleBCity,
@@ -2621,7 +2629,7 @@ export default function CRMMatchmaking() {
                   hasPets: match.singleBHasPets, petType: match.singleBPetType, acceptsPets: match.singleBAcceptsPets,
                   locationPref: match.singleBLocationPref, smokingStatus: match.singleBSmokingStatus,
                   subscriptionEnd: match.singleBSubscriptionEnd, email: match.singleBEmail, isActive: match.singleBIsActive,
-                  isCoachingClient: (match as any).singleBIsCoachingClient, isNotBasic: (match as any).singleBIsNotBasic, updatedAt: (match as any).singleBUpdatedAt,
+                  isCoachingClient: (match as any).singleBIsCoachingClient, isNotBasic: (match as any).singleBIsNotBasic, isMatchingDifficult: (match as any).singleBIsMatchingDifficult, matchingDifficultyNote: (match as any).singleBMatchingDifficultyNote, updatedAt: (match as any).singleBUpdatedAt,
                 },
               ];
 
@@ -3231,18 +3239,16 @@ export default function CRMMatchmaking() {
                 {unmatchedNameSearch && <button type="button" onClick={() => changeUnmatchedNameSearch("")} className="rounded-lg px-3 py-2 text-xs font-bold text-[#191265] hover:bg-[#f8f6f0]">נקה</button>}
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap rounded-xl bg-white p-2 shadow-sm" aria-label="סינון סיבת טיפול">
-              <button type="button" aria-pressed={unmatchedView === "matches"} onClick={() => setUnmatchedView("matches")} className={`rounded-lg px-4 py-2 text-xs font-bold ${unmatchedView === "matches" ? "bg-[#191265] text-white" : "bg-[#f8f6f0] text-[#191265]"}`}>ממתינים להתאמה</button>
-              <button type="button" aria-pressed={unmatchedView === "nonresponse"} onClick={() => setUnmatchedView("nonresponse")} className={`rounded-lg px-4 py-2 text-xs font-bold ${unmatchedView === "nonresponse" ? "bg-[#191265] text-white" : "bg-[#f8f6f0] text-[#191265]"}`}>אי־מענה חוזר להצעות</button>
-            </div>
+            <WaitingTreatmentTabs value={unmatchedView} onChange={changeUnmatchedView} summary={unmatchedResult.summary}
+              nonresponseCount={responsesLoading || responsesError ? undefined : typedSingles.filter(profile => profile.isActive !== false && !profile.isSeed && responseSummaries[profile.id]?.needsFollowup && filterProfilesByName([profile], debouncedUnmatchedNameSearch).length > 0).length} />
             {unmatchedSearchIsDebouncing || unmatchedQueueIsRefreshing ? <div className="rounded-xl bg-white p-8 text-center text-[#191265]">{unmatchedNameSearch.trim() ? "מחפשת לפי שם..." : "טוענת את תור הממתינים..."}</div> : unmatchedView === "nonresponse" ? <ResponseFollowupSection profiles={typedSingles} summaries={responseSummaries} loading={responsesLoading} error={responsesError} refresh={() => void refetchResponses()} onPhoto={setLightboxUrl} searchQuery={debouncedUnmatchedNameSearch} /> : <>
 
             <div className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold text-[#191265]">🔍 לא קיבלו התאמה יותר מ־14 יום או ביקשו טיפול דרך המשוב</p>
+                <p className="text-sm font-bold text-[#191265]">{waitingTreatmentTitle(unmatchedView)}</p>
                 <p className="text-xs text-[#727272]">{unmatchedSortOrder === "longest" ? "ממוינים מההמתנה הארוכה לקצרה" : "ממוינים מההמתנה הקצרה לארוכה"} לפי השליחה האישית האחרונה; למי שטרם קיבלו, מהשלמת הפרופיל. רק חברי מאגר פעילים ומשולמים עם שאלון והסכמה. מועמדות פנימית שלא נשלחה אינה נספרת.</p>
                 <p className="text-xs font-semibold text-[#191265] mt-1">{unmatchedLoading ? "טוענת נתונים מעודכנים..." : `${unmatchedResult.total} ממתינים לטיפול · עמוד ${unmatchedResult.page} מתוך ${Math.max(1, Math.ceil(unmatchedResult.total / unmatchedResult.limit))}`}{unmatchedFetching && !unmatchedLoading ? " · מרעננת..." : ""}</p>
-                {!unmatchedLoading && <div className="flex flex-wrap gap-2 mt-2 text-[10px]"><span className="bg-orange-100 text-orange-800 rounded-full px-2 py-1">{unmatchedResult.summary.over14} מעל 14 יום</span><span className="bg-violet-100 text-violet-800 rounded-full px-2 py-1">{unmatchedResult.summary.fromFeedback} בעקבות משוב</span><span className="bg-red-100 text-red-800 rounded-full px-2 py-1">{unmatchedResult.summary.neverDelivered} מעולם לא קיבלו</span>{unmatchedResult.summary.blocked > 0 && <span className="bg-yellow-100 text-yellow-800 rounded-full px-2 py-1">{unmatchedResult.summary.blocked} עם הצעה פתוחה לטיפול</span>}{unmatchedResult.summary.missingPhoto > 0 && <span className="bg-slate-100 text-slate-700 rounded-full px-2 py-1">{unmatchedResult.summary.missingPhoto} חסרי תמונה</span>}</div>}
+                <p className="mt-2 text-[11px] text-[#727272]">הסינון מחושב על כל הרשימה לפני החלוקה לעמודים. פרופיל שסומן בקושי נשאר גם בקבוצות האחרות שמתאימות לו.</p>
               </div>
               <button
                 onClick={() => { void refreshScoringData(); }}
@@ -3268,7 +3274,7 @@ export default function CRMMatchmaking() {
               <div className="bg-white rounded-xl p-8 text-center">
                 <div className="text-4xl mb-3">{hasUnmatchedNameSearch ? "🔎" : unmatchedResult.total ? "↩" : "🎉"}</div>
                 <p className="text-[#191265] font-bold">{hasUnmatchedNameSearch ? "לא נמצאו ממתינים בשם הזה" : unmatchedResult.total ? "אין אנשים בעמוד הזה" : "אין כרגע התאמות שממתינות לטיפול"}</p>
-                <p className="text-xs text-[#727272] mt-1">{hasUnmatchedNameSearch ? "אפשר לנסות שם אחר או לנקות את החיפוש." : unmatchedResult.total ? "ייתכן שהרשימה התעדכנה לאחר שליחה. חזרי לעמוד הקודם." : "אין פרופיל שעבר 14 יום ואין פידבק פתוח שדורש בדיקת התאמות"}</p>
+                <p className="text-xs text-[#727272] mt-1">{hasUnmatchedNameSearch ? "אפשר לנסות שם אחר או לנקות את החיפוש." : unmatchedResult.total ? "ייתכן שהרשימה התעדכנה לאחר שליחה. חזרי לעמוד הקודם." : "אין כרגע פרופילים בקבוצה הזו"}</p>
                 {hasUnmatchedNameSearch ? <button type="button" onClick={() => changeUnmatchedNameSearch("")} className="mt-3 text-xs underline text-[#191265]">נקה חיפוש</button> : unmatchedResult.total > 0 && <button onClick={() => setUnmatchedPage(page => Math.max(1, page - 1))} className="mt-3 text-xs underline text-[#191265]">לעמוד הקודם</button>}
               </div>
             ) : (<>
@@ -3299,6 +3305,7 @@ export default function CRMMatchmaking() {
                         {!full && <p className="text-xs text-[#727272] mt-2">{singlesLoading ? "טוענת את פרטי הפרופיל המלאים..." : "פרטי הפרופיל המלאים לא נטענו. לחצי רענן כדי לנסות שוב."}</p>}
                       </div>
                       <div className="flex flex-wrap gap-2 shrink-0">
+                        <ProfileMatchingDifficultyControl profile={profile} compact />
                         <button type="button" disabled={!full} aria-expanded={isExpanded} onClick={() => setWaitingExpandedId(isExpanded ? null : s.id)} className="rounded-lg border border-[#191265]/20 px-3 py-2 text-xs font-bold text-[#191265] disabled:opacity-40">{isExpanded ? "סגור פרופיל" : "פרופיל מלא והיסטוריה"}</button>
                         <button type="button" onClick={() => openAdvancedForUnmatched(profile)} disabled={s.hasBlockingProposal || !s.photoUrl || !full} className="rounded-lg bg-[#191265] px-3 py-2 text-xs font-bold text-white disabled:opacity-40">חיפוש מתקדם להתאמה</button>
                       </div>

@@ -2,9 +2,11 @@ import { useState } from "react";
 import { getPairPreferenceIndicators } from "@shared/pairPreferenceIndicators";
 import { PairCriterionIndicator } from "./PairCriterionIndicator";
 import ProfileStaffMarkers, { profileStaffSurface, type ProfileStaffFlags } from "./ProfileStaffMarkers";
+import ProfileMatchingDifficultyControl from "./ProfileMatchingDifficultyControl";
 
 export type MatchProfile = ProfileStaffFlags & {
   id: number; firstName?: string | null; lastName?: string | null; name?: string | null;
+  matchingDifficultyNote?: string | null;
   gender?: string | null; age?: number | null; city?: string | null; photoUrl?: string | null;
   dnaType?: string | null; occupation?: string | null; education?: string | null;
   religiosity?: string | null; religiosityPreference?: string | null;
@@ -67,8 +69,8 @@ export function MatchProfileFacts({ profile, sentCount }: { profile: MatchProfil
     {profile.subscriptionRenewsAt ? <p className={Date.now() > profile.subscriptionRenewsAt ? "text-red-700 font-bold" : ""}>מנוי עד: {new Date(profile.subscriptionRenewsAt).toLocaleDateString("he-IL")}{Date.now() > profile.subscriptionRenewsAt ? " (פג תוקף)" : ""}</p> : null}
   </div>;
 }
-export default function MatchProfileCard({ profile, otherProfile, onPhoto, sentCount, horizontal = false, comparison = false }: { profile: MatchProfile; otherProfile?: MatchProfile; onPhoto?: (url: string) => void; sentCount?: number; horizontal?: boolean; comparison?: boolean }) {
-  if (comparison) return <ComparisonProfile profile={profile} otherProfile={otherProfile} onPhoto={onPhoto} sentCount={sentCount} />;
+export default function MatchProfileCard({ profile, otherProfile, onPhoto, sentCount, horizontal = false, comparison = false, showMatchingDifficultyControl = true }: { profile: MatchProfile; otherProfile?: MatchProfile; onPhoto?: (url: string) => void; sentCount?: number; horizontal?: boolean; comparison?: boolean; showMatchingDifficultyControl?: boolean }) {
+  if (comparison) return <ComparisonProfile profile={profile} otherProfile={otherProfile} onPhoto={onPhoto} sentCount={sentCount} showMatchingDifficultyControl={showMatchingDifficultyControl} />;
   const name = profile.name || `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
   return <article className={`min-w-0 rounded-xl p-3 ${profileStaffSurface(profile, "bg-[#f8f6f0]")}`}>
     <div className={`flex gap-3 items-start ${horizontal ? "flex-row" : "flex-col sm:flex-row"}`}>
@@ -81,6 +83,7 @@ export default function MatchProfileCard({ profile, otherProfile, onPhoto, sentC
         {horizontal && <div className="hidden sm:block mt-2"><MatchProfileFacts profile={profile} sentCount={sentCount} /></div>}
       </div>
     </div>
+    {showMatchingDifficultyControl && <div className="mt-2"><ProfileMatchingDifficultyControl profile={profile} compact /></div>}
     <div className={`mt-3 ${horizontal ? "sm:hidden" : ""}`}><MatchProfileFacts profile={profile} sentCount={sentCount} /></div>
     <div className={`mt-3 grid gap-3 text-xs text-[#555] ${horizontal ? "md:grid-cols-3" : ""}`}>
       <div className="space-y-1">
@@ -106,7 +109,7 @@ export default function MatchProfileCard({ profile, otherProfile, onPhoto, sentC
 }
 
 /** Familiar pending-match layout, shared by both pair-comparison views. */
-function ComparisonProfile({ profile, otherProfile, onPhoto, sentCount }: { profile: MatchProfile; otherProfile?: MatchProfile; onPhoto?: (url: string) => void; sentCount?: number }) {
+function ComparisonProfile({ profile, otherProfile, onPhoto, sentCount, showMatchingDifficultyControl }: { profile: MatchProfile; otherProfile?: MatchProfile; onPhoto?: (url: string) => void; sentCount?: number; showMatchingDifficultyControl: boolean }) {
   const name = profile.name || `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
   const joined = profile.subscriptionStartedAt || profile.createdAt;
   const date = joined ? new Date(joined) : null;
@@ -121,6 +124,7 @@ function ComparisonProfile({ profile, otherProfile, onPhoto, sentCount }: { prof
         <ProfileStaffMarkers profile={profile} compact />
       </div>
     </div>
+    {showMatchingDifficultyControl && <div className="mb-2"><ProfileMatchingDifficultyControl profile={profile} compact /></div>}
     <div className="space-y-1 text-xs text-[#727272]">
       {profile.occupation && <p>💼 {profile.occupation}</p>}
       {profile.education && <p>🎓 {EDUCATION[profile.education] || profile.education}<PairCriterionIndicator criterion="השכלה" indicator={indicators?.education} /></p>}

@@ -337,6 +337,8 @@ export const plusPilotRouter = router({
         photoUrl: singles.photoUrl,
         isCoachingClient: singles.isCoachingClient,
         isNotBasic: singles.isNotBasic,
+        isMatchingDifficult: singles.isMatchingDifficult,
+        matchingDifficultyNote: singles.matchingDifficultyNote,
       },
     }).from(plusPilotMembers)
       .innerJoin(singles, eq(plusPilotMembers.singleId, singles.id))
@@ -388,6 +390,8 @@ export const plusPilotRouter = router({
         lastName: singles.lastName,
         isCoachingClient: singles.isCoachingClient,
         isNotBasic: singles.isNotBasic,
+        isMatchingDifficult: singles.isMatchingDifficult,
+        matchingDifficultyNote: singles.matchingDifficultyNote,
       }).from(singles),
       db.select({
         id: plusCheckoutIntents.id,
@@ -470,6 +474,8 @@ export const plusPilotRouter = router({
               lastName: other.lastName,
               isCoachingClient: other.isCoachingClient,
               isNotBasic: other.isNotBasic,
+              isMatchingDifficult: other.isMatchingDifficult,
+              matchingDifficultyNote: other.matchingDifficultyNote,
             } : null,
           };
         }),
@@ -494,6 +500,8 @@ export const plusPilotRouter = router({
               lastName: other.lastName,
               isCoachingClient: other.isCoachingClient,
               isNotBasic: other.isNotBasic,
+              isMatchingDifficult: other.isMatchingDifficult,
+              matchingDifficultyNote: other.matchingDifficultyNote,
             } : null,
           };
         });
@@ -516,6 +524,8 @@ export const plusPilotRouter = router({
               lastName: other.lastName,
               isCoachingClient: other.isCoachingClient,
               isNotBasic: other.isNotBasic,
+              isMatchingDifficult: other.isMatchingDifficult,
+              matchingDifficultyNote: other.matchingDifficultyNote,
             } : null,
           };
         });

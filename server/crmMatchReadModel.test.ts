@@ -11,7 +11,8 @@ function person(id: number, gender: "male" | "female"): Single {
     city: "תל אביב", height: gender === "male" ? 180 : 168, isActive: true, isSeed: false, isPaid: true,
     dnaType: "anchor", education: "bachelor", religiosity: "secular", maritalStatus: "single", minAgePreference: 25,
     maxAgePreference: 45, photoUrl: "/synthetic-photo.jpg", about: "profile detail ".repeat(100), partnerDescription: "preference detail ".repeat(100),
-    questionnaireCompletedAt: 1000, isCoachingClient: true, isNotBasic: true, updatedAt: 2000 } as Single;
+    questionnaireCompletedAt: 1000, isCoachingClient: true, isNotBasic: true, isMatchingDifficult: true,
+    matchingDifficultyNote: "Private synthetic staff note", updatedAt: 2000 } as Single;
 }
 const inputs: MatchScoreInputs = { people: new Map([[1, person(1, "male")], [2, person(2, "female")]]), answers: new Map() };
 function record(overrides: Partial<Match> = {}): Match {
@@ -50,6 +51,10 @@ describe("compact CRM match read model", () => {
     expect(full.singleBPartnerDesc).toBe(inputs.people.get(2)?.partnerDescription);
     expect(full.singleAIsCoachingClient).toBe(true);
     expect(compact.singleAIsNotBasic).toBe(true);
+    expect(full.singleAIsMatchingDifficult).toBe(true);
+    expect(compact.singleAIsMatchingDifficult).toBe(true);
+    expect(full.singleAMatchingDifficultyNote).toBe("Private synthetic staff note");
+    expect(compact.singleAMatchingDifficultyNote).toBe("Private synthetic staff note");
     expect(compact.singleAPhotoUrl).toBe(full.singleAPhotoUrl);
     expect(JSON.stringify(compact).length).toBeLessThan(JSON.stringify(full).length / 3);
   });

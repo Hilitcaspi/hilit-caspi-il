@@ -126,6 +126,8 @@ export const liveOctoberRouter = router({
       singleId: liveOctoberTickets.singleId,
       isCoachingClient: singles.isCoachingClient,
       isNotBasic: singles.isNotBasic,
+      isMatchingDifficult: singles.isMatchingDifficult,
+      matchingDifficultyNote: singles.matchingDifficultyNote,
       voucherCode: liveOctoberTickets.voucherCode, amountAgorot: liveOctoberTickets.amountAgorot,
       issuedAt: liveOctoberTickets.issuedAt, zoomDeliveryState: liveOctoberTickets.zoomDeliveryState,
       zoomAttemptCount: liveOctoberTickets.zoomAttemptCount, zoomLastError: liveOctoberTickets.zoomLastError,
@@ -147,6 +149,8 @@ export const liveOctoberRouter = router({
       singleId: liveOctoberTickets.singleId,
       isCoachingClient: singles.isCoachingClient,
       isNotBasic: singles.isNotBasic,
+      isMatchingDifficult: singles.isMatchingDifficult,
+      matchingDifficultyNote: singles.matchingDifficultyNote,
       createdAt: liveOctoberQuestions.createdAt,
     }).from(liveOctoberQuestions)
       .innerJoin(liveOctoberTickets, eq(liveOctoberQuestions.ticketId, liveOctoberTickets.id))

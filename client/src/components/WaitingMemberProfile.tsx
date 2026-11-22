@@ -16,6 +16,7 @@ import { LEGACY_PERSONAL_EVIDENCE_SOURCE_LABEL, UNMATCHED_QUEUE_HISTORY_DISCLAIM
 import MatchProfileCard, { type MatchProfile } from "./MatchProfileCard";
 import ProfileStaffMarkers, { profileStaffSurface } from "./ProfileStaffMarkers";
 import ProfileClosureDialog from "./ProfileClosureDialog";
+import ProfileMatchingDifficultyControl from "./ProfileMatchingDifficultyControl";
 
 type WaitingProfile = MatchProfile & {
   isActive?: boolean;
@@ -132,8 +133,8 @@ function HistoryItemCard({ item }: { item: MatchHistoryItem }) {
 }
 
 /**
- * Read-only expanded profile for members waiting to be matched. It has no data
- * fetching or mutations: its callbacks intentionally leave profile actions to the parent.
+ * Expanded waiting profile. General profile actions stay with the parent;
+ * the staff-only difficulty control manages its own saved marker and private note.
  */
 export default function WaitingMemberProfile({
   profile,
@@ -198,6 +199,7 @@ export default function WaitingMemberProfile({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <ProfileMatchingDifficultyControl profile={profile} />
             {emailHref && (
               <a href={emailHref} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe27c] ${coachingProfile ? "border border-pink-200 bg-white text-[#191265] hover:bg-pink-50" : "bg-white/10 text-white hover:bg-white/20"}`}>
                 <Mail className="size-3.5" aria-hidden="true" />
@@ -226,7 +228,7 @@ export default function WaitingMemberProfile({
 
       <div className="space-y-5 p-3 sm:p-5">
         <section aria-label="פרטי פרופיל מלאים">
-          <MatchProfileCard profile={profileForCard} onPhoto={onPhoto} sentCount={historicalMatches.length} horizontal />
+          <MatchProfileCard profile={profileForCard} onPhoto={onPhoto} sentCount={historicalMatches.length} horizontal showMatchingDifficultyControl={false} />
         </section>
 
         <section className="grid gap-3 rounded-xl border border-[#191265]/10 bg-[#faf6e9] p-4 text-sm sm:grid-cols-3" aria-label="תאריכי חברות">

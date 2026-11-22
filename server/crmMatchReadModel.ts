@@ -31,8 +31,9 @@ const profileFields = {
   HasPets: "hasPets", PetType: "petType", LocationPref: "locationPreference", AcceptsPets: "acceptsPets",
   SmokingStatus: "smokingStatus", SubscriptionEnd: "subscriptionRenewsAt", Email: "email",
   IsActive: "isActive", IsCoachingClient: "isCoachingClient", IsNotBasic: "isNotBasic", UpdatedAt: "updatedAt",
+  IsMatchingDifficult: "isMatchingDifficult", MatchingDifficultyNote: "matchingDifficultyNote",
 } as const;
-const headerFields = new Set(["Gender", "City", "Age", "Dna", "PhotoUrl", "IsActive", "IsCoachingClient", "IsNotBasic", "UpdatedAt"]);
+const headerFields = new Set(["Gender", "City", "Age", "Dna", "PhotoUrl", "IsActive", "IsCoachingClient", "IsNotBasic", "IsMatchingDifficult", "MatchingDifficultyNote", "UpdatedAt"]);
 
 /** Carry only the note markers used by delivery/exclusion policy in the index. */
 export function compactLifecycleNotes(notes: string | null | undefined) {
@@ -90,6 +91,7 @@ async function loadIndexInputs(db: Db, ids: number[]): Promise<MatchScoreInputs>
     db.select({ ...matchScoringProfileColumns, firstName: singles.firstName, lastName: singles.lastName,
       photoUrl: singles.photoUrl, isActive: singles.isActive, isCoachingClient: singles.isCoachingClient,
       isNotBasic: singles.isNotBasic, updatedAt: singles.updatedAt, questionnaireCompletedAt: singles.questionnaireCompletedAt,
+      isMatchingDifficult: singles.isMatchingDifficult, matchingDifficultyNote: singles.matchingDifficultyNote,
     }).from(singles).where(inArray(singles.id, ids)),
     db.select({ singleId: matchmakingAnswers.singleId, answersJson: matchmakingAnswers.answersJson })
       .from(matchmakingAnswers).where(inArray(matchmakingAnswers.singleId, ids)),

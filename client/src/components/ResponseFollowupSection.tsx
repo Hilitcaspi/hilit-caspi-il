@@ -5,6 +5,7 @@ import { buildNonResponseFollowupMessage, type MatchResponseSummary } from "@sha
 import { matchesProfileName } from "@shared/profileNameSearch";
 import { ProfilePhoto, type MatchProfile } from "./MatchProfileCard";
 import ProfileStaffMarkers, { profileStaffSurface } from "./ProfileStaffMarkers";
+import ProfileMatchingDifficultyControl from "./ProfileMatchingDifficultyControl";
 
 type Profile = MatchProfile & { phone?: string | null; isActive?: boolean; isSeed?: boolean };
 function whatsappUrl(phone?: string | null, message = "") {
@@ -41,7 +42,10 @@ export default function ResponseFollowupSection({ profiles, summaries, loading, 
               {summary.lastRespondedAt ? <p className="text-[11px] text-[#727272]">תגובה אחרונה: {new Date(summary.lastRespondedAt).toLocaleDateString("he-IL")}</p> : null}
             </div>
           </div>
-          <button type="button" onClick={() => { setSelected(profile); setDraft(buildNonResponseFollowupMessage(profile.firstName || "")); }} className="mt-3 rounded-full bg-[#191265] text-white px-4 py-2 text-xs font-bold">הכנת הודעת מעקב</button>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <ProfileMatchingDifficultyControl profile={profile} compact />
+            <button type="button" onClick={() => { setSelected(profile); setDraft(buildNonResponseFollowupMessage(profile.firstName || "")); }} className="rounded-full bg-[#191265] text-white px-4 py-2 text-xs font-bold">הכנת הודעת מעקב</button>
+          </div>
         </article>;
       })}
     </div>}

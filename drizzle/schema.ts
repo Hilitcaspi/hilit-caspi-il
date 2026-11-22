@@ -155,6 +155,8 @@ export const singles = mysqlTable("singles", {
   // CRM flags
   isCoachingClient: boolean("isCoachingClient").default(false).notNull(), // pink highlight - coaching client
   isNotBasic: boolean("isNotBasic").default(false).notNull(), // "דורש תשומת לב" flag
+  isMatchingDifficult: boolean("isMatchingDifficult").default(false).notNull(), // independent staff-only matching difficulty
+  matchingDifficultyNote: text("matchingDifficultyNote"), // private staff note; never customer/email/public data
   adminNotes: text("adminNotes"), // internal notes visible only to admin/team
 
   createdAt: bigint("createdAt", { mode: "number" }).notNull().default(0),
