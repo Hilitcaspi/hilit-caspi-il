@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { singles } from "../drizzle/schema";
 import { normalizeIsraeliPhone } from "../shared/profileValidation";
+import { normalizeCheckoutFullName } from "../shared/checkoutIdentity";
 import { getDb } from "./db";
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -19,8 +20,6 @@ export interface RegistrationCheckoutResumeProfile {
   isPaid: boolean | number;
 }
 
-const normalizeName = (value: string) => value.trim().replace(/\s+/g, " ");
-
 /** A bearer link proves access to exactly this unpaid draft; email alone never does. */
 export function matchesRegistrationCheckoutResume(
   profile: RegistrationCheckoutResumeProfile | null | undefined,
@@ -32,7 +31,7 @@ export function matchesRegistrationCheckoutResume(
   return Boolean(phone
     && phone === normalizeIsraeliPhone(profile.phone || "")
     && input.email.trim().toLowerCase() === (profile.email || "").trim().toLowerCase()
-    && normalizeName(input.fullName) === normalizeName(`${profile.firstName} ${profile.lastName}`));
+    && normalizeCheckoutFullName(input.fullName) === normalizeCheckoutFullName(`${profile.firstName} ${profile.lastName}`));
 }
 
 /** Read-only validation. No checkout state, profile, receipt, consent, or provider is mutated. */

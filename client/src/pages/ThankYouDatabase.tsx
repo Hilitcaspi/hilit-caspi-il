@@ -1,12 +1,12 @@
 /**
  * ThankYouDatabase - עמוד תודה לאחר הצטרפות למאגר הרווקים
- * מוצג לאחר תשלום מוצלח דרך Grow
- * מבקש הזנת מייל ידנית ומפנה לשאלון המדעי
+ * המעבר לעמוד אינו אישור תשלום; קישור אישי מתקבל רק לאחר אימות בשרת.
+ * מבקש הזנת מייל ידנית ומפנה לשאלון המדעי לאחר האימות.
  */
 
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DatabaseExpectations from "@/components/DatabaseExpectations";
 import { readPurchaseTrackingToken } from "@/lib/purchaseTracking";
@@ -17,59 +17,85 @@ const INSTAGRAM_URL = "https://www.instagram.com/hilitcaspi_relationship";
 
 export default function ThankYouDatabase() {
   const isLiveOffer = new URLSearchParams(window.location.search).get("offer") === "live";
+  // Analytics may clear global storage while this page is waiting for the webhook.
+  // Keep this exact proof for this page's lifetime; never switch to another purchase.
+  const [trackingToken] = useState(() => readPurchaseTrackingToken());
   const [email, setEmail] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
-  const requestPersonalLink = trpc.singles.sendDashboardLink.useMutation({
-    onSuccess: () => setErrorMsg("אם המייל רשום במאגר, נשלח אליו קישור אישי לאזור שלך."),
-    onError: () => setErrorMsg("לא הצלחנו לשלוח קישור. אפשר לנסות שוב מאוחר יותר."),
-  });
+  const mounted = useRef(true);
+  const requestId = useRef(0);
+  const checking = useRef(false);
+  const retryWait = useRef<{ timer: ReturnType<typeof setTimeout>; cancel: () => void } | null>(null);
+  const requestPersonalLink = trpc.singles.sendDashboardLink.useMutation();
+  const getLinkMutation = trpc.singles.getQuestionnaireLink.useMutation();
 
-  const getLinkMutation = trpc.singles.getQuestionnaireLink.useMutation({
-    onSuccess: (data) => {
-      if (data.url) {
-        setIsRetrying(false);
-        setRetryCount(0);
-        window.location.href = data.url;
-      } else if ((data as any).alreadyCompleted) {
-        setIsRetrying(false);
-        setErrorMsg("השאלון כבר הושלם! ניתן להיכנס לאזור האישי.");
-      } else if ((data as any).notFound) {
-        // Webhook may not have arrived yet — auto-retry up to 4 times with increasing delay
-        if (retryCount < 4) {
-          setIsRetrying(true);
-          setErrorMsg("");
-          const delay = (retryCount + 1) * 3000; // 3s, 6s, 9s, 12s
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-            const trackingToken = readPurchaseTrackingToken();
-            if (trackingToken) getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin, trackingToken });
-          }, delay);
-        } else {
-          setIsRetrying(false);
-          setErrorMsg("המייל לא נמצא במערכת. ייתכן שהתשלום עדיין מעובד. נסו שוב בעוד דקה, או כתבו לנו בוואטסאפ.");
-        }
-      } else {
-        setIsRetrying(false);
-        setErrorMsg("אירעה שגיאה. אפשר לכתוב לנו בוואטסאפ.");
-      }
-    },
-    onError: () => {
-      setIsRetrying(false);
-      setErrorMsg("אירעה שגיאה. אפשר לכתוב לנו בוואטסאפ.");
-    },
-  });
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      requestId.current += 1;
+      checking.current = false;
+      retryWait.current?.cancel();
+    };
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Guard stale/double clicks before the disabled state has rendered.
+    if (checking.current || isRetrying || getLinkMutation.isPending || requestPersonalLink.isPending) return;
+    const submittedEmail = email.trim().toLowerCase();
+    if (!submittedEmail) return;
+    checking.current = true;
+    const id = ++requestId.current;
+    const isCurrent = () => mounted.current && requestId.current === id;
+    const request = { email: submittedEmail, origin: window.location.origin };
     setErrorMsg("");
     setRetryCount(0);
-    setIsRetrying(false);
-    if (!email.trim()) return;
-    const trackingToken = readPurchaseTrackingToken();
-    if (trackingToken) getLinkMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin, trackingToken });
-    else requestPersonalLink.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
+    setIsRetrying(true);
+    try {
+      if (!trackingToken) {
+        // No proof: request the existing private email flow, never grant access here.
+        await requestPersonalLink.mutateAsync(request);
+        if (isCurrent()) setErrorMsg("הבקשה התקבלה. אם המייל רשום במאגר, אפשר לבדוק בו קישור אישי לאזור שלך.");
+        return;
+      }
+      const verifiedRequest = { ...request, trackingToken };
+      for (let retry = 0; retry <= 4 && isCurrent(); retry += 1) {
+        const data = await getLinkMutation.mutateAsync(verifiedRequest);
+        if (!isCurrent()) return;
+        if (data.success && data.url) {
+          window.location.href = data.url;
+          return;
+        }
+        if (data.success && "alreadyCompleted" in data && data.alreadyCompleted) {
+          setErrorMsg("השאלון כבר הושלם! ניתן להיכנס לאזור האישי.");
+          return;
+        }
+        if (!("notFound" in data && data.notFound)) {
+          setErrorMsg("לא הצלחנו לאמת את הגישה כרגע. אפשר לכתוב לנו בוואטסאפ.");
+          return;
+        }
+        if (retry === 4) {
+          setErrorMsg("עדיין לא נמצא אישור תשלום עבור המייל הזה. אין לשלם שוב לפני בדיקה. אפשר לבדוק שוב בעוד דקה, או לכתוב לנו בוואטסאפ.");
+          return;
+        }
+        setRetryCount(retry + 1);
+        const continueRetry = await new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => { retryWait.current = null; resolve(true); }, (retry + 1) * 3000);
+          retryWait.current = { timer, cancel: () => { clearTimeout(timer); retryWait.current = null; resolve(false); } };
+        });
+        if (!continueRetry) return;
+      }
+    } catch {
+      if (isCurrent()) setErrorMsg("לא הצלחנו לבדוק את הבקשה כרגע. אין לשלם שוב לפני בדיקה. אפשר לכתוב לנו בוואטסאפ.");
+    } finally {
+      if (isCurrent()) {
+        checking.current = false;
+        setIsRetrying(false);
+      }
+    }
   };
 
   return (
@@ -84,14 +110,14 @@ export default function ThankYouDatabase() {
 
       <div className="relative z-10 max-w-lg w-full text-center">
         {isLiveOffer && <div className="mb-8"><LiveVoucherCard receiptOnly showPending /></div>}
-        {/* Success icon */}
+        {/* Neutral status icon: visiting this URL is not proof of payment. */}
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: "spring", stiffness: 200, damping: 15 }}
           className="w-24 h-24 bg-[#191265] rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl"
         >
-          <span className="text-4xl text-[#ffe27c] font-black">✓</span>
+          <span className="text-4xl text-[#ffe27c] font-black">?</span>
         </motion.div>
 
         {/* Main message */}
@@ -101,10 +127,10 @@ export default function ThankYouDatabase() {
           transition={{ delay: 0.3, duration: 0.7 }}
         >
           <h1 className="text-3xl md:text-4xl font-black text-[#191265] mb-4 leading-tight">
-            תודה! התשלום עבר בהצלחה 💛
+            בדיקת התשלום והמשך הרישום
           </h1>
           <p className="text-[#727272] text-lg leading-relaxed mb-6">
-            ברוכים הבאים למאגר הרווקים של הילית כספי.
+            ההגעה לעמוד הזה אינה אישור תשלום. הגישה לשאלון נפתחת רק לאחר אימות במערכת. אם כבר ניסית לשלם, אין לשלם שוב לפני בדיקה.
           </p>
         </motion.div>
 
@@ -126,7 +152,7 @@ export default function ThankYouDatabase() {
         >
           <div className="text-center mb-5">
             <span className="text-3xl">🧬</span>
-            <h2 className="text-[#ffe27c] font-black text-xl mt-2">רק שלב אחד נשאר!</h2>
+            <h2 className="text-[#ffe27c] font-black text-xl mt-2">המשך לשאלון לאחר אימות</h2>
             <p className="text-white text-sm mt-2 leading-relaxed">
               מלאו את השאלון המדעי (15 דקות). הוא מאפשר להתאים בדיוק את בן/בת הזוג הנכון/ה, על בסיס מחקר מדעי.
             </p>
@@ -143,35 +169,35 @@ export default function ThankYouDatabase() {
                 onChange={(e) => { setEmail(e.target.value); setErrorMsg(""); }}
                 placeholder="example@gmail.com"
                 required
-                disabled={getLinkMutation.isPending || isRetrying}
+                disabled={getLinkMutation.isPending || requestPersonalLink.isPending || isRetrying}
                 className="px-4 py-3 rounded-xl text-right text-[#191265] bg-white text-base focus:outline-none focus:ring-2 focus:ring-[#ffe27c] disabled:opacity-60 placeholder-gray-400"
               />
             </div>
 
-            {isRetrying && (
-              <p className="text-[#ffe27c]/80 text-sm text-center animate-pulse">מחפש את התשלום שלך... (נסיון {retryCount + 1}/4)</p>
+            {isRetrying && retryCount > 0 && (
+              <p role="status" className="text-[#ffe27c]/80 text-sm text-center animate-pulse">בודקים את אישור התשלום... (בדיקה חוזרת {retryCount}/4)</p>
             )}
             {errorMsg && (
-              <p className="text-[#ffe27c] text-sm text-center leading-relaxed">{errorMsg}</p>
+              <p role="status" className="text-[#ffe27c] text-sm text-center leading-relaxed">{errorMsg}</p>
             )}
 
             <button
               type="submit"
-              disabled={getLinkMutation.isPending || isRetrying}
+              disabled={getLinkMutation.isPending || requestPersonalLink.isPending || isRetrying}
               className="bg-[#ffe27c] text-[#191265] font-black text-lg py-4 rounded-xl hover:bg-white transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {(getLinkMutation.isPending || isRetrying) ? (
+              {(getLinkMutation.isPending || requestPersonalLink.isPending || isRetrying) ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="inline-block w-5 h-5 border-3 border-[#191265] border-t-transparent rounded-full animate-spin" />
-                  מעבד תשלום, אנא המתינו...
+                  בודקים את הבקשה, אנא המתינו...
                 </span>
               ) : (
-                "המשך לשאלון המדעי ←"
+                trackingToken ? "בדיקת גישה לשאלון המדעי ←" : "בקשת קישור אישי במייל ←"
               )}
             </button>
 
             <p className="text-white/50 text-xs text-center">
-              📧 גם שלחנו קישור למייל. אפשר להשתמש בו מאוחר יותר
+              אם קיבלתם קישור אישי במייל, אפשר להשתמש בו מאוחר יותר.
             </p>
           </form>
         </motion.div>
@@ -186,10 +212,10 @@ export default function ThankYouDatabase() {
           <p className="text-[#191265] font-black text-base mb-4 text-center">📋 התקדמות הרישום שלך</p>
           <div className="space-y-3">
             <div className="flex items-start gap-3 bg-white/50 rounded-2xl p-3">
-              <div className="w-8 h-8 rounded-full bg-[#191265] text-white text-sm font-black flex items-center justify-center flex-shrink-0">✓</div>
+              <div className="w-8 h-8 rounded-full bg-[#191265] text-white text-sm font-black flex items-center justify-center flex-shrink-0">1</div>
               <div>
-                <p className="text-[#191265] font-black text-sm">שלב 1: אבחון DNA - הושלם!</p>
-                <p className="text-[#191265]/70 text-xs">שאלון ה-DNA הושלם ודמי הרישום שולמו</p>
+                <p className="text-[#191265] font-black text-sm">שלב 1: אבחון DNA ואימות תשלום</p>
+                <p className="text-[#191265]/70 text-xs">סטטוס התשלום והשלמת האבחון לא אומתו בעמוד הזה</p>
               </div>
             </div>
             <div className="flex items-start gap-3 bg-[#191265]/10 rounded-2xl p-3">

@@ -91,8 +91,82 @@ describe("Grow proxy payment retry safety", () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     globalThis.fetch = originalFetch;
     await proxy.close();
+  });
+
+  /** Real local HTTP + real route/body parser; only Grow fetch/timers are mocked. */
+  function slowUpstream(delayMs: number, payload: unknown) {
+    let started!: () => void;
+    const ready = new Promise<void>(resolve => { started = resolve; });
+    let signal!: AbortSignal;
+    fetchMock.mockImplementationOnce((_url: string, init: RequestInit) => {
+      signal = init.signal as AbortSignal;
+      return new Promise<Response>((resolve, reject) => {
+        const timer = setTimeout(() => resolve(growJson(200, payload)), delayMs);
+        signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(Object.assign(new Error("synthetic abort"), { name: "AbortError" }));
+        }, { once: true });
+        started();
+      });
+    });
+    return { ready, signal: () => signal };
+  }
+
+  it.each(["/api/light/web/1.0/chargePaymentToken", "/doPayment", "/setBitPayment"])(
+    "allows a slow %s mutation to succeed after 20s with exactly one upstream call", async path => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const slow = slowUpstream(20_000, { status: 1, data: { synthetic: true } });
+      const pending = requestProxy(proxy.port, path);
+      await slow.ready;
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(slow.signal().aborted).toBe(false);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(5_000);
+      const response = await pending;
+      expect(response.status).toBe(200);
+      expect(responseJson(response).status).toBe(1);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(checkoutReservation.markUncertain).not.toHaveBeenCalled();
+    },
+  );
+
+  it("aborts a token mutation at 60s without replay or invented success", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const slow = slowUpstream(90_000, { status: 1 });
+    const pending = requestProxy(proxy.port, "/api/light/web/1.0/chargePaymentToken");
+    await slow.ready;
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(slow.signal().aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    const response = await pending;
+    expect(slow.signal().aborted).toBe(true);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(response.status).toBe(502);
+    const result = responseJson(response);
+    expect(result).toMatchObject({ status: 0, err: { category: "outcome_unknown" } });
+    // This is the exact native token-service failure branch, not false -> NaN.
+    expect(parseInt(result.status)).toBe(0);
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps draw's 8s timeout and safe fallback rather than waiting 60s", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const slow = slowUpstream(90_000, { status: 1 });
+    fetchMock.mockResolvedValueOnce(growJson(200, { status: 1, data: { synthetic: true } }));
+    const pending = requestProxy(proxy.port, "/drawWalletPageData");
+    await slow.ready;
+    await vi.advanceTimersByTimeAsync(7_999);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1);
+    const response = await pending;
+    expect(slow.signal().aborted).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("grow-proxy.hilitcaspi.workers.dev");
+    expect(response.status).toBe(200);
   });
 
   it("does not replay doPayment after a timeout", async () => {
@@ -103,7 +177,7 @@ describe("Grow proxy payment retry safety", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(response.status).toBe(502);
     expect(responseJson(response)).toMatchObject({
-      status: false,
+      status: 0,
       err: { category: "outcome_unknown", message: expect.stringContaining("אין לשלם שוב") },
     });
   });

@@ -163,7 +163,8 @@ describe("specific social link and visible source labels", () => {
         group: "meta", primaryCampaign: "קמפיין גיוס", primaryCreative: "שם מודעה אמיתי", acquisitionCreative: "שם מודעה אמיתי",
       });
       expect(journey.primaryCreative).not.toBe(input.acquisition.content);
-      expect(explainSalesSourceEvidence(input)).toBe("התיוג שנשמר תואם למודעה בחשבון הישראלי; זהו שיוך לפי תיוג, ולא אימות הקלקה.");
+      // A historical ad match does not change the explanation of the current closing link.
+      expect(explainSalesSourceEvidence(input)).toContain(closingChannel === "Email" ? "קישור ממייל" : "הערוץ מבוסס");
       expect(summarizeSalesSources([input])).toEqual([{
         group: "meta", label: "קמפיינים ממומנים ב־Meta", count: 1, revenueAgorot: 29900,
         emailClosedCount: closingChannel === "Email" ? 1 : 0, closingOnlyCount: 0, linkTypes: [],

@@ -13,6 +13,21 @@ describe("registration checkout bearer verification", () => {
     expect(matchesRegistrationCheckoutResume(profile, { ...input, email: " RESUME@example.test ", phone: "+972 50-000-0000", fullName: " Synthetic\u00a0 Resume " })).toBe(true);
   });
   it.each([
+    "Synthetic\u200bResume",
+    "\u200b Synthetic\u202f\u200bResume \u3000",
+    "Ｓｙｎｔｈｅｔｉｃ　Ｒｅｓｕｍｅ",
+  ])("accepts equivalent names using the same NFKC/space normalization as checkout (%s)", fullName => {
+    expect(matchesRegistrationCheckoutResume(profile, { ...input, fullName })).toBe(true);
+  });
+  it("normalizes stored name parts as well as the submitted checkout name", () => {
+    expect(matchesRegistrationCheckoutResume({ ...profile, firstName: "Ｓｙｎｔｈｅｔｉｃ", lastName: "\u200bResume" }, input)).toBe(true);
+    expect(matchesRegistrationCheckoutResume({ ...profile, firstName: "נועה", lastName: "כהן" }, { ...input, fullName: "נועה\u200bכהן" })).toBe(true);
+    expect(matchesRegistrationCheckoutResume({ ...profile, firstName: "José" }, { ...input, fullName: "Jose\u0301 Resume" })).toBe(true);
+  });
+  it.each(["Synthetic\u200bOther", "Ｓｙｎｔｈｅｔｉｃ　Ｏｔｈｅｒ", "synthetic Resume", "SyntheticResume"])("still rejects a true name mismatch after canonicalization (%s)", fullName => {
+    expect(matchesRegistrationCheckoutResume(profile, { ...input, fullName })).toBe(false);
+  });
+  it.each([
     { ...input, product: "guide" },
     { ...input, token: "guessable" },
     { ...input, token: "" },

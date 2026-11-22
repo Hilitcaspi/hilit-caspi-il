@@ -30,9 +30,12 @@ const PROXY_BASE = "/api/grow-proxy";
 // retry path for payment mutations: a direct request may already have charged.
 const CF_WORKER_BASE = "https://grow-proxy.hilitcaspi.workers.dev";
 
-// Hard timeouts so a request can never hang indefinitely.
-const PRIMARY_TIMEOUT_MS = 8000;
+// Reads remain short and may fall back. A mutation gets one bounded, longer
+// attempt: token charges can finish at Grow after the old 8s abort. More waiting
+// is NOT permission to replay a timed-out or otherwise ambiguous charge.
+const READ_PRIMARY_TIMEOUT_MS = 8000;
 const FALLBACK_TIMEOUT_MS = 12000;
+const MUTATION_TIMEOUT_MS = 60_000;
 
 // Browser-like headers to avoid Incapsula 403 blocking on server→Meshulam calls.
 const SPOOF_HEADERS: Record<string, string> = {
@@ -332,7 +335,9 @@ async function markDoPaymentOutcomeUncertain(
 
 function sendOutcomeUnknown(res: Response): void {
   res.status(502).json({
-    status: false,
+    // Native Apple/Google services use parseInt(status) === 0. Boolean false is
+    // NaN there and incorrectly enters their success branch before throwing.
+    status: 0,
     err: {
       category: "outcome_unknown",
       message: "תוצאת התשלום אינה ידועה. אין לשלם שוב לפני בדיקה.",
@@ -385,7 +390,8 @@ export function registerGrowProxy(app: Express): void {
       let direct: UpstreamResult | undefined;
       let directFailed = false;
       try {
-        direct = await readUpstreamResponse(upstreamUrl, init, PRIMARY_TIMEOUT_MS);
+        direct = await readUpstreamResponse(upstreamUrl, init,
+          safety === "safe-retry" ? READ_PRIMARY_TIMEOUT_MS : MUTATION_TIMEOUT_MS);
         logProxy(
           `[GrowProxy] direct response route=${route} http=${direct.status} json=${direct.payload ? "yes" : "no"}`,
         );
@@ -424,7 +430,7 @@ export function registerGrowProxy(app: Express): void {
           const fallback = await readUpstreamResponse(
             `${CF_WORKER_BASE}${afterBase}`,
             init,
-            FALLBACK_TIMEOUT_MS,
+            safety === "safe-retry" ? FALLBACK_TIMEOUT_MS : MUTATION_TIMEOUT_MS,
           );
           logProxy(
             `[GrowProxy] fallback response route=${route} http=${fallback.status} json=${fallback.payload ? "yes" : "no"}`,

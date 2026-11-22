@@ -1232,34 +1232,34 @@ const SALES_CALL_EMAIL_2: EmailTemplate = {
     <div class="quote">
       "3 חודשים אחרי שהתחלנו לעבוד ביחד, רחל בזוגיות. לא בגלל שמצאה מישהו 'מרגש יותר'. בגלל שהבינה מה היא באמת מחפשת ואיך לזהות את זה."
     </div>
-    <p>בשיחה שלנו נדבר בדיוק על הדפוס שלך. ואני אגיד לך בכנות מה אני רואה.</p>
-    <a href="${CALENDLY_15MIN}&utm_campaign=sales_call_lead" class="cta">קביעת שיחת ההיכרות (15 דקות, חינם)</a>
-    <p style="color:#727272; font-size:13px; text-align:center;">השיחה חינמית לגמרי. בלי מחויבות.</p>
+    <p>בפגישה אישית אפשר לבחון את הדפוסים שלך ולחשוב יחד על הצעד הבא.</p>
+    <a href="${CALENDLY_15MIN}?utm_campaign=sales_call_lead" class="cta">לפרטי פגישה אישית (60 דקות, ₪500)</a>
+    <p style="color:#727272; font-size:13px; text-align:center;">פגישה בתשלום עם הילית או עם מלווה מקצועי מהצוות. אין חובה להמשיך לתהליך ליווי.</p>
     ${emailSignature()}
   `),
-  textBody: `{{firstName}},\n\nרציתי לשתף אותך בסיפור של רחל - לקוחה שהגיעה אלי אחרי 3 שנים של תאריכים שלא הובילו לשום מקום.\n\n3 חודשים אחרי שהתחלנו לעבוד ביחד, היא בזוגיות.\n\nבשיחה שלנו נדבר על הדפוס שלך.\n\nקביעת שיחה (חינם): ${CALENDLY_15MIN}&utm_campaign=sales_call_lead\n\nהילית`,
+  textBody: `{{firstName}},\n\nרציתי לשתף אותך בסיפור של רחל - לקוחה שהגיעה אלי אחרי 3 שנים של תאריכים שלא הובילו לשום מקום.\n\n3 חודשים אחרי שהתחלנו לעבוד ביחד, היא בזוגיות.\n\nבפגישה אישית אפשר לבחון את הדפוסים שלך ולחשוב יחד על הצעד הבא.\n\nפגישה בתשלום עם הילית או עם מלווה מקצועי מהצוות: 60 דקות, ₪500. אין חובה להמשיך לתהליך ליווי.\nלפרטים: ${CALENDLY_15MIN}?utm_campaign=sales_call_lead\n\nהילית`,
 };
 
-// מייל 3 (48 שעות): "שמרתי לך מקום" + Calendly CTA
+// מייל 3 (48 שעות): פרטי הפגישה האישית בתשלום
 const SALES_CALL_EMAIL_3: EmailTemplate = {
-  subject: "{{firstName}}, שמרתי לך מקום לשיחה",
+  subject: "{{firstName}}, פרטים על הפגישה האישית",
   htmlBody: baseTemplate(`
     <h2>{{firstName}},</h2>
-    <p>שמרתי לך מקום בלוח הזמנים שלי לשיחת היכרות.</p>
+    <p>אם מתאים לך לחשוב יחד על הצעד הבא, אפשר לבדוק את פרטי הפגישה האישית.</p>
     <p>אני לא עובדת עם כולם. אני עובדת עם מי שיש בו נכונות לשינוי אמיתי ולהשקעה בתהליך.</p>
     <p>הפנייה שלך אמרה לי שהצעד הזה עשוי להתאים לך.</p>
     <div style="background:#f0eadc; border-radius:16px; padding:28px 32px; margin:24px 0; text-align:center;">
-      <p style="font-size:15px; color:#191265; font-weight:700; margin:0 0 8px;">שיחת היכרות אישית עם הילית</p>
-      <p style="font-size:14px; color:#555; margin:0 0 20px;">15 דקות. חינמי לגמרי. ללא מחויבות.</p>
-      <p style="font-size:13px; color:#727272; margin:0 0 20px;">בשיחה נבין יחד מה עוצר אותך ומה הצעד הנכון עבורך.</p>
-      <a href="${CALENDLY_15MIN}&utm_campaign=sales_call_lead" style="display:inline-block; background:#ffe27c; color:#191265; font-weight:700; font-size:16px; padding:14px 32px; border-radius:12px; text-decoration:none;">קביעת השיחה עכשיו</a>
+      <p style="font-size:15px; color:#191265; font-weight:700; margin:0 0 8px;">פגישה אישית עם הילית או עם מלווה מקצועי מהצוות</p>
+      <p style="font-size:14px; color:#555; margin:0 0 20px;">60 דקות. ₪500. פגישה בתשלום, ללא חובה להמשיך לתהליך ליווי.</p>
+      <p style="font-size:13px; color:#727272; margin:0 0 20px;">בפגישה נבחן יחד מה עוצר אותך ומה הצעד הבא שמתאים לך.</p>
+      <a href="${CALENDLY_15MIN}?utm_campaign=sales_call_lead" style="display:inline-block; background:#ffe27c; color:#191265; font-weight:700; font-size:16px; padding:14px 32px; border-radius:12px; text-decoration:none;">לפרטים ולקביעת פגישה</a>
     </div>
-    <p>אם המקום הזה לא יתפס, אצטרך להעביר אותו לממתינים ברשימה.</p>
-    <p>אם יש שאלה לפני השיחה, אני כאן:</p>
+    <p>אפשר לקרוא את פרטי השירות ולבחור אם הפגישה מתאימה לך. לא נשמר מקום לפני תיאום.</p>
+    <p>אם יש שאלה לפני הפגישה, אני כאן:</p>
     <a href="${WHATSAPP_LINK}" class="secondary-cta">אפשר לכתוב לי בוואטסאפ</a>
     ${emailSignature()}
   `),
-  textBody: `{{firstName}},\n\nשמרתי לך מקום לשיחת היכרות.\n\nקביעת שיחה (15 דקות, חינם): ${CALENDLY_15MIN}&utm_campaign=sales_call_lead\n\nשאלות? וואטסאפ: ${WHATSAPP_LINK}\n\nהילית`,
+  textBody: `{{firstName}},\n\nאם מתאים לך לחשוב יחד על הצעד הבא, אפשר לבדוק את פרטי הפגישה האישית.\n\nפגישה בתשלום עם הילית או עם מלווה מקצועי מהצוות: 60 דקות, ₪500. אין חובה להמשיך לתהליך ליווי.\nלפרטים ולקביעת פגישה: ${CALENDLY_15MIN}?utm_campaign=sales_call_lead\n\nלא נשמר מקום לפני תיאום.\n\nשאלות? וואטסאפ: ${WHATSAPP_LINK}\n\nהילית`,
 };
 
 // ─── JOURNEY: Meta Lead DNA ───────────────────────────────────────────────────

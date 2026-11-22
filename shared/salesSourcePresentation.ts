@@ -97,6 +97,12 @@ export function presentSalesSource(sale: SaleSource) {
 }
 
 export type SalesSourceGroup = "meta" | "instagram" | "facebook" | "google_ads" | "google" | "whatsapp" | "sms" | "email" | "onsite" | "renewal" | "referral" | "other" | "unknown";
+export type SalesSourceLens = "closing" | "acquisition";
+export const DEFAULT_SALES_SOURCE_LENS: SalesSourceLens = "closing";
+export const SALES_SOURCE_LENSES: Record<SalesSourceLens, string> = {
+  closing: "מאיפה בוצעה הרכישה", acquisition: "מקור ההיכרות",
+};
+export const SALES_SOURCE_TAG_NOTE = "תיוג שנשמר אינו הוכחה לקליק היום או בזמן הרכישה. מקור ההיכרות עשוי להיות היסטורי; הוא אינו ראיה לסגירת הרכישה הנוכחית.";
 const groupNames: Record<SalesSourceGroup, string> = {
   meta: "קמפיינים ממומנים ב־Meta", instagram: "אינסטגרם · ביו, תוכן וקישורים", facebook: "פייסבוק · תוכן וקישורים", google_ads: "קמפיינים ממומנים בגוגל", google: "חיפוש בגוגל",
   whatsapp: "וואטסאפ", sms: "SMS", email: "מייל", onsite: "אזור אישי והצעות באתר", renewal: "חידוש מנוי", referral: "הפניה", other: "מקור אחר", unknown: "מקור לא מזוהה",
@@ -142,11 +148,38 @@ export function salesSourceJourney(sale: SaleSource) {
     evidence: hasRecordedAcquisition ? sale.acquisition.confidence : sale.closing.confidence,
   };
 }
-export function summarizeSalesSources(sales: Array<SaleSource & { status: "included" | "review"; amountAgorot: number }>) {
+
+/** Explicit dashboard lenses. Neither lens substitutes the other when its evidence is missing. */
+export function salesSourceForLens(sale: SaleSource, lens: SalesSourceLens = DEFAULT_SALES_SOURCE_LENS) {
+  const journey = salesSourceJourney(sale);
+  const isAcquisition = lens === "acquisition";
+  const attribution = isAcquisition ? sale.acquisition : sale.closing;
+  const recorded = !isAcquisition || journey.acquisitionRecorded;
+  const primary = describeSourceLink(attribution, isAcquisition ? attribution.creative : sale.creative);
+  const group = recorded ? sourceGroup(attribution.channel) : "unknown";
+  const namedCampaign = recorded && !genericCampaign(attribution.campaign)
+    && !["unknown", "untyped_social", "organic", "tagged_social"].includes(primary.type);
+  return {
+    ...journey,
+    lens, group,
+    label: group === "unknown" && isAcquisition ? "מקור ההיכרות לא מתועד" : groupNames[group],
+    primaryLabel: !recorded ? "מקור ההיכרות לא מתועד" : isAcquisition ? primary.title : presentSalesSource(sale).title,
+    primaryCampaign: namedCampaign ? attribution.campaign : null,
+    primaryCreative: group === "meta" && hasMatchedMetaCreative(attribution.confidence)
+      ? (isAcquisition ? attribution.creative : sale.creative) || null : null,
+    // Historical creative stays available in details even when closing is onsite or email.
+    acquisitionCreative: journey.acquisitionRecorded && sale.acquisition.channel === "Meta Ads (ממומן)"
+      && hasMatchedMetaCreative(sale.acquisition.confidence) ? sale.acquisition.creative || null : null,
+    evidence: recorded ? attribution.confidence : "מקור ההיכרות הקודם לא מתועד",
+  };
+}
+
+/** Omitted lens retains the legacy journey summary for non-dashboard callers. Dashboard always passes its selected lens. */
+export function summarizeSalesSources(sales: Array<SaleSource & { status: "included" | "review"; amountAgorot: number }>, lens?: SalesSourceLens) {
   const groups = new Map<SalesSourceGroup, { group: SalesSourceGroup; label: string; count: number; revenueAgorot: number; emailClosedCount: number; closingOnlyCount: number; linkTypes: Array<{ label: string; count: number }> }>();
   for (const sale of sales) {
     if (sale.status !== "included") continue;
-    const journey = salesSourceJourney(sale);
+    const journey = lens ? salesSourceForLens(sale, lens) : salesSourceJourney(sale);
     const total = groups.get(journey.group) || { group: journey.group, label: journey.label, count: 0, revenueAgorot: 0, emailClosedCount: 0, closingOnlyCount: 0, linkTypes: [] };
     total.count += 1;
     total.revenueAgorot += sale.amountAgorot;
@@ -170,7 +203,7 @@ export function explainSalesSourceEvidence(sale: SaleSource) {
     if (sale.sourceDiagnostics && !sale.sourceDiagnostics.checkoutTagged) return "אין תיוג מקור בעסקה או בקופה המקושרת, ולא נמצא מקור קודם מתועד בשאלון, בפרופיל או בקליק רלוונטי לפני התשלום. סיבת אובדן התיוג עצמה אינה מתועדת; אי אפשר להסיק שזה ממומן או ישיר.";
     return "לא נשמר מקור לקישור הרכישה. אין בכך הוכחה לרכישה ישירה או ממומנת.";
   }
-  const confidences = [sale.acquisition.confidence, sale.closing.confidence];
+  const confidences = [sale.closing.confidence];
   if (confidences.some(confidence => confidence.includes("תיוג מודעה ייחודי תואם"))) return "התיוג שנשמר תואם למודעה בחשבון הישראלי; זהו שיוך לפי תיוג, ולא אימות הקלקה.";
   if (confidences.some(confidence => confidence.includes("מזהה מודעה תואם"))) return "מזהה המודעה שנשמר בעסקה תואם למודעה בחשבון הישראלי.";
   if (sale.closing.channel === "Email") return sale.emailAssist?.clicked ? "תועד קליק במייל לפני התשלום. זהו המגע שנמדד, לא הוכחה שהמייל לבדו גרם לרכישה." : "נשמר תיוג של קישור ממייל, אך המייל המסוים לא זוהה.";

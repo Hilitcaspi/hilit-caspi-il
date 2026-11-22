@@ -51,7 +51,6 @@ import {
   acquireCheckoutOwner,
   checkoutAttemptStorageKey,
   completeCheckoutOwner,
-  createFreshProductionCheckoutAttempt,
   createNextDiagnosticCheckoutAttempt,
   getOrCreateCheckoutAttemptId,
   isCheckoutAttemptCompleted,
@@ -169,6 +168,20 @@ const GROW_SDK_URL = "/grow-sdk/gs.min.js";
 // ─── SDK Script Preloader ─────────────────────────────────────────────────────
 // Just loads the script tag — does NOT call init()
 let scriptLoadPromise: Promise<void> | null = null;
+// Verification hides the global root without asking the SDK to mutate/cancel.
+// Restore only roots we hid, once a new checkout legitimately owns the SDK.
+const verifiedHiddenWalletRoots = new WeakSet<HTMLElement>();
+
+function isAmbiguousGrowSdkFailure(response: unknown): boolean {
+  if (isGrowPaymentOutcomeUnknown(response)) return true;
+  try {
+    // Native services replace transport/provider details with these generic
+    // messages. Neither proves that a token/Bit charge did not happen.
+    return /תוצאת התשלום אינה ידועה|חיוב העסקה בביט נכשל|אירעה שגיאה בתהליך/.test(JSON.stringify(response) || "");
+  } catch {
+    return true;
+  }
+}
 
 function preloadGrowSDKScript(): Promise<void> {
   if (scriptLoadPromise) return scriptLoadPromise;
@@ -294,6 +307,11 @@ async function renderGrowPaymentOptionsWithRetry(
       );
     }
 
+    const root = document.getElementById("Gr0W8-wallet-root");
+    if (root && verifiedHiddenWalletRoots.has(root)) {
+      root.style.removeProperty("display");
+      verifiedHiddenWalletRoots.delete(root);
+    }
     growPaymentSdk.renderPaymentOptions(authCode);
     logStep("5_renderPaymentOptions_attempt", `attempt=${attempt}`);
     try {
@@ -306,6 +324,14 @@ async function renderGrowPaymentOptionsWithRetry(
       // Timeout/error callbacks invalidate ownership. Never redraw an expired
       // authorization (or another unknown outcome) from this in-flight loop.
       if (!isCurrentAttempt()) return;
+      try {
+        // A read may use 8s direct + 12s safe fallback. Wait for this SAME
+        // draw (plus DOM settling) before redrawing an in-flight request.
+        await waitForGrowWalletOpen(13_000);
+        return;
+      } catch {
+        if (!isCurrentAttempt()) return;
+      }
       if (attempt < 2) {
         await new Promise(resolve => setTimeout(resolve, attempt * 350));
       }
@@ -374,6 +400,25 @@ interface GrowWalletProps {
 type CheckoutCallbacks = Pick<GrowWalletProps, "onSuccess" | "onFailure">;
 type CouponApplyOutcome = "applied" | "free_access" | "invalid" | "error";
 
+function isDefinitivePreProviderValidationRejection(error: any): boolean {
+  // The router exposes this exact marker only when creation was safely rejected.
+  // Transport text merely containing it is not proof. Generic business rejections
+  // are not proof either: they include already-open/processing checkouts.
+  if (error?.message === "PAYMENT_PHONE_INVALID") return true;
+  // tRPC schema issues run before the mutation/reservation/provider. Require the
+  // structured envelope and editable-field issues, not generic BAD_REQUEST text.
+  if (error?.data?.code !== "BAD_REQUEST" || error?.data?.path !== "payment.createProcess") return false;
+  try {
+    const issues: unknown = JSON.parse(error.message);
+    return Array.isArray(issues) && issues.length > 0 && issues.every(issue =>
+      typeof issue?.code === "string" && Array.isArray(issue.path) &&
+      issue.path.length === 1 && ["fullName", "email", "phone", "couponCode"].includes(issue.path[0])
+    );
+  } catch {
+    return false;
+  }
+}
+
 interface LocalCheckoutAttempt {
   attemptId: string;
   storageKey: string;
@@ -384,6 +429,7 @@ interface LocalCheckoutAttempt {
   callbacks: CheckoutCallbacks;
   lease?: CheckoutOwnerLease;
   authCode?: string;
+  processCreated?: boolean;
   processToken?: string | null;
   outcomeUnknown?: boolean;
   purchaseTrackingToken?: string;
@@ -423,8 +469,6 @@ export default function GrowWallet({
   const [walletOpen, setWalletOpen] = useState(false);
   const [paymentStatusAmbiguous, setPaymentStatusAmbiguous] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(false);
-  // Production only: shown after reconciliation ended without a confirmation.
-  const [freshRetryReady, setFreshRetryReady] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
@@ -605,7 +649,9 @@ export default function GrowWallet({
   const handlePay = useCallback(async () => {
     // This ref is intentionally set before the first await. React state alone
     // cannot prevent two click handlers from entering in the same event turn.
-    if (checkoutLockRef.current || checkoutAttemptRef.current?.outcomeUnknown || paymentCompleted || paymentStatusAmbiguous) return;
+    if (checkoutLockRef.current || checkoutAttemptRef.current?.outcomeUnknown ||
+        (checkoutAttemptRef.current?.processCreated && !checkoutAttemptRef.current.authCode) ||
+        paymentCompleted || paymentStatusAmbiguous) return;
 
     const fullName = normalizeCheckoutFullName(name);
     const userEmail = email.trim();
@@ -693,6 +739,12 @@ export default function GrowWallet({
       boostMatchId,
     });
     let attempt = checkoutAttemptRef.current;
+    if (attempt && attempt.storageKey !== storageKey &&
+        (attempt.processCreated || attempt.authCode || attempt.processToken || attempt.purchaseTrackingToken)) {
+      // Editing an email after closing a wallet must not discard an open process.
+      toast.error("כבר נפתח תהליך תשלום לפרטים הקודמים. אין לפתוח תשלום נוסף לפני בדיקה.");
+      return;
+    }
     if (!attempt || attempt.storageKey !== storageKey || attempt.terminal) {
       attempt = {
         attemptId: getOrCreateCheckoutAttemptId({
@@ -786,19 +838,11 @@ export default function GrowWallet({
     const reconcilePayment = async () => {
       const stillThisAttempt = () => mountedRef.current &&
         checkoutAttemptRef.current === attempt && !attempt.terminal;
-      const offerFreshAttempt = () => {
-        if (stillThisAttempt() && attempt.outcomeUnknown && !attempt.reconciling &&
-            attempt.couponCode?.toUpperCase() !== "TEST1") setFreshRetryReady(true);
-      };
       if (attempt.reconciling || attempt.terminal || !attempt.outcomeUnknown ||
           attempt.couponCode === "TEST1") return;
-      if (!attempt.purchaseTrackingToken || !attempt.processToken) {
-        offerFreshAttempt();
-        return;
-      }
+      if (!attempt.purchaseTrackingToken || !attempt.processToken) return;
       if (!stillThisAttempt()) return;
       attempt.reconciling = true;
-      setFreshRetryReady(false);
       setCheckingPayment(true);
       try {
         for (let check = 0; check < 30 && stillThisAttempt(); check++) {
@@ -821,7 +865,10 @@ export default function GrowWallet({
               attempt.terminal = true;
               attempt.outcomeUnknown = false;
               const root = document.getElementById("Gr0W8-wallet-root");
-              if (root?.style) root.style.display = "none";
+              if (root?.style) {
+                verifiedHiddenWalletRoots.add(root);
+                root.style.display = "none";
+              }
               completeCheckoutOwner(confirmationLease);
               attempt.lease = undefined;
               checkoutLockRef.current = true;
@@ -848,7 +895,6 @@ export default function GrowWallet({
       } finally {
         attempt.reconciling = false;
         if (stillThisAttempt()) setCheckingPayment(false);
-        offerFreshAttempt();
       }
     };
     attempt.checkStatus = reconcilePayment;
@@ -882,7 +928,20 @@ export default function GrowWallet({
           version: GROW_VERSION,
           events: {
             onSuccess: (r: any) => {
-              if (!isCurrentAttempt()) return;
+              if (!isCurrentAttempt()) {
+                // Late SDK success is a reason to SELECT the exact proof again,
+                // not permission to mark paid or revive a released SDK lease.
+                if (mountedRef.current && checkoutAttemptRef.current === attempt &&
+                    attempt.outcomeUnknown && !attempt.terminal) void reconcilePayment();
+                return;
+              }
+              if (!r || (r.status !== 1 && r.status !== "1") ||
+                  !r.data || !/^[1-9]\d*$/.test(String(r.data.confirmation_number || ""))) {
+                releaseRecoverableAttempt(true);
+                attempt.statusToastId = toast.error("אישור התשלום אינו תקין. אין לשלם שוב לפני בדיקה.");
+                void reconcilePayment();
+                return;
+              }
               stage("sdk_success");
               // Terminal success wins over every later close/cancel/error
               // callback. The SDK result is not presented as server verification.
@@ -906,7 +965,7 @@ export default function GrowWallet({
             },
             onFailure: (r: any) => {
               if (!isCurrentAttempt()) return;
-              const ambiguousFailure = isGrowPaymentOutcomeUnknown(r);
+              const ambiguousFailure = isAmbiguousGrowSdkFailure(r);
               stage("sdk_failure", ambiguousFailure ? "outcome_unknown" : "other");
               releaseRecoverableAttempt(ambiguousFailure);
               attempt.statusToastId = toast.error(ambiguousFailure
@@ -914,7 +973,9 @@ export default function GrowWallet({
                 : "התשלום נכשל. אפשר לפתוח שוב את אותו תהליך תשלום.");
               if (ambiguousFailure) void reconcilePayment();
               reportSdkFailure(r);
-              attempt.callbacks.onFailure?.(r);
+              // Pending is not failed: a page callback may display a terminal
+              // failure or unmount us before the provider-confirmed ledger lands.
+              if (!ambiguousFailure) attempt.callbacks.onFailure?.(r);
             },
             onTimeout: (r: any) => {
               if (!isCurrentAttempt()) return;
@@ -928,29 +989,28 @@ export default function GrowWallet({
               );
               void reconcilePayment();
               reportSdkFailure(r);
-              attempt.callbacks.onFailure?.(r);
             },
             onCancel: () => {
               if (!isCurrentAttempt()) return;
               stage("sdk_closed");
-              releaseRecoverableAttempt(false);
+              releaseRecoverableAttempt(Boolean(attempt.processCreated && !attempt.authCode));
             },
             onPaymentCancel: () => {
               if (!isCurrentAttempt()) return;
               stage("sdk_closed");
-              releaseRecoverableAttempt(false);
+              releaseRecoverableAttempt(Boolean(attempt.processCreated && !attempt.authCode));
             },
             onClose: () => {
               if (!isCurrentAttempt()) return;
               stage("sdk_closed");
               // Closing is recoverable: keep the immutable authCode/process
               // client-side and reopen it, rather than creating a new purchase.
-              releaseRecoverableAttempt(false);
+              releaseRecoverableAttempt(Boolean(attempt.processCreated && !attempt.authCode));
             },
             onWalletChange: (state: unknown) => {
               if (state !== "close" || !isCurrentAttempt()) return;
               stage("sdk_closed");
-              releaseRecoverableAttempt(false);
+              releaseRecoverableAttempt(Boolean(attempt.processCreated && !attempt.authCode));
             },
             onError: (e: any) => {
               if (!isCurrentAttempt()) return;
@@ -1067,21 +1127,26 @@ export default function GrowWallet({
         } catch {}
         const { fbp, fbc } = getMetaBrowserIdentifiers();
 
-        // Save lead for cart abandonment tracking (non-blocking)
-        try {
-          await saveLeadMutation.mutateAsync({
-            name: attempt.fullName,
-            email: attempt.email,
-            phone: attempt.phone || "",
-            product,
-          });
-        } catch {
-          /* non-blocking */
+        // TEST1 must not create phantom production cart-abandonment leads.
+        if (attempt.couponCode !== "TEST1") {
+          try {
+            await saveLeadMutation.mutateAsync({
+              name: attempt.fullName,
+              email: attempt.email,
+              phone: attempt.phone || "",
+              product,
+            });
+          } catch {
+            /* non-blocking */
+          }
         }
         if (!isCurrentAttempt()) return;
 
         logStep("4_createProcess_start");
         failureStage = "createProcess";
+        // Synchronous guard: a close while this mutation is in flight must not
+        // allow another creation before its authorization is available.
+        attempt.processCreated = true;
         const result = await createProcessMutation.mutateAsync({
           product: product as
             | "database"
@@ -1141,14 +1206,28 @@ export default function GrowWallet({
           // opaque UUID; no token, payment data, or personal data is persisted here.
           checkoutAttemptId: attempt.attemptId,
         } as any);
-        if (!isCurrentAttempt()) return;
+        if (!mountedRef.current || checkoutAttemptRef.current !== attempt || attempt.terminal) return;
 
+        // A fulfilled but malformed createProcess response is NOT permission to
+        // create again. Keep this attempt blocked even when its auth is missing.
+        failureStage = "sdk_failure";
+        if (!result || typeof result !== "object") {
+          throw new Error("אישור פתיחת התשלום אינו תקין. אין לשלם שוב לפני בדיקה.");
+        }
         rememberPurchaseTrackingToken(result.purchaseTrackingToken);
         activeCheckoutCouponRef.current = attempt.couponCode;
-        attempt.processToken = result.processToken || null;
-        attempt.purchaseTrackingToken = result.purchaseTrackingToken || undefined;
+        attempt.processToken = typeof result.processToken === "string" && result.processToken.trim()
+          ? result.processToken : null;
+        attempt.purchaseTrackingToken = typeof result.purchaseTrackingToken === "string" && /^[a-f0-9]{64}$/.test(result.purchaseTrackingToken)
+          ? result.purchaseTrackingToken : undefined;
         lastProcessTokenRef.current = attempt.processToken;
 
+        if (!isCurrentAttempt()) {
+          // Closing during creation released the SDK, not the immutable proof.
+          // Retain it for SELECT-only recovery; never draw a closed attempt.
+          if (attempt.outcomeUnknown) void reconcilePayment();
+          return;
+        }
         if (result.url) {
           // Hosted Plus bypasses the embedded SDK. Releasing before navigation
           // avoids a stale page-level owner if navigation is blocked by a browser.
@@ -1160,6 +1239,9 @@ export default function GrowWallet({
           return;
         }
 
+        if (typeof result.authCode !== "string" || !result.authCode.trim() || !attempt.processToken) {
+          throw new Error("אישור פתיחת התשלום אינו תקין. אין לשלם שוב לפני בדיקה.");
+        }
         attempt.authCode = result.authCode;
         logStep(
           "4_createProcess_done",
@@ -1197,17 +1279,27 @@ export default function GrowWallet({
       const technicalMessage = String(err?.message || "Unknown");
       const errDetail = `${technicalMessage} | stack: ${err?.stack?.slice(0, 200) || "N/A"}`;
       const expectedRejection = isExpectedCheckoutRejection(technicalMessage);
-      stage(expectedRejection ? "rejected" : "error", classifyCheckoutErrorReason(technicalMessage));
-      logStep(expectedRejection ? "REJECTED" : "ERROR", errDetail);
+      const safeInputRejection = failureStage === "createProcess" &&
+        isDefinitivePreProviderValidationRejection(err) &&
+        !attempt.outcomeUnknown && !attempt.authCode && !attempt.processToken && !attempt.purchaseTrackingToken;
+      stage(expectedRejection || safeInputRejection ? "rejected" : "error", classifyCheckoutErrorReason(technicalMessage));
+      logStep(expectedRejection || safeInputRejection ? "REJECTED" : "ERROR", errDetail);
       releaseRecoverableAttempt(
-        failureStage === "sdk_failure" && Boolean(attempt.authCode)
+        !safeInputRejection && Boolean(attempt.authCode || attempt.processCreated)
       );
+      if (safeInputRejection) {
+        // Retire the rejected input snapshot, not the stored UUID. The next click
+        // snapshots corrected fields/coupon under the SAME idempotency key. Ref
+        // identity also invalidates callbacks from this rejected attempt.
+        attempt.processCreated = false;
+        checkoutAttemptRef.current = null;
+      }
       if (attempt.outcomeUnknown) void reconcilePayment();
       const isConnectivityFailure =
         /Grow API error|fetch failed|Failed to fetch|HTTP\s*\d+/i.test(
           technicalMessage
         );
-      if (/PAYMENT_PHONE_INVALID/.test(technicalMessage)) {
+      if (safeInputRejection && technicalMessage === "PAYMENT_PHONE_INVALID") {
         toast.error("מספר הטלפון אינו תקין. יש לבדוק את הספרות ולנסות שוב.");
         return;
       }
@@ -1221,7 +1313,7 @@ export default function GrowWallet({
             ? "לא ניתן להתחבר כרגע למערכת התשלום. אפשר לנסות שוב בעוד כמה רגעים."
             : technicalMessage
       );
-      if (!expectedRejection) {
+      if (!expectedRejection && !safeInputRejection) {
         reportFailureMutation.mutate({
           customerName: attempt.fullName,
           customerEmail: attempt.email,
@@ -1576,37 +1668,7 @@ export default function GrowWallet({
         <div className="mt-3 rounded-xl bg-amber-50 p-4 text-center text-sm leading-6 text-amber-900" role="status" aria-live="polite">
           <p>{checkingPayment
             ? "בודקים את אישור העסקה מול האתר. אין צורך לשלם שוב."
-            : freshRetryReady
-              ? "לא קיבלנו אישור על התשלום הקודם. אם לא ירד חיוב בכרטיס, אפשר לנסות שוב. אם בסוף יתברר שהיה חיוב כפול, נחזיר אותו."
-              : "אישור העסקה עדיין לא אומת באתר. כדי להימנע מחיוב נוסף, אין לשלם שוב."}</p>
-          {!checkingPayment && freshRetryReady && couponApplied?.code !== "TEST1" && (
-            <button
-              type="button"
-              className="mt-3 w-full rounded-xl bg-[#191265] py-3 text-sm font-bold text-white"
-              onClick={() => {
-                const prior = checkoutAttemptRef.current;
-                if (!prior || prior.terminal || !prior.outcomeUnknown || prior.reconciling ||
-                    prior.couponCode?.toUpperCase() === "TEST1" || checkoutLockRef.current) return;
-                const next = createFreshProductionCheckoutAttempt(
-                  { product, email: prior.email, boostMatchId }, prior.couponCode, prior.attemptId,
-                );
-                if (!next) {
-                  toast.message("לא ניתן להכין ניסיון חדש כרגע. אפשר לפנות אלינו בוואטסאפ ונעזור.");
-                  return;
-                }
-                // Retire the old attempt: its late SDK callbacks and checks are ignored.
-                prior.terminal = true;
-                checkoutAttemptRef.current = null;
-                if (prior.statusToastId !== undefined) toast.dismiss(prior.statusToastId);
-                setFreshRetryReady(false);
-                setPaymentStatusAmbiguous(false);
-                try { trackCheckoutStage(product, "fresh_attempt", "-"); } catch {}
-                toast.message("אפשר ללחוץ שוב על כפתור התשלום.");
-              }}
-            >
-              ניסיון תשלום חדש
-            </button>
-          )}
+            : "אישור העסקה עדיין לא אומת באתר. כדי להימנע מחיוב נוסף, אין לשלם שוב."}</p>
           {!checkingPayment && checkoutAttemptRef.current?.purchaseTrackingToken && checkoutAttemptRef.current?.processToken && (
             <button type="button" className="mt-2 font-bold underline" onClick={() => void checkoutAttemptRef.current?.checkStatus?.()}>
               בדיקת אישור התשלום בלבד

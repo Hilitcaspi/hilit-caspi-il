@@ -13,7 +13,8 @@ describe("restored dashboard presentation", () => {
     expect(dashboardSource).toContain("דשבורד שיווק ומכירות");
     expect(dashboardSource).toContain("דמוגרפיה: מצבה כיום");
     expect(dashboardSource).toContain("Meta Ads — תקציב ותוצאות מדווחות");
-    expect(dashboardSource).toContain("SEO ותנועה");
+    // The traffic block now labels event counts, not attributable SEO visits.
+    expect(dashboardSource).toContain("אירועי פעילות באתר");
     expect(dashboardSource).not.toContain('id="campaign-journey"');
     expect(dashboardSource).not.toContain("campaignJourney.useQuery");
     expect(dashboardSource).not.toContain("שתי עדשות שיוך");
@@ -56,12 +57,28 @@ describe("restored dashboard presentation", () => {
 describe("product selector and understandable evidence", () => {
   it("shares product-filtered rows between summary and purchase list", () => {
     expect(tableSource).toContain("useState<SalesProductFilter>(DEFAULT_SALES_PRODUCT)");
-    expect(tableSource).toContain("summarizeSalesSources(productSales)");
-    expect(tableSource).toContain("summarizeProductSales(productSales)");
-    expect(tableSource).toContain("[...productSales].reverse()");
+    expect(tableSource).toContain("summarizeSalesSources(scopedSales, lens)");
+    expect(tableSource).toContain("summarizeProductSales(scopedSales)");
+    expect(tableSource).toContain("[...scopedSales].reverse()");
     expect(tableSource).not.toContain("data.summary.includedCount");
     expect(tableSource).toContain("בחירת מוצר ברכישות");
     expect(tableSource).toContain("setSelectedGroup(null)");
+  });
+  it("defaults to closing and uses one explicit lens for cards, filters and rows", () => {
+    expect(tableSource).toContain("useState<SalesSourceLens>(DEFAULT_SALES_SOURCE_LENS)");
+    expect(tableSource).toContain("salesSourceForLens(sale, lens)");
+    expect(tableSource).toContain("summarizeSalesSources(scopedSales, lens)");
+    expect(tableSource).toContain("SourceBadge sale={sale} lens={lens}");
+    expect(tableSource).toContain("SALES_SOURCE_LENSES[lens]");
+    expect(tableSource).not.toContain("journey.emailClosed ? \"email\" : journey.group");
+  });
+  it("labels a consistent day or period and does not expose stale totals on failure", () => {
+    expect(tableSource).toContain('useState<"day" | "period">("day")');
+    expect(tableSource).toContain('timeScope === "day" ? productDays.visible : productSales');
+    expect(tableSource).toContain('timeScope === "period" && dayRows.older.length > 0');
+    expect(tableSource).toContain("!loading && !error ? data : undefined");
+    expect(tableSource).toContain("SALES_SOURCE_TAG_NOTE");
+    expect(tableSource).not.toContain("salesSourceJourney(sale)");
   });
   it("hides raw tags behind a second expansion and does not invent acquisition", () => {
     expect(tableSource).toContain("פרטי המדידה (לפי הצורך)");

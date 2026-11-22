@@ -24,7 +24,9 @@ describe('purchase-day compact presentation',()=>{
  it('keeps historical list closed and bounded, while period summary stays product scoped',()=>{
  const ui=readFileSync(new URL('../client/src/components/SalesSourcesTable.tsx',import.meta.url),'utf8');
  expect(ui).toContain('splitSalesVisibleDay(rows');expect(ui).toContain('rows={dayRows.visible}');expect(ui).toContain('rows={dayRows.older}');
- expect(ui).toContain('max-h-[28rem] overflow-y-auto');expect(ui).not.toContain('<details open');expect(ui).toContain('summarizeSalesSources(productSales)');
+ expect(ui).toContain('max-h-[28rem] overflow-y-auto');expect(ui).not.toContain('<details open');expect(ui).toContain('summarizeSalesSources(scopedSales, lens)');
+ expect(ui).toContain('timeScope === "day" ? productDays.visible : productSales');
+ expect(ui).toContain('timeScope === "period" && dayRows.older.length > 0');
  });
 });
 describe('source-gap evidence safeguards',()=>{

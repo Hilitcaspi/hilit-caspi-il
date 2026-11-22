@@ -8501,31 +8501,34 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
         if (input.couponCode && db && choose50FixedPrice === undefined && !validatedRecoveryCode && input.product !== "plus" && input.product !== "match_boost" && reservedCode !== "LIVE" && reservedCode !== "LIVE48" && reservedCode !== "LIVEPLUS" && reservedCode !== "FRIENDS" && reservedCode !== "TEST1") {
           const { discountCodes } = await import("../drizzle/schema");
           const [code] = await db.select().from(discountCodes)
-            .where(eq(discountCodes.code, input.couponCode.toUpperCase()))
+            .where(eq(discountCodes.code, reservedCode!))
             .limit(1);
-          if (code && code.isActive &&
-           (!code.expiresAt || code.expiresAt > Date.now()) &&
-           (code.maxUses === null || code.maxUses === undefined || code.usedCount < code.maxUses) &&
-            (!code.product || code.product.split(",").map(p => p.trim()).includes(input.product))) {
-            if (code.code === "PLUS50") {
-              const { hasActivePlusCouponEntitlement, isPlus50ProductAllowed } = await import("./couponPolicy");
-              if (!isPlus50ProductAllowed(input.product)) {
-                throw new TRPCError({ code: "FORBIDDEN", message: "הטבת PLUS50 אינה תקפה למוצר זה" });
-              }
-              const normalizedEmail = input.email.trim().toLowerCase();
-              const [single] = await db.select({ id: singles.id }).from(singles)
-                .where(eq(singles.email, normalizedEmail)).limit(1);
-              const [plusMember] = single
-                ? await db.select().from(plusPilotMembers).where(eq(plusPilotMembers.singleId, single.id)).limit(1)
-                : [];
-              if (!hasActivePlusCouponEntitlement(plusMember)) {
-                throw new TRPCError({ code: "FORBIDDEN", message: "קוד PLUS50 זמין לחברי Plus פעילים בלבד" });
-              }
-            }
-            const basePrice = PRODUCT_CONFIGS[input.product]?.sum ?? 0;
-            const { computeCouponPrice } = await import("./couponPolicy");
-            finalSum = computeCouponPrice(basePrice, code);
+          // Client validation is advisory: a supplied coupon must still be
+          // valid now, never silently fall back to a full-price Grow process.
+          if (!code || !code.isActive ||
+            (code.expiresAt && code.expiresAt <= Date.now()) ||
+            (code.maxUses != null && code.usedCount >= code.maxUses) ||
+            (code.product && !code.product.split(",").map(p => p.trim()).includes(input.product))) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "קוד הקופון אינו זמין או אינו תקף למוצר הזה. לא נפתח תשלום במחיר מלא." });
           }
+          if (code.code === "PLUS50") {
+            const { hasActivePlusCouponEntitlement, isPlus50ProductAllowed } = await import("./couponPolicy");
+            if (!isPlus50ProductAllowed(input.product)) {
+              throw new TRPCError({ code: "FORBIDDEN", message: "הטבת PLUS50 אינה תקפה למוצר זה" });
+            }
+            const normalizedEmail = input.email.trim().toLowerCase();
+            const [single] = await db.select({ id: singles.id }).from(singles)
+              .where(eq(singles.email, normalizedEmail)).limit(1);
+            const [plusMember] = single
+              ? await db.select().from(plusPilotMembers).where(eq(plusPilotMembers.singleId, single.id)).limit(1)
+              : [];
+            if (!hasActivePlusCouponEntitlement(plusMember)) {
+              throw new TRPCError({ code: "FORBIDDEN", message: "קוד PLUS50 זמין לחברי Plus פעילים בלבד" });
+            }
+          }
+          const basePrice = PRODUCT_CONFIGS[input.product]?.sum ?? 0;
+          const { computeCouponPrice } = await import("./couponPolicy");
+          finalSum = computeCouponPrice(basePrice, code);
         }
 
         // Save/update UTM + ga4ClientId + ga4SessionId in crm_leads so the webhook can use them later

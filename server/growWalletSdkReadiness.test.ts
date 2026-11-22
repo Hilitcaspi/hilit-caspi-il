@@ -97,10 +97,10 @@ describe("Grow wallet SDK readiness", () => {
     expect(reportIndex).toBeGreaterThan(sdkStageIndex);
   });
 
-  it("does not report expected checkout rejections as payment failures", () => {
+  it("does not report expected or proven pre-provider validation rejections as payment failures", () => {
     const source = readFileSync(resolve(process.cwd(), "client/src/components/GrowWallet.tsx"), "utf8");
     const catchIndex = source.indexOf("const expectedRejection = isExpectedCheckoutRejection(technicalMessage)");
-    const guardIndex = source.indexOf("if (!expectedRejection)", catchIndex);
+    const guardIndex = source.indexOf("if (!expectedRejection && !safeInputRejection)", catchIndex);
     const reportIndex = source.indexOf("reportFailureMutation.mutate", guardIndex);
 
     expect(catchIndex).toBeGreaterThan(-1);

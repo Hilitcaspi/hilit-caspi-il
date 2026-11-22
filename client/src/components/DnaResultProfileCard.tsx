@@ -9,16 +9,17 @@ type Props = {
 };
 
 // Editorial examples, never live members or a computed personal match list.
+// The DNA quiz does not collect age preferences; examples deliberately omit ages.
 const EXAMPLES = {
   male: [
-    { name: "נועה", age: 38, city: "תל אביב", dna: "העוגן היציב", detail: "הדדיות, יציבות וקרבה", image: "/manus-storage/tv-demo-fictional-noa_729c3436.webp" },
-    { name: "מאיה", age: 42, city: "רמת גן", dna: "הרומנטיקנית העמוקה", detail: "חום, תקשורת וקשר רציני", image: "/manus-storage/tv-demo-fictional-maya_d18c6c36.webp" },
-    { name: "תמר", age: 35, city: "הרצליה", dna: "הרוח החופשית", detail: "סקרנות, מרחב ושמחת חיים", image: "/manus-storage/tv-demo-fictional-tamar_82047198.webp" },
+    { name: "נועה", city: "תל אביב", dna: "העוגן היציב", detail: "הדדיות, יציבות וקרבה", image: "/manus-storage/tv-demo-fictional-noa_729c3436.webp" },
+    { name: "מאיה", city: "רמת גן", dna: "הרומנטיקנית העמוקה", detail: "חום, תקשורת וקשר רציני", image: "/manus-storage/tv-demo-fictional-maya_d18c6c36.webp" },
+    { name: "תמר", city: "הרצליה", dna: "הרוח החופשית", detail: "סקרנות, מרחב ושמחת חיים", image: "/manus-storage/tv-demo-fictional-tamar_82047198.webp" },
   ],
   female: [
-    { name: "אורי", age: 39, city: "תל אביב", dna: "העוגן היציב", detail: "הדדיות, יציבות וקרבה", image: "" },
-    { name: "יואב", age: 43, city: "רמת גן", dna: "הרומנטיקן העמוק", detail: "חום, תקשורת וקשר רציני", image: "" },
-    { name: "איתן", age: 37, city: "הרצליה", dna: "הרוח החופשית", detail: "סקרנות, מרחב ושמחת חיים", image: "" },
+    { name: "אורי", city: "תל אביב", dna: "העוגן היציב", detail: "הדדיות, יציבות וקרבה", image: "" },
+    { name: "יואב", city: "רמת גן", dna: "הרומנטיקן העמוק", detail: "חום, תקשורת וקשר רציני", image: "" },
+    { name: "איתן", city: "הרצליה", dna: "הרוח החופשית", detail: "סקרנות, מרחב ושמחת חיים", image: "" },
   ],
 };
 
@@ -36,7 +37,7 @@ export default function DnaResultProfileCard({ name, gender, resultLabel, href, 
             {profile.image ? <img src={profile.image} alt={`פרופיל בדיוני לדוגמה: ${profile.name}`} loading="lazy" width={160} height={180} className="aspect-[1/1.15] w-full object-cover" /> : <div aria-label="פרופיל דוגמה ללא תמונה" className="flex aspect-[1/1.15] items-center justify-center bg-[#e6dcf2] text-4xl font-bold">{profile.name.slice(0, 1)}</div>}
             <figcaption className="px-1.5 py-3">
               <strong className="block text-base font-black">{profile.name}</strong>
-              <span className="mt-1 block text-[11px]">{profile.age} · {profile.city}</span>
+              <span className="mt-1 block text-[11px]">{profile.city}</span>
               <span className="mt-2 block text-[10px] font-bold">{profile.dna}</span>
               <span className="mt-1 block text-[10px] leading-relaxed">{profile.detail}</span>
             </figcaption>

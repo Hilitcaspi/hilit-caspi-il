@@ -1,15 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import express from "express";
 import type { AddressInfo } from "net";
+
+vi.mock("./routers", () => ({ addToPaymentLogBuffer: vi.fn() }));
+vi.mock("./checkoutReservation", () => ({ markCheckoutReservationPaymentUncertain: vi.fn() }));
 import { encodeGrowUrlEncodedBody, registerGrowProxy } from "./_core/growProxy";
 
-/**
- * Regression test for the wallet "hang" bug:
- * The proxy is registered AFTER express.json()/urlencoded(), so it must rebuild
- * the upstream body from req.body (not re-read the consumed stream). This test
- * spins up a tiny express app with the SAME middleware order as production and
- * confirms a createPaymentProcess call returns quickly with status:1 + authCode.
- */
+/** Real local HTTP/body parsers; all provider requests use synthetic responses. */
 describe("grow proxy (post-body-parser, no hang)", () => {
   it("rebuilds nested Apple Pay fields with bracket notation", () => {
     const encoded = encodeGrowUrlEncodedBody({
@@ -25,64 +22,49 @@ describe("grow proxy (post-body-parser, no hang)", () => {
       },
     });
     const decoded = new URLSearchParams(encoded);
-
     expect(decoded.get("card_token[paymentData][data]")).toBe("encrypted+payload/with=symbols");
     expect(decoded.get("card_token[paymentData][header][transactionId]")).toBe("transaction-id");
     expect(decoded.get("card_token[paymentMethod][network]")).toBe("Visa");
     expect(encoded).not.toContain("%5Bobject+Object%5D");
   });
 
-  it("returns an authCode quickly through the proxy", async () => {
+  it("returns a synthetic authCode quickly through the proxy without provider egress", async () => {
     const app = express();
     app.use(express.json({ limit: "10mb" }));
     app.use(express.urlencoded({ limit: "10mb", extended: true }));
     registerGrowProxy(app);
-
     const server = app.listen(0);
-    await new Promise<void>((r) => server.once("listening", () => r()));
+    await new Promise<void>((resolve) => server.once("listening", resolve));
     const port = (server.address() as AddressInfo).port;
-
+    const localFetch = globalThis.fetch;
+    const providerFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      status: 1, data: { authCode: "synthetic-auth-code" },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    // Only the captured native fetch talks to the loopback server. The route
+    // itself sees this stub and can never contact a live payment provider.
+    globalThis.fetch = providerFetch;
     try {
       const body = new URLSearchParams({
-        pageCode: process.env.GROW_PAGE_CODE_DATABASE || "b497c06813ac",
-        userId: process.env.GROW_USER_ID || "e02cfda4ca3d4736",
-        sum: "299",
-        description: "vitest proxy check",
-        successUrl: "https://hilitcaspi.com/thank-you/database",
-        cancelUrl: "https://hilitcaspi.com",
-        paymentNum: "1",
+        pageCode: "synthetic-page", userId: "synthetic-user", sum: "299",
+        description: "synthetic proxy check", successUrl: "https://example.invalid/thank-you",
+        cancelUrl: "https://example.invalid", paymentNum: "1",
       });
-
       const start = Date.now();
-      const res = await fetch(
-        `http://127.0.0.1:${port}/api/grow-proxy/api/light/server/1.0/createPaymentProcess`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: body.toString(),
-        },
-      );
-      const elapsed = Date.now() - start;
-      const responseText = await res.text();
-      console.log(
-        "[GrowProxyTest] elapsed=" + elapsed + "ms resp=" +
-          responseText.slice(0, 80),
-      );
-
-      // Must NOT hang — well under the old 100s+ freeze.
-      expect(elapsed).toBeLessThan(25000);
-      if (responseText.trimStart().startsWith("{")) {
-        const json = JSON.parse(responseText) as any;
-        expect(res.status).toBe(200);
-        expect(json.status).toBe(1);
-        expect(json.data?.authCode).toBeTruthy();
-      } else {
-        // Incapsula can block both egress paths in CI. A prompt error response
-        // still proves the consumed-body regression no longer hangs the route.
-        expect(res.status).toBeGreaterThanOrEqual(400);
-      }
+      const res = await localFetch(`http://127.0.0.1:${port}/api/grow-proxy/api/light/server/1.0/createPaymentProcess`, {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body.toString(),
+      });
+      expect(Date.now() - start).toBeLessThan(25000);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.status).toBe(1);
+      expect(json.data.authCode).toBe("synthetic-auth-code");
+      expect(providerFetch).toHaveBeenCalledOnce();
+      const upstreamBody = new URLSearchParams(String(providerFetch.mock.calls[0][1].body));
+      expect(upstreamBody.get("pageCode")).toBe("synthetic-page");
+      expect(upstreamBody.get("sum")).toBe("299");
     } finally {
-      server.close();
+      globalThis.fetch = localFetch;
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     }
   }, 30000);
 });

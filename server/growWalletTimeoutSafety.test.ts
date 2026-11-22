@@ -8,6 +8,7 @@ import * as safety from "../client/src/lib/checkoutSafety";
 import * as identity from "../shared/checkoutIdentity";
 import { normalizeIsraeliPhone } from "../shared/profileValidation";
 import * as checkoutFunnel from "../shared/checkoutFunnel";
+import * as paymentFailureClassification from "../shared/paymentFailureClassification";
 
 const ATTEMPT_ID = "11111111-1111-4111-8111-111111111111";
 const EXPIRY = "התשלום נכשל: נגמר הזמן לתשלום. אנא רענן את הדף ונסה שנית";
@@ -16,7 +17,8 @@ const walletSource = readFileSync(resolve(process.cwd(), "client/src/components/
 /** Execute the real component with tiny hook/JSX/DOM mocks, not a browser. */
 function walletHarness(servicesLoaded = true, visible = true, withTrackingProof = false,
   opts: { showCoupon?: boolean; validateCoupon?: ReturnType<typeof vi.fn>;
-    applePay?: ReturnType<typeof vi.fn>; product?: "guide" | "plus"; prefillCoupon?: string } = {}) {
+    applePay?: ReturnType<typeof vi.fn>; product?: "guide" | "plus"; prefillCoupon?: string;
+    keepDetailsVisible?: boolean } = {}) {
   const storage = new Map<string, string>();
   const sessionStorage = {
     getItem: (key: string) => storage.get(key) ?? null,
@@ -57,24 +59,29 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
   };
   let events: Record<string, (response?: any) => void> = {};
   let loaded = servicesLoaded;
+  let walletVisible = visible;
   const renderPaymentOptions = vi.fn();
   const init = vi.fn(async (config: any) => { events = config.events; });
   const applePay = opts.applePay ?? vi.fn().mockResolvedValue(undefined);
   const createProcess = vi.fn().mockResolvedValue({ authCode: "synthetic-auth", processToken: "synthetic-process",
     ...(withTrackingProof ? { purchaseTrackingToken: "a".repeat(64) } : {}) });
   const checkoutStatus = vi.fn().mockResolvedValue({ status: "pending" });
+  const saveLead = vi.fn().mockResolvedValue({});
   const reportFailure = vi.fn();
   const logStep = vi.fn();
   const success = vi.fn();
   const failure = vi.fn();
   const toast = { error: vi.fn().mockReturnValue("unknown-payment-toast"), success: vi.fn(), message: vi.fn(), dismiss: vi.fn() };
+  const root = { style: { display: "", removeProperty: vi.fn(function (this: { display: string }, key: string) {
+    if (key === "display") this.display = "";
+  }) } };
   const windowMock = {
     location: { origin: "https://synthetic.example.test", search: "", assign: vi.fn() },
     sessionStorage,
     growRuntime: {},
     growPayment: { init, renderPaymentOptions, updateEvents: vi.fn() },
     __growServicesLoaded: () => loaded,
-    getComputedStyle: () => ({ display: "block", visibility: visible ? "visible" : "hidden", opacity: visible ? "1" : "0" }),
+    getComputedStyle: () => ({ display: root.style.display || "block", visibility: walletVisible ? "visible" : "hidden", opacity: walletVisible ? "1" : "0" }),
   };
   vi.stubGlobal("window", windowMock); // real checkoutSafety uses only synthetic storage
   vi.stubGlobal("crypto", { randomUUID: () => ATTEMPT_ID });
@@ -89,7 +96,7 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
     sonner: { toast },
     "@/lib/trpc": { trpc: {
       useUtils: () => ({ client: { payment: { checkoutStatus: { query: checkoutStatus } } } }),
-      coupons: { validate: mutation(opts.validateCoupon), saveLead: mutation() },
+      coupons: { validate: mutation(opts.validateCoupon), saveLead: mutation(saveLead) },
       payment: { createProcess: mutation(createProcess), reportFailure: mutation(undefined, reportFailure), logStep: mutation(undefined, logStep) },
     } },
     "@/lib/ga": { gaBeginCheckout: vi.fn() },
@@ -100,7 +107,7 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
     "@/lib/growSdkReadiness": readiness,
     "@shared/profileValidation": { normalizeIsraeliPhone },
     "@/lib/purchaseTracking": { getMetaBrowserIdentifiers: () => ({}), rememberPurchaseTrackingToken: vi.fn() },
-    "@shared/paymentFailureClassification": { isExpectedCheckoutRejection: () => false },
+    "@shared/paymentFailureClassification": paymentFailureClassification,
     "@shared/checkoutIdentity": identity,
     "@/lib/acquisitionTracking": { getFirstTouchAcquisition: () => undefined, getLastUtmAcquisition: () => undefined },
     "@/lib/checkoutSafety": safety,
@@ -110,7 +117,7 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
   };
   const context = createContext({
     window: windowMock,
-    document: { cookie: "", getElementById: () => visible ? {} : null },
+    document: { cookie: "", getElementById: () => root },
     console: { log: vi.fn(), warn: vi.fn() },
     setInterval, clearInterval, setTimeout, Date,
     exports: {},
@@ -133,21 +140,31 @@ function walletHarness(servicesLoaded = true, visible = true, withTrackingProof 
   }
   function render() {
     stateIndex = 0; refIndex = 0; effectIndex = 0;
-    const tree = Component({ product: opts.product ?? "guide", prefillCoupon: opts.prefillCoupon, prefillName: "Synthetic Buyer", prefillEmail: "synthetic@example.test", prefillPhone: "0500000000", showCoupon: opts.showCoupon ?? false, onSuccess: success, onFailure: failure });
+    const tree = Component({ product: opts.product ?? "guide", prefillCoupon: opts.prefillCoupon, prefillName: "Synthetic Buyer", prefillEmail: "synthetic@example.test", prefillPhone: "0500000000", showCoupon: opts.showCoupon ?? false, keepDetailsVisible: opts.keepDetailsVisible, onSuccess: success, onFailure: failure });
     effects.splice(0).forEach(effect => effect());
     const all = nodes(tree);
     return { tree, button: all.find(node => node.type === "button" && node.props.onClick && node.props.className?.includes("bg-[#ffe27c]")) ?? all.find(node => node.type === "button" && node.props.onClick),
-      age: all.find(node => node.type === "Checkbox"), coupon: all.find(node => node.type === "Input" && String(node.props.id).startsWith("gw-coupon-")) };
+      age: all.find(node => node.type === "Checkbox"), coupon: all.find(node => node.type === "Input" && String(node.props.id).startsWith("gw-coupon-")),
+      name: all.find(node => node.type === "Input" && String(node.props.id).startsWith("gw-name-")),
+      email: all.find(node => node.type === "Input" && String(node.props.id).startsWith("gw-email-")),
+      phone: all.find(node => node.type === "Input" && String(node.props.id).startsWith("gw-phone-")),
+      removeCoupon: all.find(node => node.type === "button" && node.props.children === "✕") };
   }
   const initial = render();
   initial.age.props.onCheckedChange(true);
   return {
-    render, createProcess, checkoutStatus, renderPaymentOptions, init, applePay, reportFailure, logStep, toast, success, failure,
+    render, createProcess, checkoutStatus, saveLead, renderPaymentOptions, init, applePay, reportFailure, logStep, toast, success, failure, root,
     location: windowMock.location,
     storage, sessionStorage,
     unmount: () => { cleanups.forEach(cleanup => { if (typeof cleanup === "function") cleanup(); }); },
+    remount: () => {
+      cleanups.forEach(cleanup => { if (typeof cleanup === "function") cleanup(); });
+      states.length = refs.length = effectDeps.length = cleanups.length = 0;
+      render().age.props.onCheckedChange(true);
+    },
     events: () => events,
     setServicesLoaded: (value: boolean) => { loaded = value; },
+    setWalletVisible: (value: boolean) => { walletVisible = value; },
     attempt: () => refs.find(ref => ref.current?.attemptId)?.current,
     pay: () => render().button.props.onClick() as Promise<void>,
   };
@@ -300,6 +317,211 @@ describe("Grow wallet payment timeout safety (isolated real component)", () => {
     expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
     expect(h.location.assign).not.toHaveBeenCalled();
     expect(h.reportFailure).not.toHaveBeenCalled();
+    expect(h.saveLead).not.toHaveBeenCalled();
+  });
+
+  it("refreshes corrected phone after exact safe rejection, retaining UUID and ignoring retired callbacks", async () => {
+    const h = walletHarness(true, true, false, { keepDetailsVisible: true });
+    h.createProcess.mockRejectedValueOnce(new Error("PAYMENT_PHONE_INVALID"));
+    let paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    const rejectedEvents = h.events();
+    const stored = [...h.storage.entries()];
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.createProcess.mock.calls[0][0]).toMatchObject({ phone: "0500000000", checkoutAttemptId: ATTEMPT_ID });
+    expect(h.attempt()).toBeUndefined();
+    expect(h.render().phone.props.disabled).toBe(false);
+    expect(h.reportFailure).not.toHaveBeenCalled();
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+
+    h.render().phone.props.onChange({ target: { value: "052-1234567" } });
+    paying = h.pay();
+    // Same-turn second click is still guarded, even before disabled UI commits.
+    await h.pay();
+    rejectedEvents.onTimeout();
+    rejectedEvents.onSuccess({ status: 1, data: { confirmation_number: "123456" } });
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.createProcess).toHaveBeenCalledTimes(2);
+    expect(h.createProcess.mock.calls[1][0]).toMatchObject({ email: "synthetic@example.test", phone: "0521234567", checkoutAttemptId: ATTEMPT_ID });
+    expect(h.attempt()).toMatchObject({ phone: "0521234567", authCode: "synthetic-auth" });
+    expect(h.attempt().outcomeUnknown).toBeUndefined();
+    expect([...h.storage.entries()]).toEqual(stored);
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.success).not.toHaveBeenCalled();
+    expect(h.saveLead).toHaveBeenCalledTimes(2); // ordinary production behavior retained
+  });
+
+  it.each(["remove", "replace"])("snapshots edited name and %s coupon only after safe pre-provider rejection", async mode => {
+    const validateCoupon = vi.fn(async ({ code }: { code: string }) => ({ valid: true, code, discountPercent: 10 }));
+    const h = walletHarness(true, true, false, { showCoupon: true, keepDetailsVisible: true, validateCoupon });
+    h.render().coupon.props.onChange({ target: { value: "OLD10" } });
+    await h.pay(); h.render();
+    h.createProcess.mockRejectedValueOnce(new Error("PAYMENT_PHONE_INVALID"));
+    await vi.advanceTimersByTimeAsync(700);
+    expect(h.createProcess.mock.calls[0][0]).toMatchObject({ fullName: "Synthetic Buyer", couponCode: "OLD10" });
+    expect(h.attempt()).toBeUndefined();
+    h.render().name.props.onChange({ target: { value: "Corrected Buyer" } });
+    h.render().removeCoupon.props.onClick();
+    if (mode === "replace") h.render().coupon.props.onChange({ target: { value: "NEW10" } });
+    const paying = h.pay();
+    if (mode === "replace") { await paying; h.render(); }
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.createProcess).toHaveBeenCalledTimes(2);
+    expect(h.createProcess.mock.calls[1][0]).toMatchObject({ fullName: "Corrected Buyer", couponCode: mode === "replace" ? "NEW10" : undefined, checkoutAttemptId: ATTEMPT_ID });
+    expect(h.attempt().couponCode).toBe(mode === "replace" ? "NEW10" : undefined);
+    h.events().onSuccess({ status: 1, data: { confirmation_number: "123456" } });
+    expect(h.success).toHaveBeenCalledWith(expect.anything(), mode === "replace" ? "NEW10" : undefined);
+  });
+
+  it.each(["fullName", "phone", "couponCode"])("allows refresh after structured tRPC %s input validation before mutation", async field => {
+    const h = walletHarness(true, true, false, { keepDetailsVisible: true });
+    h.createProcess.mockRejectedValueOnce(Object.assign(new Error(JSON.stringify([
+      { code: "custom", path: [field], message: "Synthetic input validation" },
+    ])), { data: { code: "BAD_REQUEST", path: "payment.createProcess" } }));
+    let paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.attempt()).toBeUndefined();
+    h.render().name.props.onChange({ target: { value: "Corrected Buyer" } });
+    paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.createProcess).toHaveBeenCalledTimes(2);
+    expect(h.createProcess.mock.calls[1][0]).toMatchObject({ fullName: "Corrected Buyer", checkoutAttemptId: ATTEMPT_ID });
+    expect(h.reportFailure).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "fetch failed: timeout", "Unknown create failure", "HTTP 503",
+    "fetch failed: PAYMENT_PHONE_INVALID", "בקשת התשלום כבר נמצאת בעיבוד",
+    "כבר נפתח תהליך תשלום עבור בקשה זו",
+    "לא ניתן לאמת את מצב התשלום כרגע. לא נפתח תהליך תשלום חדש. אם כבר ניסית לשלם, אין לשלם שוב לפני בדיקה.",
+  ])("cannot refresh fields or duplicate after unproven create rejection: %s", async message => {
+    const h = walletHarness(true, true, false, { showCoupon: true, keepDetailsVisible: true });
+    h.createProcess.mockRejectedValueOnce(new Error(message));
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    const original = h.attempt();
+    const stored = [...h.storage.entries()];
+    expect(original.outcomeUnknown).toBe(true);
+    const view = h.render();
+    expect(view.name.props.disabled).toBe(true);
+    expect(view.phone.props.disabled).toBe(true);
+    expect(view.coupon.props.disabled).toBe(true);
+    // Even bypassing disabled mocked DOM handlers cannot reset the attempt.
+    view.name.props.onChange({ target: { value: "Changed Buyer" } });
+    view.phone.props.onChange({ target: { value: "0521234567" } });
+    view.email.props.onChange({ target: { value: "different@example.test" } });
+    view.coupon.props.onChange({ target: { value: "NEW10" } });
+    h.events().onClose();
+    await h.pay();
+    expect(h.attempt()).toBe(original);
+    expect(original).toMatchObject({ fullName: "Synthetic Buyer", email: "synthetic@example.test", phone: "0500000000", attemptId: ATTEMPT_ID });
+    expect([...h.storage.entries()]).toEqual(stored);
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+    expect(h.render().button.props.disabled).toBe(true);
+    expect(h.toast.error.mock.calls.some(([text]) => text === "מספר הטלפון אינו תקין. יש לבדוק את הספרות ולנסות שוב.")).toBe(false);
+    if (paymentFailureClassification.isExpectedCheckoutRejection(message)) expect(h.reportFailure).not.toHaveBeenCalled();
+  });
+
+  it.each(["generic BAD_REQUEST", "wrong endpoint", "non-editable issue"])("does not treat %s as schema proof", async mode => {
+    const h = walletHarness();
+    const message = mode === "generic BAD_REQUEST" ? "Invalid input" : JSON.stringify([
+      { code: "custom", path: [mode === "non-editable issue" ? "checkoutAttemptId" : "phone"], message: "Invalid input" },
+    ]);
+    h.createProcess.mockRejectedValue(Object.assign(new Error(message), {
+      data: { code: "BAD_REQUEST", path: mode === "wrong endpoint" ? "payment.other" : "payment.createProcess" },
+    }));
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.attempt().outcomeUnknown).toBe(true);
+    await h.pay();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+  });
+
+  it.each(["processToken", "purchaseTrackingToken", "authCode"])("does not clear safe-looking rejection with existing %s proof", async proof => {
+    const h = walletHarness();
+    let reject!: (error: Error) => void;
+    h.createProcess.mockReturnValue(new Promise((_resolve, fail) => { reject = fail; }));
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700);
+    const original = h.attempt();
+    original[proof] = "synthetic-existing-proof";
+    reject(new Error("PAYMENT_PHONE_INVALID"));
+    await vi.advanceTimersByTimeAsync(0); await paying;
+    expect(h.attempt()).toBe(original);
+    expect(original.outcomeUnknown).toBe(true);
+    await h.pay();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+  });
+
+  it("never clears exact phone-like SDK failure after a provider process was already created", async () => {
+    const h = walletHarness(true, true, true);
+    h.renderPaymentOptions.mockImplementation(() => { throw new Error("PAYMENT_PHONE_INVALID"); });
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    const original = h.attempt();
+    expect(original).toMatchObject({ outcomeUnknown: true, authCode: "synthetic-auth", processToken: "synthetic-process", purchaseTrackingToken: "a".repeat(64) });
+    await h.pay();
+    expect(h.attempt()).toBe(original);
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.checkoutStatus).toHaveBeenCalledWith({ trackingToken: "a".repeat(64), processToken: "synthetic-process", expectedProduct: "guide" });
+  });
+
+  it("does not clear a late phone rejection after an in-flight close marked the attempt unknown", async () => {
+    const h = walletHarness();
+    let reject!: (error: Error) => void;
+    h.createProcess.mockReturnValue(new Promise((_resolve, fail) => { reject = fail; }));
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700);
+    const original = h.attempt();
+    h.events().onClose();
+    reject(new Error("PAYMENT_PHONE_INVALID"));
+    await vi.advanceTimersByTimeAsync(0); await paying;
+    await h.pay();
+    expect(h.attempt()).toBe(original);
+    expect(original.outcomeUnknown).toBe(true);
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("preserves closed but open-provider snapshot after edits (email changed: %s)", async changeEmail => {
+    const validateCoupon = vi.fn(async ({ code }: { code: string }) => ({ valid: true, code, discountPercent: 10 }));
+    const h = walletHarness(true, true, false, { keepDetailsVisible: true, showCoupon: true, validateCoupon });
+    let paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    const original = h.attempt();
+    const stored = [...h.storage.entries()];
+    h.events().onClose();
+    h.render().name.props.onChange({ target: { value: "Changed Buyer" } });
+    h.render().phone.props.onChange({ target: { value: "0521234567" } });
+    if (changeEmail) h.render().email.props.onChange({ target: { value: "different@example.test" } });
+    h.render().coupon.props.onChange({ target: { value: "NEW10" } });
+    await h.pay(); h.render();
+    await vi.advanceTimersByTimeAsync(700);
+    expect(h.attempt()).toBe(original);
+    expect(original).toMatchObject({ fullName: "Synthetic Buyer", phone: "0500000000", email: "synthetic@example.test", couponCode: undefined, authCode: "synthetic-auth" });
+    expect([...h.storage.entries()]).toEqual(stored);
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).toHaveBeenCalledTimes(changeEmail ? 1 : 2);
+  });
+
+  it.each(["guide", "plus"] as const)("TEST1 %s skips production lead saving even across a safe phone correction", async product => {
+    const validateCoupon = vi.fn().mockResolvedValue({ valid: true, code: "TEST1", fixedPrice: 1 });
+    const h = walletHarness(true, true, false, { product, prefillCoupon: "TEST1", keepDetailsVisible: true, validateCoupon });
+    await vi.advanceTimersByTimeAsync(0);
+    h.createProcess.mockRejectedValueOnce(new Error("PAYMENT_PHONE_INVALID"));
+    let paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.attempt()).toBeUndefined();
+    h.render().phone.props.onChange({ target: { value: "0521234567" } });
+    paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.createProcess).toHaveBeenCalledTimes(2);
+    expect(h.createProcess.mock.calls[1][0]).toMatchObject({ product, phone: "0521234567", couponCode: "TEST1", checkoutAttemptId: ATTEMPT_ID });
+    expect(h.saveLead).not.toHaveBeenCalled();
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.location.assign).not.toHaveBeenCalled();
   });
 
   it.each(["העסקה כבר בוצעה", "התשלום כבר בוצע", "Payment Not Completed", "PaymentNotCompleted", "already charged"])("treats %s as unknown, never paid or safe to replay", message => {
@@ -362,7 +584,7 @@ describe("Grow wallet payment timeout safety (isolated real component)", () => {
     expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
   });
 
-  it("offers a conscious fresh production attempt only after reconciliation ends unconfirmed", async () => {
+  it("never offers a new purchase after reconciliation ends without unpaid proof", async () => {
     const h = walletHarness(true, true, true);
     const paying = h.pay();
     await vi.advanceTimersByTimeAsync(700); await paying;
@@ -373,30 +595,12 @@ describe("Grow wallet payment timeout safety (isolated real component)", () => {
     expect(JSON.stringify(h.render().tree)).not.toContain("ניסיון תשלום חדש");
     await vi.advanceTimersByTimeAsync(60000);
     expect(h.checkoutStatus).toHaveBeenCalledTimes(30);
-    const findRetry = () => {
-      const all: any[] = [];
-      const walk = (node: any) => {
-        if (!node || typeof node !== "object") return;
-        if (Array.isArray(node)) { node.forEach(walk); return; }
-        all.push(node); walk(node.props?.children);
-      };
-      walk(h.render().tree);
-      return all.find(node => node.type === "button" && JSON.stringify(node.props.children).includes("ניסיון תשלום חדש"));
-    };
-    const retry = findRetry();
-    expect(retry).toBeTruthy();
-    const priorId = h.attempt().attemptId;
-    vi.stubGlobal("crypto", { randomUUID: () => "22222222-2222-4222-8222-222222222222" });
-    retry.props.onClick();
-    expect(h.render().button.props.disabled).toBe(false);
-    // A late callback from the retired attempt is ignored.
-    h.events().onError({ message: "late" });
-    const second = h.pay();
-    await vi.advanceTimersByTimeAsync(700); await second;
-    expect(h.createProcess).toHaveBeenCalledTimes(2);
-    const ids = h.createProcess.mock.calls.map((call: any[]) => call[0].checkoutAttemptId);
-    expect(ids[0]).toBe(priorId);
-    expect(ids[1]).not.toBe(priorId);
+    expect(JSON.stringify(h.render().tree)).not.toContain("ניסיון תשלום חדש");
+    expect(JSON.stringify(h.render().tree)).toContain("אין לשלם שוב");
+    expect(h.render().button.props.disabled).toBe(true);
+    await h.pay();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
     expect(h.success).not.toHaveBeenCalled();
   });
 
@@ -541,7 +745,7 @@ describe("Grow wallet payment timeout safety (isolated real component)", () => {
     expect(h.reportFailure.mock.calls[0][0].stage).toBe("sdk_failure");
     expect(h.toast.error).toHaveBeenCalledOnce();
     expect(h.toast.error.mock.calls[0][0]).toContain("אין לשלם שוב");
-    expect(h.failure).toHaveBeenCalledTimes(event === "onError" ? 0 : 1);
+    expect(h.failure).not.toHaveBeenCalled();
     await h.pay();
     expect(h.createProcess).toHaveBeenCalledOnce();
     expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
@@ -554,7 +758,7 @@ describe("Grow wallet payment timeout safety (isolated real component)", () => {
     await paying;
     h.events().onTimeout({ status: 0 });
     expect(h.render().button.props.disabled).toBe(true);
-    expect(h.failure).toHaveBeenCalledOnce();
+    expect(h.failure).not.toHaveBeenCalled();
     expect(h.attempt().terminal).toBe(false);
     expect(h.logStep).toHaveBeenCalledWith(expect.objectContaining({ step: "sdk_timeout", detail: "outcome_unknown" }));
   });
@@ -583,7 +787,7 @@ describe("Grow wallet payment timeout safety (isolated real component)", () => {
     expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
     expect(h.reportFailure).toHaveBeenCalledOnce();
     expect(h.toast.error).toHaveBeenCalledOnce();
-    expect(h.failure).toHaveBeenCalledOnce();
+    expect(h.failure).not.toHaveBeenCalled();
     expect(h.render().button.props.disabled).toBe(true);
   });
 
@@ -592,7 +796,7 @@ describe("Grow wallet payment timeout safety (isolated real component)", () => {
     const paying = h.pay();
     await vi.advanceTimersByTimeAsync(700);
     await paying;
-    const response = { status: 1, data: { confirmation_number: "synthetic-confirmation" } };
+    const response = { status: 1, data: { confirmation_number: "123456" } };
     h.events().onSuccess(response);
     h.events().onSuccess(response);
     h.events().onTimeout({ status: 0, message: EXPIRY });
@@ -621,6 +825,162 @@ describe("Grow wallet payment timeout safety (isolated real component)", () => {
     expect(h.createProcess).toHaveBeenCalledOnce();
     expect(h.renderPaymentOptions.mock.calls).toEqual([["synthetic-auth"], ["synthetic-auth"]]);
     expect(h.attempt().attemptId).toBe(ATTEMPT_ID);
+  });
+
+  it.each(["אירעה שגיאה בתהליך", "חיוב העסקה בביט נכשל", "תוצאת התשלום אינה ידועה. אין לשלם שוב לפני בדיקה."])(
+    "treats native '%s' as pending until delayed exact-ledger confirmation, never false failure", async message => {
+      const h = walletHarness(true, true, true);
+      const paying = h.pay();
+      await vi.advanceTimersByTimeAsync(700); await paying;
+      h.checkoutStatus.mockResolvedValueOnce({ status: "pending" }).mockResolvedValue({
+        status: "confirmed", product: "guide", currency: "ILS", amountAgorot: 14900, confirmedAt: Date.now(),
+      });
+      const staleClick = h.render().button.props.onClick;
+      h.events().onFailure({ status: 0, message });
+      h.events().onClose(); h.events().onCancel(); h.events().onWalletChange("close");
+      await staleClick();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.failure).not.toHaveBeenCalled();
+      expect(h.success).not.toHaveBeenCalled();
+      expect(h.attempt().outcomeUnknown).toBe(true);
+      expect(h.render().button.props.disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(h.success).toHaveBeenCalledOnce();
+      expect(h.success).toHaveBeenCalledWith(expect.objectContaining({ serverVerified: true }), undefined);
+      expect(h.failure).not.toHaveBeenCalled();
+      expect(h.createProcess).toHaveBeenCalledOnce();
+      expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+      expect(h.toast.dismiss).toHaveBeenCalledWith("unknown-payment-toast");
+    },
+  );
+
+  it("uses late SDK success only to restart exact read-only verification after the bounded pending window", async () => {
+    const h = walletHarness(true, true, true);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    h.events().onTimeout();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.checkoutStatus).toHaveBeenCalledTimes(30);
+    expect(h.success).not.toHaveBeenCalled();
+    h.checkoutStatus.mockResolvedValue({ status: "confirmed", product: "guide", currency: "ILS", amountAgorot: 14900, confirmedAt: Date.now() });
+    h.events().onSuccess({ status: 1, data: { confirmation_number: "123456" } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.checkoutStatus).toHaveBeenCalledTimes(31);
+    expect(h.success).toHaveBeenCalledOnce();
+    expect(h.failure).not.toHaveBeenCalled();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+  });
+
+  it.each([null, {}, { authCode: "" }, { authCode: {} }, { authCode: "synthetic-auth", processToken: "" }])(
+    "blocks malformed process response %j without rendering or extra purchase on close/reclick", async response => {
+      const h = walletHarness();
+      h.createProcess.mockResolvedValue(response as any);
+      const paying = h.pay();
+      await vi.advanceTimersByTimeAsync(700); await paying;
+      h.events().onClose(); h.events().onPaymentCancel();
+      await h.pay();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(h.createProcess).toHaveBeenCalledOnce();
+      expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+      expect(h.attempt().outcomeUnknown).toBe(true);
+      expect(h.render().button.props.disabled).toBe(true);
+      expect(h.success).not.toHaveBeenCalled();
+      expect(h.failure).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([undefined, { status: 0 }, { status: 1 }, { status: 1, data: { confirmation_number: "" } }])(
+    "does not manufacture paid status from malformed success %j", async response => {
+      const h = walletHarness(true, true, true);
+      const paying = h.pay();
+      await vi.advanceTimersByTimeAsync(700); await paying;
+      h.events().onSuccess(response);
+      h.events().onClose();
+      await h.pay();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.success).not.toHaveBeenCalled();
+      expect(safety.isCheckoutAttemptCompleted(ATTEMPT_ID, h.sessionStorage)).toBe(false);
+      expect(h.attempt().outcomeUnknown).toBe(true);
+      expect(h.createProcess).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("restores a root hidden by prior verification for a legitimately different checkout owner", async () => {
+    const h = walletHarness(true, true, true);
+    let paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    h.checkoutStatus.mockResolvedValue({ status: "confirmed", product: "guide", currency: "ILS", amountAgorot: 14900, confirmedAt: Date.now() });
+    h.events().onError({ message: "error" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.root.style.display).toBe("none");
+    expect(h.success).toHaveBeenCalledOnce();
+    h.storage.clear(); // different synthetic checkout, not an unknown replay
+    vi.stubGlobal("crypto", { randomUUID: () => "22222222-2222-4222-8222-222222222222" });
+    h.remount();
+    paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    expect(h.root.style.removeProperty).toHaveBeenCalledWith("display");
+    expect(h.root.style.display).toBe("");
+    expect(h.createProcess).toHaveBeenCalledTimes(2);
+    expect(h.renderPaymentOptions).toHaveBeenCalledTimes(2);
+    expect(h.reportFailure).toHaveBeenCalledOnce(); // prior unknown only
+  });
+
+  it("does not unhide a root hidden by somebody else", async () => {
+    const h = walletHarness();
+    h.root.style.display = "none";
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(50_000); await paying;
+    expect(h.root.style.removeProperty).not.toHaveBeenCalled();
+    expect(h.root.style.display).toBe("none");
+    expect(h.success).not.toHaveBeenCalled();
+  });
+
+  it("waits for a slow 18s read/fallback draw to become visible without overlapping redraw or false error", async () => {
+    const h = walletHarness(true, false);
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(18_000);
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.reportFailure).not.toHaveBeenCalled();
+    h.setWalletVisible(true);
+    await vi.advanceTimersByTimeAsync(200); await paying;
+    expect(h.renderPaymentOptions).toHaveBeenCalledOnce();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.toast.error).not.toHaveBeenCalled();
+  });
+
+  it.each(["onClose", "onCancel", "onPaymentCancel"])(
+    "%s during process creation cannot create another purchase or draw its late authorization", async event => {
+      const h = walletHarness(true, true, true);
+      let finish!: (result: any) => void;
+      h.createProcess.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+      const paying = h.pay();
+      await vi.advanceTimersByTimeAsync(700);
+      expect(h.createProcess).toHaveBeenCalledOnce();
+      h.events()[event]();
+      await h.pay();
+      finish({ authCode: "synthetic-auth", processToken: "synthetic-process", purchaseTrackingToken: "a".repeat(64) });
+      await vi.advanceTimersByTimeAsync(0); await paying;
+      expect(h.createProcess).toHaveBeenCalledOnce();
+      expect(h.renderPaymentOptions).not.toHaveBeenCalled();
+      expect(h.attempt().outcomeUnknown).toBe(true);
+      expect(h.attempt().processToken).toBe("synthetic-process");
+      expect(h.checkoutStatus).toHaveBeenCalledOnce();
+      expect(h.failure).not.toHaveBeenCalled();
+      expect(h.success).not.toHaveBeenCalled();
+    },
+  );
+
+  it("never replays process creation after a transport timeout", async () => {
+    const h = walletHarness();
+    h.createProcess.mockRejectedValue(new Error("fetch failed: timeout"));
+    const paying = h.pay();
+    await vi.advanceTimersByTimeAsync(700); await paying;
+    h.events().onClose();
+    await h.pay();
+    expect(h.createProcess).toHaveBeenCalledOnce();
+    expect(h.attempt().outcomeUnknown).toBe(true);
+    expect(h.renderPaymentOptions).not.toHaveBeenCalled();
   });
 });
 
