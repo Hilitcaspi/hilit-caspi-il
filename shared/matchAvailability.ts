@@ -1,7 +1,7 @@
 import { wasMatchProposalSent, type MatchDeliveryEvidence } from "./matchDelivery";
-import { hasMutualYes, type MatchLifecycleLike } from "./matchLifecycle";
+import { hasMutualYes, getProposalDeadline, PROPOSAL_WINDOW_MS, type MatchLifecycleLike } from "./matchLifecycle";
 
-export const PROPOSAL_WINDOW_MS = 48 * 60 * 60 * 1000;
+export { getProposalDeadline, PROPOSAL_WINDOW_MS };
 
 /**
  * The match fields used to decide whether either participant is unavailable for
@@ -34,18 +34,6 @@ export type MatchAvailability = {
 
 function finiteTimestamp(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
-}
-
-/**
- * Returns the enforceable proposal deadline. An explicit deadline always wins;
- * the 48-hour window is used only for a proposal with a usable proposedAt.
- */
-export function getProposalDeadline(match: MatchAvailabilityMatch): number | null {
-  const explicitDeadline = finiteTimestamp(match.approvalExpiresAt);
-  if (explicitDeadline !== null) return explicitDeadline;
-
-  const proposedAt = finiteTimestamp(match.proposedAt);
-  return proposedAt === null ? null : proposedAt + PROPOSAL_WINDOW_MS;
 }
 
 /**

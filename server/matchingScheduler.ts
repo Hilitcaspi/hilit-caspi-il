@@ -335,6 +335,7 @@ function proposalDeadlineReached(now: number) {
   );
 }
 
+const EXPIRY_NOTIFY_GRACE_MS = 30 * 60 * 1000;
 export async function expireStaleMatches(): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
@@ -368,14 +369,24 @@ export async function expireStaleMatches(): Promise<number> {
           eq(matches.id, current.id),
           eq(matches.status, "proposed"),
           proposalDeadlineReached(now),
-          or(eq(matches.approvedByA, false), eq(matches.approvedByB, false)),
+          // Legacy rows can hold NULL instead of false; NULL must not block expiry.
+          or(
+            isNull(matches.approvedByA), eq(matches.approvedByA, false),
+            isNull(matches.approvedByB), eq(matches.approvedByB, false),
+          ),
         ));
       if (result.affectedRows !== 1) return null;
-      return { ...current, status: "expired" as const, updatedAt: now };
+      return { ...current, status: "expired" as const, updatedAt: now, staleBacklog: now - deadline > EXPIRY_NOTIFY_GRACE_MS };
     });
     // Only the transaction that actually claimed expiry may notify or count it.
     if (!match) continue;
     expired++;
+    // Rows that should have expired long ago (backlog) are closed silently; telling a
+    // customer days later that a proposal ended would be confusing.
+    if (match.staleBacklog) {
+      console.log(`[ExpiryScheduler] Match ${match.id} closed silently (deadline passed long ago)`);
+      continue;
+    }
 
     // Fetch both singles for notifications
     const [singleA, singleB] = await Promise.all([

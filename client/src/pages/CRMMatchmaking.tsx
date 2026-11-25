@@ -1104,8 +1104,8 @@ export default function CRMMatchmaking() {
 
   const matchSubCounts = {
     pending:  typedMatches.filter(m => isPendingVisible(m)).length,
-    proposed: typedMatches.filter(m => isWaitingForMatchResponses(m)).length,
-    unsuccessful: typedMatches.filter(m => isUnsuccessfulMatch(m)).length,
+    proposed: typedMatches.filter(m => isWaitingForMatchResponses(m, matchAvailabilityNow)).length,
+    unsuccessful: typedMatches.filter(m => isUnsuccessfulMatch(m, matchAvailabilityNow)).length,
     mutual_yes: typedMatches.filter(m => hasMutualYes(m)).length,
     followup: typedMatches.filter(m => hasMutualYes(m)).length,
   };
@@ -1121,8 +1121,8 @@ export default function CRMMatchmaking() {
 
   const filteredMatchesBySubTab = {
     pending:  typedMatches.filter(m => isPendingVisible(m)).filter(filterMatchByName),
-    proposed: typedMatches.filter(m => isWaitingForMatchResponses(m)).filter(filterMatchByName),
-    unsuccessful: typedMatches.filter(m => isUnsuccessfulMatch(m)).filter(filterMatchByName),
+    proposed: typedMatches.filter(m => isWaitingForMatchResponses(m, matchAvailabilityNow)).filter(filterMatchByName),
+    unsuccessful: typedMatches.filter(m => isUnsuccessfulMatch(m, matchAvailabilityNow)).filter(filterMatchByName),
     mutual_yes: typedMatches.filter(m => hasMutualYes(m)).filter(filterMatchByName),
     followup: typedMatches.filter(m => hasMutualYes(m)).filter(filterMatchByName),
   };

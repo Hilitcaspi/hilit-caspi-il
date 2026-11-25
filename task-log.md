@@ -6747,3 +6747,14 @@ TEST1 תוקן ממצב שפג תוקפו ושאפשר רק שני מוצרים,
 **Send completed 2026-11-25T21:37+02:00 (~9 min).** נשלחו 154 מיילים ו-154 SMS, 0 כשלים, 0 כפילויות (journeyKeys: plus_reoffer_nov26_email / plus_reoffer_nov26_sms; utm_campaign=plus_reoffer_nov26). קהל: הצטרפו 25.9-24.11, בלי מי שנרשם ב-25.11. מעקב: פתיחות, לחיצות והצטרפויות ל-Plus לפי utm_campaign. אי אפשר להפריד השפעת מייל מול SMS.
 **Status:** resolved (שליחה). מעקב תוצאות ייעשה בנפרד.
 ---
+
+## Task: התאמות שפג תוקפן נשארות בטאב "קיבלו התאמה" ולא עוברות ל"אין התאמה"
+**Category:** matchmaking
+**Trigger:** reactive (דיווח הילית 26.11 00:11, צילומי מסך מ-24.11)
+**Continuation of:** new
+**Before:** התחלה 2026-11-26T00:11+02:00. בעמוד ההתאמות (7224 ממתינות) התאמות עם תג "פג תוקף" (למשל מ-22.11) נשארות בטאב "קיבלו התאמה" (199), ואמורות לעבור ל"אין התאמה" (4319) ברגע שפג תוקף ההתאמה או כשלא הייתה התאמה. טרם נבדק קוד. לא נשלח דבר ללקוחות.
+**After (completed 2026-11-26T00:19+02:00, duration ~8m):** שורש הבעיה כפול. (1) הטאבים "קיבלו התאמה" ו"אין התאמה" סיננו רק לפי status במסד, בלי להתחשב בחלון התגובה (48 שעות או approvalExpiresAt), ולכן הצעה שפג תוקפה אבל ה-status שלה עדיין proposed נשארה ב"קיבלו התאמה". (2) המתזמן expireStaleMatches (כל 5 דקות) דרש approvedBy=false בשני הצדדים, אבל בשורות ישנות הערך NULL, ולכן לא סימן אותן כפגות תוקף. בבדיקת קריאה בלבד נמצאו 211 הצעות במצב proposed, מתוכן 174 אחרי תום החלון (60 בלי תשובה משני הצדדים, 52 עם כן מצד A בלבד, 62 עם כן מצד B בלבד), 37 עדיין בתוקף, אפס עם אישור הדדי. שינויים: shared/matchLifecycle.ts (getProposalDeadline, hasProposalWindowEnded, isWaitingForMatchResponses ו-isUnsuccessfulMatch מקבלים now ומתחשבים בתום החלון), shared/matchAvailability.ts (שימוש חוזר באותה פונקציית דדליין), client/src/pages/CRMMatchmaking.tsx (העברת הזמן הנוכחי לשני הסינונים והספירות), server/matchingScheduler.ts (NULL לא חוסם סימון פג תוקף; הצעה שהדדליין שלה עבר לפני יותר מ-30 דקות נסגרת בשקט, בלי SMS או מייל ללקוחות). טסטים: matchLifecycle.test.ts ו-matchingSchedulerExpiry.test.ts. 46 טסטים רלוונטיים עוברים, tsc נקי. לא נשלחה הודעה ללקוחות. 
+**Status:** resolved (בקוד; נכנס לתוקף אחרי Publish)
+**Cost:** לא נמדד ברמת המשימה
+**Notes:** בטאב "אין התאמה" ייכנסו אחרי Publish גם 174 ההצעות הישנות (בסגירה שקטה). המתזמנים רצים רק בסביבה המפורסמת (SCHEDULERS_ENABLED).
+---

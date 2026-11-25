@@ -310,3 +310,17 @@ describe("expireStaleMatches", () => {
     expect(mocks.sendEmail).not.toHaveBeenCalled();
   });
 });
+
+describe("expireStaleMatches backlog", () => {
+  it("closes a long-overdue proposal (NULL approval flags included) without messaging anyone", async () => {
+    const fake = fakeDb(matchRow({
+      proposedAt: NOW - PROPOSAL_WINDOW_MS - 3 * 24 * HOUR,
+      approvedByA: null as unknown as boolean,
+      approvedByB: true,
+    }));
+    mocks.getDb.mockResolvedValue(fake.db);
+    expect(await expireStaleMatches()).toBe(1);
+    expect(fake.row().status).toBe("expired");
+    expectNoNotifications();
+  });
+});
