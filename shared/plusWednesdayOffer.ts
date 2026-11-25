@@ -5,7 +5,7 @@ export const PLUS_STANDARD_CYCLE_TARGET = 2;
 export const PLUS_WEDNESDAY_OFFER_CUTOFF_AT = Date.parse("2026-10-14T14:48:00Z");
 // Keep the persisted internal marker stable across the public code rename.
 export const PLUS_WEDNESDAY_OFFER_UTM_TERM_MARKER = "BONUS:PLUS3" as const;
-export const PLUS_CURRENT_OFFER_EXPIRES_AT = Date.parse("2026-10-18T00:00:00+03:00");
+export const PLUS_CURRENT_OFFER_EXPIRES_AT = Date.parse("2026-12-03T00:00:00+02:00");
 export function isPlusBonusCouponCode(value: string | null | undefined) {
   return ["PLUS", "PLUS3"].includes(String(value || "").trim().toUpperCase());
 }

@@ -6,7 +6,7 @@ import { canApplyPlusWednesdayOfferCoupon, isPlusWednesdayOfferPaymentTime, PLUS
 /** Preview validation only; createProcess and verified fulfilment recheck separately. */
 export async function validatePlusWednesdayCoupon(input: { product?: string; email?: string }, now = Date.now()) {
   if (input.product !== "plus") return { valid: false as const, error: "קוד PLUS מיועד להצטרפות ל־Plus בלבד" };
-  if (!isPlusWednesdayOfferPaymentTime(now)) return { valid: false as const, error: "חלון המימוש של הטבת PLUS הסתיים. ההטבה הנוכחית תקפה עד סוף שבת 17.10 לפי שעון ישראל" };
+  if (!isPlusWednesdayOfferPaymentTime(now)) return { valid: false as const, error: "חלון המימוש של הטבת PLUS הסתיים. ההטבה הנוכחית תקפה עד סוף יום רביעי 2.12 לפי שעון ישראל" };
   if (!input.email) return { valid: false as const, error: "יש להזין את כתובת המייל של חברות המאגר כדי לבדוק את ההטבה" };
   const db = await getDb();
   if (!db) return { valid: false as const, error: "לא ניתן לאמת זכאות כרגע. אפשר לנסות שוב." };

@@ -8385,7 +8385,7 @@ ${analysisText.replace(/## /g, '<h3 style="color: #191265; margin-top: 20px;">')
               paidAt: now,
               existingMember: priorPlusMember,
             })) {
-              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "הטבת PLUS מיועדת להצטרפות ראשונה בלבד ובחלון ההטבה הפעיל. ההטבה הנוכחית בתוקף עד סוף שבת 17.10 לפי שעון ישראל. המחיר נשאר 99 ₪" });
+              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "הטבת PLUS מיועדת להצטרפות ראשונה בלבד ובחלון ההטבה הפעיל. ההטבה הנוכחית בתוקף עד סוף יום רביעי 2.12 לפי שעון ישראל. המחיר נשאר 99 ₪" });
             }
             input.utmTerm = verifiedLivePostOfferCode === "LIVEPLUS"
               ? appendLivePostPlusOfferMarker(cleanUtmTerm)

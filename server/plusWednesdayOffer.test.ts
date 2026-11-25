@@ -16,9 +16,12 @@ describe("Plus Wednesday offer policy", () => {
     expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-10-14T17:48:00+03:00"))).toBe(false);
     expect(isPlusWednesdayOfferPaymentTime(qualifyingWednesday)).toBe(true);
     expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-10-17T23:59:59+03:00"))).toBe(true);
-    expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-10-18T00:00:00+03:00"))).toBe(false);
     expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-10-21T18:00:00+03:00"))).toBe(true);
-    expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-10-22T18:00:00+03:00"))).toBe(false);
+    expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-11-26T10:00:00+02:00"))).toBe(true);
+    expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-12-02T23:59:59+02:00"))).toBe(true);
+    expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-12-03T00:00:00+02:00"))).toBe(false);
+    expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-12-09T10:00:00+02:00"))).toBe(true);
+    expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-12-10T10:00:00+02:00"))).toBe(false);
     expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-10-14T23:59:59+03:00"))).toBe(true);
     expect(isPlusWednesdayOfferPaymentTime(Date.parse("2026-10-15T00:00:00+03:00"))).toBe(true);
   });
@@ -38,7 +41,7 @@ describe("Plus Wednesday offer policy", () => {
     expect(stripPlusWednesdayOfferMarker(savedTerm)).toBe("keyword|facebook_feed");
     expect(qualifiesForPlusWednesdayOffer({ utmTerm: savedTerm, paidAt: qualifyingWednesday, amountAgorot: 9900 })).toBe(true);
     expect(qualifiesForPlusWednesdayOffer({ utmTerm: "BONUS:PLUS3", paidAt: qualifyingWednesday, amountAgorot: 100 })).toBe(false);
-    expect(qualifiesForPlusWednesdayOffer({ utmTerm: savedTerm, paidAt: Date.parse("2026-10-18T00:00:00+03:00"), amountAgorot: 9900 })).toBe(false);
+    expect(qualifiesForPlusWednesdayOffer({ utmTerm: savedTerm, paidAt: Date.parse("2026-12-03T00:00:00+02:00"), amountAgorot: 9900 })).toBe(false);
   });
 
   it("keeps three manual proposals only in the Wednesday cohort's first service cycle and preserves the legacy first-cycle bonus", () => {
