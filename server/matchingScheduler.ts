@@ -27,6 +27,11 @@ import { notifyOwner } from "./_core/notification";
 import { sendEmail } from "./brevo";
 import type { MatchAnswer } from "../shared/matchmakingTypes";
 import { isInvalidMatchPlaceholder } from "./invalidMatchPlaceholder";
+import {
+  buildMatchingHealthReport, countStuckProposals, formatMatchingHealthReport, getExistingPairKeys,
+  getUnavailableSingleIds, pairKey, selectCandidatesPerUser,
+  type MatchingHealthReport, type SingleScanStats,
+} from "./matchingAvailabilityPolicy";
 
 const ADMIN_EMAIL = "hilitcaspi@gmail.com";
 const HIGH_THRESHOLD = 90;
@@ -137,9 +142,17 @@ async function buildMatchExplanation(
 }
 
 // ─── MAIN MATCHING FUNCTION ──────────────────────────────────────────────────
-export async function runWeeklyMatching(): Promise<{ newMatches: number; notified: boolean }> {
+export type WeeklyMatchingResult = { newMatches: number; notified: boolean; report?: MatchingHealthReport; reportLines?: string[]; dryRun?: boolean };
+
+/**
+ * Creates PENDING candidates only. Nothing is sent to participants here: every candidate waits
+ * for the owner's approval in the CRM, and only then are the one-time approve/decline emails sent.
+ * With `dryRun` nothing is written, no LLM text is generated and nobody (including the owner) is notified.
+ */
+export async function runWeeklyMatching(options: { dryRun?: boolean } = {}): Promise<WeeklyMatchingResult> {
+  const dryRun = options.dryRun === true;
   const db = await getDb();
-  if (!db) return { newMatches: 0, notified: false };
+  if (!db) return { newMatches: 0, notified: false, dryRun };
 
   // Get all active singles with completed profiles
   const activeSingles = await db
@@ -154,7 +167,7 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
       )
     );
 
-  if (activeSingles.length < 2) return { newMatches: 0, notified: false };
+  if (activeSingles.length < 2) return { newMatches: 0, notified: false, dryRun };
 
   // Get all matchmaking answers
   const allAnswers = await db.select().from(matchmakingAnswers);
@@ -162,24 +175,26 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
 
   // Get existing matches to avoid duplicates
   const existingMatches = await db.select().from(matches);
-  const existingPairs = new Set(
-    existingMatches.filter(m => !isInvalidMatchPlaceholder(m))
-      .map(m => `${Math.min(m.singleAId, m.singleBId)}-${Math.max(m.singleAId, m.singleBId)}`)
-  );
+  const existingPairs = getExistingPairKeys(existingMatches.filter(m => !isInvalidMatchPlaceholder(m)));
   const placeholders = new Map(existingMatches.filter(isInvalidMatchPlaceholder)
     .map(m => [`${Math.min(m.singleAId, m.singleBId)}-${Math.max(m.singleAId, m.singleBId)}`, m.id]));
 
-  // Build set of singles who are currently UNAVAILABLE (in proposed or matched without return)
-  const unavailableIds = new Set<number>();
-  for (const m of existingMatches) {
-    if (m.status === 'proposed') {
-      unavailableIds.add(m.singleAId);
-      unavailableIds.add(m.singleBId);
-    } else if (m.status === 'matched' && !m.returnedToPoolAt) {
-      unavailableIds.add(m.singleAId);
-      unavailableIds.add(m.singleBId);
-    }
-  }
+  // Singles who cannot get a new proposal right now. Same shared policy as the CRM and send guards:
+  // only a current sent proposal inside its window or an active connection blocks. Expired, ended,
+  // returned, declined or never-sent rows do not, and a past match is never a permanent blocker.
+  const matchingNow = Date.now();
+  const unavailableIds = getUnavailableSingleIds(existingMatches, matchingNow);
+  const stuckProposals = countStuckProposals(existingMatches, matchingNow);
+  const waitingPendingPairs = new Set(existingMatches
+    .filter(m => m.status === "pending" && (m.score ?? 0) >= LOW_THRESHOLD)
+    .map(m => pairKey(m.singleAId, m.singleBId)));
+  const scanStats = new Map<number, SingleScanStats>();
+  const bumpStats = (id: number, passed: boolean, score: number) => {
+    const cur = scanStats.get(id) ?? { passedHard: 0, bestScore: 0, hasWaitingCandidate: false };
+    if (passed) cur.passedHard++;
+    cur.bestScore = Math.max(cur.bestScore, score);
+    scanStats.set(id, cur);
+  };
 
   type NewMatchRow = {
     singleAId: number;
@@ -198,8 +213,14 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
       const b = activeSingles[j];
 
       // Skip if already matched/pending
-      const pairKey = `${Math.min(a.id, b.id)}-${Math.max(a.id, b.id)}`;
-      if (existingPairs.has(pairKey)) continue;
+      const key = pairKey(a.id, b.id);
+      if (existingPairs.has(key)) {
+        // An existing pending candidate still counts as an available proposal for monitoring.
+        if (waitingPendingPairs.has(key)) {
+          for (const id of [a.id, b.id]) { const c = scanStats.get(id) ?? { passedHard: 0, bestScore: 0, hasWaitingCandidate: false }; c.hasWaitingCandidate = true; scanStats.set(id, c); }
+        }
+        continue;
+      }
 
       // Skip if either person is currently unavailable (in proposed or matched)
       if (unavailableIds.has(a.id) || unavailableIds.has(b.id)) continue;
@@ -214,42 +235,74 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
       const structuredScore = computeFullScore(a, b, answersAList, answersBList);
       if (structuredScore.total === 0) continue; // failed hard filters
       const finalScore = structuredScore.total;
+      bumpStats(a.id, true, finalScore);
+      bumpStats(b.id, true, finalScore);
 
       if (finalScore >= LOW_THRESHOLD) {
-        const breakdown: ScoreBreakdown = structuredScore;
-
-        // ── AUTO EXPLANATION ──────────────────────────────────────────────────────────────────────
-        const explanation = await buildMatchExplanation(a, b, breakdown, answersAList, answersBList);
-
+        // The LLM explanation is generated only for candidates that are actually kept (below).
         newMatchRows.push({
           singleAId: a.id,
           singleBId: b.id,
           score: finalScore,
-          scoreBreakdown: JSON.stringify(breakdown),
-          autoExplanation: explanation,
+          scoreBreakdown: JSON.stringify(structuredScore as ScoreBreakdown),
         });
       }
     }
   }
 
-  if (newMatchRows.length === 0) {
-    await notifyOwner({
-      title: "🔍 ריצת התאמות (כל 3 ימים)",
-      content: "לא נמצאו התאמות חדשות (מתחת ל-80%). המאגר זקוק לחברים נוספים.",
-    });
-    return { newMatches: 0, notified: true };
+  // Per-person bounded selection: only profiles with no candidate waiting for the owner get new ones.
+  const hasWaiting = new Set<number>();
+  for (const m of existingMatches) {
+    if (m.status === "pending" && (m.score ?? 0) >= LOW_THRESHOLD && !unavailableIds.has(m.singleAId) && !unavailableIds.has(m.singleBId)) {
+      hasWaiting.add(m.singleAId); hasWaiting.add(m.singleBId);
+    }
+  }
+  const matchesToInsert = selectCandidatesPerUser(newMatchRows, { lowThreshold: LOW_THRESHOLD, alreadyHasWaitingCandidate: hasWaiting });
+  const highMatches = matchesToInsert.filter(m => m.score >= HIGH_THRESHOLD);
+  for (const m of matchesToInsert) {
+    for (const id of [m.singleAId, m.singleBId]) {
+      const c = scanStats.get(id) ?? { passedHard: 0, bestScore: 0, hasWaitingCandidate: false };
+      c.hasWaitingCandidate = true;
+      scanStats.set(id, c);
+    }
+  }
+  const report = buildMatchingHealthReport({
+    eligibleIds: activeSingles.map(s => s.id),
+    blocked: unavailableIds,
+    stats: scanStats,
+    stuckProposals,
+    newCandidatesCreated: dryRun ? 0 : matchesToInsert.length,
+    lowThreshold: LOW_THRESHOLD,
+  });
+  const reportLines = formatMatchingHealthReport(report);
+  if (dryRun) {
+    // Nothing is written, no LLM call, nobody notified.
+    return { newMatches: matchesToInsert.length, notified: false, report: { ...report, newCandidatesCreated: matchesToInsert.length }, reportLines, dryRun: true };
   }
 
-  // Filter: prefer 90%+ matches; fall back to 80%+ if none
-  const highMatches = newMatchRows.filter(m => m.score >= HIGH_THRESHOLD);
-  const matchesToInsert = highMatches.length > 0 ? highMatches : newMatchRows;
+  if (matchesToInsert.length === 0) {
+    await notifyOwner({
+      title: "🔍 ריצת התאמות (כל 3 ימים)",
+      content: ["לא נוצרו מועמדים חדשים בהרצה הזו.", "", ...reportLines].join("\n"),
+    });
+    return { newMatches: 0, notified: true, report, reportLines };
+  }
 
-  // Sort by score descending
-  matchesToInsert.sort((a, b) => b.score - a.score);
-
-  // Insert into DB as "pending" (waiting for Hilit's approval)
+  // Explanations only for kept candidates (previously generated for every 80%+ pair).
+  const singleById = new Map(activeSingles.map(s => [s.id, s]));
   for (const m of matchesToInsert) {
-    const key = `${Math.min(m.singleAId, m.singleBId)}-${Math.max(m.singleAId, m.singleBId)}`;
+    const a = singleById.get(m.singleAId)!;
+    const b = singleById.get(m.singleBId)!;
+    m.autoExplanation = await buildMatchExplanation(
+      a, b, JSON.parse(m.scoreBreakdown!) as ScoreBreakdown,
+      answersMap.get(a.id) ? JSON.parse(answersMap.get(a.id)!.answersJson ?? "[]") : [],
+      answersMap.get(b.id) ? JSON.parse(answersMap.get(b.id)!.answersJson ?? "[]") : [],
+    );
+  }
+
+  // Insert into DB as "pending" (waiting for Hilit's approval). Nothing is sent to participants here.
+  for (const m of matchesToInsert) {
+    const key = pairKey(m.singleAId, m.singleBId);
     const placeholderId = placeholders.get(key);
     if (placeholderId) {
       await db.update(matches).set({
@@ -273,7 +326,7 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
   }
 
   // Build summary for Hilit
-  const singleMap = new Map(activeSingles.map(s => [s.id, s]));
+  const singleMap = singleById;
   const summaryLines = matchesToInsert.slice(0, 10).map(m => {
     const a = singleMap.get(m.singleAId);
     const b = singleMap.get(m.singleBId);
@@ -281,12 +334,15 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
   });
 
   const content = [
-    `נמצאו ${matchesToInsert.length} התאמות חדשות${highMatches.length > 0 ? " (90%+)" : " (80%+, אין 90%+)"}:`,
+    `נוצרו ${matchesToInsert.length} מועמדים חדשים לאישורך (${highMatches.length} מהם 90%+):`,
     "",
     ...summaryLines,
     matchesToInsert.length > 10 ? `...ועוד ${matchesToInsert.length - 10} נוספות` : "",
     "",
-    "כנסי ל-CRM → מאגר רווקים → התאמות ממתינות כדי לאשר ולשלוח.",
+    "מצב המאגר בהרצה:",
+    ...reportLines,
+    "",
+    "כנסי ל-CRM → מאגר רווקים → התאמות ממתינות כדי לאשר ולשלוח. לא נשלחה שום הודעה למשתתפים.",
   ].filter(l => l !== "").join("\n");
 
   // Notify owner
@@ -295,24 +351,26 @@ export async function runWeeklyMatching(): Promise<{ newMatches: number; notifie
     content,
   });
 
-  // Also send email to admin
+  // Also send email to admin (owner only)
   try {
     await sendEmail({
       to: { email: ADMIN_EMAIL, name: "הילית כספי" },
       subject: `💛 ${matchesToInsert.length} התאמות חדשות ממתינות לאישורך`,
       htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;color:#191265;padding:24px">
         <h2 style="color:#191265">💛 התאמות חדשות ממתינות לאישורך</h2>
-        <p>נמצאו <strong>${matchesToInsert.length}</strong> התאמות חדשות${highMatches.length > 0 ? " (90%+)" : " (80%+)"}:</p>
+        <p>נוצרו <strong>${matchesToInsert.length}</strong> מועמדים חדשים (${highMatches.length} מהם 90%+):</p>
         <ul>${summaryLines.map(l => `<li>${l}</li>`).join("")}</ul>
+        <p><strong>מצב המאגר בהרצה:</strong></p>
+        <ul>${reportLines.map(l => `<li>${l}</li>`).join("")}</ul>
         <p><a href="https://hilitcaspi.com/crm/matchmaking" style="background:#ffe27c;color:#191265;padding:12px 24px;border-radius:50px;text-decoration:none;font-weight:bold">כנסי לניהול התאמות →</a></p>
-        <p style="color:#727272;font-size:12px">הילית כספי | מאגר הרווקים הדיגיטלי</p>
+        <p style="color:#727272;font-size:12px">לא נשלחה שום הודעה למשתתפים. ההצעות יישלחו רק לאחר אישורך.</p>
       </div>`,
     });
   } catch (e) {
     console.error("[MatchScheduler] Failed to send admin email:", e);
   }
 
-  return { newMatches: matchesToInsert.length, notified: true };
+  return { newMatches: matchesToInsert.length, notified: true, report, reportLines };
 }
 
 /**
