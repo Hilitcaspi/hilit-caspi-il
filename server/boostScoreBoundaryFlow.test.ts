@@ -244,6 +244,7 @@ function paymentDb(existingByTransaction: unknown[] = []) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.computeFullScore.mockReset();
   mocks.sendEmail.mockResolvedValue({ success: true });
   mocks.sendInitialMatchSmsOnce.mockResolvedValue({ sentA: true, sentB: true });
   vi.stubGlobal("fetch", vi.fn(() => { throw new Error("network forbidden in boundary tests"); }));
@@ -320,6 +321,17 @@ describe("Boost score boundary candidate flows", () => {
     expect(mocks.sendEmail).not.toHaveBeenCalled();
     expect(mocks.sendInitialMatchSmsOnce).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("hides a stored Boost option whose current score is no longer 60-79 and keeps a fresh in-range one", async () => {
+    const harness = highCandidateContextDb();
+    // Stored score says 80 (not offerable); an option stored at 76 now scores 81 => hidden; stored 80 now 78 stays hidden by marker only if not Boost note.
+    mocks.computeFullScore.mockReturnValue(scoreBreakdown(81));
+    mocks.getDb.mockResolvedValue(harness.db);
+    const caller = matchBoostRouter.createCaller(publicContext());
+    await expect(caller.redeemPlusBoost({ email: "dana@example.com", token: "synthetic-personal-token-123456", matchId: 80, entryChannel: "personal_area" }))
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(harness.writes).toEqual({ inserts: 0, updates: 0, transactions: 0 });
   });
 
   it("turns a paid callback for a current high pending draft into a reusable credit without delivery", async () => {

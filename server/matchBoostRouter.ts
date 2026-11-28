@@ -23,7 +23,8 @@ import { normalizeEmail, normalizedEmailEquals } from "./emailNormalization";
 import { getMissingProfileFields } from "./matchmakingMetrics";
 import { sendInitialMatchSmsOnce } from "./matchSms";
 import { isBoostExcludedProfile, loadBoostExclusionAnchors, type BoostExclusionAnchors } from "./boostExclusions";
-import { BOOST_CANDIDATE_NOTE_MARKER, REGULAR_REVIEW_NOTE_MARKER, isBoostCandidate, isBoostScore, isRegularReviewScore } from "../shared/boostScorePolicy";
+import { BOOST_CANDIDATE_NOTE_MARKER, REGULAR_REVIEW_NOTE_MARKER, isBoostCandidate, isBoostScore, isRegularReviewScore, regularReviewNotes } from "../shared/boostScorePolicy";
+import { resolvePlusServiceCycle } from "../shared/plusServiceCycle";
 export { BOOST_CANDIDATE_NOTE_MARKER, MIN_BOOST_SCORE, MAX_BOOST_SCORE } from "../shared/boostScorePolicy";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -32,6 +33,25 @@ const LEGACY_BOOST_PRICE_AGOROT = 1999;
 const MAX_BOOST_OPTIONS = 6;
 export const BOOST_CONSENT_VERSION = "2026-08-29-v2";
 const OPEN_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
+/**
+ * The Plus service cycle is computed from the original activation (30-day windows), exactly like
+ * the manual-proposal counter. billingCycleStartedAt can stay frozen on the first payment, which
+ * previously made a Boost used in an old cycle look "used" forever.
+ */
+export function getPlusBoostCycle(plusMember: any, now = Date.now()) {
+  if (!plusMember) return { cycleStart: 0, cycleEnd: 0 };
+  const resolved = resolvePlusServiceCycle(plusMember, now);
+  if (resolved.valid && resolved.cycleStart > 0) return { cycleStart: resolved.cycleStart, cycleEnd: resolved.cycleEnd };
+  const legacyStart = Number(plusMember.billingCycleStartedAt || 0);
+  return { cycleStart: legacyStart, cycleEnd: legacyStart > 0 ? legacyStart + 30 * DAY_MS : 0 };
+}
+export function isPlusBoostRequestInCycle(request: any, cycle: { cycleStart: number; cycleEnd: number }) {
+  if (request?.source !== "plus_included" || cycle.cycleStart <= 0) return false;
+  if (Number(request.plusBillingCycleStartedAt || 0) === cycle.cycleStart) return true;
+  const at = Number(request.fulfilledAt || request.requestedAt || 0);
+  return at >= cycle.cycleStart && at < cycle.cycleEnd;
+}
+
 const REVIEWABLE_BOOST_STATUSES = ["paid", "queued", "reviewing"] as const;
 
 export function isDuplicateBoostRequestError(error: unknown): boolean {
@@ -453,10 +473,9 @@ export function evaluateBoostEligibility(input: {
     && !(request.status === "awaiting_payment" && Number(request.expiresAt || 0) > 0 && Number(request.expiresAt) <= now),
   );
   const plusActive = input.plusMember?.status === "active" && input.plusMember?.billingStatus === "active";
-  const cycleStart = Number(input.plusMember?.billingCycleStartedAt || 0);
-  const plusBenefitUsed = plusActive && cycleStart > 0 && (input.boostRequests || []).some(request =>
-    request.source === "plus_included"
-    && Number(request.plusBillingCycleStartedAt || 0) === cycleStart
+  const plusCycle = getPlusBoostCycle(input.plusMember, now);
+  const plusBenefitUsed = plusActive && plusCycle.cycleStart > 0 && (input.boostRequests || []).some(request =>
+    isPlusBoostRequestInCycle(request, plusCycle)
     && Boolean(request.fulfilledAt),
   );
 
@@ -481,7 +500,7 @@ export function evaluateBoostEligibility(input: {
     topCandidate: candidates[0] || null,
     topScore: candidates[0] ? Math.round(Number(candidates[0].score || 0)) : null,
     plusActive,
-    plusBenefitAvailable: plusActive && !plusBenefitUsed,
+    plusBenefitAvailable: plusActive && plusCycle.cycleStart > 0 && !plusBenefitUsed,
     plusBenefitUsed,
     openRequest: openRequest || null,
   };
@@ -539,7 +558,7 @@ async function loadBoostContext(db: any, single: any) {
     .filter((match: any) => match.status === "pending" && !match.returnedToPoolAt)
     .map((match: any) => match.singleAId === single.id ? match.singleBId : match.singleAId)
     .filter(Boolean))) as number[];
-  const [candidateProfiles, candidateActiveMatches, candidateMemberships] = candidateIds.length > 0 ? await Promise.all([
+  const [candidateProfiles, candidateActiveMatches, candidateMemberships, candidateAnswerRows] = candidateIds.length > 0 ? await Promise.all([
     db.select().from(singles).where(inArray(singles.id, candidateIds)),
     db.select({
       singleAId: matches.singleAId,
@@ -554,7 +573,9 @@ async function loadBoostContext(db: any, single: any) {
       or(inArray(matches.singleAId, candidateIds), inArray(matches.singleBId, candidateIds)),
     )),
     db.select().from(matchBoostMemberships).where(inArray(matchBoostMemberships.singleId, candidateIds)),
-  ]) : [[], [], []];
+    db.select().from(matchmakingAnswers).where(inArray(matchmakingAnswers.singleId, [single.id, ...candidateIds])),
+  ]) : [[], [], [], []];
+  const candidateAnswers = new Map<number, any[]>((candidateAnswerRows as any[]).map((row: any) => [row.singleId, parseAnswersJson(row.answersJson)]));
   const candidateProfileMap = new Map<number, any>(candidateProfiles.map((profile: any) => [profile.id, profile]));
   const candidateMembershipMap = new Map<number, any>((candidateMemberships as any[]).map((membership: any) => [membership.singleId, membership]));
   const unavailableCandidateIds = new Set<number>();
@@ -569,6 +590,16 @@ async function loadBoostContext(db: any, single: any) {
     const recentActivityAt = Number(candidateMembership?.lastActiveAt || candidateMembership?.consentedAt || 0);
     const hardFilterResult = profile ? passesHardFilters(single, profile) : { pass: false };
     const reverseHardFilterResult = profile ? passesHardFilters(profile, single) : { pass: false };
+    // Stored scores age: rank and offer only what the send step will still accept (60-79 right now).
+    let freshScore: number | null = null;
+    if (profile && match.status === "pending" && !match.returnedToPoolAt && hardFilterResult.pass && reverseHardFilterResult.pass) {
+      const profileIsA = match.singleAId === candidateId;
+      const fresh = profileIsA
+        ? computeFullScore(profile, single, candidateAnswers.get(candidateId) || [], candidateAnswers.get(single.id) || [])
+        : computeFullScore(single, profile, candidateAnswers.get(single.id) || [], candidateAnswers.get(candidateId) || []);
+      const total = Number(fresh?.total);
+      freshScore = Number.isFinite(total) ? total : null;
+    }
     const candidateEligible = Boolean(
       profile
       && !isBoostExcludedProfile(profile, exclusions)
@@ -581,9 +612,10 @@ async function loadBoostContext(db: any, single: any) {
       && hasActiveBoostConsent(candidateMembership)
       && recentActivityAt >= Date.now() - 90 * DAY_MS
       && hardFilterResult.pass
-      && reverseHardFilterResult.pass,
+      && reverseHardFilterResult.pass
+      && (freshScore === null || isBoostScore(freshScore)),
     );
-    return { ...match, candidateEligible, candidateProfile: profile || null };
+    return { ...match, score: freshScore ?? match.score, candidateEligible, candidateProfile: profile || null };
   });
   return {
     memberMatches,
@@ -835,6 +867,14 @@ async function dispatchAlgorithmicBoostProposal(db: any, requestId: number) {
   const answerMap = new Map<number, any[]>((answerRows as any[]).map(row => [row.singleId, parseAnswersJson(row.answersJson)]));
   const verifiedBreakdown = computeFullScore(partyA, partyB, answerMap.get(partyA.id) || [], answerMap.get(partyB.id) || []);
   if (!isBoostScore(verifiedBreakdown.total)) {
+    // Repair the stale row so the same option is not offered (and paid for) again.
+    try {
+      await db.update(matches).set({
+        score: verifiedBreakdown.total,
+        notes: verifiedBreakdown.total >= 80 ? regularReviewNotes(match.notes) : match.notes,
+        updatedAt: Date.now(),
+      }).where(and(eq(matches.id, match.id), eq(matches.status, "pending")));
+    } catch { /* best effort; the request below is still rejected */ }
     throw new TRPCError({ code: "CONFLICT", message: "ציון ההתאמה המעודכן אינו בטווח Boost של 60 עד 79 אחוז. לא תישלח הצעה; תשלום שאושר יישמר כקרדיט." });
   }
 
@@ -1339,7 +1379,7 @@ export const matchBoostRouter = router({
       }
 
       const now = Date.now();
-      const cycleStart = Number(context.plusMember.billingCycleStartedAt);
+      const cycleStart = getPlusBoostCycle(context.plusMember, now).cycleStart;
       const idempotencyKey = `plus:${single.id}:${cycleStart}`;
       const dispatchWithFailureRelease = async (requestId: number) => {
         try {

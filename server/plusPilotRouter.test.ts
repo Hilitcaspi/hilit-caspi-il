@@ -79,13 +79,25 @@ describe("Plus admin visibility helpers", () => {
 
   it("marks the included boost as used only when a request exists for the current cycle", () => {
     const member = { status: "active", billingStatus: "active", billingCycleStartedAt: 1234 };
-    expect(calculatePlusBoostBenefit(member, [])).toEqual({ available: true, inProgress: false, used: false, requestStatus: null, requestedAt: null, usedAt: null });
-    expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "queued", requestedAt: 1500 }]))
+    expect(calculatePlusBoostBenefit(member, [], 2000)).toEqual({ available: true, inProgress: false, used: false, requestStatus: null, requestedAt: null, usedAt: null });
+    expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "queued", requestedAt: 1500 }], 2000))
       .toEqual({ available: false, inProgress: true, used: false, requestStatus: "queued", requestedAt: 1500, usedAt: null });
-    expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "approved", requestedAt: 1500, fulfilledAt: 1800 }]))
+    expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "approved", requestedAt: 1500, fulfilledAt: 1800 }], 2000))
       .toEqual({ available: false, inProgress: false, used: true, requestStatus: "approved", requestedAt: 1500, usedAt: 1800 });
-    expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "cancelled", requestedAt: 1500 }]))
+    expect(calculatePlusBoostBenefit(member, [{ source: "plus_included", plusBillingCycleStartedAt: 1234, status: "cancelled", requestedAt: 1500 }], 2000))
       .toEqual({ available: true, inProgress: false, used: false, requestStatus: "cancelled", requestedAt: 1500, usedAt: null });
+  });
+  it("renews the included boost every 30-day service cycle even when billing fields stay on the first payment", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const activatedAt = Date.parse("2026-09-13T19:44:00Z");
+    const member = { status: "active", billingStatus: "active", activatedAt, billingCycleStartedAt: activatedAt, billingCycleEndsAt: activatedAt + 30 * DAY };
+    const usedInFirstCycle = [{ source: "plus_included", plusBillingCycleStartedAt: activatedAt, status: "rejected", requestedAt: activatedAt + 3 * DAY, fulfilledAt: activatedAt + 3 * DAY }];
+    expect(calculatePlusBoostBenefit(member, usedInFirstCycle, activatedAt + 10 * DAY).used).toBe(true);
+    const later = calculatePlusBoostBenefit(member, usedInFirstCycle, activatedAt + 75 * DAY);
+    expect(later.available).toBe(true);
+    expect(later.used).toBe(false);
+    const usedInThirdCycle = [...usedInFirstCycle, { source: "plus_included", plusBillingCycleStartedAt: activatedAt + 60 * DAY, status: "approved", requestedAt: activatedAt + 62 * DAY, fulfilledAt: activatedAt + 62 * DAY }];
+    expect(calculatePlusBoostBenefit(member, usedInThirdCycle, activatedAt + 75 * DAY).used).toBe(true);
   });
 
   it("marks the holiday launch entitlement and preserves the exact purchase channel", () => {

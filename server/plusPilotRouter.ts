@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { crmTeamTasks, emailLog, matchBoostMemberships, matchBoostRequests, matches, plusCheckoutIntents, plusPaymentEvents, plusPilotMembers, singles } from "../drizzle/schema";
 import { getDb } from "./db";
+import { getPlusBoostCycle, isPlusBoostRequestInCycle } from "./matchBoostRouter";
 import { sendEmail } from "./brevo";
 import { zonedMidnightUtc } from "./dailyReportMetrics";
 import { getMissingProfileFields } from "./matchmakingMetrics";
@@ -68,11 +69,11 @@ export function hasConfirmedProductionPlusPayment(events: Array<{ eventType: str
     && Boolean(event.providerTransactionId));
 }
 
-export function calculatePlusBoostBenefit(member: any, requests: any[]) {
-  const cycleStart = Number(member.billingCycleStartedAt || 0);
+export function calculatePlusBoostBenefit(member: any, requests: any[], now = Date.now()) {
+  const cycle = getPlusBoostCycle(member, now);
+  const cycleStart = cycle.cycleStart;
   const request = requests
-    .filter(row => row.source === "plus_included"
-      && Number(row.plusBillingCycleStartedAt || 0) === cycleStart)
+    .filter(row => isPlusBoostRequestInCycle(row, cycle))
     .sort((a, b) => Number(b.requestedAt || 0) - Number(a.requestedAt || 0))[0];
   const active = member.status === "active" && member.billingStatus === "active";
   const deliveredAt = Number(request?.fulfilledAt || request?.matchProposedAt || 0) || null;
